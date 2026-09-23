@@ -27,3 +27,49 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   await expect(overlay).toHaveCount(0);
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
 });
+
+test("plain runtime preserves the painted frame when open and close reverse", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/headless.html");
+
+  const samples = await page.evaluate(async () => {
+    const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const bounds = () => {
+      const frame = document.querySelector<HTMLElement>("[data-lightbox-frame]")!;
+      const rect = frame.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    };
+    const setMotionTime = (time: number) => {
+      for (const animation of document.getAnimations()) {
+        animation.pause();
+        animation.currentTime = time;
+      }
+    };
+
+    void window.headlessViewer.open({ id: "one" });
+    await nextFrame();
+    setMotionTime(120);
+    const openingBefore = bounds();
+    void window.headlessViewer.close();
+    const openingAfter = bounds();
+
+    setMotionTime(90);
+    const closingBefore = bounds();
+    void window.headlessViewer.open({ id: "one" });
+    const closingAfter = bounds();
+    return { openingBefore, openingAfter, closingBefore, closingAfter };
+  });
+
+  for (const [before, after] of [
+    [samples.openingBefore, samples.openingAfter],
+    [samples.closingBefore, samples.closingAfter],
+  ]) {
+    for (const property of ["left", "top", "width", "height"] as const) {
+      expect(Math.abs(before[property] - after[property])).toBeLessThan(4);
+    }
+  }
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+});

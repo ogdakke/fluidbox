@@ -21,6 +21,16 @@ const OPEN_DURATION = 260;
 const CLOSE_DURATION = 220;
 const EASING = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 
+interface PaintedPose {
+  readonly transform: string;
+  readonly opacity: string;
+  readonly borderTopLeftRadius: string;
+  readonly borderTopRightRadius: string;
+  readonly borderBottomRightRadius: string;
+  readonly borderBottomLeftRadius: string;
+  readonly backdropOpacity: string;
+}
+
 function isImageItem(item: LightboxItem): item is LightboxItem<LightboxImageMedia> {
   return item.media.type === "image";
 }
@@ -39,6 +49,17 @@ function radiusFor(element: HTMLElement | null) {
   return `${style.borderTopLeftRadius} ${style.borderTopRightRadius} ${style.borderBottomRightRadius} ${style.borderBottomLeftRadius}`;
 }
 
+function frameKeyframe(pose: PaintedPose): Keyframe {
+  return {
+    transform: pose.transform,
+    opacity: pose.opacity,
+    borderTopLeftRadius: pose.borderTopLeftRadius,
+    borderTopRightRadius: pose.borderTopRightRadius,
+    borderBottomRightRadius: pose.borderBottomRightRadius,
+    borderBottomLeftRadius: pose.borderBottomLeftRadius,
+  };
+}
+
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 export class DomViewerDriver<
   TItem extends LightboxItem = LightboxItem,
@@ -49,6 +70,7 @@ export class DomViewerDriver<
   #controller: LightboxController<TItem> | undefined;
   #portalDispose: LightboxDispose | undefined;
   #animations: Animation[] = [];
+  #interruptedPose: PaintedPose | undefined;
   #returnFocus: HTMLElement | null = null;
   #destroyed = false;
 
@@ -88,7 +110,7 @@ export class DomViewerDriver<
 
   async open(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
-    this.#cancelAnimations();
+    this.#cancelAnimations(true);
     this.#render(context.item, context.index);
     this.#returnFocus =
       context.origin?.trigger ??
@@ -103,22 +125,25 @@ export class DomViewerDriver<
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (context.signal.aborted) return;
 
+    const interruptedPose = this.#takeInterruptedPose();
     const origin = context.origin?.visual;
     const target = this.#portal.frame.getBoundingClientRect();
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const frameMotion: Keyframe[] = from
-      ? [
-          {
-            transform: originTransform(from.getBoundingClientRect(), target),
-            borderRadius: radiusFor(from),
-            opacity: 1,
-          },
-          { transform: "none", borderRadius: "0px", opacity: 1 },
-        ]
-      : [
-          { transform: "scale(0.96)", borderRadius: "0px", opacity: 0 },
-          { transform: "none", borderRadius: "0px", opacity: 1 },
-        ];
+    const frameMotion: Keyframe[] = interruptedPose
+      ? [frameKeyframe(interruptedPose), { transform: "none", borderRadius: "0px", opacity: 1 }]
+      : from
+        ? [
+            {
+              transform: originTransform(from.getBoundingClientRect(), target),
+              borderRadius: radiusFor(from),
+              opacity: 1,
+            },
+            { transform: "none", borderRadius: "0px", opacity: 1 },
+          ]
+        : [
+            { transform: "scale(0.96)", borderRadius: "0px", opacity: 0 },
+            { transform: "none", borderRadius: "0px", opacity: 1 },
+          ];
     await this.#play(
       [
         this.#portal.frame.animate(frameMotion, {
@@ -126,11 +151,14 @@ export class DomViewerDriver<
           easing: EASING,
           fill: "both",
         }),
-        this.#portal.backdrop.animate([{ opacity: 0 }, { opacity: 1 }], {
-          duration: OPEN_DURATION,
-          easing: EASING,
-          fill: "both",
-        }),
+        this.#portal.backdrop.animate(
+          [{ opacity: interruptedPose?.backdropOpacity ?? 0 }, { opacity: 1 }],
+          {
+            duration: OPEN_DURATION,
+            easing: EASING,
+            fill: "both",
+          },
+        ),
       ],
       context.signal,
     );
@@ -141,7 +169,8 @@ export class DomViewerDriver<
 
   async select(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
-    this.#cancelAnimations();
+    this.#cancelAnimations(true);
+    this.#takeInterruptedPose();
     this.#render(context.item, context.index);
     await this.#play(
       [
@@ -155,7 +184,8 @@ export class DomViewerDriver<
   }
 
   async close(context: ViewerSessionCloseContext) {
-    this.#cancelAnimations();
+    this.#cancelAnimations(true);
+    const interruptedPose = this.#takeInterruptedPose();
     this.#setState("closing");
     if (context.origin?.trigger.isConnected) this.#returnFocus = context.origin.trigger;
     const origin = context.origin?.visual;
@@ -163,7 +193,9 @@ export class DomViewerDriver<
     const frame = this.#portal.frame.getBoundingClientRect();
     const frameMotion: Keyframe[] = from
       ? [
-          { transform: "none", borderRadius: "0px", opacity: 1 },
+          interruptedPose
+            ? frameKeyframe(interruptedPose)
+            : { transform: "none", borderRadius: "0px", opacity: 1 },
           {
             transform: originTransform(from.getBoundingClientRect(), frame),
             borderRadius: radiusFor(from),
@@ -171,7 +203,7 @@ export class DomViewerDriver<
           },
         ]
       : [
-          { transform: "none", opacity: 1 },
+          interruptedPose ? frameKeyframe(interruptedPose) : { transform: "none", opacity: 1 },
           { transform: "scale(0.96)", opacity: 0 },
         ];
     await this.#play(
@@ -181,11 +213,14 @@ export class DomViewerDriver<
           easing: EASING,
           fill: "both",
         }),
-        this.#portal.backdrop.animate([{ opacity: 1 }, { opacity: 0 }], {
-          duration: CLOSE_DURATION,
-          easing: EASING,
-          fill: "both",
-        }),
+        this.#portal.backdrop.animate(
+          [{ opacity: interruptedPose?.backdropOpacity ?? 1 }, { opacity: 0 }],
+          {
+            duration: CLOSE_DURATION,
+            easing: EASING,
+            fill: "both",
+          },
+        ),
       ],
       context.signal,
     );
@@ -197,7 +232,7 @@ export class DomViewerDriver<
     if (this.#destroyed) return;
     this.#destroyed = true;
     this.#lifetime.abort();
-    this.#cancelAnimations();
+    this.#cancelAnimations(false);
     this.#portalDispose?.();
     this.#portalDispose = undefined;
     this.#finishClose();
@@ -220,16 +255,62 @@ export class DomViewerDriver<
 
   async #play(animations: Animation[], signal: AbortSignal) {
     this.#animations = animations;
-    const cancel = () => this.#cancelAnimations();
+    const cancel = () => this.#cancelAnimations(true);
     signal.addEventListener("abort", cancel, { once: true });
     await Promise.allSettled(animations.map((animation) => animation.finished));
     signal.removeEventListener("abort", cancel);
-    if (this.#animations === animations) this.#animations = [];
+    if (this.#animations !== animations) return;
+    this.#animations = [];
+    for (const animation of animations) animation.cancel();
+    this.#clearMotionStyles();
   }
 
-  #cancelAnimations() {
+  #cancelAnimations(preserve: boolean) {
+    if (preserve && this.#animations.length > 0) {
+      const frame = getComputedStyle(this.#portal.frame);
+      this.#interruptedPose = {
+        transform: frame.transform,
+        opacity: frame.opacity,
+        borderTopLeftRadius: frame.borderTopLeftRadius,
+        borderTopRightRadius: frame.borderTopRightRadius,
+        borderBottomRightRadius: frame.borderBottomRightRadius,
+        borderBottomLeftRadius: frame.borderBottomLeftRadius,
+        backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
+      };
+      Object.assign(this.#portal.frame.style, {
+        transform: this.#interruptedPose.transform,
+        opacity: this.#interruptedPose.opacity,
+        borderTopLeftRadius: this.#interruptedPose.borderTopLeftRadius,
+        borderTopRightRadius: this.#interruptedPose.borderTopRightRadius,
+        borderBottomRightRadius: this.#interruptedPose.borderBottomRightRadius,
+        borderBottomLeftRadius: this.#interruptedPose.borderBottomLeftRadius,
+      });
+      this.#portal.backdrop.style.opacity = this.#interruptedPose.backdropOpacity;
+    }
     for (const animation of this.#animations) animation.cancel();
     this.#animations = [];
+  }
+
+  #takeInterruptedPose() {
+    const pose = this.#interruptedPose;
+    this.#interruptedPose = undefined;
+    this.#clearMotionStyles();
+    return pose;
+  }
+
+  #clearMotionStyles() {
+    for (const property of [
+      "transform",
+      "opacity",
+      "border-top-left-radius",
+      "border-top-right-radius",
+      "border-bottom-right-radius",
+      "border-bottom-left-radius",
+    ]) {
+      this.#portal.frame.style.removeProperty(property);
+    }
+    this.#portal.backdrop.style.removeProperty("opacity");
+    this.#portal.media.style.removeProperty("opacity");
   }
 
   #finishClose() {
