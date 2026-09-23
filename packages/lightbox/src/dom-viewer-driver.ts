@@ -212,10 +212,21 @@ export class DomViewerDriver<
       this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
     ];
+    if (this.#portal.dialog.hasAttribute("data-filmstrip")) {
+      const ready = motion.backdrop.find((keyframe) => Number(keyframe.opacity) >= 0.85);
+      this.#portal.dialog.style.setProperty(
+        "--lightbox-filmstrip-reveal-delay",
+        `${Number(ready?.offset ?? 0.7) * motion.duration}ms`,
+      );
+      this.#portal.dialog.dataset.filmstripRevealing = "";
+    }
+    this.#synchronizeStart(animations);
     delete this.#portal.overlay.dataset.lightboxPrepared;
     await this.#play(animations, context.signal);
     if (context.signal.aborted) return;
     this.#setState("open");
+    delete this.#portal.dialog.dataset.filmstripRevealing;
+    this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
     this.#portal.dialog.focus({ preventScroll: true });
   }
 
@@ -224,9 +235,17 @@ export class DomViewerDriver<
     this.#cancelAnimations(true);
     this.#takeInterruptedPose();
     const selected = this.#strip?.index === context.index;
-    await this.#strip?.select(context.index, !selected && context.reason !== "source-update");
+    // A native swipe updates the strip before it reports the selected index.
+    // Sending that selection back into the strip would snap an in-progress
+    // touch gesture to its midpoint and discard the browser's momentum.
+    if (!selected) {
+      const smooth = context.reason !== "source-update" && context.reason !== "filmstrip";
+      await this.#strip?.select(context.index, smooth);
+    }
     this.#render(context.item, context.index);
-    if (selected) return;
+    // Filmstrip movement is a direct preview scrub. The full-size image swaps
+    // immediately while native scrolling continues under the user's finger.
+    if (selected || context.reason === "filmstrip") return;
     await this.#play(
       [
         this.#media.animate([{ opacity: 0.35 }, { opacity: 1 }], {
@@ -279,15 +298,14 @@ export class DomViewerDriver<
       fadeFrame: !from,
     });
     applyImageTransitionPose(this.#frame, this.#media, start);
-    await this.#play(
-      [
-        this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
-        this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
-        this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
-        this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
-      ],
-      context.signal,
-    );
+    const animations = [
+      this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
+      this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
+      this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
+      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+    ];
+    this.#synchronizeStart(animations);
+    await this.#play(animations, context.signal);
     if (context.signal.aborted) return;
     this.#finishClose();
   }
@@ -335,6 +353,15 @@ export class DomViewerDriver<
 
   #motionOptions(duration: number): KeyframeAnimationOptions {
     return { duration, easing: "linear", fill: "both" };
+  }
+
+  #synchronizeStart(animations: Animation[]) {
+    const timelineTime = Number(this.#portal.overlay.ownerDocument.timeline.currentTime ?? 0);
+    for (const animation of animations) {
+      animation.play();
+      animation.currentTime = 0;
+      animation.startTime = timelineTime;
+    }
   }
 
   #cancelAnimations(preserve: boolean) {
@@ -509,6 +536,10 @@ export class DomViewerDriver<
       target.toggleAttribute("data-ending-style", state === "closing");
       target.toggleAttribute("data-opening", state === "opening");
       target.toggleAttribute("data-dismissing", state === "closing");
+    }
+    if (state === "closed") {
+      delete this.#portal.dialog.dataset.filmstripRevealing;
+      this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
     }
   }
 

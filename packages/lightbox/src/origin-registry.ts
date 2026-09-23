@@ -14,6 +14,8 @@ interface OriginRegistration {
 export class OriginRegistry {
   readonly #adapter: LightboxOriginAdapter | undefined;
   readonly #registrations = new Map<LightboxItemId, OriginRegistration>();
+  #hiddenId: LightboxItemId | null = null;
+  #hiddenThumbnail: HTMLImageElement | null = null;
 
   constructor(adapter?: LightboxOriginAdapter) {
     this.#adapter = adapter;
@@ -33,16 +35,51 @@ export class OriginRegistry {
   register(id: LightboxItemId, origin: LightboxOrigin): LightboxDispose {
     const token = {};
     this.#registrations.set(id, { origin, token });
+    if (id === this.#hiddenId) this.#hideOriginThumbnail(origin);
     let disposed = false;
 
     return () => {
       if (disposed) return;
       disposed = true;
-      if (this.#registrations.get(id)?.token === token) this.#registrations.delete(id);
+      if (this.#registrations.get(id)?.token !== token) return;
+      this.#registrations.delete(id);
+      if (id === this.#hiddenId) this.#restoreThumbnail();
     };
   }
 
+  hideThumbnail(id: LightboxItemId) {
+    this.#hiddenId = id;
+    this.#restoreThumbnail();
+    const origin = this.get(id);
+    if (origin) this.#hideOriginThumbnail(origin);
+  }
+
+  restoreThumbnail() {
+    this.#hiddenId = null;
+    this.#restoreThumbnail();
+  }
+
   clear() {
+    this.restoreThumbnail();
     this.#registrations.clear();
+  }
+
+  #hideOriginThumbnail(origin: LightboxOrigin) {
+    const thumbnail =
+      origin.thumbnail ??
+      (origin.visual instanceof HTMLImageElement
+        ? origin.visual
+        : origin.visual.querySelector<HTMLImageElement>("img"));
+    if (!thumbnail) return;
+    if (thumbnail === this.#hiddenThumbnail) return;
+    this.#restoreThumbnail();
+    this.#hiddenThumbnail = thumbnail;
+    thumbnail.dataset.lightboxThumbnailHidden = "";
+  }
+
+  #restoreThumbnail() {
+    if (!this.#hiddenThumbnail) return;
+    delete this.#hiddenThumbnail.dataset.lightboxThumbnailHidden;
+    this.#hiddenThumbnail = null;
   }
 }

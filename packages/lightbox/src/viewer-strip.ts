@@ -39,6 +39,8 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   #mounted = false;
   #rebasing = false;
   #rebaseFrame = 0;
+  #instantFrame = 0;
+  #instantTarget: number | null = null;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #selection:
     | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
@@ -101,12 +103,15 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     if (!Number.isInteger(index) || index < 0 || index >= this.#source.count) {
       throw new RangeError(`Viewer strip index ${index} is out of range.`);
     }
+    // A newer selection owns the strip. Cancel the previous smooth-scroll
+    // fallback before rebasing its virtual window, otherwise that stale timer
+    // can jump to a slide which has already been recycled.
+    this.#resolveSelection();
     if (!this.#slides.has(index)) this.#renderWindow(index, smooth ? this.#index : index);
     if (!this.#mounted || !smooth || index === this.#index) {
       this.#jump(index);
       return Promise.resolve();
     }
-    this.#resolveSelection();
     this.element.scrollTo({ left: (index - this.#base) * this.#width, behavior: "smooth" });
     return new Promise<void>((resolve) => {
       this.#selection = {
@@ -124,6 +129,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#controller.abort();
     this.#observer.disconnect();
     cancelAnimationFrame(this.#rebaseFrame);
+    cancelAnimationFrame(this.#instantFrame);
     clearTimeout(this.#settleTimer);
     this.#resolveSelection();
     this.#slides.clear();
@@ -203,11 +209,27 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   }
 
   #jump(index: number) {
+    this.#instantTarget = index;
     this.element.style.scrollSnapType = "none";
     this.#align(index);
     this.#sync(index);
-    requestAnimationFrame(() => this.element.style.removeProperty("scroll-snap-type"));
+    cancelAnimationFrame(this.#instantFrame);
+    this.#instantFrame = requestAnimationFrame(this.#alignInstant);
   }
+
+  #alignInstant = () => {
+    const index = this.#instantTarget;
+    if (index === null) return;
+    const left = (index - this.#base) * this.#width;
+    if (Math.abs(this.element.scrollLeft - left) > 1) {
+      this.element.scrollTo({ left, behavior: "instant" });
+      this.#instantFrame = requestAnimationFrame(this.#alignInstant);
+      return;
+    }
+    this.#instantTarget = null;
+    this.#instantFrame = 0;
+    this.element.style.removeProperty("scroll-snap-type");
+  };
 
   #align(index: number) {
     if (!this.#width) return;
@@ -273,6 +295,14 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   }
 
   #onScroll = () => {
+    if (this.#instantTarget !== null) {
+      const left = (this.#instantTarget - this.#base) * this.#width;
+      if (Math.abs(this.element.scrollLeft - left) > 1) return;
+      this.#instantTarget = null;
+      cancelAnimationFrame(this.#instantFrame);
+      this.#instantFrame = 0;
+      this.element.style.removeProperty("scroll-snap-type");
+    }
     if (this.#rebasing || !this.#width) return;
     this.#sync();
     clearTimeout(this.#settleTimer);
@@ -280,7 +310,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   };
 
   #settled = () => {
-    if (this.#rebasing) return;
+    if (this.#rebasing || this.#instantTarget !== null) return;
     clearTimeout(this.#settleTimer);
     this.#sync();
     if (this.#selection?.index === this.#index) this.#resolveSelection();

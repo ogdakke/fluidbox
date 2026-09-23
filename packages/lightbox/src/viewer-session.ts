@@ -155,6 +155,7 @@ export class ViewerSession<
       this.#driver.close({ origin, signal: operation.controller.signal, reason }),
     ).then((settled) => {
       if (!settled) return;
+      this.#origins.restoreThumbnail();
       this.#publish("closed", null, null);
       this.#emit({ type: "status-change", status: "closed" });
       this.#finish(operation, completed(true));
@@ -309,6 +310,7 @@ export class ViewerSession<
       signal: operation.controller.signal,
       reason,
     };
+    this.#origins.hideThumbnail(item.id);
     void this.#run(operation, () =>
       opening ? this.#driver.open(context) : this.#driver.select(context),
     ).then((settled) => {
@@ -339,6 +341,7 @@ export class ViewerSession<
       signal: operation.controller.signal,
       reason: "source-update",
     };
+    this.#origins.hideThumbnail(item.id);
     void this.#run(operation, () =>
       opening ? this.#driver.open(context) : this.#driver.select(context),
     ).then((settled) => {
@@ -362,6 +365,7 @@ export class ViewerSession<
       this.#driver.close({ origin: null, signal: operation.controller.signal, reason }),
     ).then((settled) => {
       if (!settled) return;
+      this.#origins.restoreThumbnail();
       this.#publish("closed", null, null);
       this.#emit({ type: "status-change", status: "closed" });
       this.#finish(operation, completed(true));
@@ -470,9 +474,13 @@ export class ViewerSession<
     const controller = new AbortController();
     this.#revealController = controller;
     try {
-      void Promise.resolve(
-        adapter.revealOrigin(id, index, { signal: controller.signal, reason }),
-      ).catch(() => {});
+      void Promise.resolve(adapter.revealOrigin(id, index, { signal: controller.signal, reason }))
+        .then(() => {
+          if (!controller.signal.aborted && this.#state.activeId === id) {
+            this.#origins.hideThumbnail(id);
+          }
+        })
+        .catch(() => {});
     } catch {
       // Host scrolling never owns viewer motion or command completion.
     }
