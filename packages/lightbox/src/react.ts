@@ -17,6 +17,7 @@ import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode, Ref } from
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { createLightbox } from "./create-lightbox";
+import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
 import { markedVisualOrigin } from "./origin-geometry";
 import type {
   LightboxCommandResult,
@@ -396,6 +397,26 @@ const Close = action("close", "Close", (state) => state.status === "closed");
 const Previous = action("previous", "Previous", (state) => !state.canPrevious);
 const Next = action("next", "Next", (state) => !state.canNext);
 
+function FilmstripThumbnail({ item }: { item: LightboxItem }) {
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const sources = filmstripThumbnailSources(item);
+  const sourceKey = sources.join("\u0000");
+  useEffect(() => {
+    const image = imageRef.current;
+    if (!image || !sources.length) return;
+    const controller = new AbortController();
+    void loadFilmstripThumbnail(image, sources, controller.signal);
+    return () => controller.abort();
+  }, [sourceKey]);
+  return createElement("img", {
+    ref: imageRef,
+    src: item.thumbnail?.src ?? item.preview?.src ?? sources[0],
+    alt: "",
+    draggable: false,
+    "data-lightbox-filmstrip-thumbnail": "",
+  });
+}
+
 function Filmstrip<TItem extends LightboxItem>({
   renderItem,
   children,
@@ -607,13 +628,8 @@ function Filmstrip<TItem extends LightboxItem>({
         },
         renderItem
           ? renderItem({ item, index, selected })
-          : item.thumbnail?.src
-            ? createElement("img", {
-                src: item.thumbnail.src,
-                alt: "",
-                draggable: false,
-                "data-lightbox-filmstrip-thumbnail": "",
-              })
+          : filmstripThumbnailSources(item).length
+            ? createElement(FilmstripThumbnail, { item })
             : item.id,
       ),
     );

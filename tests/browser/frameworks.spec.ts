@@ -11,6 +11,10 @@ test("React binding opens and navigates without custom elements", async ({ page 
     "aria-label",
     "Item 1 of 3",
   );
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
   await page.keyboard.press("ArrowRight");
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -23,6 +27,10 @@ test("React binding opens and navigates without custom elements", async ({ page 
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 1 of 2",
+  );
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
   );
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);

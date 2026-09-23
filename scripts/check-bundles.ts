@@ -19,7 +19,7 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 const initialGzipLimits: Record<Entry, number> = {
   root: 16_300,
   elements: 25_000,
-  react: 18_750,
+  react: 19_050,
   solid: 1_500,
   vue: 1_500,
   angular: 1_500,
@@ -28,7 +28,7 @@ const cssGzipLimit = 5_000;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 37_900,
   elements: 24_500,
-  react: 22_550,
+  react: 22_820,
   solid: 24_500,
   vue: 24_500,
   angular: 24_500,
@@ -36,7 +36,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 41_650,
   elements: 28_500,
-  react: 26_300,
+  react: 26_580,
   solid: 28_500,
   vue: 28_500,
   angular: 28_500,
