@@ -1,6 +1,5 @@
-import { arraySource } from "../packages/lightbox/src/index";
+import { arraySource, createLightbox } from "../packages/lightbox/src/index";
 import type {
-  CreateLightbox,
   LightboxController,
   LightboxImageMedia,
   LightboxItem,
@@ -32,7 +31,6 @@ const origins: LightboxOriginAdapter = {
   },
 };
 
-declare const createLightbox: CreateLightbox;
 const controller: LightboxController<(typeof items)[number]> = createLightbox({ source, origins });
 const composedController = createLightbox({
   source,

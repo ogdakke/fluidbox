@@ -103,7 +103,7 @@ scrolling; the runtime cannot undo arbitrary host work performed after cancellat
 
 ## Controller
 
-The plain runtime will implement the exported `CreateLightbox` signature:
+The root package exports the plain runtime through the `CreateLightbox` signature:
 
 ```ts
 const viewer = createLightbox({

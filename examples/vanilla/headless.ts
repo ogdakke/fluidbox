@@ -1,7 +1,6 @@
-import { arraySource } from "@ogdakke/fluidbox";
+import { arraySource, createLightbox } from "@ogdakke/fluidbox";
 import type { LightboxController } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/styles.css";
-import { createLightbox } from "../../packages/lightbox/src/create-lightbox";
 import "./headless.css";
 
 const source = arraySource([

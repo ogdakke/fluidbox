@@ -41,8 +41,11 @@ Work has started in bounded, reviewed parts. Stage 0 is still incomplete.
 - Added the first plain DOM image driver and a plain-JavaScript composition example using the proposed
   `createLightbox`, source, origin, controller, portal-renderer, data-attribute, and CSS-variable
   contracts. It opens, navigates, closes, restores current-origin focus, and passes all six browser
-  profiles without registering custom elements. The factory remains internal until shared gesture,
-  interruption, and responsive-media behavior reaches the interaction gate.
+  profiles without registering custom elements.
+- The plain runtime now preserves interrupted motion, handles touch and vertical trackpad dismissal
+  through the shared spring controller, publishes drag state through data attributes and CSS variables,
+  and builds native responsive image candidates and picture sources. `createLightbox` is exported from
+  the SSR-safe root; custom elements remain available as a compatibility binding.
 - Added deterministic open/close interruption geometry checks, focus/inert restoration checks, and trace/video evidence in `tests/browser/motion.spec.ts`. This protects pose continuity at command handoff, not gesture velocity or compositor performance.
 - Fixed indexed-source opening preparation to resolve mounted thumbnails before the gallery becomes active; added opening-pose and missing-origin scale/fade regressions.
 - Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.

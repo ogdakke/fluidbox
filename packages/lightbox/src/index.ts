@@ -1,5 +1,6 @@
 export { registerLightboxElements } from "./register";
 export { arraySource } from "./array-source";
+export { createLightbox } from "./create-lightbox";
 
 export type {
   CreateLightbox,

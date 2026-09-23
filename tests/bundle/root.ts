@@ -1,6 +1,6 @@
 import { arraySource } from "@ogdakke/fluidbox";
 
-export { registerLightboxElements } from "@ogdakke/fluidbox";
+export { createLightbox, registerLightboxElements } from "@ogdakke/fluidbox";
 
 export const source = arraySource([
   {
