@@ -19,6 +19,8 @@ for (const count of [10_000, 100_000]) {
   test(`TanStack host scrolls and Fluidbox resolves stable origins across ${count} items`, async ({
     page,
   }, testInfo) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto(`/photo-library.html?count=${count}`);
     const scroll = page.locator(".library-scroll");
@@ -84,6 +86,8 @@ for (const count of [10_000, 100_000]) {
       "open",
     );
     await expect(page.locator("[data-lightbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
+    await expect(image).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+    await expect(image).toHaveCSS("visibility", "hidden");
 
     await scroll.evaluate((element) => {
       element.scrollTop = element.scrollHeight - element.clientHeight;
@@ -95,8 +99,28 @@ for (const count of [10_000, 100_000]) {
         getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
       );
       const gap = parseFloat(getComputedStyle(element).columnGap);
-      element.scrollTo({ left: selectedIndex * (size + gap), behavior: "instant" });
+      const padding = parseFloat(getComputedStyle(element).paddingLeft);
+      element.scrollTo({
+        left: padding + selectedIndex * (size + gap) + size / 2 - element.clientWidth / 2,
+        behavior: "instant",
+      });
     }, farIndex);
+    const filmstripGeometry = await page
+      .locator("[data-lightbox-filmstrip-scroll]")
+      .evaluate((element) => ({
+        scrollLeft: element.scrollLeft,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+        gap: getComputedStyle(element).columnGap,
+        trackWidth: getComputedStyle(element.firstElementChild!).width,
+        rendered: [...element.querySelectorAll<HTMLElement>("[data-index]")].map(
+          (item) => item.dataset.index,
+        ),
+      }));
+    await testInfo.attach("far-filmstrip-geometry", {
+      body: JSON.stringify(filmstripGeometry, null, 2),
+      contentType: "application/json",
+    });
     const filmstripTarget = page.locator(
       `[data-lightbox-filmstrip-item][data-index="${farIndex}"]`,
     );
@@ -112,12 +136,13 @@ for (const count of [10_000, 100_000]) {
         }),
       )
       .toBe(true);
-    await filmstripTarget.click();
     await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
       `Item ${farIndex + 1} of ${count}`,
     );
     await expect(scroll.locator(`[data-photo-index="${farIndex}"]`)).toHaveCount(1);
+    const farThumbnail = scroll.locator(`[data-photo-index="${farIndex}"] img`);
+    await expect(farThumbnail).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
     await expect
       .poll(() =>
         scroll.locator(`[data-photo-index="${farIndex}"]`).evaluate((element) => {
@@ -135,21 +160,26 @@ for (const count of [10_000, 100_000]) {
       "aria-label",
       `Item ${farIndex + 2} of ${count}`,
     );
+    await expect(farThumbnail).not.toHaveAttribute("data-lightbox-thumbnail-hidden", "");
     const selectedIndex = count - 250;
     await page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element, index) => {
       const size = parseFloat(
         getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
       );
       const gap = parseFloat(getComputedStyle(element).columnGap);
-      element.scrollTo({ left: index * (size + gap), behavior: "instant" });
+      const padding = parseFloat(getComputedStyle(element).paddingLeft);
+      element.scrollTo({
+        left: padding + index * (size + gap) + size / 2 - element.clientWidth / 2,
+        behavior: "instant",
+      });
     }, selectedIndex);
-    await page.locator(`[data-lightbox-filmstrip-item][data-index="${selectedIndex}"]`).click();
     await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
       `Item ${selectedIndex + 1} of ${count}`,
     );
     const selectedTile = scroll.locator(`[data-photo-index="${selectedIndex}"]`);
     await expect(selectedTile).toHaveCount(1);
+    await expect(selectedTile.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
     await expect
       .poll(() =>
         selectedTile.evaluate((element) => {
@@ -190,6 +220,11 @@ for (const count of [10_000, 100_000]) {
       expect(Math.abs(closingEnd[dimension] - selectedBounds![dimension])).toBeLessThan(5);
     }
     await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+    await expect(selectedTile.locator("img")).not.toHaveAttribute(
+      "data-lightbox-thumbnail-hidden",
+      "",
+    );
+    await expect(selectedTile.locator("img")).toHaveCSS("visibility", "visible");
     await expect(selectedTile).toBeFocused();
     await scroll.evaluate((element) => {
       element.scrollTop = 0;
@@ -222,6 +257,7 @@ for (const count of [10_000, 100_000]) {
     expect(await firstVisiblePhotoIndex(page)).toBeLessThanOrEqual(beforeResize + 6);
     expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
     expect(await scroll.evaluate((element) => element.scrollHeight)).toBeLessThan(12_000_000);
+    expect(pageErrors).toEqual([]);
   });
 }
 

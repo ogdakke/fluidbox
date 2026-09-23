@@ -325,7 +325,10 @@ test("direct React gallery carries clipped-origin geometry through opening and c
 });
 
 test("direct React transition matches its reference frames", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium", "Reference frames use Chromium rendering.");
+  test.skip(
+    !["chromium", "iphone-15-pro"].includes(testInfo.project.name),
+    "Reference frames use Chromium and iPhone WebKit rendering.",
+  );
   await page.emulateMedia({ reducedMotion: "no-preference", colorScheme: "dark" });
   await page.goto("/photo-library.html");
   const origin = page.locator('[data-photo-index="1"]');

@@ -23,7 +23,7 @@ export default defineConfig({
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
     { name: "pixel-7", use: { ...devices["Pixel 7"] } },
-    { name: "iphone-13", use: { ...devices["iPhone 13"] } },
+    { name: "iphone-15-pro", use: { ...devices["iPhone 15 Pro"] } },
     { name: "ipad-pro-11", use: { ...devices["iPad Pro 11"] } },
   ],
   webServer: [

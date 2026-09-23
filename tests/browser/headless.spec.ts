@@ -41,6 +41,36 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
 });
 
+test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const sample = await page.locator("[data-lightbox-slides]").evaluate(async (scroller) => {
+    const element = scroller as HTMLElement;
+    const width = element.clientWidth;
+    element.style.scrollSnapType = "none";
+    element.scrollLeft = width * 0.62;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    return {
+      position: element.scrollLeft / width,
+      selected: element
+        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        ?.getAttribute("aria-label"),
+      snapOverride: element.style.scrollSnapType,
+    };
+  });
+
+  expect(sample.selected).toBe("Item 2 of 2");
+  expect(sample.position).toBeGreaterThan(0.55);
+  expect(sample.position).toBeLessThan(0.8);
+  expect(sample.snapOverride).toBe("none");
+});
+
 test("plain runtime preserves the painted frame when open and close reverse", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/headless.html");
