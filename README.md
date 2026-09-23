@@ -1,33 +1,47 @@
-# Lightbox
+# @ogdakke/fluidbox
 
-The viewer extracted from `portfolio-v4`. This repository is a Bun workspace with one installable package, `@ogdakke/fluidbox`. It is private and linked locally while the public API is being developed.
+A lightbox for image galleries. Use the custom elements with plain HTML, or attach an indexed source when the page renders only some of its thumbnails. The viewer supports keyboard navigation, swiping, zooming, and a filmstrip.
 
-## Current usage
+## Getting started
+
+Import the elements and styles in a browser entry:
 
 ```ts
 import "@ogdakke/fluidbox/elements";
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-The `elements` entry registers `<app-lightbox>`, `<app-gallery>`, and `<app-filmstrip>`. The CSS entry is explicit. See [the styling and markup contract](docs/LIGHTBOX.md) for slots, state attributes, and styling hooks.
+Add a gallery to the page:
 
-The root import is safe to evaluate during server rendering:
+```html
+<app-gallery aria-label="Photos">
+  <app-lightbox src="/photos/first.jpg" alt="A mountain at dusk" close-button>
+    <img src="/photos/first-thumb.jpg" alt="A mountain at dusk" width="300" height="200" />
+  </app-lightbox>
+  <app-lightbox src="/photos/second.jpg" alt="A lake in the morning" close-button>
+    <img src="/photos/second-thumb.jpg" alt="A lake in the morning" width="300" height="200" />
+  </app-lightbox>
+  <app-filmstrip></app-filmstrip>
+</app-gallery>
+```
+
+The `elements` import registers the custom elements. Import the CSS separately to style the viewer. See the [markup and styling guide](docs/LIGHTBOX.md) for slots, state attributes, and CSS hooks.
+
+For server rendering, import the package root and register the elements after hydration:
 
 ```ts
 import { registerLightboxElements } from "@ogdakke/fluidbox";
 
-// Run after hydration or in a client-only entry.
 await registerLightboxElements();
 ```
 
-The element implementation remains browser-only. Framework bindings are not exported yet. Bindings will use distinct `/react`, `/solid`, `/vue`, and `/angular` entries in this same package.
+The package also exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue`, and `/angular`.
 
-## Indexed galleries and virtual lists
+## Indexed galleries
 
-A host list can render only its visible thumbnails and give `<app-gallery>` an indexed source. The gallery creates one persistent controller, so recycling a host thumbnail while the viewer is open does not close it.
+An indexed source lets a gallery open items whose thumbnails are not currently in the DOM. This is useful with virtual lists. The viewer and filmstrip keep a bounded number of elements mounted.
 
 ```ts
-import "@ogdakke/fluidbox/elements";
 import type { AppGallery, LightboxGallerySource } from "@ogdakke/fluidbox";
 
 const gallery = document.querySelector<AppGallery>("app-gallery")!;
@@ -48,28 +62,24 @@ const source: LightboxGallerySource = {
     return document.querySelector(`[data-photo-id="${CSS.escape(id)}"]`);
   },
 };
+
 gallery.source = source;
-// Call this from the host list's item click handler:
-gallery.open(index);
+gallery.open(0);
 ```
 
-`getOrigin` is optional. If the item has no mounted origin, opening and closing use a scale-and-fade transition. IDs, count, and indexed metadata should remain stable while the viewer is open. The source API is synchronous today; asynchronous pagination and mutation notifications are not implemented yet. The viewer and filmstrip each keep a bounded DOM window. [Browser testing and baseline](docs/TESTING.md) cover 100,000-item sources.
+`getOrigin` is optional. When an item has no mounted thumbnail, the viewer uses a scale and fade transition. Keep IDs, item count, and item metadata stable while the viewer is open. The source API is synchronous; it does not currently handle asynchronous pagination or mutation notifications.
 
 ## Development
 
+This repository uses Bun. The package lives in `packages/lightbox`, and `examples/vanilla` is a local playground.
+
 ```sh
 bun install
-bun run dev                 # Standalone vanilla example (works when wrapped by Portless)
-bun run dev:share           # Portless LAN URL for phone and browser testing
-bun run build:example       # Build that example
+bun run dev
+bun run build:example
 bun run test
 bun run lint:all
 bun run format:check
-bun run format
 ```
 
-`dev:share` runs the example through Portless as `lightbox.local` on the local network. You can also run `portless lightbox --tailscale --force bun run dev`; the root `dev` script invokes Vite directly so it receives Portless's assigned port. Portless must be installed globally, as in the portfolio setup. Its startup output prints the actual URL; use that address on your phone while it is on the same network. The page includes a small DOM gallery and a 100,000-item indexed gallery.
-
-The repository has one package under `packages/lightbox`. Workspace example apps can be added under `examples/` to exercise framework bindings and SSR without creating more installable packages.
-
-`portfolio-v4` links the package with `file:../lightbox/packages/lightbox`. A checkout of both repositories as siblings is required for its local install and build.
+The playground includes a small gallery and an indexed gallery with 100,000 items. See [browser testing](docs/TESTING.md) for test commands and visual baselines.
