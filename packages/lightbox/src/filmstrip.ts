@@ -20,6 +20,7 @@ export class FilmstripSession {
   #scrollFrame = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #scrollMode: ScrollMode = "idle";
+  #commandedLeft: number | null = null;
   #touching = false;
   #initializing = true;
   #mountFrame = 0;
@@ -254,7 +255,12 @@ export class FilmstripSession {
   #center(index: number, smooth: boolean) {
     const left =
       this.#padding + index * this.#step + this.#size / 2 - this.scroller.clientWidth / 2;
-    this.scroller.scrollTo({ left, behavior: smooth ? "smooth" : "instant" });
+    this.#commandedLeft = Math.max(
+      0,
+      Math.min(left, this.scroller.scrollWidth - this.scroller.clientWidth),
+    );
+    this.#scrollMode = "commanded";
+    this.scroller.scrollTo({ left: this.#commandedLeft, behavior: smooth ? "smooth" : "instant" });
   }
 
   #nearestIndex() {
@@ -292,6 +298,13 @@ export class FilmstripSession {
     clearTimeout(this.#settleTimer);
     if (this.#initializing || this.#touching) return;
     if (this.#scrollMode === "commanded") {
+      // Some engines fire scrollend between frames of a smooth scroll. Keep
+      // programmatic centering from becoming a user selection until it arrives.
+      if (Math.abs(this.scroller.scrollLeft - (this.#commandedLeft ?? 0)) > 1) {
+        this.#scheduleSettle();
+        return;
+      }
+      this.#commandedLeft = null;
       this.#scrollMode = "idle";
       return;
     }
@@ -316,6 +329,7 @@ export class FilmstripSession {
   };
 
   #takeControl = () => {
+    this.#commandedLeft = null;
     this.#scrollMode = "user";
   };
 

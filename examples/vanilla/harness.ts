@@ -70,9 +70,15 @@ if (params.has("virtual")) {
     const image = document.createElement("img");
     image.src = index % 2 ? "/second.svg" : "/first.svg";
     image.alt = `Gallery item ${index + 1}`;
-    image.width = 120;
-    image.height = 80;
+    image.width = params.has("pictures") ? (index % 2 ? 3024 : 1200) : 120;
+    image.height = params.has("pictures") ? (index % 2 ? 4032 : 800) : 80;
     lightbox.append(image);
+    if (params.has("pictures")) {
+      const template = document.createElement("template");
+      template.setAttribute("slot", "content");
+      template.innerHTML = `<picture width="${image.width}" height="${image.height}"><img src="${image.src}" width="${image.width}" height="${image.height}" alt="Full-size item ${index + 1}"></picture>`;
+      lightbox.append(template);
+    }
     if (params.has("iframes")) {
       const template = document.createElement("template");
       template.setAttribute("slot", "content");

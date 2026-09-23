@@ -122,11 +122,11 @@ export class GalleryStrip {
       }
       if (width && height) {
         const ratio = width / height;
-        image.style.setProperty(
+        frame.style.setProperty(
           "--lightbox-item-width",
           `min(100vw, calc(var(--lightbox-content-height, var(--lightbox-height, 100svh)) * ${ratio}))`,
         );
-        image.style.setProperty(
+        frame.style.setProperty(
           "--lightbox-item-height",
           `min(${100 / ratio}vw, var(--lightbox-content-height, var(--lightbox-height, 100svh)))`,
         );

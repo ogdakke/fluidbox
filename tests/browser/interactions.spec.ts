@@ -45,6 +45,24 @@ for (const shadow of [false, true]) {
   });
 }
 
+test("picture content stays within the viewport after placeholder replacement", async ({
+  page,
+}) => {
+  await page.goto("/harness.html?pictures");
+  await page.locator("app-lightbox").first().click();
+  const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+  await expect(active).toHaveAttribute("aria-label", "Item 1 of 3");
+  await page.keyboard.press("ArrowRight");
+  await expect(active).toHaveAttribute("aria-label", "Item 2 of 3");
+  const picture = active.locator("[data-lightbox-content] picture");
+  await expect(picture).toBeVisible();
+  const { width, height } = await picture.boundingBox().then((box) => box!);
+  const viewport = page.viewportSize()!;
+  expect(width).toBeLessThanOrEqual(viewport.width);
+  expect(height).toBeLessThanOrEqual(viewport.height);
+  expect(width / height).toBeCloseTo(3024 / 4032, 2);
+});
+
 test("filmstrip selects a distant item", async ({ page }) => {
   await page.goto("/harness.html?count=30");
   await page.locator("app-lightbox").first().click();
