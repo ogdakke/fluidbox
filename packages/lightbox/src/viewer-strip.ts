@@ -41,6 +41,8 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   #rebaseFrame = 0;
   #instantFrame = 0;
   #instantTarget: number | null = null;
+  #frozen = false;
+  #frozenLeft = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #selection:
     | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
@@ -76,6 +78,10 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     const slide = this.#slides.get(this.#index);
     if (!slide) throw new Error("The viewer source has no active image.");
     return slide;
+  }
+
+  get snapOffset() {
+    return this.#frozen ? this.#frozenLeft - (this.#index - this.#base) * this.#width : 0;
   }
 
   setSource(source: LightboxSource<TItem>) {
@@ -134,6 +140,23 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#resolveSelection();
     this.#slides.clear();
     this.element.remove();
+  }
+
+  freeze() {
+    if (this.#frozen) return;
+    this.#frozenLeft = this.element.scrollLeft;
+    this.#frozen = true;
+    this.element.dataset.lightboxFrozen = "";
+    this.element.scrollTo({ left: this.#frozenLeft, behavior: "instant" });
+  }
+
+  resume() {
+    if (!this.#frozen) return;
+    this.element.scrollTo({ left: this.#frozenLeft, behavior: "instant" });
+    this.element.style.removeProperty("--lightbox-scroll-compensation");
+    this.#frozen = false;
+    delete this.element.dataset.lightboxFrozen;
+    this.#align(this.#index);
   }
 
   #makeSlide(index: number) {
@@ -238,14 +261,12 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
 
   #sync(forcedIndex?: number) {
     if (!this.#source.count) return;
+    const left = this.#frozen ? this.#frozenLeft : this.element.scrollLeft;
     const index =
       forcedIndex ??
       Math.max(
         0,
-        Math.min(
-          this.#source.count - 1,
-          this.#base + Math.round(this.element.scrollLeft / Math.max(1, this.#width)),
-        ),
+        Math.min(this.#source.count - 1, this.#base + Math.round(left / Math.max(1, this.#width))),
       );
     if (index === this.#index) return;
     this.#slides.get(this.#index)?.element.setAttribute("aria-hidden", "true");
@@ -295,6 +316,11 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   }
 
   #onScroll = () => {
+    if (this.#frozen) {
+      const offset = this.element.scrollLeft - this.#frozenLeft;
+      this.element.style.setProperty("--lightbox-scroll-compensation", `${offset}px`);
+      return;
+    }
     if (this.#instantTarget !== null) {
       const left = (this.#instantTarget - this.#base) * this.#width;
       if (Math.abs(this.element.scrollLeft - left) > 1) return;
@@ -310,7 +336,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   };
 
   #settled = () => {
-    if (this.#rebasing || this.#instantTarget !== null) return;
+    if (this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
     clearTimeout(this.#settleTimer);
     this.#sync();
     if (this.#selection?.index === this.#index) this.#resolveSelection();

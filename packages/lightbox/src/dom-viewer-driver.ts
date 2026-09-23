@@ -4,6 +4,7 @@ import {
   boundDismissVelocity,
   dragDistance,
   dragProgress,
+  dismissRadiusProgress,
   LightboxGestureController,
   touchAxisThreshold,
   type LightboxDragState,
@@ -36,12 +37,16 @@ import {
   type ViewerPortalElements,
 } from "./viewer-portal";
 import { ViewerStrip } from "./viewer-strip";
+import { mapRadii } from "./transition-geometry";
 
 const OPEN_DURATION = 300;
 const TOUCH_DISMISS_DISTANCE = 60;
 const EASING = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 const OPENING_SPRING_RESPONSE = 210;
 const TOUCH_OPENING_SPRING_RESPONSE = 380;
+const DISMISS_RADIUS_END = 0.1;
+const BROWSER_CHROME_RELEASE_PROGRESS = 0.34;
+const BROWSER_CHROME_RESTORE_PROGRESS = 0.2;
 
 interface PaintedPose extends ImageTransitionPose {
   readonly frameOpacity: string;
@@ -64,6 +69,7 @@ export class DomViewerDriver<
   #portalDispose: LightboxDispose | undefined;
   #animations: Animation[] = [];
   #interruptedPose: PaintedPose | undefined;
+  #activeOrigin: HTMLElement | null = null;
   #suppressClick = false;
   #suppressClickTimer: ReturnType<typeof setTimeout> | undefined;
   #pointer:
@@ -174,6 +180,7 @@ export class DomViewerDriver<
     const interruptedPose = this.#takeInterruptedPose(false);
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    this.#activeOrigin = from;
     const openPose = openImageTransitionPose();
     const start = interruptedPose
       ? interruptedPose
@@ -234,6 +241,8 @@ export class DomViewerDriver<
     this.#assertImage(context.item);
     this.#cancelAnimations(true);
     this.#takeInterruptedPose();
+    const origin = context.origin?.visual;
+    this.#activeOrigin = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
     const selected = this.#strip?.index === context.index;
     // A native swipe updates the strip before it reports the selected index.
     // Sending that selection back into the strip would snap an in-progress
@@ -420,31 +429,47 @@ export class DomViewerDriver<
 
   #beginDrag(wheelDirection = 0) {
     if (this.#dragGesture.active || this.#controller?.state.status !== "open") return;
+    this.#cancelAnimations(true);
     const frame = this.#frame;
-    const style = getComputedStyle(frame);
-    const number = (value: string) => Number.parseFloat(value) || 0;
-    const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
+    const current = readImageTransitionPose(frame, this.#media);
+    const matrix = current.transform;
+    this.#strip?.freeze();
+    const origin = this.#activeOrigin;
+    const target =
+      origin && origin.isConnected && originIsVisible(origin)
+        ? poseFromThumbnail(thumbnailTransitionPose(origin, frame, this.#media, current))
+        : {
+            transform: new DOMMatrix()
+              .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+              .scale(0.96),
+            clip: current.clip,
+          };
+    const wheelTarget = wheelDirection ? new DOMMatrix(target.transform.toString()) : undefined;
+    const wheelOffset = !wheelTarget
+      ? 0
+      : matrix.a > 1
+        ? 180 * Math.log(Math.max(0.001, 1 - (matrix.a - 1) / 0.12))
+        : Math.abs(1 - wheelTarget.a) > 0.001
+          ? (360 * (1 - matrix.a)) / (1 - wheelTarget.a)
+          : Math.abs(1 - wheelTarget.d) > 0.001
+            ? (360 * (1 - matrix.d)) / (1 - wheelTarget.d)
+            : 0;
     const state = this.#dragGesture.begin({
       matrix,
-      wheelTarget: wheelDirection ? new DOMMatrix() : undefined,
+      wheelTarget,
       wheelDirection,
-      wheelOffset: 0,
-      wheelSnapOffset: 0,
+      wheelOffset,
+      wheelSnapOffset: wheelDirection ? (this.#strip?.snapOffset ?? 0) : 0,
       opacity: Number(getComputedStyle(this.#portal.backdrop).opacity),
       closeOpacity: 1,
-      borderRadii: [
-        number(style.borderTopLeftRadius),
-        number(style.borderTopRightRadius),
-        number(style.borderBottomRightRadius),
-        number(style.borderBottomLeftRadius),
-      ],
-      targetRadii: [0, 0, 0, 0],
-      clipX: 0,
-      clipY: 0,
-      targetClipX: 0,
-      targetClipY: 0,
-      width: frame.offsetWidth,
-      height: frame.offsetHeight,
+      borderRadii: current.clip.radii,
+      targetRadii: target.clip.radii,
+      clipX: current.clip.x,
+      clipY: current.clip.y,
+      targetClipX: target.clip.x,
+      targetClipY: target.clip.y,
+      width: this.#media.offsetWidth,
+      height: this.#media.offsetHeight,
       time: performance.now(),
     });
     for (const target of [this.#portal.overlay, this.#portal.dialog]) {
@@ -455,12 +480,51 @@ export class DomViewerDriver<
   }
 
   #paintDrag(state: LightboxDragState) {
+    const distance = dragDistance(state);
     const progress = dragProgress(state);
-    const scale = 1 - progress * 0.3;
     this.#portal.overlay.style.setProperty("--lightbox-drag-x", `${state.x}px`);
     this.#portal.overlay.style.setProperty("--lightbox-drag-y", `${state.y}px`);
     this.#portal.overlay.style.setProperty("--lightbox-dismiss-progress", String(progress));
-    this.#frame.style.transform = `translate(${state.x}px, ${state.y}px) scale(${scale})`;
+    if (!state.wheelTarget) this.#syncOverlayEdges(progress);
+    const stretch = distance < 0 ? 1 + 0.12 * (1 - Math.exp(distance / 180)) : 1;
+    const scale = 1 - progress * 0.3;
+    const from = state.wheelTarget
+      ? new DOMMatrix().translate(state.wheelSnapOffset * state.wheelSnapProgress, 0)
+      : state.matrix;
+    const to = state.wheelTarget;
+    const matrix =
+      to && distance < 0
+        ? from
+            .translate((state.width * (1 - stretch)) / 2, (state.height * (1 - stretch)) / 2)
+            .scale(stretch)
+        : to
+          ? new DOMMatrix([
+              from.a + (to.a - from.a) * progress,
+              0,
+              0,
+              from.d + (to.d - from.d) * progress,
+              from.e + (to.e - from.e) * progress,
+              from.f + (to.f - from.f) * progress,
+            ])
+          : new DOMMatrix()
+              .translate(state.x, state.y)
+              .multiply(from)
+              .translate((state.width * (1 - scale)) / 2, (state.height * (1 - scale)) / 2)
+              .scale(scale);
+    const radiusProgress = state.wheelTarget
+      ? Math.min(1, progress / DISMISS_RADIUS_END)
+      : dismissRadiusProgress(state.x, state.y);
+    applyImageTransitionPose(this.#frame, this.#media, {
+      transform: matrix,
+      clip: {
+        x: state.clipX + (state.targetClipX - state.clipX) * progress,
+        y: state.clipY + (state.targetClipY - state.clipY) * progress,
+        radii: mapRadii(
+          state.borderRadii,
+          (radius, index) => radius + (state.targetRadii[index]! - radius) * radiusProgress,
+        ),
+      },
+    });
     this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
     if (
       state.wheelTarget &&
@@ -469,6 +533,15 @@ export class DomViewerDriver<
     ) {
       this.#dragGesture.finish();
       this.#clearMotionStyles();
+      this.#strip?.resume();
+    }
+  }
+
+  #syncOverlayEdges(progress: number) {
+    if (progress >= BROWSER_CHROME_RELEASE_PROGRESS) {
+      this.#portal.overlay.dataset.lightboxEdgeReleased = "";
+    } else if (progress <= BROWSER_CHROME_RESTORE_PROGRESS) {
+      delete this.#portal.overlay.dataset.lightboxEdgeReleased;
     }
   }
 
@@ -497,29 +570,36 @@ export class DomViewerDriver<
       void this.#controller?.close({ reason: "pointer" });
       return;
     }
-    const transform = getComputedStyle(this.#frame).transform;
-    const opacity = getComputedStyle(this.#portal.backdrop).opacity;
+    const current = readImageTransitionPose(this.#frame, this.#media);
+    const opacity = Number(getComputedStyle(this.#portal.backdrop).opacity);
     const settleX = boundDismissVelocity(state.x, velocityX, "x");
     const settleY = boundDismissVelocity(state.y, velocityY, "y");
     const duration = Math.max(140, 220 - Math.min(80, Math.hypot(settleX, settleY) * 50));
-    void this.#play(
-      [
-        this.#frame.animate([{ transform }, { transform: "none" }], {
-          duration,
-          easing: EASING,
-          fill: "both",
-        }),
-        this.#portal.backdrop.animate([{ opacity }, { opacity: 1 }], {
-          duration,
-          easing: EASING,
-          fill: "both",
-        }),
-      ],
-      this.#lifetime.signal,
-    );
+    const motion = createImageTransitionMotion({
+      opening: true,
+      from: current,
+      to: openImageTransitionPose(),
+      width: this.#media.offsetWidth,
+      height: this.#media.offsetHeight,
+      backdropFrom: opacity,
+      backdropTo: 1,
+      duration,
+      response: duration * 0.8,
+      samples: 24,
+    });
+    const animations = [
+      this.#frame.animate(motion.frame, this.#motionOptions(duration)),
+      this.#media.animate(motion.image, this.#motionOptions(duration)),
+      this.#frame.animate(motion.radius, this.#motionOptions(duration)),
+      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(duration)),
+    ];
+    this.#synchronizeStart(animations);
+    void this.#play(animations, this.#lifetime.signal).then(() => this.#strip?.resume());
   }
 
   #finishClose() {
+    this.#strip?.resume();
+    delete this.#portal.overlay.dataset.lightboxEdgeReleased;
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
     this.#setState("closed");

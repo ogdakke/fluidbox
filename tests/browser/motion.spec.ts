@@ -463,6 +463,77 @@ test("direct React transition reverses from its painted crop", async ({ page }, 
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 
+test("direct touch dismissal preserves crop, radii, and native strip position", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.evaluate((element: HTMLElement) => {
+    element.style.borderRadius = "8px 12px 16px 4px";
+  });
+  await origin.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const bounds = await frame.boundingBox();
+  expect(bounds).not.toBeNull();
+  const x = bounds!.x + bounds!.width / 2;
+  const y = bounds!.y + bounds!.height / 2;
+  await frame.dispatchEvent("pointerdown", {
+    pointerId: 12,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x,
+    clientY: y,
+  });
+  await frame.dispatchEvent("pointermove", {
+    pointerId: 12,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x,
+    clientY: y + 48,
+  });
+
+  await expect
+    .poll(() =>
+      frame.evaluate((element) =>
+        element.closest("[data-lightbox-slides]")?.hasAttribute("data-lightbox-frozen"),
+      ),
+    )
+    .toBe(true);
+  const drag = await frame.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const media = element.querySelector<HTMLElement>("[data-lightbox-media]")!;
+    return {
+      radius: parseFloat(style.borderTopLeftRadius),
+      mediaTransform: getComputedStyle(media).transform,
+    };
+  });
+  expect(drag.radius).toBeGreaterThan(0);
+  expect(drag.mediaTransform).not.toBe("none");
+
+  await frame.dispatchEvent("pointercancel", {
+    pointerId: 12,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x,
+    clientY: y + 48,
+  });
+  await expect(page.locator("[data-lightbox-slides]")).not.toHaveAttribute(
+    "data-lightbox-frozen",
+    "",
+  );
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+});
+
 test("nested visual target takes precedence over its preview box", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/harness.html?no-filmstrip");
