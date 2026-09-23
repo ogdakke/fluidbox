@@ -6,7 +6,7 @@ import { ViewerSession } from "./viewer-session";
 export function createLightbox<TItem extends LightboxItem = LightboxItem>(
   options: LightboxOptions<TItem>,
 ): LightboxController<TItem> {
-  const driver = new DomViewerDriver<TItem>(document, options.zoom);
+  const driver = new DomViewerDriver<TItem>(document, options.zoom, options.renderers);
   const session = new ViewerSession(options, driver);
   driver.connect(session, options.portal);
   return session;

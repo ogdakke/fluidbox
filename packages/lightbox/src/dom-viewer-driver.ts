@@ -21,9 +21,9 @@ import {
 import type {
   LightboxController,
   LightboxDispose,
-  LightboxImageMedia,
   LightboxItem,
   LightboxPortalRenderer,
+  LightboxRenderer,
   LightboxSource,
   LightboxZoomOptions,
 } from "./public-api";
@@ -60,10 +60,6 @@ interface PaintedPose extends ImageTransitionPose {
   readonly backdropOpacity: string;
 }
 
-function isImageItem(item: LightboxItem): item is LightboxItem<LightboxImageMedia> {
-  return item.media.type === "image";
-}
-
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 export class DomViewerDriver<
   TItem extends LightboxItem = LightboxItem,
@@ -71,6 +67,7 @@ export class DomViewerDriver<
   readonly #portal: ViewerPortalElements;
   readonly #isolation: ViewerModalIsolation;
   readonly #thumbnailOverlays: ThumbnailOverlayRuntime<TItem>;
+  readonly #renderers: Readonly<Record<string, LightboxRenderer<TItem>>>;
   readonly #viewerOwner = {
     closeImmediately: () => {
       void this.#controller?.close({ reason: "api" });
@@ -122,10 +119,15 @@ export class DomViewerDriver<
   #viewportWidth = 0;
   #destroyed = false;
 
-  constructor(ownerDocument: Document, zoomOptions: false | LightboxZoomOptions | undefined) {
+  constructor(
+    ownerDocument: Document,
+    zoomOptions: false | LightboxZoomOptions | undefined,
+    renderers?: Readonly<Record<string, LightboxRenderer<TItem>>>,
+  ) {
     this.#portal = createViewerPortal(ownerDocument, { defaultCloseButton: false });
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
     this.#thumbnailOverlays = new ThumbnailOverlayRuntime(ownerDocument);
+    this.#renderers = renderers ?? {};
     this.#portal.dialog.dataset.lightboxHeadless = "";
     this.#portal.container.addEventListener(
       "click",
@@ -241,12 +243,17 @@ export class DomViewerDriver<
       this.#portal.dialog.toggleAttribute("data-lightbox-gallery", source.count > 1);
       return;
     }
-    this.#strip = new ViewerStrip(this.#portal.overlay.ownerDocument, source, (index) => {
-      const controller = this.#controller;
-      if (controller?.state.status === "open" && controller.state.requestedIndex !== index) {
-        void controller.goTo({ index }, { reason: "pointer" });
-      }
-    });
+    this.#strip = new ViewerStrip(
+      this.#portal.overlay.ownerDocument,
+      source,
+      (index) => {
+        const controller = this.#controller;
+        if (controller?.state.status === "open" && controller.state.requestedIndex !== index) {
+          void controller.goTo({ index }, { reason: "pointer" });
+        }
+      },
+      this.#renderers,
+    );
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-lightbox-gallery", source.count > 1);
   }
@@ -259,7 +266,6 @@ export class DomViewerDriver<
   }
 
   async open(context: ViewerSessionMotionContext<TItem>) {
-    this.#assertImage(context.item);
     activeViewer.claim(this.#viewerOwner)?.closeImmediately();
     this.#endWheelHandoff();
     void this.#loadZoom();
@@ -364,7 +370,6 @@ export class DomViewerDriver<
   }
 
   async select(context: ViewerSessionMotionContext<TItem>) {
-    this.#assertImage(context.item);
     this.#cancelAnimations(true);
     this.#zoom?.suspend();
     void this.#loadZoom();
@@ -500,9 +505,9 @@ export class DomViewerDriver<
   }
 
   #render(item: TItem, index: number) {
-    this.#assertImage(item);
     const media = item.media;
-    this.#portal.dialog.setAttribute("aria-label", media.alt || "Image viewer");
+    const label = media.type === "image" ? media.alt : media.title;
+    this.#portal.dialog.setAttribute("aria-label", label || "Media viewer");
     this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
   }
 
@@ -616,7 +621,13 @@ export class DomViewerDriver<
   }
 
   #prepareZoom() {
-    if (this.#controller?.state.status !== "open" || this.#flight || !this.#strip) return null;
+    if (
+      this.#controller?.state.status !== "open" ||
+      this.#flight ||
+      !this.#strip ||
+      !(this.#media instanceof HTMLImageElement)
+    )
+      return null;
     this.#dragGesture.cancel();
     this.#cancelAnimations(true);
     const interrupted = this.#takeInterruptedPose();
@@ -1045,12 +1056,6 @@ export class DomViewerDriver<
     }
   }
 
-  #assertImage(item: TItem): asserts item is TItem & LightboxItem<LightboxImageMedia> {
-    if (!isImageItem(item)) {
-      throw new TypeError(`The plain DOM image driver does not yet support ${item.media.type}.`);
-    }
-  }
-
   #onKeydown = (event: KeyboardEvent) => {
     if (!this.#portal.overlay.isConnected) return;
     if (event.key === "Escape") {
@@ -1118,13 +1123,24 @@ export class DomViewerDriver<
     });
   }
 
+  #eventUsesNativeInteraction(event: Event, includeMedia = true) {
+    return event
+      .composedPath()
+      .some(
+        (target) =>
+          target instanceof HTMLElement &&
+          target.matches(
+            `${includeMedia ? "video, audio, " : ""}iframe, input, select, textarea, button, summary, a[href], [contenteditable], [data-lightbox-filmstrip]`,
+          ),
+      );
+  }
+
   #onPointerDown = (event: PointerEvent) => {
     if (
       event.pointerType !== "touch" ||
       !event.isPrimary ||
       this.#controller?.state.status !== "open" ||
-      (event.target instanceof Element &&
-        event.target.closest("button, a, input, select, textarea"))
+      this.#eventUsesNativeInteraction(event)
     ) {
       return;
     }
@@ -1175,8 +1191,8 @@ export class DomViewerDriver<
       event.ctrlKey ||
       this.#controller?.state.status !== "open" ||
       Math.abs(event.deltaY) <= Math.abs(event.deltaX) * 1.3 ||
-      (event.target instanceof Element &&
-        event.target.closest("button, a, input, select, textarea, [data-lightbox-portal]"))
+      this.#eventUsesNativeInteraction(event, false) ||
+      (event.target instanceof Element && event.target.closest("[data-lightbox-portal]"))
     ) {
       return;
     }

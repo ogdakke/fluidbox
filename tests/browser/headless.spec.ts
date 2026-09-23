@@ -93,6 +93,78 @@ test("plain controllers hand body-level ownership to the newest viewer", async (
   await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
 });
 
+test("plain runtime owns video and iframe media while custom renderers own descendants", async ({
+  page,
+}) => {
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 3,
+      getItem(index) {
+        return (
+          [
+            {
+              id: "custom",
+              media: {
+                type: "custom",
+                renderer: "demo",
+                title: "Custom study",
+                width: 800,
+                height: 600,
+              },
+            },
+            {
+              id: "video",
+              media: {
+                type: "video",
+                src: "data:video/mp4;base64,",
+                title: "Video study",
+                width: 800,
+                height: 450,
+              },
+            },
+            {
+              id: "iframe",
+              media: {
+                type: "iframe",
+                src: "about:blank",
+                title: "Iframe study",
+                width: 800,
+                height: 600,
+                sandbox: "allow-scripts",
+              },
+            },
+          ] as const
+        )[index]!;
+      },
+      getIndex(id) {
+        const ids = ["custom", "video", "iframe"];
+        const index = ids.indexOf(id);
+        return index < 0 ? null : index;
+      },
+    });
+    void window.headlessViewer.open({ id: "custom" });
+  });
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(page.locator("[data-test-custom-media]")).toHaveText("Custom custom");
+
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] video[data-lightbox-media]'),
+  ).toHaveAttribute("aria-label", "Video study");
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] iframe[data-lightbox-media]'),
+  ).toHaveAttribute("title", "Iframe study");
+  await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
+  await expect(page.locator("body")).toHaveAttribute("data-custom-aborts", "1");
+  await expect(page.locator("body")).toHaveAttribute("data-custom-disposals", "1");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+});
+
 test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();

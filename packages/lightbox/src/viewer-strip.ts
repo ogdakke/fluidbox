@@ -1,7 +1,8 @@
 import type {
+  LightboxDispose,
   LightboxImageCandidate,
-  LightboxImageMedia,
   LightboxItem,
+  LightboxRenderer,
   LightboxSource,
 } from "./public-api";
 
@@ -11,13 +12,11 @@ const LOAD_RADIUS = 1;
 interface ViewerSlide {
   readonly element: HTMLDivElement;
   readonly frame: HTMLDivElement;
-  readonly picture: HTMLPictureElement;
-  readonly image: HTMLImageElement;
+  readonly picture?: HTMLPictureElement;
+  readonly image: HTMLElement;
   loaded: boolean;
-}
-
-function isImageItem(item: LightboxItem): item is LightboxItem<LightboxImageMedia> {
-  return item.media.type === "image";
+  controller?: AbortController;
+  dispose?: LightboxDispose;
 }
 
 function candidateSet(candidates: readonly LightboxImageCandidate[] | undefined) {
@@ -32,6 +31,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   readonly #observer: ResizeObserver;
   readonly #controller = new AbortController();
   readonly #onSelect: (index: number) => void;
+  readonly #renderers: Readonly<Record<string, LightboxRenderer<TItem>>>;
   #source: LightboxSource<TItem>;
   #index = 0;
   #base = 0;
@@ -52,10 +52,12 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     ownerDocument: Document,
     source: LightboxSource<TItem>,
     onSelect: (index: number) => void,
+    renderers: Readonly<Record<string, LightboxRenderer<TItem>>> = {},
   ) {
     this.#ownerDocument = ownerDocument;
     this.#source = source;
     this.#onSelect = onSelect;
+    this.#renderers = renderers;
     this.element = ownerDocument.createElement("div");
     this.element.dataset.lightboxSlides = "";
     this.element.setAttribute("aria-label", "Gallery items");
@@ -88,7 +90,11 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#resolveSelection();
     this.#source = source;
     this.#index = Math.max(0, Math.min(this.#index, source.count - 1));
-    for (const slide of this.#slides.values()) slide.element.remove();
+    for (const slide of this.#slides.values()) {
+      this.#unload(slide);
+      slide.element.remove();
+    }
+    for (const slide of this.#slides.values()) this.#unload(slide);
     this.#slides.clear();
     this.#base = 0;
     this.#renderWindow(this.#index, this.#index);
@@ -161,9 +167,6 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
 
   #makeSlide(index: number) {
     const item = this.#source.getItem(index);
-    if (!isImageItem(item)) {
-      throw new TypeError(`The plain DOM gallery does not yet support ${item.media.type}.`);
-    }
     const element = this.#ownerDocument.createElement("div");
     element.dataset.lightboxSlide = "";
     element.setAttribute("role", "group");
@@ -179,24 +182,50 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       "--lightbox-item-height",
       `min(${(item.media.height / item.media.width) * 100}vw, var(--lightbox-content-height, var(--lightbox-height, 100svh)))`,
     );
-    const picture = this.#ownerDocument.createElement("picture");
-    picture.dataset.lightboxPicture = "";
-    picture.style.display = "contents";
-    const image = this.#ownerDocument.createElement("img");
-    image.dataset.lightboxMedia = "";
-    image.alt = item.media.alt;
-    image.width = item.media.width;
-    image.height = item.media.height;
-    image.decoding = "async";
-    image.draggable = false;
-    image.style.setProperty(
+    let picture: HTMLPictureElement | undefined;
+    let media: HTMLElement;
+    if (item.media.type === "image") {
+      picture = this.#ownerDocument.createElement("picture");
+      picture.dataset.lightboxPicture = "";
+      picture.style.display = "contents";
+      const image = this.#ownerDocument.createElement("img");
+      image.alt = item.media.alt;
+      image.width = item.media.width;
+      image.height = item.media.height;
+      image.decoding = "async";
+      image.draggable = false;
+      picture.append(image);
+      frame.append(picture);
+      media = image;
+    } else if (item.media.type === "video") {
+      const video = this.#ownerDocument.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.setAttribute("aria-label", item.media.title);
+      frame.append(video);
+      media = video;
+    } else if (item.media.type === "iframe") {
+      const iframe = this.#ownerDocument.createElement("iframe");
+      iframe.title = item.media.title;
+      iframe.loading = "lazy";
+      iframe.setAttribute("allowfullscreen", "");
+      frame.append(iframe);
+      media = iframe;
+    } else {
+      const content = this.#ownerDocument.createElement("div");
+      content.dataset.lightboxItemContent = "";
+      content.setAttribute("aria-label", item.media.title);
+      frame.append(content);
+      media = content;
+    }
+    media.dataset.lightboxMedia = "";
+    media.style.setProperty(
       "--lightbox-media-aspect",
       `${item.media.width} / ${item.media.height}`,
     );
-    picture.append(image);
-    frame.append(picture);
     element.append(frame);
-    return { element, frame, picture, image, loaded: false } satisfies ViewerSlide;
+    return { element, frame, picture, image: media, loaded: false } satisfies ViewerSlide;
   }
 
   #renderWindow(anchor: number, scrollIndex: number) {
@@ -206,6 +235,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     if (base === this.#base && this.#slides.size === size) return;
     for (const [index, slide] of this.#slides) {
       if (index >= base && index < base + size) continue;
+      this.#unload(slide);
       slide.element.remove();
       this.#slides.delete(index);
     }
@@ -285,33 +315,65 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
 
   #load(index: number, slide: ViewerSlide) {
     if (slide.loaded) {
-      slide.image.fetchPriority = index === this.#index ? "high" : "low";
+      if (slide.image instanceof HTMLImageElement)
+        slide.image.fetchPriority = index === this.#index ? "high" : "low";
       return;
     }
     const item = this.#source.getItem(index);
-    if (!isImageItem(item)) return;
-    for (const resource of item.media.sources ?? []) {
-      const source = this.#ownerDocument.createElement("source");
-      source.srcset = candidateSet(resource.candidates);
-      if (resource.sizes) source.sizes = resource.sizes;
-      if (resource.media) source.media = resource.media;
-      if (resource.type) source.type = resource.type;
-      slide.picture.insertBefore(source, slide.image);
+    if (item.media.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
+      for (const resource of item.media.sources ?? []) {
+        const source = this.#ownerDocument.createElement("source");
+        source.srcset = candidateSet(resource.candidates);
+        if (resource.sizes) source.sizes = resource.sizes;
+        if (resource.media) source.media = resource.media;
+        if (resource.type) source.type = resource.type;
+        slide.picture.insertBefore(source, slide.image);
+      }
+      slide.image.srcset = candidateSet(item.media.candidates);
+      if (item.media.sizes) slide.image.sizes = item.media.sizes;
+      slide.image.loading = index === this.#index ? "eager" : "lazy";
+      slide.image.fetchPriority = index === this.#index ? "high" : "low";
+      slide.image.src = item.media.src;
+    } else if (item.media.type === "video" && slide.image instanceof HTMLVideoElement) {
+      slide.image.src = item.media.src;
+      if (item.media.poster) slide.image.poster = item.media.poster.src;
+    } else if (item.media.type === "iframe" && slide.image instanceof HTMLIFrameElement) {
+      slide.image.src = item.media.src;
+      if (item.media.allow) slide.image.allow = item.media.allow;
+      if (item.media.referrerPolicy) slide.image.referrerPolicy = item.media.referrerPolicy;
+      if (item.media.sandbox) slide.image.setAttribute("sandbox", item.media.sandbox);
+    } else if (item.media.type === "custom") {
+      const renderer = this.#renderers[item.media.renderer];
+      if (!renderer) throw new TypeError(`Unknown lightbox renderer: ${item.media.renderer}`);
+      const controller = new AbortController();
+      slide.controller = controller;
+      slide.dispose =
+        renderer.mount({ item, index, target: slide.image, signal: controller.signal }) ??
+        undefined;
     }
-    slide.image.srcset = candidateSet(item.media.candidates);
-    if (item.media.sizes) slide.image.sizes = item.media.sizes;
-    slide.image.loading = index === this.#index ? "eager" : "lazy";
-    slide.image.fetchPriority = index === this.#index ? "high" : "low";
-    slide.image.src = item.media.src;
     slide.loaded = true;
   }
 
   #unload(slide: ViewerSlide) {
     if (!slide.loaded) return;
-    for (const source of slide.picture.querySelectorAll("source")) source.remove();
-    slide.image.removeAttribute("src");
-    slide.image.removeAttribute("srcset");
-    slide.image.removeAttribute("sizes");
+    slide.controller?.abort();
+    slide.controller = undefined;
+    slide.dispose?.();
+    slide.dispose = undefined;
+    for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
+    if (slide.image instanceof HTMLMediaElement) {
+      slide.image.pause();
+      slide.image.removeAttribute("src");
+      slide.image.load();
+    } else if (slide.image instanceof HTMLIFrameElement) {
+      slide.image.removeAttribute("src");
+    } else if (slide.image instanceof HTMLImageElement) {
+      slide.image.removeAttribute("src");
+      slide.image.removeAttribute("srcset");
+      slide.image.removeAttribute("sizes");
+    } else {
+      slide.image.replaceChildren();
+    }
     slide.loaded = false;
   }
 

@@ -1,9 +1,9 @@
 import { arraySource, createLightbox } from "@ogdakke/fluidbox";
-import type { LightboxController } from "@ogdakke/fluidbox";
+import type { LightboxController, LightboxItem, LightboxRenderer } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/styles.css";
 import "./headless.css";
 
-const source = arraySource([
+const source = arraySource<LightboxItem>([
   {
     id: "one",
     media: {
@@ -47,10 +47,28 @@ const origins = {
     return trigger && visual ? { trigger, visual, thumbnail: visual } : null;
   },
 };
+const increment = (name: string) => {
+  document.body.dataset[name] = String(Number(document.body.dataset[name] ?? 0) + 1);
+};
+const renderers = {
+  demo: {
+    mount({ target, item, signal }) {
+      increment("customMounts");
+      const content = document.createElement("button");
+      content.type = "button";
+      content.dataset.testCustomMedia = "";
+      content.textContent = `Custom ${item.id}`;
+      target.append(content);
+      signal.addEventListener("abort", () => increment("customAborts"), { once: true });
+      return () => increment("customDisposals");
+    },
+  },
+} satisfies Record<string, LightboxRenderer<DemoItem>>;
 
 const viewer: LightboxController<DemoItem> = createLightbox({
   source,
   origins,
+  renderers,
   portal: {
     mount({ target, controller, signal }) {
       const controls = document.createElement("div");
@@ -88,7 +106,11 @@ const viewer: LightboxController<DemoItem> = createLightbox({
     },
   },
 });
-const secondaryViewer: LightboxController<DemoItem> = createLightbox({ source, origins });
+const secondaryViewer: LightboxController<DemoItem> = createLightbox({
+  source,
+  origins,
+  renderers,
+});
 
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
   trigger.addEventListener("click", () => {
