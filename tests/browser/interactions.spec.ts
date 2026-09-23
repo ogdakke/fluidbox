@@ -1,5 +1,43 @@
 import { expect, test } from "@playwright/test";
 
+test("viewer selectors stay isolated and honor stylesheet order", async ({ page }) => {
+  await page.goto("/harness.html?no-filmstrip");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  await page.evaluate(() => {
+    const lookalike = document.createElement("div");
+    lookalike.id = "outside-lightbox-lookalike";
+    lookalike.dataset.lightboxDialog = "";
+    const frame = document.createElement("div");
+    frame.dataset.lightboxFrame = "";
+    lookalike.append(frame);
+    document.body.append(lookalike);
+
+    const earlyOverride = document.createElement("style");
+    earlyOverride.textContent =
+      "[data-lightbox-close] { width: 41px; } app-lightbox { --background: rgb(12 34 56); }";
+    document.head.prepend(earlyOverride);
+  });
+  await expect(page.locator("#outside-lightbox-lookalike")).toHaveCSS("position", "static");
+  await expect(page.locator("#outside-lightbox-lookalike [data-lightbox-frame]")).toHaveCSS(
+    "overflow",
+    "visible",
+  );
+
+  await page.locator("app-lightbox").first().click();
+  const overlay = page.locator("[data-lightbox-overlay]");
+  const close = overlay.locator("[data-lightbox-close]").first();
+  await expect(overlay).toHaveCSS("position", "fixed");
+  await expect(overlay.locator("[data-lightbox-backdrop]")).toHaveCSS(
+    "background-color",
+    "rgb(12, 34, 56)",
+  );
+  await expect(overlay.locator("[data-lightbox-frame]").first()).toHaveCSS("overflow", "hidden");
+  await expect(close).toHaveCSS("width", "32px");
+
+  await page.addStyleTag({ content: "[data-lightbox-close] { width: 41px; }" });
+  await expect(close).toHaveCSS("width", "41px");
+});
+
 test("playground opens both the DOM gallery and indexed source", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Open, swipe, zoom, explore." })).toBeVisible();

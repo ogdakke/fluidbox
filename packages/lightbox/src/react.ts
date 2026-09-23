@@ -5,6 +5,23 @@ import { registerLightboxElements } from "./register";
 import type { AppGallery } from "./gallery";
 import type { LightboxGallerySource } from "./source";
 
+export type {
+  LightboxActionProps,
+  LightboxContentProps,
+  LightboxFilmstripProps,
+  LightboxFilmstripRenderContext,
+  LightboxItemProps,
+  LightboxPortalProps,
+  LightboxReactParts,
+  LightboxReactRenderer,
+  LightboxReactRenderContext,
+  LightboxRootProps,
+  LightboxThumbnailOverlayProps,
+  LightboxTriggerProps,
+  UseLightbox,
+  UseLightboxState,
+} from "./react-public-api";
+
 export interface FluidboxGalleryProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
   source?: LightboxGallerySource | null;
   children?: ReactNode;

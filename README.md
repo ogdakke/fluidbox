@@ -80,6 +80,7 @@ bun run dev                 # builds the package, then watches package code and 
 bun run build:example
 bun run build:frameworks
 bun run test
+bun run test:contract
 bun run test:ssr
 bun run test:bundle
 bun run test:browser
@@ -88,5 +89,9 @@ bun run format:check
 ```
 
 The vanilla playground includes a small gallery and an indexed gallery with 100,000 items. Run `bun run --cwd examples/frameworks dev` to open the React, Solid, Vue, and Angular pages. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
+
+The [public API contract](docs/PUBLIC_API.md) defines the headless source, controller, renderer,
+origin, and thumbnail-overlay target. The [roadmap to 1.0](docs/ROADMAP.md) tracks its runtime and
+framework implementation, CDN adapters, styling work, and release gates.
 
 Portfolio declares `"@ogdakke/fluidbox": "file:../lightbox/packages/lightbox"`, so a fresh checkout works after building this package and running `bun install` in `portfolio-v4`. For a live directory link during development, run `bun link` in `packages/lightbox`, then `bun link @ogdakke/fluidbox` in `portfolio-v4`. Reapply the consumer link after reinstalling dependencies.

@@ -9,6 +9,7 @@
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "test": "bun run --bun vitest run --pool=threads --maxWorkers=1",
+    "test:contract": "tsc --noEmit",
     "dev": "bun run build && concurrently --kill-others --names package,example \"bun run --cwd packages/lightbox build --watch --no-clean\" \"vite examples/vanilla\"",
     "build:example": "bun run build && bun run --cwd examples/vanilla build",
     "build:frameworks": "bun run build && bun run --cwd examples/frameworks build",

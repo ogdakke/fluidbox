@@ -14,4 +14,10 @@ export interface LightboxGallerySource {
   readonly count: number;
   getItem(index: number): LightboxSourceItem;
   getOrigin?(id: string): HTMLElement | null;
+  /** Move a virtualized host toward the selected origin. Never blocks viewer motion. */
+  revealOrigin?(
+    id: string,
+    index: number,
+    context: { signal: AbortSignal; reason: "open" | "selection" },
+  ): void | Promise<void>;
 }

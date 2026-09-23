@@ -15,6 +15,7 @@ export class AppGallery extends HTMLElement {
   }
 
   set source(source: LightboxGallerySource | null) {
+    if (this.#source !== source) this.#controller?.sourceChanged();
     this.#source = source;
     if (source) {
       if (!this.hasAttribute("tabindex")) this.tabIndex = -1;

@@ -1,10 +1,11 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { build } from "tsdown";
 
 const entrypoints = ["root", "elements", "react", "solid", "vue", "angular"] as const;
-const frameworks = ["react", "solid-js", "vue", "@angular/core"];
-const expectedFramework: Record<(typeof entrypoints)[number], string | null> = {
+type Entry = (typeof entrypoints)[number];
+const frameworkPeers = ["react", "solid-js", "vue", "@angular/core"] as const;
+const expectedFramework: Record<Entry, (typeof frameworkPeers)[number] | null> = {
   root: null,
   elements: null,
   react: "react",
@@ -13,8 +14,9 @@ const expectedFramework: Record<(typeof entrypoints)[number], string | null> = {
   angular: "@angular/core",
 };
 
-// Gzip limits cover the initial static import graph of each consumer entry.
-const gzipLimits: Record<(typeof entrypoints)[number], number> = {
+// Keep the original initial-import ceilings, including the separate CSS limit.
+// The static-graph method is unchanged; unlazy now contributes to the measured bytes.
+const initialGzipLimits: Record<Entry, number> = {
   root: 600,
   elements: 25_000,
   react: 1_500,
@@ -22,9 +24,67 @@ const gzipLimits: Record<(typeof entrypoints)[number], number> = {
   vue: 1_500,
   angular: 1_500,
 };
+const cssGzipLimit = 5_000;
+const activationJsGzipLimit = 24_500;
+const activationWithCssGzipLimit = 28_500;
+
+type Chunk = Extract<
+  Awaited<ReturnType<typeof build>>["bundles"][number]["chunks"][number],
+  { type: "chunk" }
+>;
+type Size = { rawBytes: number; gzipBytes: number };
+
+const sizeOf = (code: string | Uint8Array): Size => ({
+  rawBytes: Buffer.byteLength(code),
+  gzipBytes: gzipSync(code).byteLength,
+});
+const isFrameworkImport = (specifier: string, peer: string): boolean =>
+  specifier === peer || specifier.startsWith(`${peer}/`);
+const peerFor = (specifier: string): (typeof frameworkPeers)[number] | undefined =>
+  frameworkPeers.find((peer) => isFrameworkImport(specifier, peer));
+
+const jsonIndex = process.argv.indexOf("--json");
+if (
+  jsonIndex !== -1 &&
+  (!process.argv[jsonIndex + 1] || process.argv[jsonIndex + 1].startsWith("--"))
+) {
+  throw new Error("--json requires an output path");
+}
+const jsonPath = jsonIndex === -1 ? null : process.argv[jsonIndex + 1];
+const css = sizeOf(await readFile("packages/lightbox/dist/styles.css"));
+const tsdownInfo = JSON.parse(await readFile("node_modules/tsdown/package.json", "utf8")) as {
+  version: string;
+};
+const report = {
+  schemaVersion: 1,
+  command: "bun run test:bundle",
+  toolVersions: {
+    bun: process.versions.bun ?? "unknown",
+    tsdown: tsdownInfo.version,
+  },
+  method:
+    "tsdown browser ESM, es2022, minified consumer builds; gzip each emitted JS chunk once; exclude only framework peer externals",
+  limits: {
+    initialJsGzipBytes: initialGzipLimits,
+    cssGzipBytes: cssGzipLimit,
+    activationJsGzipBytes: activationJsGzipLimit,
+    activationWithCssGzipBytes: activationWithCssGzipLimit,
+  },
+  css,
+  entries: {} as Record<
+    Entry,
+    {
+      initialJs: Size;
+      activationJs: Size;
+      activationWithCss: Size;
+      chunks: Array<Size & { fileName: string; phase: "initial" | "lazy" }>;
+      frameworkExternals: string[];
+      errors: string[];
+    }
+  >,
+};
 
 let failed = false;
-
 for (const name of entrypoints) {
   const result = await build({
     entry: `tests/bundle/${name}.ts`,
@@ -37,72 +97,104 @@ for (const name of entrypoints) {
     report: false,
     clean: false,
     write: false,
-    deps: { neverBundle: [...frameworks, "unlazy"] },
+    deps: { neverBundle: [...frameworkPeers] },
   });
 
   const chunks = result.bundles
     .flatMap((bundle) => bundle.chunks)
-    .filter((chunk) => chunk.type === "chunk");
+    .filter((chunk): chunk is Chunk => chunk.type === "chunk");
   const byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
   const entry = chunks.find((chunk) => chunk.isEntry);
   if (!entry) throw new Error(`tsdown did not emit an entry for ${name}`);
 
   const visited = new Set<string>();
-  const staticChunks: typeof chunks = [];
-  const externalImports = new Set<string>();
-  const visit = (fileName: string): void => {
+  const initial = new Set<string>();
+  const externals = new Set<string>();
+  const unresolved = new Set<string>();
+  const visitInitial = (fileName: string): void => {
+    if (initial.has(fileName)) return;
+    initial.add(fileName);
+    const chunk = byName.get(fileName);
+    if (!chunk) throw new Error(`${name}: missing emitted chunk ${fileName}`);
+    for (const imported of chunk.imports) {
+      if (byName.has(imported)) visitInitial(imported);
+    }
+  };
+  const visitActivation = (fileName: string): void => {
     if (visited.has(fileName)) return;
     visited.add(fileName);
     const chunk = byName.get(fileName);
-    if (!chunk) return;
-    staticChunks.push(chunk);
-    for (const imported of chunk.imports) {
-      if (byName.has(imported)) visit(imported);
-      else externalImports.add(imported);
+    if (!chunk) throw new Error(`${name}: missing emitted chunk ${fileName}`);
+    for (const imported of [...chunk.imports, ...chunk.dynamicImports]) {
+      if (byName.has(imported)) visitActivation(imported);
+      else if (peerFor(imported)) externals.add(imported);
+      else unresolved.add(imported);
     }
   };
-  visit(entry.fileName);
+  visitInitial(entry.fileName);
+  visitActivation(entry.fileName);
 
-  const code = staticChunks.map((chunk) => chunk.code).join("\n");
-  const bytes = Buffer.byteLength(code);
-  const gzipBytes = gzipSync(code).byteLength;
-  const allImports = new Set(
-    chunks.flatMap((chunk) => [...chunk.imports, ...chunk.dynamicImports]),
+  const initialChunks = [...initial].map((fileName) => byName.get(fileName)!);
+  const activationChunks = [...visited].map((fileName) => byName.get(fileName)!);
+  // Preserve the legacy concatenated static-graph calculation. It now includes unlazy.
+  const initialJs = sizeOf(initialChunks.map((chunk) => chunk.code).join("\n"));
+  const chunkSizes = activationChunks.map((chunk) => ({
+    fileName: chunk.fileName,
+    phase: (initial.has(chunk.fileName) ? "initial" : "lazy") as "initial" | "lazy",
+    ...sizeOf(chunk.code),
+  }));
+  const activationJs = chunkSizes.reduce<Size>(
+    (total, chunk) => ({
+      rawBytes: total.rawBytes + chunk.rawBytes,
+      gzipBytes: total.gzipBytes + chunk.gzipBytes,
+    }),
+    { rawBytes: 0, gzipBytes: 0 },
   );
-  const forbidden = frameworks.filter(
-    (framework) => framework !== expectedFramework[name] && allImports.has(framework),
+  const activationWithCss = {
+    rawBytes: activationJs.rawBytes + css.rawBytes,
+    gzipBytes: activationJs.gzipBytes + css.gzipBytes,
+  };
+  const forbidden = [...externals].filter(
+    (specifier) => peerFor(specifier) !== expectedFramework[name],
   );
-  const oversized = gzipBytes > gzipLimits[name];
-  const registersLightbox = /customElements\.define\([`"']app-lightbox[`"']/.test(code);
-  const eagerElements = name !== "elements" && registersLightbox;
-  const missingElements = name === "elements" && !registersLightbox;
+  const initialCode = initialChunks.map((chunk) => chunk.code).join("\n");
+  const registersLightbox = /customElements\.define\([`"']app-lightbox[`"']/.test(initialCode);
+  const errors = [
+    unresolved.size && `unresolved runtime externals: ${[...unresolved].join(", ")}`,
+    forbidden.length && `unexpected framework imports: ${forbidden.join(", ")}`,
+    initialJs.gzipBytes > initialGzipLimits[name] &&
+      `initial JS gzip budget exceeded (${initialGzipLimits[name]} B)`,
+    activationJs.gzipBytes > activationJsGzipLimit &&
+      `activation JS gzip budget exceeded (${activationJsGzipLimit} B)`,
+    activationWithCss.gzipBytes > activationWithCssGzipLimit &&
+      `activation with CSS gzip budget exceeded (${activationWithCssGzipLimit} B)`,
+    name !== "elements" && registersLightbox && "custom elements loaded eagerly",
+    name === "elements" && !registersLightbox && "custom element registration missing",
+  ].filter((error): error is string => typeof error === "string");
 
+  report.entries[name] = {
+    initialJs,
+    activationJs,
+    activationWithCss,
+    chunks: chunkSizes,
+    frameworkExternals: [...externals].sort(),
+    errors,
+  };
   console.log(
-    `${name.padEnd(8)} ${String(bytes).padStart(7)} B raw  ${String(gzipBytes).padStart(6)} B gzip  imports: ${[...externalImports].join(", ") || "none"}`,
+    `${name.padEnd(8)} initial ${String(initialJs.gzipBytes).padStart(6)} B gzip  activation JS ${String(activationJs.gzipBytes).padStart(6)} B gzip  + CSS ${String(activationWithCss.gzipBytes).padStart(6)} B gzip`,
   );
-  if (forbidden.length || oversized || eagerElements || missingElements) {
-    console.error(
-      `${name}: ${[
-        forbidden.length && `unexpected framework imports: ${forbidden.join(", ")}`,
-        oversized && `gzip budget exceeded (${gzipLimits[name]} B)`,
-        eagerElements && "custom elements loaded eagerly",
-        missingElements && "custom element registration missing",
-      ]
-        .filter(Boolean)
-        .join("; ")}`,
-    );
+  if (errors.length) {
+    console.error(`${name}: ${errors.join("; ")}`);
     failed = true;
   }
 }
 
-const css = await readFile("packages/lightbox/dist/styles.css");
-const cssGzip = gzipSync(css).byteLength;
 console.log(
-  `styles   ${String(css.byteLength).padStart(7)} B raw  ${String(cssGzip).padStart(6)} B gzip`,
+  `styles   ${String(css.rawBytes).padStart(7)} B raw  ${String(css.gzipBytes).padStart(6)} B gzip`,
 );
-if (cssGzip > 5_000) {
-  console.error("styles: gzip budget exceeded (5000 B)");
+if (css.gzipBytes > cssGzipLimit) {
+  console.error(`styles: gzip budget exceeded (${cssGzipLimit} B)`);
   failed = true;
 }
-
+if (jsonPath) await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
 if (failed) process.exitCode = 1;

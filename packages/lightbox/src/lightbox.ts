@@ -3,6 +3,17 @@ import { triggerLoad } from "unlazy";
 import { GalleryStrip, type GalleryItem, type GalleryItemSource } from "./gallery-strip";
 import { AppGallery } from "./gallery";
 import { AppFilmstrip, type FilmstripSession } from "./filmstrip";
+import { markedVisualOrigin, originIsVisible } from "./origin-geometry";
+import { OriginRevealCoordinator } from "./origin-reveal";
+import type { LightboxGallerySource } from "./source";
+import {
+  cropPose,
+  emptyClip,
+  emptyRadii,
+  mapRadii,
+  type ImageClip,
+  type ThumbnailPose,
+} from "./transition-geometry";
 import {
   backdropVisibility,
   boundDismissVelocity,
@@ -30,46 +41,6 @@ const OPENING_SPRING_RESPONSE = 210;
 const TOUCH_OPENING_SPRING_RESPONSE = 380;
 const OPENING_BACKDROP_EASING = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 type TransitionPhase = "preview" | "opening" | "open" | "dragging" | "closing";
-
-interface ImageClip {
-  x: number;
-  y: number;
-  radii: CornerRadii;
-}
-
-interface ThumbnailPose extends ImageClip {
-  transform: string;
-}
-
-const emptyRadii = (): CornerRadii => [0, 0, 0, 0];
-const emptyClip = (): ImageClip => ({ x: 0, y: 0, radii: emptyRadii() });
-
-function mapRadii(radii: CornerRadii, map: (radius: number, index: number) => number): CornerRadii {
-  return [map(radii[0], 0), map(radii[1], 1), map(radii[2], 2), map(radii[3], 3)];
-}
-
-interface CropPose {
-  frame: DOMMatrix;
-  image: DOMMatrix;
-  borderRadius: string;
-}
-
-function cropPose(transform: DOMMatrix, clip: ImageClip, width: number, height: number): CropPose {
-  const x = Math.min(Math.max(0, clip.x), Math.max(0, width / 2 - 0.01));
-  const y = Math.min(Math.max(0, clip.y), Math.max(0, height / 2 - 0.01));
-  const crop = new DOMMatrix()
-    .translate(x, y)
-    .scale(Math.max(0.0001, (width - x * 2) / width), Math.max(0.0001, (height - y * 2) / height));
-  const frame = transform.multiply(crop);
-  const image = frame.inverse().multiply(transform);
-  const radiiX = mapRadii(clip.radii, (radius) => radius / Math.max(0.0001, Math.abs(frame.a)));
-  const radiiY = mapRadii(clip.radii, (radius) => radius / Math.max(0.0001, Math.abs(frame.d)));
-  return {
-    frame,
-    image,
-    borderRadius: `${radiiX.join("px ")}px / ${radiiY.join("px ")}px`,
-  };
-}
 
 class AppLightbox extends HTMLElement {
   static observedAttributes = ["src", "alt", "loading", "close-button"];
@@ -116,6 +87,8 @@ class AppLightbox extends HTMLElement {
   #hiddenThumbnail: HTMLElement | null = null;
   #pendingImage: (() => void) | undefined;
   #gallery: GalleryStrip | undefined;
+  #sessionSource: LightboxGallerySource | null = null;
+  #originReveal = new OriginRevealCoordinator();
   #filmstrip: FilmstripSession | undefined;
   #filmstripDock: HTMLDivElement | undefined;
   #openingControlsRevealDelay = 210;
@@ -383,7 +356,7 @@ class AppLightbox extends HTMLElement {
   }
 
   #updateCloseTarget() {
-    const thumbnail = this.#thumbnailImg;
+    const thumbnail = this.#transitionOrigin;
     const frameEffect = this.#animations[0]?.effect;
     const imageEffect = this.#animations[1]?.effect;
     const radiusEffect = this.#animations[2]?.effect;
@@ -430,12 +403,25 @@ class AppLightbox extends HTMLElement {
   }
 
   get #thumbnailImg(): HTMLElement | null {
-    if (!this.#gallery) return this.#ownPreview;
-    const item = this.#gallery.item;
+    // Preparation builds opening keyframes before open() promotes this gallery.
+    const gallery = this.#gallery ?? this.#preparedGallery?.gallery;
+    if (!gallery) return this.#ownPreview;
+    const item = gallery.item;
     const previewMore = this.#previewMore;
     if (previewMore && this.#usesPreviewMore(item.trigger))
       return previewMore.#ownPreview ?? previewMore;
     return item.preview ?? item.thumbnail;
+  }
+
+  get #transitionOrigin(): HTMLElement | null {
+    if (
+      this.#gallery &&
+      this.#sessionSource &&
+      this.closest<AppGallery>("app-gallery")?.source !== this.#sessionSource
+    )
+      return null;
+    const origin = this.#thumbnailImg;
+    return origin?.isConnected && originIsVisible(origin) ? origin : null;
   }
 
   #usesPreviewMore(trigger = this.#gallery?.item.trigger) {
@@ -806,13 +792,8 @@ class AppLightbox extends HTMLElement {
       if (proxy) return proxy;
     }
 
-    if (trigger.matches("[data-lightbox-preview]")) return trigger;
-    const preview = trigger.querySelector<HTMLElement>("[data-lightbox-preview]");
-    if (preview) return preview;
-
-    if (trigger.matches("[data-lightbox-target]")) return trigger;
-    const target = trigger.querySelector<HTMLElement>("[data-lightbox-target]");
-    if (target) return target;
+    const marked = markedVisualOrigin(trigger);
+    if (marked) return marked;
 
     if (trigger.matches("img, video")) return trigger;
     return (
@@ -849,7 +830,7 @@ class AppLightbox extends HTMLElement {
   #prepareGallery() {
     if (this.#phase !== "closed") return;
     const group = this.closest<AppGallery>("app-gallery");
-    if (!(group instanceof AppGallery) || group.itemCount < 2) return;
+    if (!(group instanceof AppGallery) || (!group.source && group.itemCount < 2)) return;
     const ownIndex = group.source
       ? Number(this.dataset.lightboxSourceIndex)
       : group.lightboxes.indexOf(this);
@@ -882,7 +863,7 @@ class AppLightbox extends HTMLElement {
             return {
               id: data.id,
               trigger: origin ?? this,
-              preview: thumbnail,
+              preview: origin ? (markedVisualOrigin(origin) ?? thumbnail) : null,
               thumbnail,
               thumbnailSrc: data.thumbnailSrc,
               previewSrc: data.previewSrc ?? data.thumbnailSrc,
@@ -1025,7 +1006,11 @@ class AppLightbox extends HTMLElement {
   }
 
   public select(index: number) {
-    if (this.#phase === "open" && this.#gallery) this.#gallery.select(index);
+    if (this.#phase !== "open" || !this.#gallery) return;
+    // An explicit API selection also takes ownership of a filmstrip scroll
+    // whose final scrollend has not fired, including a same-index request.
+    this.#filmstrip?.scrollTo(Math.max(0, Math.min(index, this.#gallery.items.length - 1)), false);
+    this.#gallery.select(index);
   }
 
   public open() {
@@ -1055,11 +1040,12 @@ class AppLightbox extends HTMLElement {
       triggerLoad(image);
     }
     const group = this.closest<AppGallery>("app-gallery");
-    if (group instanceof AppGallery && group.itemCount > 1) {
+    if (group instanceof AppGallery && (group.source || group.itemCount > 1)) {
       if (!this.#preparedOverlay) this.#prepareOpen();
       this.#gallery = this.#preparedGallery?.gallery;
       this.#preparedGallery = undefined;
       if (!this.#gallery) return;
+      this.#sessionSource = group.source;
       this.#backgroundSelection = this.#gallery.index;
       this.#galleryTrigger = this;
       this.#gallerySelectionIndex = this.#gallery.index;
@@ -1173,7 +1159,28 @@ class AppLightbox extends HTMLElement {
       this.#transitionContent.dataset.lightboxControlsRevealing = "";
     }
     this.#focus();
+    this.#requestOriginReveal("open");
     this.dispatchEvent(new CustomEvent("lightbox-open", { bubbles: true }));
+  }
+
+  /** @internal Called by the gallery when its source reference changes. */
+  public sourceChanged() {
+    this.#abortOriginReveal();
+  }
+
+  #abortOriginReveal() {
+    this.#originReveal.abort();
+  }
+
+  #requestOriginReveal(reason: "open" | "selection") {
+    this.#abortOriginReveal();
+    const group = this.closest<AppGallery>("app-gallery");
+    const source = this.#sessionSource;
+    if (!this.#gallery || !source || group?.source !== source) return;
+    const index = this.#gallery.index;
+    const id = this.#gallery.item.id;
+    if (!id) return;
+    this.#originReveal.request(source, id, index, reason);
   }
 
   #prepareZoom() {
@@ -1225,11 +1232,13 @@ class AppLightbox extends HTMLElement {
       closeOpacity,
       clip: crop.clip,
     });
+    this.#requestOriginReveal("open");
     this.dispatchEvent(new CustomEvent("lightbox-open", { bubbles: true }));
   }
 
   public close() {
     if (this.#phase !== "open") return;
+    this.#abortOriginReveal();
     if (this.#dialog) delete this.#dialog.dataset.filmstripRevealing;
     if (this.#transitionContent) delete this.#transitionContent.dataset.lightboxControlsRevealing;
     this.#zoom?.suspend();
@@ -1241,8 +1250,15 @@ class AppLightbox extends HTMLElement {
       const group = this.closest<AppGallery>("app-gallery");
       if (group?.source) {
         const id = this.#gallery.item.id;
-        const origin = id ? group.source.getOrigin?.(id) : null;
-        this.#returnFocus = origin?.isConnected ? origin : group;
+        let origin: HTMLElement | null = null;
+        if (group.source === this.#sessionSource && id) {
+          try {
+            origin = group.source.getOrigin?.(id) ?? null;
+          } catch {
+            // A lookup failure uses the gallery as the focus fallback.
+          }
+        }
+        this.#returnFocus = origin?.isConnected && originIsVisible(origin) ? origin : group;
       } else {
         const trigger = this.#gallery.item.trigger;
         this.#returnFocus = trigger instanceof AppLightbox ? trigger.#triggerElement : trigger;
@@ -1270,6 +1286,8 @@ class AppLightbox extends HTMLElement {
     if (!settled) this.#completeOpening();
     const changed = this.#gallerySelectionIndex !== this.#gallery.index;
     if (changed) {
+      this.#abortOriginReveal();
+      if (this.#sessionSource) this.#backgroundSelection = -1;
       const outgoingVideo =
         this.#image instanceof HTMLVideoElement
           ? this.#image
@@ -1319,11 +1337,12 @@ class AppLightbox extends HTMLElement {
     }
     if (settled && this.#gallery.index !== this.#backgroundSelection) {
       this.#backgroundSelection = this.#gallery.index;
-      // Only navigation changes the background; opening preserves the reading position.
-      const trigger = this.#gallery.item.trigger;
-      const group = trigger.closest("app-gallery");
-      if (group instanceof AppGallery && trigger instanceof AppLightbox) {
-        group.scrollItemIntoView(trigger);
+      const group = this.closest<AppGallery>("app-gallery");
+      if (group?.source) {
+        this.#requestOriginReveal("selection");
+      } else {
+        const trigger = this.#gallery.item.trigger;
+        if (group && trigger instanceof AppLightbox) group.scrollItemIntoView(trigger);
       }
     }
     if (changed)
@@ -1806,6 +1825,8 @@ class AppLightbox extends HTMLElement {
           this.#cancelAnimations();
         }
         this.#completeOpening();
+        // Keyboard navigation supersedes unfinished filmstrip momentum.
+        this.#filmstrip?.scrollTo(this.#gallery.index, false);
         this.#gallery.navigate(event.key === "ArrowRight" ? 1 : -1, this.#prefersReducedMotion);
       }
     }
@@ -1930,8 +1951,8 @@ class AppLightbox extends HTMLElement {
   }
 
   #thumbnailPose(): ThumbnailPose {
-    const thumbnail = this.#thumbnailImg;
-    if (!thumbnail?.isConnected || !this.#image) return { transform: "none", ...emptyClip() };
+    const thumbnail = this.#transitionOrigin;
+    if (!thumbnail || !this.#image) return { transform: "none", ...emptyClip() };
     const from = thumbnail.getBoundingClientRect();
     // offset dimensions are unaffected by an in-flight transform.
     const current = this.#readCropPose();
@@ -1956,8 +1977,8 @@ class AppLightbox extends HTMLElement {
   }
 
   get #thumbnailRadii(): CornerRadii {
-    const thumbnail = this.#thumbnailImg;
-    if (!thumbnail?.isConnected) return emptyRadii();
+    const thumbnail = this.#transitionOrigin;
+    if (!thumbnail) return emptyRadii();
     const style = getComputedStyle(thumbnail);
     return [
       Number.parseFloat(style.borderTopLeftRadius) || 0,
@@ -2042,7 +2063,8 @@ class AppLightbox extends HTMLElement {
     const closeOpacity = resume?.closeOpacity ?? getComputedStyle(this.#closeButton!).opacity;
     const thumbnailPose = this.#thumbnailPose();
     const transform = thumbnailPose.transform;
-    const originlessSource = !!this.#gallery && !this.#thumbnailImg?.isConnected;
+    const originlessSource =
+      !!(this.#gallery ?? this.#preparedGallery?.gallery) && !this.#transitionOrigin;
     const imageBounds = this.#image!.getBoundingClientRect();
     const bounds = {
       left: imageBounds.left - current.transform.e,
@@ -2429,6 +2451,7 @@ class AppLightbox extends HTMLElement {
   }
 
   #finishClose() {
+    this.#abortOriginReveal();
     this.#zoom?.destroy();
     this.#zoom = undefined;
     this.#wheelDirection = 0;
@@ -2505,6 +2528,7 @@ class AppLightbox extends HTMLElement {
     }
     this.#inertElements.clear();
     this.#phase = "closed";
+    this.#sessionSource = null;
     this.#setPresentationState("closed");
     if (AppLightbox.#active === this) AppLightbox.#active = null;
     if (this.#returnFocus?.isConnected) this.#returnFocus.focus({ preventScroll: true });
