@@ -119,3 +119,34 @@ test("plain runtime publishes drag state and dismisses from a touch pointer", as
   await expect(overlay).toHaveCount(0);
   await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
 });
+
+test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  const overlay = page.locator("[data-lightbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+
+  const progress = await page.locator("[data-lightbox-frame]").evaluate(async (element) => {
+    let maximum = 0;
+    for (let index = 0; index < 3; index++) {
+      element.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }),
+      );
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const overlay = document.querySelector<HTMLElement>("[data-lightbox-overlay]")!;
+      maximum = Math.max(
+        maximum,
+        Number(overlay.style.getPropertyValue("--lightbox-dismiss-progress")),
+      );
+    }
+    return maximum;
+  });
+  expect(progress).toBeGreaterThan(0);
+  await page.locator("[data-lightbox-frame]").dispatchEvent("wheel", {
+    deltaX: 0,
+    deltaY: 160,
+    deltaMode: 0,
+  });
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
+});

@@ -2,6 +2,7 @@ import { originIsVisible } from "./origin-geometry";
 import {
   backdropVisibility,
   boundDismissVelocity,
+  dragDistance,
   dragProgress,
   LightboxGestureController,
   touchAxisThreshold,
@@ -87,7 +88,7 @@ export class DomViewerDriver<
     | undefined;
   readonly #dragGesture = new LightboxGestureController(
     (state) => this.#paintDrag(state),
-    () => {},
+    () => this.#commitWheelDismiss(),
   );
   #returnFocus: HTMLElement | null = null;
   #destroyed = false;
@@ -128,6 +129,10 @@ export class DomViewerDriver<
     });
     this.#portal.container.addEventListener("pointercancel", this.#onPointerCancel, {
       passive: true,
+      signal: this.#lifetime.signal,
+    });
+    this.#portal.container.addEventListener("wheel", this.#onWheel, {
+      passive: false,
       signal: this.#lifetime.signal,
     });
     ownerDocument.addEventListener("keydown", this.#onKeydown, {
@@ -369,7 +374,7 @@ export class DomViewerDriver<
     };
   }
 
-  #beginDrag() {
+  #beginDrag(wheelDirection = 0) {
     if (this.#dragGesture.active || this.#controller?.state.status !== "open") return;
     const frame = this.#portal.frame;
     const style = getComputedStyle(frame);
@@ -377,7 +382,8 @@ export class DomViewerDriver<
     const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
     const state = this.#dragGesture.begin({
       matrix,
-      wheelDirection: 0,
+      wheelTarget: wheelDirection ? new DOMMatrix() : undefined,
+      wheelDirection,
       wheelOffset: 0,
       wheelSnapOffset: 0,
       opacity: Number(getComputedStyle(this.#portal.backdrop).opacity),
@@ -412,6 +418,22 @@ export class DomViewerDriver<
     this.#portal.overlay.style.setProperty("--lightbox-dismiss-progress", String(progress));
     this.#portal.frame.style.transform = `translate(${state.x}px, ${state.y}px) scale(${scale})`;
     this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
+    if (
+      state.wheelTarget &&
+      state.wheelPhase === "past-open" &&
+      Math.abs(dragDistance(state)) < 0.1
+    ) {
+      this.#dragGesture.finish();
+      this.#clearMotionStyles();
+    }
+  }
+
+  #commitWheelDismiss() {
+    const release = this.#dragGesture.finish();
+    if (!release) return;
+    this.#paintDrag(release.state);
+    this.#interruptedPose = this.#paintedPose();
+    void this.#controller?.close({ reason: "wheel" });
   }
 
   #endDrag(cancel = false) {
@@ -537,5 +559,22 @@ export class DomViewerDriver<
   #onPointerCancel = (event: PointerEvent) => {
     if (event.pointerId !== this.#pointer?.id) return;
     this.#endDrag(true);
+  };
+
+  #onWheel = (event: WheelEvent) => {
+    if (
+      event.ctrlKey ||
+      this.#controller?.state.status !== "open" ||
+      Math.abs(event.deltaY) <= Math.abs(event.deltaX) * 1.3 ||
+      (event.target instanceof Element &&
+        event.target.closest("button, a, input, select, textarea, [data-lightbox-portal]"))
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+    const direction = Math.sign(-event.deltaY);
+    this.#beginDrag(direction);
+    this.#dragGesture.moveWheel(event.deltaY * unit);
   };
 }
