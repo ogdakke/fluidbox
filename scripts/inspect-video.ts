@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
 const input = process.argv[2];
@@ -62,9 +62,16 @@ if (frameArgument) {
     "1",
     path,
   ]);
+  await writeFile(
+    resolve(output, "frames.json"),
+    JSON.stringify({ video, frameCount: frames.length, frames }, null, 2),
+  );
   console.log(`${path} at ${frames[index]!.videoTimeSeconds}s`);
 } else {
-  const path = resolve(output, "contact-sheet.jpg");
+  for (const name of await readdir(output)) {
+    if (/^contact-\d{3}\.jpg$/.test(name)) await Bun.file(resolve(output, name)).delete();
+  }
+  const pattern = resolve(output, "contact-%03d.jpg");
   await run([
     "ffmpeg",
     "-y",
@@ -73,10 +80,31 @@ if (frameArgument) {
     "-i",
     video,
     "-vf",
-    "scale=240:-2,tile=8x10",
-    "-frames:v",
-    "1",
-    path,
+    "scale=240:-2,drawtext=text='%{n}':x=3:y=3:fontsize=12:fontcolor=white:box=1:boxcolor=black@0.8,tile=8x10",
+    "-fps_mode",
+    "vfr",
+    pattern,
   ]);
-  console.log(`${path} (${frames.length} frames; sheet contains the first 80)`);
+  const sheets = (await readdir(output)).filter((name) => /^contact-\d{3}\.jpg$/.test(name)).sort();
+  if (sheets[0]) await copyFile(resolve(output, sheets[0]), resolve(output, "contact-sheet.jpg"));
+  await writeFile(
+    resolve(output, "frames.json"),
+    JSON.stringify(
+      {
+        video,
+        frameCount: frames.length,
+        contactSheets: sheets.map((name, index) => ({
+          file: name,
+          firstFrame: index * 80,
+          lastFrame: Math.min(frames.length - 1, index * 80 + 79),
+        })),
+        frames,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(
+    `${output}: ${frames.length} frames across ${sheets.length} numbered contact sheet(s)`,
+  );
 }

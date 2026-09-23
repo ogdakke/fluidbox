@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { expect, test, type CDPSession } from "@playwright/test";
 
 const capture = !!process.env.BASELINE_CAPTURE;
-const baselineRoot = resolve("baseline/current");
+const baselineRoot = resolve(process.env.BASELINE_OUTPUT || "test-results/capture");
 
 test.use({ video: "on", trace: "on" });
 
@@ -277,4 +277,116 @@ test("timecoded transition diagnostic", async ({ page }, testInfo) => {
   const video = page.video();
   await page.close();
   if (video) await video.saveAs(resolve(folder, "diagnostic.webm"));
+});
+
+test("indexed source timing and frame capture", async ({ page, browserName }, testInfo) => {
+  test.skip(!capture, "Run bun run test:browser:baseline to capture performance telemetry.");
+  const folder = resolve(baselineRoot, testInfo.project.name);
+  await mkdir(folder, { recursive: true });
+  await page.goto("/harness.html?virtual&count=100000");
+  const initialNodes = await page.locator("*").count();
+  await page.evaluate(() => {
+    const samples: Array<{ time: number; gapMs: number; active: string | null }> = [];
+    let previous = performance.now();
+    let active = true;
+    function frame(now: number) {
+      samples.push({
+        time: Math.round(now),
+        gapMs: Math.round((now - previous) * 100) / 100,
+        active:
+          document
+            .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+            ?.getAttribute("aria-label") ?? null,
+      });
+      previous = now;
+      if (active) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    Object.assign(window, { __sourcePerf: { samples, stop: () => (active = false) } });
+  });
+  let cdp: CDPSession | undefined;
+  let before: Record<string, number> | undefined;
+  if (browserName === "chromium") {
+    cdp = await page.context().newCDPSession(page);
+    await cdp.send("Performance.enable");
+    before = Object.fromEntries(
+      (await cdp.send("Performance.getMetrics")).metrics.map(
+        (metric: { name: string; value: number }) => [metric.name, metric.value],
+      ),
+    );
+  }
+  const openMs = await page
+    .locator("app-gallery")
+    .evaluate((gallery: HTMLElement & { open(index: number): void }) => {
+      const start = performance.now();
+      gallery.open(99_990);
+      return performance.now() - start;
+    });
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 99991 of 100000",
+  );
+  await page.waitForTimeout(400);
+  const openedNodes = await page.locator("*").count();
+  const slides = await page.locator("[data-lightbox-slide]").count();
+  const thumbnails = await page.locator("[data-lightbox-filmstrip-item]").count();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 99992 of 100000",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  const closedNodes = await page.locator("*").count();
+  const after = cdp
+    ? Object.fromEntries(
+        (await cdp.send("Performance.getMetrics")).metrics.map(
+          (metric: { name: string; value: number }) => [metric.name, metric.value],
+        ),
+      )
+    : undefined;
+  const samples = await page.evaluate(() => {
+    const probe = (window as Window & { __sourcePerf?: { samples: unknown[]; stop: () => void } })
+      .__sourcePerf!;
+    probe.stop();
+    return probe.samples;
+  });
+  const gaps = samples
+    .map((sample) => (sample as { gapMs: number }).gapMs)
+    .filter((gap) => gap > 0)
+    .toSorted((a, b) => a - b);
+  const cpu =
+    before && after
+      ? Object.fromEntries(
+          ["TaskDuration", "ScriptDuration", "LayoutDuration", "RecalcStyleDuration"].map(
+            (name) => [name, (after[name] ?? 0) - (before[name] ?? 0)],
+          ),
+        )
+      : null;
+  await writeFile(
+    resolve(folder, "source-100k-metrics.json"),
+    JSON.stringify(
+      {
+        browser: testInfo.project.name,
+        browserVersion: page.context().browser()?.version(),
+        scenario: "100k indexed items; open near end, navigate once, close",
+        openCallMs: Math.round(openMs * 100) / 100,
+        initialNodes,
+        openedNodes,
+        closedNodes,
+        slides,
+        thumbnails,
+        p95FrameGapMs: gaps[Math.floor(gaps.length * 0.95)] ?? null,
+        maxFrameGapMs: Math.max(...gaps),
+        gapsOver50Ms: gaps.filter((gap) => gap > 50).length,
+        cpuSeconds: cpu,
+        samples,
+      },
+      null,
+      2,
+    ),
+  );
+  const video = page.video();
+  await page.close();
+  if (video) await video.saveAs(resolve(folder, "source-100k.webm"));
 });

@@ -1,6 +1,6 @@
 # Browser and scalability testing
 
-The current baseline is documented in [`baseline/README.md`](../baseline/README.md). Capture it before changing renderer behavior.
+The current baseline is documented in [`baseline/README.md`](../baseline/README.md). It was captured before the renderer changed.
 
 ## Test tiers
 
@@ -26,8 +26,8 @@ Each interaction test should assert state and accessibility, then retain a trace
 
 ## Virtualization contract
 
-The future gallery source should expose a stable `count` and indexed item lookup without requiring every `<app-lightbox>` trigger in the DOM. Items need stable IDs and media/thumbnail metadata; an optional `getOrigin(id)` supplies a mounted element for shared-element transitions. When the host list recycles that element, the viewer must keep the item open and use a defined fallback closing animation.
+`LightboxGallerySource` now exposes `count`, `getItem(index)`, and optional `getOrigin(id)` without requiring every `<app-lightbox>` trigger in the DOM. Source items carry stable IDs and media/thumbnail metadata. The gallery owns a persistent hidden controller, so host thumbnails can be recycled while the viewer stays open. A missing origin uses a scale-and-fade transition, and focus returns to the gallery when the selected origin is no longer mounted.
 
-The viewer should keep a fixed overscanned window of slides around the active index and preserve native scroll geometry through spacers or an equivalent windowed track. The filmstrip should render only the visible thumbnail range and calculate the nearest index from scroll offset in constant time. Decodes and fetches outside the window must be cancelled. Selection should survive data refresh by ID, and mounted custom media must be restored or disposed exactly once.
+The slide renderer keeps at most 31 slides and rebases its native scroll window after settlement. The filmstrip keeps a viewport-sized thumbnail range and selects by scroll offset in constant time. Image decodes outside the active window are aborted; custom content, including iframes, mounts only near the active item and is restored when evicted.
 
-The first hard scalability gates after that work are independent of gallery size: a bounded number of slide and filmstrip nodes, bounded listeners and active decodes, O(1) selection work per animation frame, and no increase in retained heap after repeated open/close. The existing 10k baseline makes these regressions straightforward to detect.
+Pull-request tests enforce bounded slide, filmstrip, and total DOM counts at 1,000 and 100,000 items and exact DOM cleanup after repeated open/close. A same-run Chromium gate compares median synchronous open time at those sizes and saves raw measurements. The manual capture records frame gaps and CDP task/script/layout time. Absolute CPU/frame budgets still need calibration on a dedicated runner. An indexed source currently requires synchronous item lookup and stable count/IDs during a session; source mutation notifications, asynchronous pagination, and very large scroll tracks beyond the tested 100,000 items remain future work.

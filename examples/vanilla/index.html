@@ -3,21 +3,71 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Lightbox example</title>
+    <meta name="theme-color" content="#11151c" />
+    <title>Lightbox playground</title>
     <script type="module" src="/main.ts"></script>
   </head>
   <body>
     <main>
-      <h1>Lightbox example</h1>
-      <p>Open either image. Use arrow keys or swipe to change images.</p>
-      <app-gallery aria-label="Example gallery">
-        <app-lightbox src="/first.svg" alt="Blue and green circles" close-button>
-          <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
-        </app-lightbox>
-        <app-lightbox src="/second.svg" alt="Pink and orange squares" close-button>
-          <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
-        </app-lightbox>
-      </app-gallery>
+      <header>
+        <p class="eyebrow">@dw/lightbox playground</p>
+        <h1>Open, swipe, zoom, explore.</h1>
+        <p>
+          Try the gallery on a phone or desktop. Use swipe or arrow keys to move, pinch or wheel to
+          zoom, and Escape to close.
+        </p>
+      </header>
+      <section aria-labelledby="regular-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">DOM gallery</p>
+            <h2 id="regular-title">A small gallery</h2>
+          </div>
+          <p>Tap either image to open the viewer.</p>
+        </div>
+        <app-gallery class="photo-grid" aria-label="Example gallery">
+          <app-lightbox src="/first.svg" alt="Blue and green circles" close-button>
+            <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
+          </app-lightbox>
+          <app-lightbox src="/second.svg" alt="Pink and orange squares" close-button>
+            <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
+          </app-lightbox>
+          <app-filmstrip></app-filmstrip>
+        </app-gallery>
+      </section>
+      <section aria-labelledby="virtual-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Indexed source</p>
+            <h2 id="virtual-title">100,000 items, 12 mounted thumbnails</h2>
+          </div>
+          <p>Jump across the collection while the viewer stays open.</p>
+        </div>
+        <form id="jump-form" class="jump-form">
+          <label for="jump-index">Open item</label>
+          <input
+            id="jump-index"
+            name="index"
+            type="number"
+            min="1"
+            max="100000"
+            value="50000"
+            inputmode="numeric"
+          />
+          <button type="submit">Open</button>
+        </form>
+        <app-gallery id="virtual-gallery" class="virtual-grid" aria-label="Virtual source gallery">
+          <app-filmstrip></app-filmstrip>
+        </app-gallery>
+        <p class="hint">
+          Only the twelve cards shown here are in the host DOM. The viewer and filmstrip keep their
+          own small windows.
+        </p>
+      </section>
+      <footer>
+        For repeatable browser scenarios, open the
+        <a href="/harness.html?virtual&count=100000">test harness</a>.
+      </footer>
     </main>
   </body>
 </html>

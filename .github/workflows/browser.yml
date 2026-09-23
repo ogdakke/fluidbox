@@ -14,8 +14,16 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      - run: bun run format:check
+      - run: bun run lint:all
+      - run: bun run test
+      - run: bun run build:example
       - run: bunx playwright install --with-deps chromium firefox webkit
+      - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
       - run: bun run test:browser
+      - name: Index failure videos
+        if: failure()
+        run: bun run inspect:failures
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -36,13 +44,16 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bunx playwright install --with-deps chromium firefox webkit
+      - name: Generate missing WebKit visual references
+        run: VISUAL_BOOTSTRAP=1 bunx playwright test tests/browser/interactions.spec.ts --grep 'visually stable' --project=webkit --project=iphone-13 --project=ipad-pro-11 --update-snapshots
       - run: bun run test:browser:baseline
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
           name: current-lightbox-baseline
           path: |
-            baseline/current
+            test-results/capture
+            tests/browser/interactions.spec.ts-snapshots
             playwright-report
             test-results
           retention-days: 30

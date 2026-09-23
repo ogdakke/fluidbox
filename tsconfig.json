@@ -16,6 +16,7 @@
     "tests/**/*.ts",
     "playwright.config.ts",
     "types.d.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "vitest.config.ts"
   ]
 }

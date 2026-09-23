@@ -597,11 +597,15 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   [data-lightbox-filmstrip-scroll]::-webkit-scrollbar {
     display: none;
   }
+  [data-lightbox-filmstrip-track] {
+    position: relative;
+    flex: 0 0 auto;
+    height: 100%;
+  }
   [data-lightbox-filmstrip-item] {
     all: unset;
+    position: absolute;
     box-sizing: border-box;
-    position: relative;
-    flex: 0 0 var(--lightbox-filmstrip-item-size);
     width: var(--lightbox-filmstrip-item-size);
     height: var(--lightbox-filmstrip-item-size);
     margin-block: 6px;

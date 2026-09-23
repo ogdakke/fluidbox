@@ -6,3 +6,6 @@ export async function registerLightboxElements(): Promise<void> {
 
 export type { AppLightbox } from "./lightbox";
 export type { GalleryItem } from "./gallery-strip";
+
+export type { LightboxGallerySource, LightboxSourceItem } from "./source";
+export type { AppGallery } from "./gallery";

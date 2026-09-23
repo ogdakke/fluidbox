@@ -1,6 +1,6 @@
 import { LightboxZoom } from "./lightbox-zoom";
 import { triggerLoad } from "unlazy";
-import { GalleryStrip } from "./gallery-strip";
+import { GalleryStrip, type GalleryItem, type GalleryItemSource } from "./gallery-strip";
 import { AppGallery } from "./gallery";
 import { AppFilmstrip, type FilmstripSession } from "./filmstrip";
 import {
@@ -124,6 +124,7 @@ class AppLightbox extends HTMLElement {
   #preparedOpening = false;
   #prepareCleanup: ReturnType<typeof setTimeout> | undefined;
   #galleryTrigger: HTMLElement | null = null;
+  #gallerySelectionIndex = -1;
   #standaloneImage: HTMLElement | null = null;
   #standaloneFrame: HTMLDivElement | null = null;
   #frame: HTMLElement | null = null;
@@ -848,14 +849,16 @@ class AppLightbox extends HTMLElement {
   #prepareGallery() {
     if (this.#phase !== "closed") return;
     const group = this.closest<AppGallery>("app-gallery");
-    if (!(group instanceof AppGallery) || group.lightboxes.length < 2) return;
-    const ownIndex = group.lightboxes.indexOf(this);
+    if (!(group instanceof AppGallery) || group.itemCount < 2) return;
+    const ownIndex = group.source
+      ? Number(this.dataset.lightboxSourceIndex)
+      : group.lightboxes.indexOf(this);
     const proxyIndex = Number(this.dataset.lightboxPreviewIndex);
     const index =
       this.hasAttribute("data-lightbox-preview-more") &&
       Number.isInteger(proxyIndex) &&
       proxyIndex >= 0 &&
-      proxyIndex < group.lightboxes.length
+      proxyIndex < group.itemCount
         ? proxyIndex
         : ownIndex;
     if (
@@ -865,11 +868,32 @@ class AppLightbox extends HTMLElement {
       return;
     this.#preparedGallery?.gallery.destroy();
     const lightboxes = group.lightboxes;
-    this.#preparedGallery = {
-      group,
-      index,
-      gallery: new GalleryStrip(
-        lightboxes.map((lightbox, itemIndex) => {
+    const source = group.source;
+    const items: GalleryItemSource | GalleryItem[] = source
+      ? {
+          length: source.count,
+          get: (itemIndex) => {
+            const data = source.getItem(itemIndex);
+            const origin = source.getOrigin?.(data.id) ?? null;
+            const thumbnail =
+              origin instanceof HTMLImageElement
+                ? origin
+                : (origin?.querySelector<HTMLImageElement>("img") ?? null);
+            return {
+              id: data.id,
+              trigger: origin ?? this,
+              preview: thumbnail,
+              thumbnail,
+              thumbnailSrc: data.thumbnailSrc,
+              previewSrc: data.previewSrc ?? data.thumbnailSrc,
+              src: data.src,
+              alt: data.alt ?? "",
+              width: data.width,
+              height: data.height,
+            };
+          },
+        }
+      : lightboxes.map((lightbox, itemIndex) => {
           const hiddenSelectionPreview =
             itemIndex === index &&
             lightbox.hasAttribute("data-lightbox-preview-hidden") &&
@@ -907,10 +931,11 @@ class AppLightbox extends HTMLElement {
                 }
               : undefined,
           };
-        }),
-        index,
-        this.#onGalleryChange,
-      ),
+        });
+    this.#preparedGallery = {
+      group,
+      index,
+      gallery: new GalleryStrip(items, index, this.#onGalleryChange),
     };
   }
 
@@ -995,6 +1020,14 @@ class AppLightbox extends HTMLElement {
     this.#preparedOpening = false;
   }
 
+  public get isOpen() {
+    return this.#phase === "open";
+  }
+
+  public select(index: number) {
+    if (this.#phase === "open" && this.#gallery) this.#gallery.select(index);
+  }
+
   public open() {
     clearTimeout(this.#prepareCleanup);
     this.#prepareCleanup = undefined;
@@ -1022,13 +1055,14 @@ class AppLightbox extends HTMLElement {
       triggerLoad(image);
     }
     const group = this.closest<AppGallery>("app-gallery");
-    if (group instanceof AppGallery && group.lightboxes.length > 1) {
+    if (group instanceof AppGallery && group.itemCount > 1) {
       if (!this.#preparedOverlay) this.#prepareOpen();
       this.#gallery = this.#preparedGallery?.gallery;
       this.#preparedGallery = undefined;
       if (!this.#gallery) return;
       this.#backgroundSelection = this.#gallery.index;
       this.#galleryTrigger = this;
+      this.#gallerySelectionIndex = this.#gallery.index;
       this.#image = this.#gallery.active.image;
       this.#frame = this.#gallery.active.frame;
       this.#mountFilmstrip(group);
@@ -1204,8 +1238,15 @@ class AppLightbox extends HTMLElement {
     this.#gallery?.sync();
     this.#syncPreviewMore();
     if (this.#gallery) {
-      const trigger = this.#gallery.item.trigger;
-      this.#returnFocus = trigger instanceof AppLightbox ? trigger.#triggerElement : trigger;
+      const group = this.closest<AppGallery>("app-gallery");
+      if (group?.source) {
+        const id = this.#gallery.item.id;
+        const origin = id ? group.source.getOrigin?.(id) : null;
+        this.#returnFocus = origin?.isConnected ? origin : group;
+      } else {
+        const trigger = this.#gallery.item.trigger;
+        this.#returnFocus = trigger instanceof AppLightbox ? trigger.#triggerElement : trigger;
+      }
     }
     this.#phase = "closing";
     this.#setPresentationState("closing");
@@ -1227,7 +1268,7 @@ class AppLightbox extends HTMLElement {
   #onGalleryChange = (_index: number, settled: boolean) => {
     if (this.#phase !== "open" || !this.#gallery) return;
     if (!settled) this.#completeOpening();
-    const changed = this.#galleryTrigger !== this.#gallery.item.trigger;
+    const changed = this.#gallerySelectionIndex !== this.#gallery.index;
     if (changed) {
       const outgoingVideo =
         this.#image instanceof HTMLVideoElement
@@ -1238,6 +1279,7 @@ class AppLightbox extends HTMLElement {
       this.#image?.style.removeProperty("--lightbox-media-transform");
       if (this.#galleryTrigger) this.#setTriggerState(this.#galleryTrigger, false);
       this.#galleryTrigger = this.#gallery.item.trigger;
+      this.#gallerySelectionIndex = this.#gallery.index;
       this.#setTriggerState(this.#galleryTrigger, true);
     }
     this.#image = this.#gallery.active.image;
@@ -1288,7 +1330,11 @@ class AppLightbox extends HTMLElement {
       this.dispatchEvent(
         new CustomEvent("lightbox-change", {
           bubbles: true,
-          detail: { index: this.#gallery.index, lightbox: this.#gallery.item.trigger },
+          detail: {
+            index: this.#gallery.index,
+            id: this.#gallery.item.id,
+            lightbox: this.#gallery.item.trigger,
+          },
         }),
       );
   };
@@ -1312,8 +1358,8 @@ class AppLightbox extends HTMLElement {
     this.#setTransitionPhase("open");
     this.#setPresentationState("open");
     if (this.#standaloneImage) this.#revealContent(this.#standaloneImage);
-    for (const item of this.#gallery?.items ?? []) {
-      if (item.content) this.#revealContent(item.content);
+    for (const slide of this.#gallery?.slides.values() ?? []) {
+      if (slide.image.hasAttribute("data-lightbox-item-content")) this.#revealContent(slide.image);
     }
     for (const property of [
       "--lightbox-drag-x",
@@ -1877,6 +1923,7 @@ class AppLightbox extends HTMLElement {
     this.#animations = [];
     this.#frame?.style.removeProperty("--lightbox-frame-transform");
     this.#frame?.style.removeProperty("--lightbox-frame-radius");
+    this.#frame?.style.removeProperty("opacity");
     this.#image?.style.removeProperty("--lightbox-media-transform");
     this.#backdrop?.style.removeProperty("--lightbox-backdrop-opacity");
     this.#closeButton?.style.removeProperty("--lightbox-close-opacity");
@@ -1995,6 +2042,7 @@ class AppLightbox extends HTMLElement {
     const closeOpacity = resume?.closeOpacity ?? getComputedStyle(this.#closeButton!).opacity;
     const thumbnailPose = this.#thumbnailPose();
     const transform = thumbnailPose.transform;
+    const originlessSource = !!this.#gallery && !this.#thumbnailImg?.isConnected;
     const imageBounds = this.#image!.getBoundingClientRect();
     const bounds = {
       left: imageBounds.left - current.transform.e,
@@ -2060,12 +2108,28 @@ class AppLightbox extends HTMLElement {
     if (!opening && this.#transitionContent) document.body.append(this.#transitionContent);
     const returningFromDismissal = opening && !!resume;
     const settlingDismissal = returningFromDismissal || !opening;
+    const fallbackMatrix = new DOMMatrix()
+      .translate(bounds.width * 0.02, bounds.height * 0.02)
+      .scale(0.96);
     const from = new DOMMatrix(
       opening
-        ? (resume?.transform ?? (transform === "none" ? undefined : transform))
+        ? (resume?.transform ??
+            (originlessSource
+              ? fallbackMatrix.toString()
+              : transform === "none"
+                ? undefined
+                : transform))
         : current.transform.toString(),
     );
-    const to = new DOMMatrix(opening ? undefined : transform === "none" ? undefined : transform);
+    const to = new DOMMatrix(
+      opening
+        ? undefined
+        : originlessSource
+          ? fallbackMatrix.toString()
+          : transform === "none"
+            ? undefined
+            : transform,
+    );
     if (opening && resume) to.translateSelf(this.#gallery?.snapOffset ?? 0, 0);
     const closeTravel = Math.max(
       Math.abs(to.e - from.e),
@@ -2144,7 +2208,11 @@ class AppLightbox extends HTMLElement {
         radii: mapRadii(fromRadii, (radius, corner) => value(radius, toRadii[corner]!)),
       };
       const pose = cropPose(matrix, clip, bounds.width, bounds.height);
-      frameMotion.push({ offset, transform: pose.frame.toString() });
+      frameMotion.push({
+        offset,
+        transform: pose.frame.toString(),
+        ...(originlessSource ? { opacity: opening ? offset : 1 - offset } : {}),
+      });
       imageMotion.push({ offset, transform: pose.image.toString() });
       radiusMotion.push({ offset, borderRadius: pose.borderRadius });
       if (springOpening || !opening) {
@@ -2210,6 +2278,7 @@ class AppLightbox extends HTMLElement {
       "--lightbox-frame-radius",
       String(initialRadius?.borderRadius ?? "0px"),
     );
+    if (originlessSource) frame.style.opacity = String(opening ? 0 : 1);
     image.style.setProperty(
       "--lightbox-media-transform",
       String(initialImage?.transform ?? "none"),
@@ -2419,6 +2488,7 @@ class AppLightbox extends HTMLElement {
       this.#gallery.destroy();
       this.#gallery = undefined;
       this.#galleryTrigger = null;
+      this.#gallerySelectionIndex = -1;
       delete this.#dialog!.dataset.lightboxGallery;
       delete this.#dialog!.dataset.opening;
       this.#dialog!.prepend(this.#standaloneFrame!);
