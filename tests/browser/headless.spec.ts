@@ -118,6 +118,37 @@ test("plain runtime reveals the selected mounted origin without a host callback"
   await expect(second.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
 });
 
+test("plain runtime settles immediately when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  expect(await frame.evaluate((element) => element.getAnimations().length)).toBe(0);
+
+  const behavior = await page.locator("[data-lightbox-slides]").evaluate((slides) => {
+    const element = slides as HTMLElement;
+    let selected: ScrollBehavior | undefined;
+    const original = element.scrollTo.bind(element);
+    element.scrollTo = ((options?: ScrollToOptions | number, y?: number) => {
+      if (typeof options === "object") selected = options.behavior;
+      if (typeof options === "number") original(options, y ?? 0);
+      else original(options);
+    }) as typeof element.scrollTo;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    return new Promise<ScrollBehavior | undefined>((resolve) =>
+      requestAnimationFrame(() => resolve(selected)),
+    );
+  });
+  expect(behavior).toBe("instant");
+  await expect(page.locator("[data-demo-caption]")).toHaveText("two");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
+});
+
 test("plain runtime preserves the painted frame when open and close reverse", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/headless.html");

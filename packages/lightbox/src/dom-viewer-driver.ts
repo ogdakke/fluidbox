@@ -254,6 +254,15 @@ export class DomViewerDriver<
     this.#setState("opening");
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (context.signal.aborted) return;
+    if (this.#prefersReducedMotion()) {
+      this.#takeInterruptedPose();
+      this.#clearMotionStyles();
+      this.#thumbnailOverlays.prepare(context.item, context.index, this.#frame, "open", 0);
+      delete this.#portal.overlay.dataset.lightboxPrepared;
+      this.#setState("open");
+      this.#focus();
+      return;
+    }
 
     const interruptedPose = this.#takeInterruptedPose(false);
     const origin = context.origin?.visual;
@@ -338,7 +347,10 @@ export class DomViewerDriver<
     // Sending that selection back into the strip would snap an in-progress
     // touch gesture to its midpoint and discard the browser's momentum.
     if (!selected) {
-      const smooth = context.reason !== "source-update" && context.reason !== "filmstrip";
+      const smooth =
+        !this.#prefersReducedMotion() &&
+        context.reason !== "source-update" &&
+        context.reason !== "filmstrip";
       await this.#strip?.select(context.index, smooth);
     }
     this.#render(context.item, context.index);
@@ -363,6 +375,12 @@ export class DomViewerDriver<
     const interruptedPose = this.#takeInterruptedPose(false);
     this.#setState("closing");
     if (context.origin?.trigger.isConnected) this.#returnFocus = context.origin.trigger;
+    if (this.#prefersReducedMotion()) {
+      this.#takeInterruptedPose();
+      this.#clearMotionStyles();
+      this.#finishClose();
+      return;
+    }
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
     const start = interruptedPose ?? {
@@ -472,6 +490,13 @@ export class DomViewerDriver<
 
   #motionOptions(duration: number): KeyframeAnimationOptions {
     return { duration, easing: "linear", fill: "both" };
+  }
+
+  #prefersReducedMotion() {
+    return (
+      this.#portal.overlay.ownerDocument.defaultView?.matchMedia("(prefers-reduced-motion: reduce)")
+        .matches ?? false
+    );
   }
 
   #synchronizeStart(animations: Animation[]) {
