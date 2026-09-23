@@ -1,4 +1,12 @@
 import { originIsVisible } from "./origin-geometry";
+import {
+  backdropVisibility,
+  boundDismissVelocity,
+  dragProgress,
+  LightboxGestureController,
+  touchAxisThreshold,
+  type LightboxDragState,
+} from "./lightbox-gesture";
 import type {
   LightboxController,
   LightboxDispose,
@@ -19,6 +27,7 @@ import {
 
 const OPEN_DURATION = 260;
 const CLOSE_DURATION = 220;
+const TOUCH_DISMISS_DISTANCE = 60;
 const EASING = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 
 interface PaintedPose {
@@ -71,6 +80,15 @@ export class DomViewerDriver<
   #portalDispose: LightboxDispose | undefined;
   #animations: Animation[] = [];
   #interruptedPose: PaintedPose | undefined;
+  #suppressClick = false;
+  #suppressClickTimer: ReturnType<typeof setTimeout> | undefined;
+  #pointer:
+    | { id: number; x: number; y: number; axis: "pending" | "horizontal" | "vertical" }
+    | undefined;
+  readonly #dragGesture = new LightboxGestureController(
+    (state) => this.#paintDrag(state),
+    () => {},
+  );
   #returnFocus: HTMLElement | null = null;
   #destroyed = false;
 
@@ -81,6 +99,11 @@ export class DomViewerDriver<
     this.#portal.container.addEventListener(
       "click",
       (event) => {
+        if (this.#suppressClick) {
+          this.#suppressClick = false;
+          clearTimeout(this.#suppressClickTimer);
+          return;
+        }
         if (
           event.target === this.#portal.dialog ||
           event.target === this.#portal.backdrop ||
@@ -91,6 +114,22 @@ export class DomViewerDriver<
       },
       { signal: this.#lifetime.signal },
     );
+    this.#portal.container.addEventListener("pointerdown", this.#onPointerDown, {
+      passive: true,
+      signal: this.#lifetime.signal,
+    });
+    this.#portal.container.addEventListener("pointermove", this.#onPointerMove, {
+      passive: false,
+      signal: this.#lifetime.signal,
+    });
+    this.#portal.container.addEventListener("pointerup", this.#onPointerEnd, {
+      passive: true,
+      signal: this.#lifetime.signal,
+    });
+    this.#portal.container.addEventListener("pointercancel", this.#onPointerCancel, {
+      passive: true,
+      signal: this.#lifetime.signal,
+    });
     ownerDocument.addEventListener("keydown", this.#onKeydown, {
       capture: true,
       signal: this.#lifetime.signal,
@@ -232,6 +271,8 @@ export class DomViewerDriver<
     if (this.#destroyed) return;
     this.#destroyed = true;
     this.#lifetime.abort();
+    clearTimeout(this.#suppressClickTimer);
+    this.#dragGesture.cancel();
     this.#cancelAnimations(false);
     this.#portalDispose?.();
     this.#portalDispose = undefined;
@@ -267,16 +308,7 @@ export class DomViewerDriver<
 
   #cancelAnimations(preserve: boolean) {
     if (preserve && this.#animations.length > 0) {
-      const frame = getComputedStyle(this.#portal.frame);
-      this.#interruptedPose = {
-        transform: frame.transform,
-        opacity: frame.opacity,
-        borderTopLeftRadius: frame.borderTopLeftRadius,
-        borderTopRightRadius: frame.borderTopRightRadius,
-        borderBottomRightRadius: frame.borderBottomRightRadius,
-        borderBottomLeftRadius: frame.borderBottomLeftRadius,
-        backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
-      };
+      this.#interruptedPose = this.#paintedPose();
       Object.assign(this.#portal.frame.style, {
         transform: this.#interruptedPose.transform,
         opacity: this.#interruptedPose.opacity,
@@ -311,6 +343,114 @@ export class DomViewerDriver<
     }
     this.#portal.backdrop.style.removeProperty("opacity");
     this.#portal.media.style.removeProperty("opacity");
+    for (const property of [
+      "--lightbox-drag-x",
+      "--lightbox-drag-y",
+      "--lightbox-dismiss-progress",
+    ]) {
+      this.#portal.overlay.style.removeProperty(property);
+    }
+    for (const target of [this.#portal.overlay, this.#portal.dialog]) {
+      target.removeAttribute("data-dragging");
+      target.removeAttribute("data-dismissing");
+    }
+  }
+
+  #paintedPose(): PaintedPose {
+    const frame = getComputedStyle(this.#portal.frame);
+    return {
+      transform: frame.transform,
+      opacity: frame.opacity,
+      borderTopLeftRadius: frame.borderTopLeftRadius,
+      borderTopRightRadius: frame.borderTopRightRadius,
+      borderBottomRightRadius: frame.borderBottomRightRadius,
+      borderBottomLeftRadius: frame.borderBottomLeftRadius,
+      backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
+    };
+  }
+
+  #beginDrag() {
+    if (this.#dragGesture.active || this.#controller?.state.status !== "open") return;
+    const frame = this.#portal.frame;
+    const style = getComputedStyle(frame);
+    const number = (value: string) => Number.parseFloat(value) || 0;
+    const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
+    const state = this.#dragGesture.begin({
+      matrix,
+      wheelDirection: 0,
+      wheelOffset: 0,
+      wheelSnapOffset: 0,
+      opacity: Number(getComputedStyle(this.#portal.backdrop).opacity),
+      closeOpacity: 1,
+      borderRadii: [
+        number(style.borderTopLeftRadius),
+        number(style.borderTopRightRadius),
+        number(style.borderBottomRightRadius),
+        number(style.borderBottomLeftRadius),
+      ],
+      targetRadii: [0, 0, 0, 0],
+      clipX: 0,
+      clipY: 0,
+      targetClipX: 0,
+      targetClipY: 0,
+      width: frame.offsetWidth,
+      height: frame.offsetHeight,
+      time: performance.now(),
+    });
+    for (const target of [this.#portal.overlay, this.#portal.dialog]) {
+      target.dataset.dragging = "";
+      target.dataset.dismissing = "";
+    }
+    this.#paintDrag(state);
+  }
+
+  #paintDrag(state: LightboxDragState) {
+    const progress = dragProgress(state);
+    const scale = 1 - progress * 0.3;
+    this.#portal.overlay.style.setProperty("--lightbox-drag-x", `${state.x}px`);
+    this.#portal.overlay.style.setProperty("--lightbox-drag-y", `${state.y}px`);
+    this.#portal.overlay.style.setProperty("--lightbox-dismiss-progress", String(progress));
+    this.#portal.frame.style.transform = `translate(${state.x}px, ${state.y}px) scale(${scale})`;
+    this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
+  }
+
+  #endDrag(cancel = false) {
+    this.#pointer = undefined;
+    const release = this.#dragGesture.finish();
+    if (!release) return;
+    this.#paintDrag(release.state);
+    const { state, inputDistance, inputSpeed, velocityX, velocityY } = release;
+    const commit =
+      !cancel &&
+      (inputDistance > TOUCH_DISMISS_DISTANCE ||
+        (inputDistance > 30 &&
+          inputSpeed > 0.6 &&
+          velocityX * state.inputX + velocityY * state.inputY > 0));
+    if (commit) {
+      this.#interruptedPose = this.#paintedPose();
+      void this.#controller?.close({ reason: "pointer" });
+      return;
+    }
+    const transform = getComputedStyle(this.#portal.frame).transform;
+    const opacity = getComputedStyle(this.#portal.backdrop).opacity;
+    const settleX = boundDismissVelocity(state.x, velocityX, "x");
+    const settleY = boundDismissVelocity(state.y, velocityY, "y");
+    const duration = Math.max(140, 220 - Math.min(80, Math.hypot(settleX, settleY) * 50));
+    void this.#play(
+      [
+        this.#portal.frame.animate([{ transform }, { transform: "none" }], {
+          duration,
+          easing: EASING,
+          fill: "both",
+        }),
+        this.#portal.backdrop.animate([{ opacity }, { opacity: 1 }], {
+          duration,
+          easing: EASING,
+          fill: "both",
+        }),
+      ],
+      this.#lifetime.signal,
+    );
   }
 
   #finishClose() {
@@ -349,5 +489,53 @@ export class DomViewerDriver<
       event.preventDefault();
       void this.#controller?.previous({ reason: "keyboard" });
     }
+  };
+
+  #onPointerDown = (event: PointerEvent) => {
+    if (
+      event.pointerType !== "touch" ||
+      !event.isPrimary ||
+      this.#controller?.state.status !== "open" ||
+      (event.target instanceof Element &&
+        event.target.closest("button, a, input, select, textarea"))
+    ) {
+      return;
+    }
+    this.#pointer = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      axis: "pending",
+    };
+    this.#suppressClick = false;
+  };
+
+  #onPointerMove = (event: PointerEvent) => {
+    const pointer = this.#pointer;
+    if (!pointer || event.pointerId !== pointer.id) return;
+    const x = event.clientX - pointer.x;
+    const y = event.clientY - pointer.y;
+    if (Math.max(Math.abs(x), Math.abs(y)) < touchAxisThreshold) return;
+    if (pointer.axis === "pending") {
+      if (Math.abs(x) > Math.abs(y) * 1.3) pointer.axis = "horizontal";
+      else if (Math.abs(y) > Math.abs(x) * 1.3) pointer.axis = "vertical";
+    }
+    if (pointer.axis !== "vertical") return;
+    if (event.cancelable) event.preventDefault();
+    this.#suppressClick = true;
+    clearTimeout(this.#suppressClickTimer);
+    this.#suppressClickTimer = setTimeout(() => (this.#suppressClick = false), 400);
+    this.#beginDrag();
+    this.#dragGesture.moveTouch(x, y);
+  };
+
+  #onPointerEnd = (event: PointerEvent) => {
+    if (event.pointerId !== this.#pointer?.id) return;
+    this.#endDrag();
+  };
+
+  #onPointerCancel = (event: PointerEvent) => {
+    if (event.pointerId !== this.#pointer?.id) return;
+    this.#endDrag(true);
   };
 }

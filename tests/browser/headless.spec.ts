@@ -73,3 +73,49 @@ test("plain runtime preserves the painted frame when open and close reverse", as
     "open",
   );
 });
+
+test("plain runtime publishes drag state and dismisses from a touch pointer", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  const overlay = page.locator("[data-lightbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+
+  const frame = page.locator("[data-lightbox-frame]");
+  const center = await frame.boundingBox();
+  expect(center).not.toBeNull();
+  const x = center!.x + center!.width / 2;
+  const y = center!.y + center!.height / 2;
+  await frame.dispatchEvent("pointerdown", {
+    pointerId: 7,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x,
+    clientY: y,
+  });
+  await frame.dispatchEvent("pointermove", {
+    pointerId: 7,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x + 4,
+    clientY: y + 120,
+  });
+
+  await expect(overlay).toHaveAttribute("data-dragging", "");
+  await expect
+    .poll(() =>
+      overlay.evaluate((element) =>
+        Number(element.style.getPropertyValue("--lightbox-dismiss-progress")),
+      ),
+    )
+    .toBeGreaterThan(0);
+
+  await frame.dispatchEvent("pointerup", {
+    pointerId: 7,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x + 4,
+    clientY: y + 120,
+  });
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
+});
