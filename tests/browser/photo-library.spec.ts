@@ -21,15 +21,11 @@ for (const count of [10_000, 100_000]) {
   }, testInfo) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto(`/photo-library.html?count=${count}`);
-    const gallery = page.locator("app-gallery");
     const scroll = page.locator(".library-scroll");
-    await expect
-      .poll(() =>
-        gallery.evaluate(
-          (element: HTMLElement & { source?: { count: number } }) => element.source?.count,
-        ),
-      )
-      .toBe(count);
+    await expect(page.locator("[data-library-count]")).toHaveAttribute(
+      "data-library-count",
+      String(count),
+    );
     await expect.poll(() => page.locator("[data-photo-index]").count()).toBeGreaterThan(0);
     const scrollHeight = await scroll.evaluate((element) => element.scrollHeight);
     expect(scrollHeight).toBeGreaterThan(100_000);
@@ -55,23 +51,22 @@ for (const count of [10_000, 100_000]) {
     const origin = await originButton.boundingBox();
     expect(origin).not.toBeNull();
 
-    const start = await gallery.evaluate(
-      (element: HTMLElement & { open(index: number): void }, selectedIndex) => {
-        element.open(selectedIndex);
-        const media = document.querySelector<HTMLElement>(
-          '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
-        )!;
-        const frame = media.closest<HTMLElement>("[data-lightbox-frame]")!;
-        for (const animation of document.getAnimations()) {
-          animation.pause();
-          animation.currentTime = 0;
-        }
-        const bounds = frame.getBoundingClientRect();
-        for (const animation of document.getAnimations()) animation.play();
-        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
-      },
-      index,
-    );
+    const start = await originButton.evaluate(async (element: HTMLElement) => {
+      element.click();
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      const frame = document.querySelector<HTMLElement>(
+        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+      )!;
+      for (const animation of document.getAnimations()) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      const bounds = frame.getBoundingClientRect();
+      for (const animation of document.getAnimations()) animation.play();
+      return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+    });
     await testInfo.attach("deep-origin-geometry", {
       body: JSON.stringify({ index, origin, start }, null, 2),
       contentType: "application/json",
@@ -141,11 +136,14 @@ for (const count of [10_000, 100_000]) {
       `Item ${farIndex + 2} of ${count}`,
     );
     const selectedIndex = count - 250;
-    await gallery.evaluate((element: HTMLElement & { open(index: number): void }, lastIndex) => {
-      element.open(lastIndex - 250);
-      element.open(lastIndex - 100);
-      element.open(lastIndex);
+    await page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element, index) => {
+      const size = parseFloat(
+        getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
+      );
+      const gap = parseFloat(getComputedStyle(element).columnGap);
+      element.scrollTo({ left: index * (size + gap), behavior: "instant" });
     }, selectedIndex);
+    await page.locator(`[data-lightbox-filmstrip-item][data-index="${selectedIndex}"]`).click();
     await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
       `Item ${selectedIndex + 1} of ${count}`,
@@ -172,7 +170,7 @@ for (const count of [10_000, 100_000]) {
     const closingEnd = await page.evaluate(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       const frame = document.querySelector<HTMLElement>(
-        "[data-lightbox-flight] > [data-lightbox-frame]",
+        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
       )!;
       const duration = Number(frame.getAnimations()[0]?.effect?.getComputedTiming().duration);
       const animations = document.getAnimations();
@@ -227,21 +225,9 @@ for (const count of [10_000, 100_000]) {
   });
 }
 
-test("filmstrip preference applies to the next open without replacing the indexed source", async ({
-  page,
-}) => {
+test("filmstrip preference applies to the next open", async ({ page }) => {
   await page.goto("/photo-library.html");
-  const gallery = page.locator("app-gallery");
-  await expect
-    .poll(() =>
-      gallery.evaluate(
-        (element: HTMLElement & { source?: { count: number } }) => element.source?.count,
-      ),
-    )
-    .toBe(10_000);
-  const initialSource = await gallery.evaluateHandle(
-    (element: HTMLElement & { source?: { count: number } }) => element.source,
-  );
+  await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
   const initialRange = await page
     .locator("[data-photo-index]")
     .first()
@@ -254,18 +240,6 @@ test("filmstrip preference applies to the next open without replacing the indexe
   await page.getByRole("checkbox", { name: "Show filmstrip on next open" }).check();
   await page.locator(`[data-photo-index="${initialRange}"]`).click();
   await expect(page.locator("[data-lightbox-filmstrip]")).toHaveCount(1);
-  expect(
-    await gallery.evaluate(
-      (element: HTMLElement & { source?: { count: number } }, source) => element.source === source,
-      initialSource,
-    ),
-  ).toBe(true);
-  await expect
-    .poll(() =>
-      gallery.evaluate(
-        (element: HTMLElement & { source?: { count: number } }) => element.source?.count,
-      ),
-    )
-    .toBe(10_000);
+  await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
   expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
 });

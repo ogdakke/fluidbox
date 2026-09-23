@@ -117,27 +117,31 @@ test("indexed item without a mounted origin uses scale and fade", async ({ page 
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 
-test("indexed clipped origin carries corner radius through opening and reversal", async ({
+test("direct React gallery carries clipped-origin geometry through opening and closing", async ({
   page,
 }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/photo-library.html");
-  const gallery = page.locator("app-gallery");
-  await expect
-    .poll(() =>
-      gallery.evaluate(
-        (element: HTMLElement & { source?: { count: number } }) => element.source?.count,
-      ),
-    )
-    .toBe(10_000);
-  const origin = page.locator('[data-photo-index="0"]');
+  await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
+  const origin = page.locator('[data-photo-index="1"]');
   await expect(origin).toBeVisible();
   await origin.scrollIntoViewIfNeeded();
   await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
   await origin.evaluate((element: HTMLElement) => {
     element.style.borderRadius = "8px 12px 16px 4px";
   });
-  const corners = await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => {
+  const originBounds = await origin.boundingBox();
+  expect(originBounds).not.toBeNull();
+  const corners = await origin.evaluate(async (element: HTMLElement) => {
+    const rect = (target: HTMLElement) => {
+      const bounds = target.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      };
+    };
     const renderedCorners = (frame: HTMLElement) => {
       const style = getComputedStyle(frame);
       const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
@@ -164,117 +168,295 @@ test("indexed clipped origin carries corner radius through opening and reversal"
         animation.currentTime = time;
       }
     };
-    element.open(0);
+    const sample = () => {
+      const frame = slideFrame();
+      const media = frame.querySelector<HTMLElement>("[data-lightbox-media]")!;
+      const backdrop = document.querySelector<HTMLElement>("[data-lightbox-backdrop]")!;
+      return {
+        frame: rect(frame),
+        media: rect(media),
+        mediaAspect: media.getBoundingClientRect().width / media.getBoundingClientRect().height,
+        corners: renderedCorners(frame),
+        backdropOpacity: Number(getComputedStyle(backdrop).opacity),
+      };
+    };
+    element.click();
+    await Promise.resolve();
+    const preparedOverlay = document.querySelector<HTMLElement>("[data-lightbox-prepared]");
+    const preparation = {
+      present: Boolean(preparedOverlay),
+      visibility: preparedOverlay ? getComputedStyle(preparedOverlay).visibility : null,
+    };
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
     const openingAnimations = document.getAnimations();
     setTime(openingAnimations, 0);
-    const openingStart = renderedCorners(slideFrame());
-    setTime(openingAnimations, 120);
-    const openingProgress = renderedCorners(slideFrame());
+    const openingStart = sample();
+    setTime(openingAnimations, 65);
+    const openingQuarter = sample();
+    setTime(openingAnimations, 130);
+    const openingHalf = sample();
+    setTime(openingAnimations, 195);
+    const openingThreeQuarter = sample();
     for (const animation of openingAnimations) animation.play();
-    return { openingStart, openingProgress };
+    return {
+      preparation,
+      openingStart,
+      openingQuarter,
+      openingHalf,
+      openingThreeQuarter,
+    };
   });
   await testInfo.attach("clipped-origin-opening-radius", {
     body: JSON.stringify(corners, null, 2),
     contentType: "application/json",
   });
+  expect(corners.preparation).toEqual({ present: true, visibility: "hidden" });
   for (const [index, expected] of [8, 12, 16, 4].entries()) {
-    expect(corners.openingStart[index]!.x).toBeCloseTo(expected, 0);
-    expect(corners.openingStart[index]!.y).toBeCloseTo(expected, 0);
-    expect(corners.openingProgress[index]!.x).toBeLessThan(expected);
+    expect(corners.openingStart.corners[index]!.x).toBeCloseTo(expected, 0);
+    expect(corners.openingStart.corners[index]!.y).toBeCloseTo(expected, 0);
+    expect(corners.openingHalf.corners[index]!.x).toBeLessThan(expected);
+  }
+  const openingSamples = [
+    corners.openingStart,
+    corners.openingQuarter,
+    corners.openingHalf,
+    corners.openingThreeQuarter,
+  ];
+  for (const sample of openingSamples) {
+    expect(sample.mediaAspect, "the portrait media must never stretch").toBeCloseTo(2 / 3, 2);
+  }
+  expect(corners.openingStart.frame.left).toBeCloseTo(originBounds!.x, 0);
+  expect(corners.openingStart.frame.top).toBeCloseTo(originBounds!.y, 0);
+  expect(corners.openingStart.frame.width).toBeCloseTo(originBounds!.width, 0);
+  expect(corners.openingStart.frame.height).toBeCloseTo(originBounds!.height, 0);
+  expect(corners.openingStart.media.height).toBeGreaterThan(corners.openingStart.frame.height);
+  expect(corners.openingStart.backdropOpacity).toBeLessThan(0.05);
+  for (let index = 1; index < openingSamples.length; index++) {
+    expect(openingSamples[index]!.frame.width).toBeGreaterThan(
+      openingSamples[index - 1]!.frame.width,
+    );
+    expect(openingSamples[index]!.backdropOpacity).toBeGreaterThanOrEqual(
+      openingSamples[index - 1]!.backdropOpacity,
+    );
   }
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",
   );
 
-  const reversal = await gallery.evaluate(() => {
-    const controller = document.querySelector<HTMLElement & { close(): void; open(): void }>(
-      "[data-lightbox-source-controller]",
-    )!;
-    const renderedCorners = (frame: HTMLElement) => {
-      const style = getComputedStyle(frame);
-      const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
-      return [
-        style.borderTopLeftRadius,
-        style.borderTopRightRadius,
-        style.borderBottomRightRadius,
-        style.borderBottomLeftRadius,
-      ].map((value) => {
-        const [horizontal, vertical = horizontal] = value.split(" ").map(Number.parseFloat);
-        return {
-          x: horizontal * Math.abs(matrix.a),
-          y: vertical * Math.abs(matrix.d),
-        };
-      });
+  const closing = await page.evaluate(async () => {
+    const rect = (target: HTMLElement) => {
+      const bounds = target.getBoundingClientRect();
+      return {
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      };
     };
-    controller.close();
-    const animations = document.getAnimations();
-    for (const animation of animations) {
-      animation.pause();
-      animation.currentTime = 120;
-    }
-    const flight = document.querySelector<HTMLElement>(
-      "[data-lightbox-flight] > [data-lightbox-frame]",
-    )!;
-    const before = renderedCorners(flight);
-    controller.open();
-    const active = document.querySelector<HTMLElement>(
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await Promise.resolve();
+    const frame = document.querySelector<HTMLElement>(
       '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
     )!;
-    const after = renderedCorners(active);
-    return { before, after };
+    const media = frame.querySelector<HTMLElement>("[data-lightbox-media]")!;
+    const backdrop = document.querySelector<HTMLElement>("[data-lightbox-backdrop]")!;
+    const animations = document.getAnimations();
+    const duration = Number(frame.getAnimations()[0]?.effect?.getComputedTiming().duration);
+    const sample = (time: number) => {
+      for (const animation of animations) {
+        animation.pause();
+        animation.currentTime = time;
+      }
+      const style = getComputedStyle(frame);
+      const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
+      const frameBounds = rect(frame);
+      const mediaBounds = rect(media);
+      return {
+        frame: frameBounds,
+        media: mediaBounds,
+        mediaAspect: mediaBounds.width / mediaBounds.height,
+        corners: [
+          style.borderTopLeftRadius,
+          style.borderTopRightRadius,
+          style.borderBottomRightRadius,
+          style.borderBottomLeftRadius,
+        ].map((value) => {
+          const [horizontal, vertical = horizontal] = value.split(" ").map(Number.parseFloat);
+          return { x: horizontal * Math.abs(matrix.a), y: vertical * Math.abs(matrix.d) };
+        }),
+        backdropOpacity: Number(getComputedStyle(backdrop).opacity),
+      };
+    };
+    const samples = [0, 0.25, 0.5, 0.75, 0.999].map((progress) => sample(duration * progress));
+    for (const animation of animations) animation.play();
+    return { duration, samples };
   });
-  await testInfo.attach("clipped-origin-radius-reversal", {
-    body: JSON.stringify(reversal, null, 2),
+  await testInfo.attach("clipped-origin-closing-geometry", {
+    body: JSON.stringify(closing, null, 2),
     contentType: "application/json",
   });
-  for (const [index, expected] of [8, 12, 16, 4].entries()) {
-    expect(reversal.before[index]!.x).toBeGreaterThan(0);
-    expect(reversal.before[index]!.x).toBeLessThan(expected);
-    expect(Math.abs(reversal.before[index]!.x - reversal.after[index]!.x)).toBeLessThan(2);
-    expect(Math.abs(reversal.before[index]!.y - reversal.after[index]!.y)).toBeLessThan(2);
+  for (const sample of closing.samples) {
+    expect(sample.mediaAspect, "the portrait media must never stretch on close").toBeCloseTo(
+      2 / 3,
+      2,
+    );
   }
+  for (let index = 1; index < closing.samples.length; index++) {
+    expect(closing.samples[index]!.frame.width).toBeLessThan(
+      closing.samples[index - 1]!.frame.width,
+    );
+    expect(closing.samples[index]!.backdropOpacity).toBeLessThanOrEqual(
+      closing.samples[index - 1]!.backdropOpacity,
+    );
+  }
+  const closingEnd = closing.samples.at(-1)!;
+  expect(closingEnd.frame.left).toBeCloseTo(originBounds!.x, 0);
+  expect(closingEnd.frame.top).toBeCloseTo(originBounds!.y, 0);
+  expect(closingEnd.frame.width).toBeCloseTo(originBounds!.width, 0);
+  expect(closingEnd.frame.height).toBeCloseTo(originBounds!.height, 0);
+  for (const [index, expected] of [8, 12, 16, 4].entries()) {
+    expect(closingEnd.corners[index]!.x).toBeCloseTo(expected, 0);
+    expect(closingEnd.corners[index]!.y).toBeCloseTo(expected, 0);
+  }
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
+test("direct React transition matches its reference frames", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "Reference frames use Chromium rendering.");
+  await page.emulateMedia({ reducedMotion: "no-preference", colorScheme: "dark" });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.scrollIntoViewIfNeeded();
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.evaluate((element: HTMLElement) => {
+    element.style.borderRadius = "8px 12px 16px 4px";
+  });
+  await origin.click();
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      const duration = Number(animation.effect?.getComputedTiming().duration);
+      animation.currentTime = duration / 2;
+    }
+  });
+  await expect(page).toHaveScreenshot("direct-photo-opening-half.png", {
+    animations: "allow",
+    caret: "hide",
+    maxDiffPixelRatio: 0.001,
+  });
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) animation.play();
+  });
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",
   );
-
-  const closingEnd = await gallery.evaluate(() => {
-    const controller = document.querySelector<HTMLElement & { close(): void }>(
-      "[data-lightbox-source-controller]",
-    )!;
-    controller.close();
-    const frame = document.querySelector<HTMLElement>(
-      "[data-lightbox-flight] > [data-lightbox-frame]",
-    )!;
-    const animations = document.getAnimations();
-    const duration = Number(frame.getAnimations()[0]?.effect?.getComputedTiming().duration);
-    for (const animation of animations) {
+  await page.keyboard.press("Escape");
+  await page.evaluate(async () => {
+    await Promise.resolve();
+    for (const animation of document.getAnimations()) {
       animation.pause();
-      animation.currentTime = duration - 1;
+      const duration = Number(animation.effect?.getComputedTiming().duration);
+      animation.currentTime = duration / 2;
     }
-    const style = getComputedStyle(frame);
-    const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
-    const corners = [
-      style.borderTopLeftRadius,
-      style.borderTopRightRadius,
-      style.borderBottomRightRadius,
-      style.borderBottomLeftRadius,
-    ].map((value) => {
-      const [horizontal, vertical = horizontal] = value.split(" ").map(Number.parseFloat);
-      return { x: horizontal * Math.abs(matrix.a), y: vertical * Math.abs(matrix.d) };
-    });
-    for (const animation of animations) animation.play();
-    return corners;
   });
-  await testInfo.attach("clipped-origin-closing-radius", {
-    body: JSON.stringify(closingEnd, null, 2),
+  await expect(page).toHaveScreenshot("direct-photo-closing-half.png", {
+    animations: "allow",
+    caret: "hide",
+    maxDiffPixelRatio: 0.001,
+  });
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) animation.play();
+  });
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
+test("direct React transition reverses from its painted crop", async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  const reversal = (phase: "opening" | "closing") =>
+    page.evaluate(async (phase): Promise<Interruption> => {
+      const media = () =>
+        document.querySelector<HTMLElement>(
+          '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+        )!;
+      const sample = (): MotionSample => {
+        const element = media();
+        const bounds = element.getBoundingClientRect();
+        const animation = element.getAnimations()[0];
+        return {
+          time: performance.now(),
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+          animationTime: Number(animation?.currentTime ?? NaN),
+          animationDuration: Number(animation?.effect?.getComputedTiming().duration ?? NaN),
+        };
+      };
+      const oldAnimations = document.getAnimations();
+      for (const animation of oldAnimations) {
+        animation.pause();
+        animation.currentTime = 120;
+      }
+      const before = sample();
+      if (phase === "opening") {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        await Promise.resolve();
+      } else {
+        document.querySelector<HTMLElement>('[data-photo-index="1"]')!.click();
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+      const nextAnimations = document
+        .getAnimations()
+        .filter((animation) => !oldAnimations.includes(animation));
+      for (const animation of nextAnimations) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      const after = sample();
+      for (const animation of nextAnimations) animation.play();
+      return { before, after };
+    }, phase);
+
+  await origin.click();
+  await page.waitForTimeout(30);
+  const opening = await reversal("opening");
+  await testInfo.attach("direct-opening-reversal", {
+    body: JSON.stringify(opening, null, 2),
     contentType: "application/json",
   });
-  for (const [index, expected] of [8, 12, 16, 4].entries()) {
-    expect(closingEnd[index]!.x).toBeCloseTo(expected, 0);
-    expect(closingEnd[index]!.y).toBeCloseTo(expected, 0);
-  }
+  expectContinuous(opening);
+  expect(opening.before.width / opening.before.height).toBeCloseTo(2 / 3, 2);
+  expect(opening.after.width / opening.after.height).toBeCloseTo(2 / 3, 2);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+
+  await origin.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(20);
+  const closing = await reversal("closing");
+  await testInfo.attach("direct-closing-reversal", {
+    body: JSON.stringify(closing, null, 2),
+    contentType: "application/json",
+  });
+  expectContinuous(closing);
+  expect(closing.before.width / closing.before.height).toBeCloseTo(2 / 3, 2);
+  expect(closing.after.width / closing.after.height).toBeCloseTo(2 / 3, 2);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await page.keyboard.press("Escape");
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 

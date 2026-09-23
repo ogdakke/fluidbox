@@ -279,6 +279,75 @@ test("timecoded transition diagnostic", async ({ page }, testInfo) => {
   if (video) await video.saveAs(resolve(folder, "diagnostic.webm"));
 });
 
+test("direct React transition diagnostic", async ({ page }, testInfo) => {
+  test.skip(
+    !capture || testInfo.project.name !== "chromium",
+    "The direct runtime diagnostic runs once in Chromium during baseline capture.",
+  );
+  const folder = resolve(baselineRoot, testInfo.project.name);
+  await mkdir(folder, { recursive: true });
+  await page.goto("/photo-library.html");
+  await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
+  await page.evaluate(() => {
+    const clock = document.createElement("output");
+    clock.style.cssText =
+      "position:fixed;z-index:2147483647;left:8px;top:8px;padding:4px 6px;background:#000;color:#fff;font:12px monospace;pointer-events:none";
+    document.body.append(clock);
+    const samples: Array<Record<string, number | string | null>> = [];
+    let phase = "opening";
+    let active = true;
+    function frame(now: number) {
+      const media = document.querySelector<HTMLElement>(
+        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+      );
+      const bounds = media?.getBoundingClientRect();
+      clock.textContent = `${Math.round(now)}ms ${phase}`;
+      samples.push({
+        time: Math.round(now),
+        phase,
+        x: bounds?.x ?? null,
+        y: bounds?.y ?? null,
+        width: bounds?.width ?? null,
+        height: bounds?.height ?? null,
+      });
+      if (active) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+    Object.assign(window, {
+      __directDiagnostic: {
+        samples,
+        setPhase: (next: string) => (phase = next),
+        stop: () => (active = false),
+      },
+    });
+  });
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.click();
+  await page.waitForTimeout(550);
+  await page.evaluate(() => {
+    (
+      window as unknown as { __directDiagnostic: { setPhase(value: string): void } }
+    ).__directDiagnostic.setPhase("closing");
+  });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(450);
+  const samples = await page.evaluate(() => {
+    const diagnostic = (
+      window as unknown as { __directDiagnostic: { samples: unknown[]; stop(): void } }
+    ).__directDiagnostic;
+    diagnostic.stop();
+    return diagnostic.samples;
+  });
+  await writeFile(
+    resolve(folder, "direct-diagnostic-frames.json"),
+    JSON.stringify(samples, null, 2),
+  );
+  const video = page.video();
+  await page.close();
+  if (video) await video.saveAs(resolve(folder, "direct-diagnostic.webm"));
+});
+
 test("indexed source timing and frame capture", async ({ page, browserName }, testInfo) => {
   test.skip(!capture, "Run bun run test:browser:baseline to capture performance telemetry.");
   const folder = resolve(baselineRoot, testInfo.project.name);
