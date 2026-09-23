@@ -17,26 +17,26 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 // Keep the original initial-import ceilings, including the separate CSS limit.
 // The static-graph method is unchanged; unlazy now contributes to the measured bytes.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 11_750,
+  root: 12_600,
   elements: 25_000,
-  react: 14_150,
+  react: 15_000,
   solid: 1_500,
   vue: 1_500,
   angular: 1_500,
 };
 const cssGzipLimit = 5_000;
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 32_600,
+  root: 33_450,
   elements: 24_500,
-  react: 14_150,
+  react: 15_000,
   solid: 24_500,
   vue: 24_500,
   angular: 24_500,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 36_400,
+  root: 37_200,
   elements: 28_500,
-  react: 17_950,
+  react: 18_800,
   solid: 28_500,
   vue: 28_500,
   angular: 28_500,

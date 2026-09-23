@@ -70,6 +70,18 @@ export class DomViewerDriver<
   #animations: Animation[] = [];
   #interruptedPose: PaintedPose | undefined;
   #activeOrigin: HTMLElement | null = null;
+  #flight: HTMLDivElement | undefined;
+  #flightFrame: HTMLDivElement | undefined;
+  #flightMedia: HTMLImageElement | undefined;
+  #flightSource: HTMLElement | undefined;
+  #flightOrigin = { x: 0, y: 0, width: 0, height: 0 };
+  #flightViewerOrigin = { x: 0, y: 0 };
+  #closeStart: ImageTransitionPose | undefined;
+  #closeTargetOrigin: HTMLElement | null = null;
+  #closeDuration = 0;
+  #closeOriginObserver: ResizeObserver | undefined;
+  #closeRetargetFrame = 0;
+  #closeRetargetSettleFrame = 0;
   #suppressClick = false;
   #suppressClickTimer: ReturnType<typeof setTimeout> | undefined;
   #pointer:
@@ -126,6 +138,9 @@ export class DomViewerDriver<
     });
     ownerDocument.addEventListener("keydown", this.#onKeydown, {
       capture: true,
+      signal: this.#lifetime.signal,
+    });
+    ownerDocument.defaultView?.addEventListener("resize", this.#scheduleCloseTargetUpdate, {
       signal: this.#lifetime.signal,
     });
   }
@@ -278,7 +293,7 @@ export class DomViewerDriver<
       frameOpacity: "1",
       backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
     };
-    const target = from
+    let target = from
       ? poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, start))
       : {
           transform: new DOMMatrix(start.transform.toString())
@@ -293,6 +308,19 @@ export class DomViewerDriver<
       Math.abs(target.transform.d - start.transform.d) * this.#media.offsetHeight,
     );
     const duration = Math.min(480, 220 + Math.sqrt(Math.max(0, travel - 240)) * 4);
+    let frame = this.#frame;
+    let media = this.#media;
+    if (from && media instanceof HTMLImageElement) {
+      const flight = this.#createCloseFlight(start, from, media);
+      frame = flight.frame;
+      media = flight.media;
+      target = flight.target;
+      this.#closeOriginObserver = new ResizeObserver(this.#scheduleCloseTargetUpdate);
+      this.#closeOriginObserver.observe(from);
+    }
+    this.#closeStart = start;
+    this.#closeTargetOrigin = from;
+    this.#closeDuration = duration;
     const motion = createImageTransitionMotion({
       opening: false,
       from: start,
@@ -306,11 +334,11 @@ export class DomViewerDriver<
       samples: 60,
       fadeFrame: !from,
     });
-    applyImageTransitionPose(this.#frame, this.#media, start);
+    applyImageTransitionPose(frame, media, start);
     const animations = [
-      this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
-      this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
-      this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
+      frame.animate(motion.frame, this.#motionOptions(motion.duration)),
+      media.animate(motion.image, this.#motionOptions(motion.duration)),
+      frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
     ];
     this.#synchronizeStart(animations);
@@ -375,7 +403,8 @@ export class DomViewerDriver<
 
   #cancelAnimations(preserve: boolean) {
     if (preserve && this.#animations.length > 0) {
-      this.#interruptedPose = this.#paintedPose();
+      this.#interruptedPose = this.#flightFrame ? this.#paintedFlightPose() : this.#paintedPose();
+      this.#removeFlight();
       applyImageTransitionPose(this.#frame, this.#media, this.#interruptedPose);
       this.#frame.style.opacity = this.#interruptedPose.frameOpacity;
       this.#portal.backdrop.style.opacity = this.#interruptedPose.backdropOpacity;
@@ -425,6 +454,161 @@ export class DomViewerDriver<
       frameOpacity: frame.opacity,
       backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
     };
+  }
+
+  #paintedFlightPose(): PaintedPose {
+    const frame = this.#flightFrame!;
+    const media = this.#flightMedia!;
+    const visible = media.getBoundingClientRect();
+    const scaleX = visible.width / Math.max(1, media.offsetWidth);
+    const scaleY = visible.height / Math.max(1, media.offsetHeight);
+    const flightPose = readImageTransitionPose(frame, media);
+    const transform = new DOMMatrix()
+      .translate(
+        visible.left - this.#flightViewerOrigin.x,
+        visible.top - this.#flightViewerOrigin.y,
+      )
+      .scale(scaleX, scaleY);
+    return {
+      transform,
+      clip: flightPose.clip,
+      frameOpacity: getComputedStyle(frame).opacity,
+      backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
+    };
+  }
+
+  #createCloseFlight(start: ImageTransitionPose, origin: HTMLElement, source: HTMLImageElement) {
+    const ownerDocument = this.#portal.overlay.ownerDocument;
+    const view = ownerDocument.defaultView!;
+    const bounds = source.getBoundingClientRect();
+    const flight = ownerDocument.createElement("div");
+    flight.dataset.lightboxFlight = "";
+    flight.setAttribute("aria-hidden", "true");
+    flight.style.setProperty(
+      "--lightbox-flight-height",
+      `${ownerDocument.documentElement.scrollHeight}px`,
+    );
+    const frame = ownerDocument.createElement("div");
+    frame.dataset.lightboxFrame = "";
+    this.#flightOrigin = {
+      x: bounds.left + view.scrollX - start.transform.e,
+      y: bounds.top + view.scrollY - start.transform.f,
+      width: source.offsetWidth,
+      height: source.offsetHeight,
+    };
+    this.#flightViewerOrigin = {
+      x: bounds.left - start.transform.e,
+      y: bounds.top - start.transform.f,
+    };
+    frame.style.setProperty("--lightbox-flight-left", `${this.#flightOrigin.x}px`);
+    frame.style.setProperty("--lightbox-flight-top", `${this.#flightOrigin.y}px`);
+    frame.style.setProperty("--lightbox-flight-width", `${source.offsetWidth}px`);
+    frame.style.setProperty("--lightbox-flight-item-height", `${source.offsetHeight}px`);
+    const media = source.cloneNode(true) as HTMLImageElement;
+    media.removeAttribute("style");
+    media.dataset.lightboxMedia = "";
+    frame.append(media);
+    flight.append(frame);
+    ownerDocument.body.append(flight);
+    this.#flight = flight;
+    this.#flightFrame = frame;
+    this.#flightMedia = media;
+    this.#flightSource = source;
+    source.dataset.lightboxFlightSourceHidden = "";
+    applyImageTransitionPose(frame, media, start);
+    const target = this.#flightTargetPose(origin, media);
+    return { frame, media, target };
+  }
+
+  #flightTargetPose(origin: HTMLElement, media: HTMLElement): ImageTransitionPose {
+    const view = this.#portal.overlay.ownerDocument.defaultView!;
+    const rect = origin.getBoundingClientRect();
+    const width = media.offsetWidth;
+    const height = media.offsetHeight;
+    const scale = Math.max(rect.width / Math.max(1, width), rect.height / Math.max(1, height));
+    const x = Math.max(0, (width - rect.width / scale) / 2);
+    const y = Math.max(0, (height - rect.height / scale) / 2);
+    const style = getComputedStyle(origin);
+    return {
+      transform: new DOMMatrix()
+        .translate(
+          rect.left + view.scrollX - this.#flightOrigin.x - x * scale,
+          rect.top + view.scrollY - this.#flightOrigin.y - y * scale,
+        )
+        .scale(scale),
+      clip: {
+        x,
+        y,
+        radii: [
+          Number.parseFloat(style.borderTopLeftRadius) || 0,
+          Number.parseFloat(style.borderTopRightRadius) || 0,
+          Number.parseFloat(style.borderBottomRightRadius) || 0,
+          Number.parseFloat(style.borderBottomLeftRadius) || 0,
+        ],
+      },
+    };
+  }
+
+  #removeFlight() {
+    if (this.#flightSource) delete this.#flightSource.dataset.lightboxFlightSourceHidden;
+    this.#flight?.remove();
+    this.#flight = undefined;
+    this.#flightFrame = undefined;
+    this.#flightMedia = undefined;
+    this.#flightSource = undefined;
+    this.#closeStart = undefined;
+    this.#closeTargetOrigin = null;
+    this.#closeDuration = 0;
+    this.#closeOriginObserver?.disconnect();
+    this.#closeOriginObserver = undefined;
+    cancelAnimationFrame(this.#closeRetargetFrame);
+    cancelAnimationFrame(this.#closeRetargetSettleFrame);
+    this.#closeRetargetFrame = 0;
+    this.#closeRetargetSettleFrame = 0;
+  }
+
+  #scheduleCloseTargetUpdate = () => {
+    cancelAnimationFrame(this.#closeRetargetFrame);
+    cancelAnimationFrame(this.#closeRetargetSettleFrame);
+    this.#closeRetargetFrame = requestAnimationFrame(() => {
+      this.#closeRetargetFrame = 0;
+      this.#updateCloseTarget();
+      this.#closeRetargetSettleFrame = requestAnimationFrame(() => {
+        this.#closeRetargetSettleFrame = 0;
+        this.#updateCloseTarget();
+      });
+    });
+  };
+
+  #updateCloseTarget() {
+    const origin = this.#closeTargetOrigin;
+    const start = this.#closeStart;
+    const frame = this.#flightFrame;
+    const media = this.#flightMedia;
+    if (!origin || !start || !frame || !media || this.#animations.length < 3) return;
+    const target = this.#flightTargetPose(origin, media);
+    const motion = createImageTransitionMotion({
+      opening: false,
+      from: start,
+      to: target,
+      width: media.offsetWidth,
+      height: media.offsetHeight,
+      backdropFrom: 1,
+      backdropTo: 0,
+      duration: this.#closeDuration,
+      response: this.#closeDuration * 0.9,
+      samples: 60,
+    });
+    const [frameAnimation, mediaAnimation, radiusAnimation] = this.#animations;
+    if (frameAnimation?.effect instanceof KeyframeEffect) {
+      frameAnimation.effect.setKeyframes(motion.frame);
+    }
+    if (mediaAnimation?.effect instanceof KeyframeEffect) {
+      mediaAnimation.effect.setKeyframes(motion.image);
+    }
+    if (radiusAnimation?.effect instanceof KeyframeEffect) {
+      radiusAnimation.effect.setKeyframes(motion.radius);
+    }
   }
 
   #beginDrag(wheelDirection = 0) {
@@ -600,6 +784,7 @@ export class DomViewerDriver<
   #finishClose() {
     this.#strip?.resume();
     delete this.#portal.overlay.dataset.lightboxEdgeReleased;
+    this.#removeFlight();
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
     this.#setState("closed");

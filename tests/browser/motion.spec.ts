@@ -386,6 +386,7 @@ test("direct React transition reverses from its painted crop", async ({ page }, 
   const reversal = (phase: "opening" | "closing") =>
     page.evaluate(async (phase): Promise<Interruption> => {
       const media = () =>
+        document.querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-media]") ??
         document.querySelector<HTMLElement>(
           '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
         )!;
@@ -532,6 +533,60 @@ test("direct touch dismissal preserves crop, radii, and native strip position", 
     "data-lightbox-state",
     "open",
   );
+});
+
+test("direct close flight retargets after viewport resize", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.setViewportSize({ width: 900, height: 720 });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.evaluate((element: HTMLElement) => {
+    element.style.borderRadius = "8px 12px 16px 4px";
+  });
+  await origin.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) animation.pause();
+  });
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-flight-source-hidden]'),
+  ).toHaveCount(1);
+
+  await page.setViewportSize({ width: 740, height: 680 });
+  const result = await page.evaluate(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      const duration = Number(animation.effect?.getComputedTiming().duration);
+      if (Number.isFinite(duration)) animation.currentTime = Math.max(0, duration - 1);
+    }
+    const flight = document
+      .querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-frame]")!
+      .getBoundingClientRect();
+    const target = document
+      .querySelector<HTMLElement>('[data-photo-index="1"]')!
+      .getBoundingClientRect();
+    return {
+      flight: { x: flight.x, y: flight.y, width: flight.width, height: flight.height },
+      target: { x: target.x, y: target.y, width: target.width, height: target.height },
+    };
+  });
+  for (const dimension of ["x", "y", "width", "height"] as const) {
+    expect(Math.abs(result.flight[dimension] - result.target[dimension])).toBeLessThan(5);
+  }
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) animation.play();
+  });
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(0);
 });
 
 test("nested visual target takes precedence over its preview box", async ({ page }) => {

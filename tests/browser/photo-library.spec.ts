@@ -199,14 +199,16 @@ for (const count of [10_000, 100_000]) {
     expect(selectedBounds).not.toBeNull();
     const closingEnd = await page.evaluate(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      const frame = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
-      )!;
-      const duration = Number(frame.getAnimations()[0]?.effect?.getComputedTiming().duration);
+      const frame =
+        document.querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-frame]") ??
+        document.querySelector<HTMLElement>(
+          '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+        )!;
       const animations = document.getAnimations();
       for (const animation of animations) {
         animation.pause();
-        animation.currentTime = duration - 1;
+        const duration = Number(animation.effect?.getComputedTiming().duration);
+        if (Number.isFinite(duration)) animation.currentTime = Math.max(0, duration - 1);
       }
       const bounds = frame.getBoundingClientRect();
       for (const animation of animations) animation.play();
