@@ -14,7 +14,10 @@ interface ViewerSlide {
   readonly frame: HTMLDivElement;
   readonly picture?: HTMLPictureElement;
   readonly image: HTMLElement;
+  readonly error: HTMLDivElement;
   loaded: boolean;
+  opening: boolean;
+  decoded: boolean;
   controller?: AbortController;
   dispose?: LightboxDispose;
 }
@@ -182,6 +185,15 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       "--lightbox-item-height",
       `min(${(item.media.height / item.media.width) * 100}vw, var(--lightbox-content-height, var(--lightbox-height, 100svh)))`,
     );
+    const error = this.#ownerDocument.createElement("div");
+    error.dataset.lightboxError = "";
+    error.hidden = true;
+    error.setAttribute("role", "alert");
+    const retry = this.#ownerDocument.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", () => this.#retry(index));
+    error.append("Unable to load media. ", retry);
     let picture: HTMLPictureElement | undefined;
     let media: HTMLElement;
     if (item.media.type === "image") {
@@ -194,6 +206,17 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       image.height = item.media.height;
       image.decoding = "async";
       image.draggable = false;
+      image.addEventListener("load", () => (error.hidden = true), {
+        signal: this.#controller.signal,
+      });
+      image.addEventListener(
+        "error",
+        () => {
+          error.hidden = false;
+          retry.tabIndex = index === this.#index ? 0 : -1;
+        },
+        { signal: this.#controller.signal },
+      );
       picture.append(image);
       frame.append(picture);
       media = image;
@@ -224,8 +247,44 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       "--lightbox-media-aspect",
       `${item.media.width} / ${item.media.height}`,
     );
+    frame.append(error);
     element.append(frame);
-    return { element, frame, picture, image: media, loaded: false } satisfies ViewerSlide;
+    return {
+      element,
+      frame,
+      picture,
+      image: media,
+      error,
+      loaded: false,
+      opening: false,
+      decoded: false,
+    } satisfies ViewerSlide;
+  }
+
+  prepareOpening(index: number, origin?: HTMLImageElement) {
+    const slide = this.#slides.get(index);
+    const item = this.#source.getItem(index);
+    if (!slide || item.media.type !== "image" || !(slide.image instanceof HTMLImageElement)) return;
+    slide.opening = true;
+    const preview = origin?.currentSrc || origin?.src || item.preview?.src || item.thumbnail?.src;
+    if (preview) {
+      for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
+      slide.image.removeAttribute("srcset");
+      slide.image.removeAttribute("sizes");
+      slide.image.src = preview;
+    }
+    slide.controller?.abort();
+    slide.controller = undefined;
+    slide.loaded = false;
+    slide.decoded = false;
+    this.#load(index, slide);
+  }
+
+  completeOpening(index: number) {
+    const slide = this.#slides.get(index);
+    if (!slide) return;
+    slide.opening = false;
+    if (slide.decoded) this.#applyImage(index, slide);
   }
 
   #renderWindow(anchor: number, scrollIndex: number) {
@@ -299,9 +358,14 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
         Math.min(this.#source.count - 1, this.#base + Math.round(left / Math.max(1, this.#width))),
       );
     if (index === this.#index) return;
-    this.#slides.get(this.#index)?.element.setAttribute("aria-hidden", "true");
+    const previous = this.#slides.get(this.#index);
+    previous?.element.setAttribute("aria-hidden", "true");
+    const previousRetry = previous?.error.querySelector("button");
+    if (previousRetry) previousRetry.tabIndex = -1;
     this.#index = index;
     this.active.element.setAttribute("aria-hidden", "false");
+    const activeRetry = this.active.error.querySelector("button");
+    if (activeRetry) activeRetry.tabIndex = 0;
     this.#loadWindow();
     this.#onSelect(index);
   }
@@ -320,20 +384,41 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       return;
     }
     const item = this.#source.getItem(index);
+    slide.error.hidden = true;
     if (item.media.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
-      for (const resource of item.media.sources ?? []) {
-        const source = this.#ownerDocument.createElement("source");
-        source.srcset = candidateSet(resource.candidates);
-        if (resource.sizes) source.sizes = resource.sizes;
-        if (resource.media) source.media = resource.media;
-        if (resource.type) source.type = resource.type;
-        slide.picture.insertBefore(source, slide.image);
+      const current = slide.image.getAttribute("src");
+      const full = item.media.src;
+      const alreadyFull =
+        current &&
+        new URL(current, this.#ownerDocument.baseURI).href ===
+          new URL(full, this.#ownerDocument.baseURI).href;
+      if (!current || alreadyFull) {
+        this.#applyImage(index, slide);
+      } else {
+        const controller = new AbortController();
+        const loader = new this.#ownerDocument.defaultView!.Image();
+        slide.controller = controller;
+        loader.src = item.media.src;
+        const abort = () => (loader.src = "");
+        controller.signal.addEventListener("abort", abort, { once: true });
+        void loader
+          .decode()
+          .then(() => {
+            if (controller.signal.aborted) return;
+            slide.decoded = true;
+            if (!slide.opening) this.#applyImage(index, slide);
+          })
+          .catch(() => {
+            if (!controller.signal.aborted) {
+              slide.error.hidden = false;
+              slide.error.querySelector("button")!.tabIndex = index === this.#index ? 0 : -1;
+            }
+          })
+          .finally(() => {
+            controller.signal.removeEventListener("abort", abort);
+            if (slide.controller === controller) slide.controller = undefined;
+          });
       }
-      slide.image.srcset = candidateSet(item.media.candidates);
-      if (item.media.sizes) slide.image.sizes = item.media.sizes;
-      slide.image.loading = index === this.#index ? "eager" : "lazy";
-      slide.image.fetchPriority = index === this.#index ? "high" : "low";
-      slide.image.src = item.media.src;
     } else if (item.media.type === "video" && slide.image instanceof HTMLVideoElement) {
       slide.image.src = item.media.src;
       if (item.media.poster) slide.image.poster = item.media.poster.src;
@@ -360,6 +445,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.controller = undefined;
     slide.dispose?.();
     slide.dispose = undefined;
+    slide.opening = false;
+    slide.decoded = false;
+    slide.error.hidden = true;
     for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
     if (slide.image instanceof HTMLMediaElement) {
       slide.image.pause();
@@ -375,6 +463,39 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       slide.image.replaceChildren();
     }
     slide.loaded = false;
+  }
+
+  #applyImage(index: number, slide: ViewerSlide) {
+    const item = this.#source.getItem(index);
+    if (item.media.type !== "image" || !(slide.image instanceof HTMLImageElement) || !slide.picture)
+      return;
+    for (const source of slide.picture.querySelectorAll("source")) source.remove();
+    for (const resource of item.media.sources ?? []) {
+      const source = this.#ownerDocument.createElement("source");
+      source.srcset = candidateSet(resource.candidates);
+      if (resource.sizes) source.sizes = resource.sizes;
+      if (resource.media) source.media = resource.media;
+      if (resource.type) source.type = resource.type;
+      slide.picture.insertBefore(source, slide.image);
+    }
+    slide.image.srcset = candidateSet(item.media.candidates);
+    if (item.media.sizes) slide.image.sizes = item.media.sizes;
+    else slide.image.removeAttribute("sizes");
+    slide.image.loading = index === this.#index ? "eager" : "lazy";
+    slide.image.fetchPriority = index === this.#index ? "high" : "low";
+    slide.image.src = item.media.src;
+    slide.decoded = false;
+    slide.error.hidden = true;
+  }
+
+  #retry(index: number) {
+    const slide = this.#slides.get(index);
+    if (!slide) return;
+    slide.controller?.abort();
+    slide.controller = undefined;
+    slide.loaded = false;
+    slide.decoded = false;
+    this.#load(index, slide);
   }
 
   #onScroll = () => {

@@ -216,6 +216,93 @@ test("plain runtime reveals the selected mounted origin without a host callback"
   await expect(second.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
 });
 
+test("plain runtime keeps the preview painted until the full image can replace it", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 1,
+      getItem() {
+        return {
+          id: "preview-test",
+          preview: { src: "/photo-portrait.svg", width: 240, height: 360 },
+          media: {
+            type: "image",
+            src: "/photo-square.svg",
+            alt: "Preview handoff",
+            width: 800,
+            height: 800,
+          },
+        };
+      },
+      getIndex(id) {
+        return id === "preview-test" ? 0 : null;
+      },
+    });
+    void window.headlessViewer.open({ id: "preview-test" });
+  });
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "opening");
+  const media = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]');
+  await expect(media).toHaveAttribute("src", "/photo-portrait.svg");
+  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(media).toHaveAttribute("src", "/photo-square.svg");
+});
+
+test("plain runtime keeps the preview available while a failed full image is retried", async ({
+  page,
+}) => {
+  let serveFullImage = false;
+  await page.route("**/retry-full.svg", async (route) => {
+    if (!serveFullImage) {
+      await route.abort("failed");
+      return;
+    }
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="green"/></svg>',
+    });
+  });
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 1,
+      getItem() {
+        return {
+          id: "retry-test",
+          preview: { src: "/photo-portrait.svg", width: 240, height: 360 },
+          media: {
+            type: "image",
+            src: "/retry-full.svg",
+            alt: "Retry handoff",
+            width: 800,
+            height: 800,
+          },
+        };
+      },
+      getIndex(id) {
+        return id === "retry-test" ? 0 : null;
+      },
+    });
+    void window.headlessViewer.open({ id: "retry-test" });
+  });
+
+  const slide = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+  const media = slide.locator("[data-lightbox-media]");
+  const error = slide.locator("[data-lightbox-error]");
+  await expect(error).toBeVisible();
+  await expect(media).toHaveAttribute("src", "/photo-portrait.svg");
+
+  serveFullImage = true;
+  await error.getByRole("button", { name: "Retry" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(error).toBeHidden();
+  await expect(media).toHaveAttribute("src", "/retry-full.svg");
+});
+
 test("plain runtime settles immediately when reduced motion is requested", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/headless.html");

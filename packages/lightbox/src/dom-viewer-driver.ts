@@ -274,6 +274,7 @@ export class DomViewerDriver<
     this.#viewportWidth = view.innerWidth;
     this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
     await this.#strip?.select(context.index, false);
+    this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
     this.#render(context.item, context.index);
     this.#returnFocus =
       context.origin?.trigger ??
@@ -293,6 +294,7 @@ export class DomViewerDriver<
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
       this.#thumbnailOverlays.prepare(context.item, context.index, this.#frame, "open", 0);
+      this.#strip?.completeOpening(context.index);
       delete this.#portal.overlay.dataset.lightboxPrepared;
       this.#setState("open");
       this.#focus();
@@ -363,6 +365,7 @@ export class DomViewerDriver<
     await this.#play(animations, context.signal);
     if (context.signal.aborted) return;
     this.#setState("open");
+    this.#strip?.completeOpening(context.index);
     this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
     delete this.#portal.dialog.dataset.filmstripRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
