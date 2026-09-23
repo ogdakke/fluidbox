@@ -14,6 +14,12 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   const overlay = page.locator("[data-lightbox-overlay]");
   await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
   await expect(page.locator("[data-lightbox-media]")).toHaveAttribute("alt", "Blue square study");
+  await expect(page.locator("[data-lightbox-picture] source")).toHaveCount(1);
+  await expect(page.locator("[data-lightbox-media]")).toHaveAttribute(
+    "srcset",
+    "/photo-square.svg 400w, /photo-square.svg 800w",
+  );
+  await expect(page.locator("[data-lightbox-media]")).toHaveAttribute("sizes", "min(100vw, 800px)");
   await expect(page.locator("[data-demo-caption]")).toHaveText("one");
 
   await page.locator("[data-demo-next]").click();
@@ -22,6 +28,9 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
     "alt",
     "Orange portrait study",
   );
+  await expect(page.locator("[data-lightbox-picture] source")).toHaveCount(0);
+  await expect(page.locator("[data-lightbox-media]")).not.toHaveAttribute("srcset", /.+/);
+  await expect(page.locator("[data-lightbox-media]")).not.toHaveAttribute("sizes", /.+/);
 
   await page.locator("[data-demo-close]").click();
   await expect(overlay).toHaveCount(0);

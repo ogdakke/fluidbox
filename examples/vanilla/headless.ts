@@ -13,6 +13,18 @@ const source = arraySource([
       alt: "Blue square study",
       width: 800,
       height: 800,
+      candidates: [
+        { src: "/photo-square.svg", width: 400 },
+        { src: "/photo-square.svg", width: 800 },
+      ],
+      sizes: "min(100vw, 800px)",
+      sources: [
+        {
+          media: "(min-width: 1px)",
+          candidates: [{ src: "/photo-square.svg", width: 800 }],
+          sizes: "min(100vw, 800px)",
+        },
+      ],
     },
   },
   {

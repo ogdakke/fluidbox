@@ -70,11 +70,16 @@ function frameKeyframe(pose: PaintedPose): Keyframe {
   };
 }
 
+function candidateSet(candidates: readonly { src: string; width: number }[] | undefined) {
+  return candidates?.map((candidate) => `${candidate.src} ${candidate.width}w`).join(", ") ?? "";
+}
+
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 export class DomViewerDriver<
   TItem extends LightboxItem = LightboxItem,
 > implements ViewerSessionDriver<TItem> {
   readonly #portal: ViewerPortalElements;
+  readonly #picture: HTMLPictureElement;
   readonly #isolation: ViewerModalIsolation;
   readonly #lifetime = new AbortController();
   #controller: LightboxController<TItem> | undefined;
@@ -95,6 +100,11 @@ export class DomViewerDriver<
 
   constructor(ownerDocument: Document) {
     this.#portal = createViewerPortal(ownerDocument, { defaultCloseButton: false });
+    this.#picture = ownerDocument.createElement("picture");
+    this.#picture.dataset.lightboxPicture = "";
+    this.#picture.style.display = "contents";
+    this.#portal.frame.insertBefore(this.#picture, this.#portal.media);
+    this.#picture.append(this.#portal.media);
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
     this.#portal.dialog.dataset.lightboxHeadless = "";
     this.#portal.container.addEventListener(
@@ -287,10 +297,25 @@ export class DomViewerDriver<
   #render(item: TItem, index: number) {
     this.#assertImage(item);
     const media = item.media;
+    for (const source of this.#picture.querySelectorAll("source")) source.remove();
+    for (const resource of media.sources ?? []) {
+      const source = this.#portal.overlay.ownerDocument.createElement("source");
+      source.srcset = candidateSet(resource.candidates);
+      if (resource.sizes) source.sizes = resource.sizes;
+      if (resource.media) source.media = resource.media;
+      if (resource.type) source.type = resource.type;
+      this.#picture.insertBefore(source, this.#portal.media);
+    }
+    this.#portal.media.srcset = candidateSet(media.candidates);
+    if (media.sizes) this.#portal.media.sizes = media.sizes;
+    else this.#portal.media.removeAttribute("sizes");
     this.#portal.media.src = media.src;
     this.#portal.media.alt = media.alt;
     this.#portal.media.width = media.width;
     this.#portal.media.height = media.height;
+    this.#portal.media.decoding = "async";
+    this.#portal.media.loading = "eager";
+    this.#portal.media.fetchPriority = "high";
     this.#portal.media.style.setProperty(
       "--lightbox-media-aspect",
       `${media.width} / ${media.height}`,
