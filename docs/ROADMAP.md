@@ -28,6 +28,11 @@ Work has started in bounded, reviewed parts. Stage 0 is still incomplete.
   clipping visibility, abortable host reveal ownership, and crop/radius transition geometry now
   live in independent modules, with the existing motion and virtualized-source suites protecting
   their behavior.
+- Added the internal plain TypeScript viewer session behind a motion-driver boundary. Unit tests now
+  cover synchronous validation, immutable state, event order, prevention, command sharing and
+  supersession, external abort, source reconciliation, host-reveal cancellation, overlay ownership,
+  runtime failure, and teardown. Connecting the compatibility element and then the public factory
+  to this session remains the next extraction work.
 - Added deterministic open/close interruption geometry checks, focus/inert restoration checks, and trace/video evidence in `tests/browser/motion.spec.ts`. This protects pose continuity at command handoff, not gesture velocity or compositor performance.
 - Fixed indexed-source opening preparation to resolve mounted thumbnails before the gallery becomes active; added opening-pose and missing-origin scale/fade regressions.
 - Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.

@@ -137,7 +137,8 @@ it settles or loses ownership:
 Repeated requests for the same pending destination share the pending operation. A newer
 incompatible command resolves the earlier result as `superseded` and continues from the painted
 pose. `destroy()` is synchronous and idempotent. It cannot be prevented and leaves no command
-pending.
+pending. An unexpected runtime or renderer failure rejects the command promise; it is not reported
+as `aborted`, because cancellation and implementation failure require different recovery.
 
 The default reason for direct controller calls is `api`. Runtime input uses `trigger`, `keyboard`,
 `pointer`, `wheel`, or `filmstrip`. Source reconciliation uses `source-update`, `source-empty`, or
