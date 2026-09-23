@@ -1,12 +1,12 @@
 # Lightbox
 
-The viewer extracted from `portfolio-v4`. This repository is a Bun workspace with one installable package, `@dw/lightbox`. It is private and linked locally while the public API is being developed.
+The viewer extracted from `portfolio-v4`. This repository is a Bun workspace with one installable package, `@ogdakke/fluidbox`. It is private and linked locally while the public API is being developed.
 
 ## Current usage
 
 ```ts
-import "@dw/lightbox/elements";
-import "@dw/lightbox/styles.css";
+import "@ogdakke/fluidbox/elements";
+import "@ogdakke/fluidbox/styles.css";
 ```
 
 The `elements` entry registers `<app-lightbox>`, `<app-gallery>`, and `<app-filmstrip>`. The CSS entry is explicit. See [the styling and markup contract](docs/LIGHTBOX.md) for slots, state attributes, and styling hooks.
@@ -14,7 +14,7 @@ The `elements` entry registers `<app-lightbox>`, `<app-gallery>`, and `<app-film
 The root import is safe to evaluate during server rendering:
 
 ```ts
-import { registerLightboxElements } from "@dw/lightbox";
+import { registerLightboxElements } from "@ogdakke/fluidbox";
 
 // Run after hydration or in a client-only entry.
 await registerLightboxElements();
@@ -27,8 +27,8 @@ The element implementation remains browser-only. Framework bindings are not expo
 A host list can render only its visible thumbnails and give `<app-gallery>` an indexed source. The gallery creates one persistent controller, so recycling a host thumbnail while the viewer is open does not close it.
 
 ```ts
-import "@dw/lightbox/elements";
-import type { AppGallery, LightboxGallerySource } from "@dw/lightbox";
+import "@ogdakke/fluidbox/elements";
+import type { AppGallery, LightboxGallerySource } from "@ogdakke/fluidbox";
 
 const gallery = document.querySelector<AppGallery>("app-gallery")!;
 const source: LightboxGallerySource = {

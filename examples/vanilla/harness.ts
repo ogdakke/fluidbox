@@ -1,6 +1,6 @@
-import type { LightboxGallerySource } from "@dw/lightbox";
-import "@dw/lightbox/elements";
-import "@dw/lightbox/styles.css";
+import type { LightboxGallerySource } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/elements";
+import "@ogdakke/fluidbox/styles.css";
 import "./site.css";
 
 const root = document.querySelector<HTMLElement>("#fixture")!;

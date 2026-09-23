@@ -1,6 +1,6 @@
-import type { AppGallery, LightboxGallerySource } from "@dw/lightbox";
-import "@dw/lightbox/elements";
-import "@dw/lightbox/styles.css";
+import type { AppGallery, LightboxGallerySource } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/elements";
+import "@ogdakke/fluidbox/styles.css";
 import "./playground.css";
 
 const gallery = document.querySelector<AppGallery>("#virtual-gallery")!;

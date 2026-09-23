@@ -1,5 +1,5 @@
 {
-  "name": "@dw/lightbox-example-vanilla",
+  "name": "@ogdakke/fluidbox-example-vanilla",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "dev:share": "portless lightbox --lan vite dev"
   },
   "dependencies": {
-    "@dw/lightbox": "workspace:*"
+    "@ogdakke/fluidbox": "workspace:*"
   },
   "devDependencies": {
     "vite": "^8.1.3"

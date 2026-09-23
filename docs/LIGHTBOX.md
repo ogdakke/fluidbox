@@ -1,6 +1,6 @@
 # Lightbox styling contract
 
-`@dw/lightbox/elements` registers the custom elements without installing CSS. Import `@dw/lightbox/styles.css` explicitly for the current viewer styling. The runtime exposes DOM parts, state attributes, and live CSS variables for theming.
+`@ogdakke/fluidbox/elements` registers the custom elements without installing CSS. Import `@ogdakke/fluidbox/styles.css` explicitly for the current viewer styling. The runtime exposes DOM parts, state attributes, and live CSS variables for theming.
 
 ## Authoring content
 
