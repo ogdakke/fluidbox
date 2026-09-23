@@ -37,6 +37,7 @@ export type {
   LightboxThumbnailOverlayBehavior,
   LightboxThumbnailOverlayRegistration,
   LightboxVideoMedia,
+  LightboxZoomOptions,
 } from "./public-api";
 
 export type { AppLightbox } from "./lightbox";

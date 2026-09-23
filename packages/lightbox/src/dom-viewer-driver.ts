@@ -25,6 +25,7 @@ import type {
   LightboxItem,
   LightboxPortalRenderer,
   LightboxSource,
+  LightboxZoomOptions,
 } from "./public-api";
 import type {
   ViewerSessionCloseContext,
@@ -91,10 +92,13 @@ export class DomViewerDriver<
     (state) => this.#paintDrag(state),
     () => this.#commitWheelDismiss(),
   );
+  readonly #zoomOptions: LightboxZoomOptions | undefined;
+  #zoom: import("./lightbox-zoom").LightboxZoom | undefined;
+  #zoomLoad: Promise<import("./lightbox-zoom").LightboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
   #destroyed = false;
 
-  constructor(ownerDocument: Document) {
+  constructor(ownerDocument: Document, zoomOptions: false | LightboxZoomOptions | undefined) {
     this.#portal = createViewerPortal(ownerDocument, { defaultCloseButton: false });
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
     this.#portal.dialog.dataset.lightboxHeadless = "";
@@ -104,6 +108,11 @@ export class DomViewerDriver<
         if (this.#suppressClick) {
           this.#suppressClick = false;
           clearTimeout(this.#suppressClickTimer);
+          return;
+        }
+        if (event instanceof MouseEvent && this.#zoom?.handleClick(event)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
           return;
         }
         if (
@@ -143,6 +152,45 @@ export class DomViewerDriver<
     ownerDocument.defaultView?.addEventListener("resize", this.#scheduleCloseTargetUpdate, {
       signal: this.#lifetime.signal,
     });
+    if (zoomOptions !== false) {
+      const max = zoomOptions?.max ?? 4;
+      const step = zoomOptions?.step ?? 2;
+      if (!Number.isFinite(max) || max <= 1 || !Number.isFinite(step) || step <= 1 || step > max) {
+        throw new RangeError("Lightbox zoom step must be greater than 1 and no greater than max.");
+      }
+      this.#zoomOptions = { max, step };
+    }
+  }
+
+  async #loadZoom() {
+    if (!this.#zoomOptions || this.#destroyed) return undefined;
+    if (this.#zoom) return this.#zoom;
+    this.#zoomLoad ??= import("./lightbox-zoom").then(({ LightboxZoom }) => {
+      if (this.#destroyed) return undefined;
+      const { max = 4, step = 2 } = this.#zoomOptions!;
+      return (this.#zoom = new LightboxZoom(this.#portal.container, {
+        prepare: () => this.#prepareZoom(),
+        config: () => ({ max, step }),
+        state: (locked) => {
+          const dialog = this.#portal.dialog;
+          const wasZoomed = dialog.hasAttribute("data-zoomed");
+          if (locked && !wasZoomed) {
+            dialog.style.setProperty(
+              "--lightbox-zoom-scroll-offset",
+              `${this.#strip?.element.scrollLeft ?? 0}px`,
+            );
+          }
+          dialog.toggleAttribute("data-zoomed", locked);
+          if (!locked) {
+            dialog.style.removeProperty("--lightbox-zoom-scroll-offset");
+            if (wasZoomed && this.#strip) void this.#strip.select(this.#strip.index, false);
+          }
+        },
+        close: () => void this.#controller?.close({ reason: "pointer" }),
+        reducedMotion: () => matchMedia("(prefers-reduced-motion: reduce)").matches,
+      }));
+    });
+    return this.#zoomLoad;
   }
 
   connect(controller: LightboxController<TItem>, renderer?: LightboxPortalRenderer<TItem>) {
@@ -174,6 +222,7 @@ export class DomViewerDriver<
 
   async open(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
+    void this.#loadZoom();
     this.#cancelAnimations(true);
     await this.#strip?.select(context.index, false);
     this.#render(context.item, context.index);
@@ -255,6 +304,8 @@ export class DomViewerDriver<
   async select(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
     this.#cancelAnimations(true);
+    this.#zoom?.suspend();
+    void this.#loadZoom();
     this.#takeInterruptedPose();
     const origin = context.origin?.visual;
     this.#activeOrigin = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
@@ -282,6 +333,7 @@ export class DomViewerDriver<
   }
 
   async close(context: ViewerSessionCloseContext) {
+    this.#zoom?.suspend();
     this.#cancelAnimations(true);
     const interruptedPose = this.#takeInterruptedPose(false);
     this.#setState("closing");
@@ -353,6 +405,7 @@ export class DomViewerDriver<
     this.#lifetime.abort();
     clearTimeout(this.#suppressClickTimer);
     this.#dragGesture.cancel();
+    this.#zoom?.destroy();
     this.#cancelAnimations(false);
     this.#portalDispose?.();
     this.#portalDispose = undefined;
@@ -475,6 +528,15 @@ export class DomViewerDriver<
       frameOpacity: getComputedStyle(frame).opacity,
       backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
     };
+  }
+
+  #prepareZoom() {
+    if (this.#controller?.state.status !== "open" || this.#flight || !this.#strip) return null;
+    this.#dragGesture.cancel();
+    this.#cancelAnimations(true);
+    const interrupted = this.#takeInterruptedPose();
+    if (interrupted) applyImageTransitionPose(this.#frame, this.#media, interrupted);
+    return { image: this.#media, frame: this.#frame };
   }
 
   #createCloseFlight(start: ImageTransitionPose, origin: HTMLElement, source: HTMLImageElement) {
@@ -613,6 +675,7 @@ export class DomViewerDriver<
 
   #beginDrag(wheelDirection = 0) {
     if (this.#dragGesture.active || this.#controller?.state.status !== "open") return;
+    this.#zoom?.suspend();
     this.#cancelAnimations(true);
     const frame = this.#frame;
     const current = readImageTransitionPose(frame, this.#media);
@@ -819,11 +882,19 @@ export class DomViewerDriver<
     if (event.key === "Escape") {
       event.preventDefault();
       void this.#controller?.close({ reason: "keyboard" });
+    } else if (["+", "=", "-", "0"].includes(event.key) && !event.metaKey && !event.ctrlKey) {
+      event.preventDefault();
+      void this.#loadZoom().then((zoom) => {
+        if (event.key === "0") zoom?.reset();
+        else zoom?.zoomBy(event.key === "-" ? 1 / 1.5 : 1.5);
+      });
     } else if (event.key === "ArrowRight") {
       event.preventDefault();
+      this.#zoom?.suspend();
       void this.#controller?.next({ reason: "keyboard" });
     } else if (event.key === "ArrowLeft") {
       event.preventDefault();
+      this.#zoom?.suspend();
       void this.#controller?.previous({ reason: "keyboard" });
     }
   };

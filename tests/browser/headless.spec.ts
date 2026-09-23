@@ -197,6 +197,49 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
   await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
 });
 
+test("plain runtime reuses pinch and double-click zoom interaction", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  const media = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]');
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+
+  await media.dblclick({ position: { x: 260, y: 260 } });
+  await expect(dialog).toHaveAttribute("data-zoomed", "");
+  const zoomViewport = page.locator("[data-lightbox-zoom-viewport]");
+  await expect(zoomViewport).toHaveCount(1);
+  const scale = await zoomViewport.locator("[data-lightbox-media]").evaluate((element) => {
+    const transform = getComputedStyle(element).transform;
+    return new DOMMatrix(transform === "none" ? undefined : transform).a;
+  });
+  expect(scale).toBeGreaterThan(1.5);
+
+  await page.keyboard.press("0");
+  await expect(dialog).not.toHaveAttribute("data-zoomed", "");
+  await expect(page.locator("[data-lightbox-zoom-viewport]")).toHaveCount(0);
+  await expect(media).toBeVisible();
+
+  await page.locator("[data-lightbox-container]").evaluate((container) => {
+    const gesture = (type: string, scale: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, {
+        scale: { value: scale },
+        clientX: { value: innerWidth / 2 },
+        clientY: { value: innerHeight / 2 },
+      });
+      container.dispatchEvent(event);
+    };
+    gesture("gesturestart", 1);
+    gesture("gesturechange", 2);
+    gesture("gestureend", 2);
+  });
+  await expect(dialog).toHaveAttribute("data-zoomed", "");
+  await expect(page.locator("[data-lightbox-zoom-viewport]")).toHaveCount(1);
+  await page.keyboard.press("0");
+  await expect(dialog).not.toHaveAttribute("data-zoomed", "");
+});
+
 test("plain runtime keeps a 100k source bounded without custom elements", async ({ page }) => {
   await page.goto("/headless.html");
   await page.evaluate(() => {

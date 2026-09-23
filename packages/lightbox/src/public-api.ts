@@ -216,11 +216,20 @@ export type LightboxThumbnailOverlayRegistration<TItem extends LightboxItem = Li
       readonly renderer: LightboxRenderer<TItem>;
     };
 
+export interface LightboxZoomOptions {
+  /** Scale used by double-click, double-tap, and keyboard zoom. @default 2 */
+  readonly step?: number;
+  /** Maximum pinch, wheel, and keyboard zoom scale. @default 4 */
+  readonly max?: number;
+}
+
 export interface LightboxOptions<TItem extends LightboxItem = LightboxItem> {
   readonly source: LightboxSource<TItem>;
   readonly origins?: LightboxOriginAdapter;
   readonly renderers?: Readonly<Record<string, LightboxRenderer<TItem>>>;
   readonly portal?: LightboxPortalRenderer<TItem>;
+  /** Set to false to disable zoom interaction. */
+  readonly zoom?: false | LightboxZoomOptions;
   readonly onBeforeCommand?: (event: LightboxBeforeCommandEvent) => void;
   readonly onEvent?: (event: LightboxEvent) => void;
 }
