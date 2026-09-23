@@ -38,6 +38,7 @@ import {
   type ViewerPortalElements,
 } from "./viewer-portal";
 import { ViewerStrip } from "./viewer-strip";
+import { activeViewer } from "./viewer-ownership";
 import { mapRadii } from "./transition-geometry";
 import { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 
@@ -70,6 +71,13 @@ export class DomViewerDriver<
   readonly #portal: ViewerPortalElements;
   readonly #isolation: ViewerModalIsolation;
   readonly #thumbnailOverlays: ThumbnailOverlayRuntime<TItem>;
+  readonly #viewerOwner = {
+    closeImmediately: () => {
+      void this.#controller?.close({ reason: "api" });
+      this.#cancelAnimations(false);
+      this.#finishClose();
+    },
+  };
   readonly #lifetime = new AbortController();
   #controller: LightboxController<TItem> | undefined;
   #strip: ViewerStrip<TItem> | undefined;
@@ -252,6 +260,7 @@ export class DomViewerDriver<
 
   async open(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
+    activeViewer.claim(this.#viewerOwner)?.closeImmediately();
     this.#endWheelHandoff();
     void this.#loadZoom();
     this.#cancelAnimations(true);
@@ -1012,6 +1021,7 @@ export class DomViewerDriver<
     delete this.#portal.overlay.dataset.lightboxEdgeReleased;
     this.#removeFlight();
     this.#thumbnailOverlays.finishClose();
+    activeViewer.release(this.#viewerOwner);
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
     this.#setState("closed");

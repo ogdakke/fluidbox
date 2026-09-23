@@ -40,15 +40,17 @@ const source = arraySource([
 
 type DemoItem = ReturnType<typeof source.getItem>;
 
+const origins = {
+  getOrigin(id: string) {
+    const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${id}"]`);
+    const visual = trigger?.querySelector<HTMLImageElement>("img");
+    return trigger && visual ? { trigger, visual, thumbnail: visual } : null;
+  },
+};
+
 const viewer: LightboxController<DemoItem> = createLightbox({
   source,
-  origins: {
-    getOrigin(id) {
-      const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${id}"]`);
-      const visual = trigger?.querySelector<HTMLImageElement>("img");
-      return trigger && visual ? { trigger, visual, thumbnail: visual } : null;
-    },
-  },
+  origins,
   portal: {
     mount({ target, controller, signal }) {
       const controls = document.createElement("div");
@@ -86,6 +88,7 @@ const viewer: LightboxController<DemoItem> = createLightbox({
     },
   },
 });
+const secondaryViewer: LightboxController<DemoItem> = createLightbox({ source, origins });
 
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
   trigger.addEventListener("click", () => {
@@ -96,7 +99,9 @@ for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]"))
 declare global {
   interface Window {
     headlessViewer: typeof viewer;
+    headlessSecondaryViewer: typeof secondaryViewer;
   }
 }
 
 window.headlessViewer = viewer;
+window.headlessSecondaryViewer = secondaryViewer;

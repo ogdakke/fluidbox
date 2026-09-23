@@ -67,6 +67,32 @@ test("plain runtime contains focus and applies the established gallery keyboard 
   await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
 });
 
+test("plain controllers hand body-level ownership to the newest viewer", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  await page.evaluate(() => void window.headlessSecondaryViewer.open({ id: "two" }));
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(1);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]'),
+  ).toHaveAttribute("alt", "Orange portrait study");
+  const states = await page.evaluate(() => ({
+    first: window.headlessViewer.state.status,
+    second: window.headlessSecondaryViewer.state.status,
+  }));
+  expect(states).toEqual({ first: "closed", second: "open" });
+  await page.evaluate(() => void window.headlessSecondaryViewer.close());
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+});
+
 test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();

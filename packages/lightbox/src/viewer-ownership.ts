@@ -19,3 +19,10 @@ export class ViewerOwnership<TOwner extends object> {
     return true;
   }
 }
+
+export interface ActiveViewerOwner {
+  closeImmediately(): void;
+}
+
+/** One owner across direct, framework, and custom-element bindings. */
+export const activeViewer = new ViewerOwnership<ActiveViewerOwner>();

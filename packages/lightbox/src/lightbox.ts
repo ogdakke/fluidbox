@@ -15,7 +15,7 @@ import {
   type ThumbnailPose,
 } from "./transition-geometry";
 import { createViewerPortal, ViewerModalIsolation } from "./viewer-portal";
-import { ViewerOwnership } from "./viewer-ownership";
+import { activeViewer } from "./viewer-ownership";
 import { clearViewerMotion, completeViewerMotion } from "./viewer-motion-completion";
 import {
   backdropVisibility,
@@ -46,6 +46,12 @@ const OPENING_BACKDROP_EASING = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 type TransitionPhase = "preview" | "opening" | "open" | "dragging" | "closing";
 
 class AppLightbox extends HTMLElement {
+  readonly #viewerOwner = {
+    closeImmediately: () => {
+      this.close();
+      this.#finishClose();
+    },
+  };
   static observedAttributes = ["src", "alt", "loading", "close-button"];
   static #progressRegistered = false;
 
@@ -1022,11 +1028,10 @@ class AppLightbox extends HTMLElement {
         "The lightbox requires browser support for inert and the Web Animations API.",
       );
     }
-    const previous = activeViewer.claim(this);
+    const previous = activeViewer.claim(this.#viewerOwner);
     const switchingImage = previous !== null;
     if (previous) {
-      previous.close();
-      previous.#finishClose();
+      previous.closeImmediately();
     }
     this.#mountPortableContent();
     for (const image of this.#standaloneImage?.querySelectorAll<HTMLImageElement>(
@@ -2509,7 +2514,7 @@ class AppLightbox extends HTMLElement {
     this.#sessionSource = null;
     this.#setPresentationState("closed");
     completeViewerMotion(this, "close");
-    activeViewer.release(this);
+    activeViewer.release(this.#viewerOwner);
     if (this.#returnFocus?.isConnected) this.#returnFocus.focus({ preventScroll: true });
     this.#returnFocus = null;
     this.#applyPendingImage();
@@ -2588,8 +2593,6 @@ class AppLightbox extends HTMLElement {
     this.#imageLoaded = true;
   }
 }
-
-const activeViewer = new ViewerOwnership<AppLightbox>();
 
 if (!customElements.get("app-lightbox")) {
   customElements.define("app-lightbox", AppLightbox);
