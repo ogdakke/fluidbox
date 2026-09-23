@@ -8,6 +8,15 @@ import {
   touchAxisThreshold,
   type LightboxDragState,
 } from "./lightbox-gesture";
+import {
+  applyImageTransitionPose,
+  createImageTransitionMotion,
+  openImageTransitionPose,
+  poseFromThumbnail,
+  readImageTransitionPose,
+  thumbnailTransitionPose,
+  type ImageTransitionPose,
+} from "./image-transition-motion";
 import type {
   LightboxController,
   LightboxDispose,
@@ -28,48 +37,19 @@ import {
 } from "./viewer-portal";
 import { ViewerStrip } from "./viewer-strip";
 
-const OPEN_DURATION = 260;
-const CLOSE_DURATION = 220;
+const OPEN_DURATION = 300;
 const TOUCH_DISMISS_DISTANCE = 60;
 const EASING = "cubic-bezier(0.2, 0.7, 0.2, 1)";
+const OPENING_SPRING_RESPONSE = 210;
+const TOUCH_OPENING_SPRING_RESPONSE = 380;
 
-interface PaintedPose {
-  readonly transform: string;
-  readonly opacity: string;
-  readonly borderTopLeftRadius: string;
-  readonly borderTopRightRadius: string;
-  readonly borderBottomRightRadius: string;
-  readonly borderBottomLeftRadius: string;
+interface PaintedPose extends ImageTransitionPose {
+  readonly frameOpacity: string;
   readonly backdropOpacity: string;
 }
 
 function isImageItem(item: LightboxItem): item is LightboxItem<LightboxImageMedia> {
   return item.media.type === "image";
-}
-
-function originTransform(from: DOMRect, to: DOMRect) {
-  const scaleX = from.width / Math.max(1, to.width);
-  const scaleY = from.height / Math.max(1, to.height);
-  const x = from.left + from.width / 2 - (to.left + to.width / 2);
-  const y = from.top + from.height / 2 - (to.top + to.height / 2);
-  return `translate(${x}px, ${y}px) scale(${scaleX}, ${scaleY})`;
-}
-
-function radiusFor(element: HTMLElement | null) {
-  if (!element) return "0px";
-  const style = getComputedStyle(element);
-  return `${style.borderTopLeftRadius} ${style.borderTopRightRadius} ${style.borderBottomRightRadius} ${style.borderBottomLeftRadius}`;
-}
-
-function frameKeyframe(pose: PaintedPose): Keyframe {
-  return {
-    transform: pose.transform,
-    opacity: pose.opacity,
-    borderTopLeftRadius: pose.borderTopLeftRadius,
-    borderTopRightRadius: pose.borderTopRightRadius,
-    borderBottomRightRadius: pose.borderBottomRightRadius,
-    borderBottomLeftRadius: pose.borderBottomLeftRadius,
-  };
 }
 
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
@@ -182,6 +162,7 @@ export class DomViewerDriver<
         ? this.#portal.overlay.ownerDocument.activeElement
         : null);
     if (!this.#portal.overlay.isConnected) {
+      this.#portal.overlay.dataset.lightboxPrepared = "";
       this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
     }
     this.#strip?.mount();
@@ -190,43 +171,49 @@ export class DomViewerDriver<
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (context.signal.aborted) return;
 
-    const interruptedPose = this.#takeInterruptedPose();
+    const interruptedPose = this.#takeInterruptedPose(false);
     const origin = context.origin?.visual;
-    const target = this.#frame.getBoundingClientRect();
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const frameMotion: Keyframe[] = interruptedPose
-      ? [frameKeyframe(interruptedPose), { transform: "none", borderRadius: "0px", opacity: 1 }]
+    const openPose = openImageTransitionPose();
+    const start = interruptedPose
+      ? interruptedPose
       : from
-        ? [
-            {
-              transform: originTransform(from.getBoundingClientRect(), target),
-              borderRadius: radiusFor(from),
-              opacity: 1,
-            },
-            { transform: "none", borderRadius: "0px", opacity: 1 },
-          ]
-        : [
-            { transform: "scale(0.96)", borderRadius: "0px", opacity: 0 },
-            { transform: "none", borderRadius: "0px", opacity: 1 },
-          ];
-    await this.#play(
-      [
-        this.#frame.animate(frameMotion, {
-          duration: OPEN_DURATION,
-          easing: EASING,
-          fill: "both",
-        }),
-        this.#portal.backdrop.animate(
-          [{ opacity: interruptedPose?.backdropOpacity ?? 0 }, { opacity: 1 }],
-          {
-            duration: OPEN_DURATION,
-            easing: EASING,
-            fill: "both",
-          },
-        ),
-      ],
-      context.signal,
-    );
+        ? poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, openPose))
+        : {
+            transform: new DOMMatrix()
+              .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+              .scale(0.96),
+            clip: openPose.clip,
+            frameOpacity: "0",
+            backdropOpacity: "0",
+          };
+    const response = matchMedia("(hover: none) and (pointer: coarse)").matches
+      ? TOUCH_OPENING_SPRING_RESPONSE
+      : OPENING_SPRING_RESPONSE;
+    const motion = createImageTransitionMotion({
+      opening: true,
+      from: start,
+      to: openPose,
+      width: this.#media.offsetWidth,
+      height: this.#media.offsetHeight,
+      backdropFrom: Number(interruptedPose?.backdropOpacity ?? 0),
+      backdropTo: 1,
+      duration: OPEN_DURATION,
+      response,
+      samples: 24,
+      fadeFrame: !from && !interruptedPose,
+    });
+    applyImageTransitionPose(this.#frame, this.#media, start);
+    this.#frame.style.opacity = interruptedPose?.frameOpacity ?? (!from ? "0" : "1");
+    this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
+    const animations = [
+      this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
+      this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
+      this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
+      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+    ];
+    delete this.#portal.overlay.dataset.lightboxPrepared;
+    await this.#play(animations, context.signal);
     if (context.signal.aborted) return;
     this.#setState("open");
     this.#portal.dialog.focus({ preventScroll: true });
@@ -253,42 +240,51 @@ export class DomViewerDriver<
 
   async close(context: ViewerSessionCloseContext) {
     this.#cancelAnimations(true);
-    const interruptedPose = this.#takeInterruptedPose();
+    const interruptedPose = this.#takeInterruptedPose(false);
     this.#setState("closing");
     if (context.origin?.trigger.isConnected) this.#returnFocus = context.origin.trigger;
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const frame = this.#frame.getBoundingClientRect();
-    const frameMotion: Keyframe[] = from
-      ? [
-          interruptedPose
-            ? frameKeyframe(interruptedPose)
-            : { transform: "none", borderRadius: "0px", opacity: 1 },
-          {
-            transform: originTransform(from.getBoundingClientRect(), frame),
-            borderRadius: radiusFor(from),
-            opacity: 1,
-          },
-        ]
-      : [
-          interruptedPose ? frameKeyframe(interruptedPose) : { transform: "none", opacity: 1 },
-          { transform: "scale(0.96)", opacity: 0 },
-        ];
+    const start = interruptedPose ?? {
+      ...readImageTransitionPose(this.#frame, this.#media),
+      frameOpacity: "1",
+      backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
+    };
+    const target = from
+      ? poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, start))
+      : {
+          transform: new DOMMatrix(start.transform.toString())
+            .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+            .scale(0.96),
+          clip: start.clip,
+        };
+    const travel = Math.max(
+      Math.abs(target.transform.e - start.transform.e),
+      Math.abs(target.transform.f - start.transform.f),
+      Math.abs(target.transform.a - start.transform.a) * this.#media.offsetWidth,
+      Math.abs(target.transform.d - start.transform.d) * this.#media.offsetHeight,
+    );
+    const duration = Math.min(480, 220 + Math.sqrt(Math.max(0, travel - 240)) * 4);
+    const motion = createImageTransitionMotion({
+      opening: false,
+      from: start,
+      to: target,
+      width: this.#media.offsetWidth,
+      height: this.#media.offsetHeight,
+      backdropFrom: Number(start.backdropOpacity),
+      backdropTo: 0,
+      duration,
+      response: duration * 0.9,
+      samples: 60,
+      fadeFrame: !from,
+    });
+    applyImageTransitionPose(this.#frame, this.#media, start);
     await this.#play(
       [
-        this.#frame.animate(frameMotion, {
-          duration: CLOSE_DURATION,
-          easing: EASING,
-          fill: "both",
-        }),
-        this.#portal.backdrop.animate(
-          [{ opacity: interruptedPose?.backdropOpacity ?? 1 }, { opacity: 0 }],
-          {
-            duration: CLOSE_DURATION,
-            easing: EASING,
-            fill: "both",
-          },
-        ),
+        this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
+        this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
+        this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
+        this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
       ],
       context.signal,
     );
@@ -337,27 +333,25 @@ export class DomViewerDriver<
     this.#clearMotionStyles();
   }
 
+  #motionOptions(duration: number): KeyframeAnimationOptions {
+    return { duration, easing: "linear", fill: "both" };
+  }
+
   #cancelAnimations(preserve: boolean) {
     if (preserve && this.#animations.length > 0) {
       this.#interruptedPose = this.#paintedPose();
-      Object.assign(this.#frame.style, {
-        transform: this.#interruptedPose.transform,
-        opacity: this.#interruptedPose.opacity,
-        borderTopLeftRadius: this.#interruptedPose.borderTopLeftRadius,
-        borderTopRightRadius: this.#interruptedPose.borderTopRightRadius,
-        borderBottomRightRadius: this.#interruptedPose.borderBottomRightRadius,
-        borderBottomLeftRadius: this.#interruptedPose.borderBottomLeftRadius,
-      });
+      applyImageTransitionPose(this.#frame, this.#media, this.#interruptedPose);
+      this.#frame.style.opacity = this.#interruptedPose.frameOpacity;
       this.#portal.backdrop.style.opacity = this.#interruptedPose.backdropOpacity;
     }
     for (const animation of this.#animations) animation.cancel();
     this.#animations = [];
   }
 
-  #takeInterruptedPose() {
+  #takeInterruptedPose(clear = true) {
     const pose = this.#interruptedPose;
     this.#interruptedPose = undefined;
-    this.#clearMotionStyles();
+    if (clear) this.#clearMotionStyles();
     return pose;
   }
 
@@ -374,6 +368,7 @@ export class DomViewerDriver<
     }
     this.#portal.backdrop.style.removeProperty("opacity");
     this.#media.style.removeProperty("opacity");
+    this.#media.style.removeProperty("transform");
     for (const property of [
       "--lightbox-drag-x",
       "--lightbox-drag-y",
@@ -390,12 +385,8 @@ export class DomViewerDriver<
   #paintedPose(): PaintedPose {
     const frame = getComputedStyle(this.#frame);
     return {
-      transform: frame.transform,
-      opacity: frame.opacity,
-      borderTopLeftRadius: frame.borderTopLeftRadius,
-      borderTopRightRadius: frame.borderTopRightRadius,
-      borderBottomRightRadius: frame.borderBottomRightRadius,
-      borderBottomLeftRadius: frame.borderBottomLeftRadius,
+      ...readImageTransitionPose(this.#frame, this.#media),
+      frameOpacity: frame.opacity,
       backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
     };
   }
@@ -516,6 +507,8 @@ export class DomViewerDriver<
       target.toggleAttribute("data-closed", state === "closed");
       target.toggleAttribute("data-starting-style", state === "opening");
       target.toggleAttribute("data-ending-style", state === "closing");
+      target.toggleAttribute("data-opening", state === "opening");
+      target.toggleAttribute("data-dismissing", state === "closing");
     }
   }
 
