@@ -295,6 +295,22 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
     deltaY: 160,
     deltaMode: 0,
   });
+  await expect(overlay).toHaveAttribute("data-lightbox-state", "closing");
+  const tailPrevented = await page.evaluate(() => {
+    document.getAnimations().forEach((animation) => animation.pause());
+    const event = new WheelEvent("wheel", { cancelable: true, deltaY: 20 });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(tailPrevented).toBe(true);
+  await page.waitForTimeout(130);
+  const freshInputPrevented = await page.evaluate(() => {
+    const event = new WheelEvent("wheel", { cancelable: true, deltaY: 20 });
+    window.dispatchEvent(event);
+    document.getAnimations().forEach((animation) => animation.play());
+    return event.defaultPrevented;
+  });
+  expect(freshInputPrevented).toBe(false);
   await expect(overlay).toHaveCount(0);
   await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
 });

@@ -49,6 +49,10 @@ const TOUCH_OPENING_SPRING_RESPONSE = 380;
 const DISMISS_RADIUS_END = 0.1;
 const BROWSER_CHROME_RELEASE_PROGRESS = 0.34;
 const BROWSER_CHROME_RESTORE_PROGRESS = 0.2;
+const WHEEL_HANDOFF_QUIET_GAP = 120;
+const WHEEL_HANDOFF_ACCELERATION = 1.25;
+const WHEEL_HANDOFF_MIN_DELTA = 4;
+const WHEEL_HANDOFF_TIMEOUT = 1200;
 
 interface PaintedPose extends ImageTransitionPose {
   readonly frameOpacity: string;
@@ -87,6 +91,15 @@ export class DomViewerDriver<
   #closeRetargetSettleFrame = 0;
   #suppressClick = false;
   #suppressClickTimer: ReturnType<typeof setTimeout> | undefined;
+  #wheelHandoff:
+    | {
+        controller: AbortController;
+        lastMagnitude: number;
+        lastTime: number;
+        accelerationSamples: number;
+        timeout: ReturnType<typeof setTimeout>;
+      }
+    | undefined;
   #pointer:
     | { id: number; x: number; y: number; axis: "pending" | "horizontal" | "vertical" }
     | undefined;
@@ -239,6 +252,7 @@ export class DomViewerDriver<
 
   async open(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
+    this.#endWheelHandoff();
     void this.#loadZoom();
     this.#cancelAnimations(true);
     const view = this.#portal.overlay.ownerDocument.defaultView!;
@@ -457,6 +471,7 @@ export class DomViewerDriver<
     this.#lifetime.abort();
     clearTimeout(this.#suppressClickTimer);
     this.#dragGesture.cancel();
+    this.#endWheelHandoff();
     this.#zoom?.destroy();
     this.#thumbnailOverlays.destroy();
     this.#cancelAnimations(false);
@@ -887,7 +902,56 @@ export class DomViewerDriver<
     if (!release) return;
     this.#paintDrag(release.state);
     this.#interruptedPose = this.#paintedPose();
+    this.#beginWheelHandoff();
     void this.#controller?.close({ reason: "wheel" });
+  }
+
+  #beginWheelHandoff() {
+    if (this.#wheelHandoff) return;
+    const controller = new AbortController();
+    const handoff = {
+      controller,
+      lastMagnitude: 0,
+      lastTime: performance.now(),
+      accelerationSamples: 0,
+      timeout: setTimeout(() => this.#endWheelHandoff(), WHEEL_HANDOFF_TIMEOUT),
+    };
+    this.#wheelHandoff = handoff;
+    this.#portal.overlay.ownerDocument.defaultView?.addEventListener(
+      "wheel",
+      this.#onWheelHandoff,
+      { capture: true, passive: false, signal: controller.signal },
+    );
+  }
+
+  #onWheelHandoff = (event: WheelEvent) => {
+    const handoff = this.#wheelHandoff;
+    if (!handoff || event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX) * 1.3) return;
+    const view = this.#portal.overlay.ownerDocument.defaultView!;
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? view.innerHeight : 1;
+    const magnitude = Math.abs(event.deltaY * unit);
+    const now = performance.now();
+    const elapsed = Math.max(1, now - handoff.lastTime);
+    const magnitudeIncreased =
+      magnitude >= WHEEL_HANDOFF_MIN_DELTA &&
+      handoff.lastMagnitude > 0 &&
+      magnitude >= handoff.lastMagnitude * WHEEL_HANDOFF_ACCELERATION;
+    handoff.accelerationSamples = magnitudeIncreased ? handoff.accelerationSamples + 1 : 0;
+    if (elapsed >= WHEEL_HANDOFF_QUIET_GAP || handoff.accelerationSamples >= 2) {
+      this.#endWheelHandoff();
+      return;
+    }
+    handoff.lastMagnitude = magnitude;
+    handoff.lastTime = now;
+    if (event.cancelable) event.preventDefault();
+  };
+
+  #endWheelHandoff() {
+    const handoff = this.#wheelHandoff;
+    if (!handoff) return;
+    clearTimeout(handoff.timeout);
+    handoff.controller.abort();
+    this.#wheelHandoff = undefined;
   }
 
   #endDrag(cancel = false) {
@@ -1093,6 +1157,10 @@ export class DomViewerDriver<
   };
 
   #onWheel = (event: WheelEvent) => {
+    if (this.#controller?.state.status === "closing") {
+      if (this.#wheelHandoff && event.cancelable) event.preventDefault();
+      return;
+    }
     if (
       event.ctrlKey ||
       this.#controller?.state.status !== "open" ||
