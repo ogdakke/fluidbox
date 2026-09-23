@@ -16,6 +16,7 @@ import {
 } from "./transition-geometry";
 import { createViewerPortal, ViewerModalIsolation } from "./viewer-portal";
 import { ViewerOwnership } from "./viewer-ownership";
+import { clearViewerMotion, completeViewerMotion } from "./viewer-motion-completion";
 import {
   backdropVisibility,
   boundDismissVelocity,
@@ -169,6 +170,7 @@ class AppLightbox extends HTMLElement {
     this.close();
     this.#finishClose();
     this.#endWheelHandoff();
+    clearViewerMotion(this);
   }
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
@@ -1347,6 +1349,7 @@ class AppLightbox extends HTMLElement {
           },
         }),
       );
+    if (settled) completeViewerMotion(this, "selection");
   };
 
   #restoreThumbnail() {
@@ -1367,6 +1370,7 @@ class AppLightbox extends HTMLElement {
   #completeOpening() {
     this.#setTransitionPhase("open");
     this.#setPresentationState("open");
+    completeViewerMotion(this, "open");
     if (this.#standaloneImage) this.#revealContent(this.#standaloneImage);
     for (const slide of this.#gallery?.slides.values() ?? []) {
       if (slide.image.hasAttribute("data-lightbox-item-content")) this.#revealContent(slide.image);
@@ -2504,6 +2508,7 @@ class AppLightbox extends HTMLElement {
     this.#phase = "closed";
     this.#sessionSource = null;
     this.#setPresentationState("closed");
+    completeViewerMotion(this, "close");
     activeViewer.release(this);
     if (this.#returnFocus?.isConnected) this.#returnFocus.focus({ preventScroll: true });
     this.#returnFocus = null;
