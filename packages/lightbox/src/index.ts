@@ -24,6 +24,8 @@ export type {
   LightboxOptions,
   LightboxOrigin,
   LightboxOriginAdapter,
+  LightboxPortalMountContext,
+  LightboxPortalRenderer,
   LightboxRenderer,
   LightboxRevealContext,
   LightboxRevealReason,

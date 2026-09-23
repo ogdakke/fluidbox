@@ -15,6 +15,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        headless: "headless.html",
         playground: "index.html",
         photoLibrary: "photo-library.html",
       },

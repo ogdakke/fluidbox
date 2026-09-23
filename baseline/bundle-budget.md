@@ -6,13 +6,13 @@ The check builds six small consumer entries with tsdown as minified browser ESM 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | CSS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | -------: | -----------------------: |
-| Root           |           460 B |           23,079 B |  3,612 B |                 26,691 B |
-| Elements       |        22,619 B |           22,619 B |  3,612 B |                 26,231 B |
-| React          |           350 B |           22,969 B |  3,612 B |                 26,581 B |
-| Solid          |           262 B |           22,881 B |  3,612 B |                 26,493 B |
-| Vue            |           385 B |           23,004 B |  3,612 B |                 26,616 B |
-| Angular        |           252 B |           22,871 B |  3,612 B |                 26,483 B |
+| Root           |           456 B |           23,127 B |  3,612 B |                 26,739 B |
+| Elements       |        22,671 B |           22,671 B |  3,612 B |                 26,283 B |
+| React          |           346 B |           23,017 B |  3,612 B |                 26,629 B |
+| Solid          |           258 B |           22,929 B |  3,612 B |                 26,541 B |
+| Vue            |           381 B |           23,052 B |  3,612 B |                 26,664 B |
+| Angular        |           249 B |           22,920 B |  3,612 B |                 26,532 B |
 
-The highest current activation JS value is 23,079 B. Its 24,500 B ceiling leaves 1,421 B, about 6.2%, for normal build variation and small fixes while flagging a new substantial dependency or an unexpectedly eager feature. The highest combined value is 26,691 B. Its 28,500 B ceiling leaves 1,809 B, about 6.8%. The prior initial JS limits remain 600 B for root, 25,000 B for elements, and 1,500 B for each framework binding; the prior CSS limit remains 5,000 B. The combined limit makes CSS growth visible in the same total even if the separate limits still pass.
+The highest current activation JS value is 23,127 B. Its 24,500 B ceiling leaves 1,373 B, about 5.9%, for normal build variation and small fixes while flagging a new substantial dependency or an unexpectedly eager feature. The highest combined value is 26,739 B. Its 28,500 B ceiling leaves 1,761 B, about 6.6%. The prior initial JS limits remain 600 B for root, 25,000 B for elements, and 1,500 B for each framework binding; the prior CSS limit remains 5,000 B. The combined limit makes CSS growth visible in the same total even if the separate limits still pass.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

@@ -38,6 +38,11 @@ Work has started in bounded, reviewed parts. Stage 0 is still incomplete.
   An abort-aware semantic completion channel and three-command compatibility driver now bridge
   element motion without DOM polling or adding element APIs. Connecting that bridge to the viewer
   session, then exposing the public factory, remains the next extraction work.
+- Added the first plain DOM image driver and a plain-JavaScript composition example using the proposed
+  `createLightbox`, source, origin, controller, portal-renderer, data-attribute, and CSS-variable
+  contracts. It opens, navigates, closes, restores current-origin focus, and passes all six browser
+  profiles without registering custom elements. The factory remains internal until shared gesture,
+  interruption, and responsive-media behavior reaches the interaction gate.
 - Added deterministic open/close interruption geometry checks, focus/inert restoration checks, and trace/video evidence in `tests/browser/motion.spec.ts`. This protects pose continuity at command handoff, not gesture velocity or compositor performance.
 - Fixed indexed-source opening preparation to resolve mounted thumbnails before the gallery becomes active; added opening-pose and missing-origin scale/fade regressions.
 - Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.

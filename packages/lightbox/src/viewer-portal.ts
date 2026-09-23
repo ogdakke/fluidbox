@@ -5,8 +5,9 @@ export interface ViewerPortalElements {
   readonly dialog: HTMLDivElement;
   readonly frame: HTMLDivElement;
   readonly media: HTMLImageElement;
-  readonly closeButton: HTMLButtonElement;
+  readonly closeButton: HTMLButtonElement | null;
   readonly status: HTMLSpanElement;
+  readonly portalTarget: HTMLDivElement;
 }
 
 function required<TElement extends Element>(root: ParentNode, selector: string): TElement {
@@ -16,7 +17,15 @@ function required<TElement extends Element>(root: ParentNode, selector: string):
 }
 
 /** Create the runtime-owned body portal without registering custom elements. */
-export function createViewerPortal(ownerDocument: Document = document): ViewerPortalElements {
+export interface ViewerPortalOptions {
+  readonly defaultCloseButton?: boolean;
+}
+
+export function createViewerPortal(
+  ownerDocument: Document = document,
+  options: ViewerPortalOptions = {},
+): ViewerPortalElements {
+  const defaultCloseButton = options.defaultCloseButton ?? true;
   const overlay = ownerDocument.createElement("div");
   overlay.dataset.lightboxOverlay = "";
   overlay.innerHTML = `
@@ -25,8 +34,9 @@ export function createViewerPortal(ownerDocument: Document = document): ViewerPo
       <div data-lightbox-dialog role="dialog" aria-modal="true"
            aria-label="Image viewer" tabindex="-1">
         <div data-lightbox-frame><img data-lightbox-media part="image" /></div>
-        <button type="button" data-lightbox-close aria-label="Close">&times;</button>
+        ${defaultCloseButton ? '<button type="button" data-lightbox-close aria-label="Close">&times;</button>' : ""}
         <span data-lightbox-status role="status" aria-live="polite" aria-atomic="true"></span>
+        <div data-lightbox-portal></div>
       </div>
     </div>
   `;
@@ -37,8 +47,9 @@ export function createViewerPortal(ownerDocument: Document = document): ViewerPo
     dialog: required(overlay, "[data-lightbox-dialog]"),
     frame: required(overlay, "[data-lightbox-frame]"),
     media: required(overlay, "[data-lightbox-media]"),
-    closeButton: required(overlay, "[data-lightbox-close]"),
+    closeButton: overlay.querySelector("[data-lightbox-close]"),
     status: required(overlay, "[data-lightbox-status]"),
+    portalTarget: required(overlay, "[data-lightbox-portal]"),
   };
 }
 

@@ -44,6 +44,7 @@ The main viewer parts have data selectors. The runtime does not generate class n
 | `[data-lightbox-container]`          | Gesture and layout container                     |
 | `[data-lightbox-backdrop]`           | Modal backdrop                                   |
 | `[data-lightbox-dialog]`             | Accessible dialog                                |
+| `[data-lightbox-portal]`             | Application controls and caption mount target    |
 | `[data-lightbox-slides]`             | Native horizontal gallery scroller               |
 | `[data-lightbox-slide]`              | Gallery item                                     |
 | `[data-lightbox-frame]`              | Cropping and radius frame                        |

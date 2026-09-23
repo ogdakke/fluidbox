@@ -109,6 +109,15 @@ The plain runtime will implement the exported `CreateLightbox` signature:
 const viewer = createLightbox({
   source,
   origins,
+  portal: {
+    mount({ target, controller, signal }) {
+      const close = document.createElement("button");
+      close.textContent = "Close";
+      close.addEventListener("click", () => void controller.close(), { signal });
+      target.append(close);
+      return () => close.remove();
+    },
+  },
   onBeforeCommand(event) {
     if (event.command === "close" && formIsDirty) event.preventDefault();
   },
@@ -169,6 +178,11 @@ no-op emits its request but no selection or status event.
 The runtime owns the body portal, measured frame, transforms, clipping, native slide track, gesture
 surfaces, focus containment, inert background, and accessibility status. Applications own controls,
 captions, thumbnail decorations, and every framework-created descendant.
+
+`LightboxOptions.portal` mounts application controls and captions once into a stable target inside the
+body portal. It receives the controller and a lifetime signal and may return an idempotent disposer.
+The runtime calls the disposer before removing the target. Plain JavaScript appends DOM there; React,
+Vue, Solid, and Angular bindings use their native portal or teleport mechanism.
 
 `LightboxRenderer.mount()` receives a stable target, item, index, and abort signal. It may return a
 disposer. The adapter invokes the disposer before removing the target. Framework adapters use their

@@ -34,6 +34,18 @@ const origins: LightboxOriginAdapter = {
 
 declare const createLightbox: CreateLightbox;
 const controller: LightboxController<(typeof items)[number]> = createLightbox({ source, origins });
+const composedController = createLightbox({
+  source,
+  portal: {
+    mount({ target, controller, signal }) {
+      const close = document.createElement("button");
+      close.addEventListener("click", () => void controller.close(), { signal });
+      target.append(close);
+      return () => close.remove();
+    },
+  },
+});
+void composedController;
 void controller.open({ id: "one" }, { reason: "api" });
 void controller.goTo({ index: 0 });
 void controller.close();

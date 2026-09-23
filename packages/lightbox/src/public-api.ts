@@ -188,6 +188,17 @@ export interface LightboxRenderer<TItem extends LightboxItem = LightboxItem> {
   mount(context: LightboxMountContext<TItem>): void | LightboxDispose;
 }
 
+export interface LightboxPortalMountContext<TItem extends LightboxItem = LightboxItem> {
+  /** Stable application-owned mount target inside the runtime body portal. */
+  readonly target: HTMLElement;
+  readonly controller: LightboxController<TItem>;
+  readonly signal: AbortSignal;
+}
+
+export interface LightboxPortalRenderer<TItem extends LightboxItem = LightboxItem> {
+  mount(context: LightboxPortalMountContext<TItem>): void | LightboxDispose;
+}
+
 export type LightboxThumbnailOverlayBehavior = "host" | "travel";
 
 export type LightboxThumbnailOverlayRegistration<TItem extends LightboxItem = LightboxItem> =
@@ -209,6 +220,7 @@ export interface LightboxOptions<TItem extends LightboxItem = LightboxItem> {
   readonly source: LightboxSource<TItem>;
   readonly origins?: LightboxOriginAdapter;
   readonly renderers?: Readonly<Record<string, LightboxRenderer<TItem>>>;
+  readonly portal?: LightboxPortalRenderer<TItem>;
   readonly onBeforeCommand?: (event: LightboxBeforeCommandEvent) => void;
   readonly onEvent?: (event: LightboxEvent) => void;
 }

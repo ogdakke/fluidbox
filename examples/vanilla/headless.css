@@ -1,0 +1,64 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  background: #0b0b0b;
+  color: #f7f7f7;
+}
+
+body {
+  margin: 0;
+}
+
+.headless-page {
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.headless-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.headless-grid button {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 1.25rem;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.headless-grid img {
+  display: block;
+  width: 100%;
+  height: 18rem;
+  object-fit: cover;
+}
+
+[data-demo-controls] {
+  position: fixed;
+  z-index: 2;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  pointer-events: auto;
+}
+
+[data-demo-controls] button {
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 999px;
+  background: rgb(10 10 10 / 75%);
+  color: white;
+}
+
+[data-demo-caption] {
+  min-width: 3rem;
+  text-align: center;
+}
