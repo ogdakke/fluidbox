@@ -39,6 +39,7 @@ import {
 } from "./viewer-portal";
 import { ViewerStrip } from "./viewer-strip";
 import { mapRadii } from "./transition-geometry";
+import { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 
 const OPEN_DURATION = 300;
 const TOUCH_DISMISS_DISTANCE = 60;
@@ -64,6 +65,7 @@ export class DomViewerDriver<
 > implements ViewerSessionDriver<TItem> {
   readonly #portal: ViewerPortalElements;
   readonly #isolation: ViewerModalIsolation;
+  readonly #thumbnailOverlays: ThumbnailOverlayRuntime<TItem>;
   readonly #lifetime = new AbortController();
   #controller: LightboxController<TItem> | undefined;
   #strip: ViewerStrip<TItem> | undefined;
@@ -101,6 +103,7 @@ export class DomViewerDriver<
   constructor(ownerDocument: Document, zoomOptions: false | LightboxZoomOptions | undefined) {
     this.#portal = createViewerPortal(ownerDocument, { defaultCloseButton: false });
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
+    this.#thumbnailOverlays = new ThumbnailOverlayRuntime(ownerDocument);
     this.#portal.dialog.dataset.lightboxHeadless = "";
     this.#portal.container.addEventListener(
       "click",
@@ -220,6 +223,13 @@ export class DomViewerDriver<
     this.#portal.dialog.toggleAttribute("data-lightbox-gallery", source.count > 1);
   }
 
+  registerThumbnailOverlay(
+    id: import("./public-api").LightboxItemId,
+    registration: import("./public-api").LightboxThumbnailOverlayRegistration<TItem>,
+  ) {
+    return this.#thumbnailOverlays.register(id, registration);
+  }
+
   async open(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
     void this.#loadZoom();
@@ -274,6 +284,14 @@ export class DomViewerDriver<
       samples: 24,
       fadeFrame: !from && !interruptedPose,
     });
+    const overlayFrom = interruptedPose ? this.#thumbnailOverlays.currentProgress(1) : 1;
+    this.#thumbnailOverlays.prepare(
+      context.item,
+      context.index,
+      this.#frame,
+      "opening",
+      overlayFrom,
+    );
     applyImageTransitionPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = interruptedPose?.frameOpacity ?? (!from ? "0" : "1");
     this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
@@ -282,6 +300,7 @@ export class DomViewerDriver<
       this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
       this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+      ...this.#thumbnailOverlays.animations(motion.frame, motion.duration, overlayFrom, 0),
     ];
     if (this.#portal.dialog.hasAttribute("data-filmstrip")) {
       const ready = motion.backdrop.find((keyframe) => Number(keyframe.opacity) >= 0.85);
@@ -296,6 +315,7 @@ export class DomViewerDriver<
     await this.#play(animations, context.signal);
     if (context.signal.aborted) return;
     this.#setState("open");
+    this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
     delete this.#portal.dialog.dataset.filmstripRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
     this.#portal.dialog.focus({ preventScroll: true });
@@ -318,6 +338,7 @@ export class DomViewerDriver<
       await this.#strip?.select(context.index, smooth);
     }
     this.#render(context.item, context.index);
+    this.#thumbnailOverlays.prepare(context.item, context.index, this.#frame, "open", 0);
     // Filmstrip movement is a direct preview scrub. The full-size image swaps
     // immediately while native scrolling continues under the user's finger.
     if (selected || context.reason === "filmstrip") return;
@@ -386,12 +407,15 @@ export class DomViewerDriver<
       samples: 60,
       fadeFrame: !from,
     });
+    const overlayFrom = this.#thumbnailOverlays.currentProgress(0);
+    this.#thumbnailOverlays.set("closing", overlayFrom);
     applyImageTransitionPose(frame, media, start);
     const animations = [
       frame.animate(motion.frame, this.#motionOptions(motion.duration)),
       media.animate(motion.image, this.#motionOptions(motion.duration)),
       frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+      ...this.#thumbnailOverlays.animations(motion.frame, motion.duration, overlayFrom, 1),
     ];
     this.#synchronizeStart(animations);
     await this.#play(animations, context.signal);
@@ -406,6 +430,7 @@ export class DomViewerDriver<
     clearTimeout(this.#suppressClickTimer);
     this.#dragGesture.cancel();
     this.#zoom?.destroy();
+    this.#thumbnailOverlays.destroy();
     this.#cancelAnimations(false);
     this.#portalDispose?.();
     this.#portalDispose = undefined;
@@ -456,6 +481,7 @@ export class DomViewerDriver<
 
   #cancelAnimations(preserve: boolean) {
     if (preserve && this.#animations.length > 0) {
+      this.#thumbnailOverlays.preservePaint();
       this.#interruptedPose = this.#flightFrame ? this.#paintedFlightPose() : this.#paintedPose();
       this.#removeFlight();
       applyImageTransitionPose(this.#frame, this.#media, this.#interruptedPose);
@@ -671,6 +697,7 @@ export class DomViewerDriver<
     if (radiusAnimation?.effect instanceof KeyframeEffect) {
       radiusAnimation.effect.setKeyframes(motion.radius);
     }
+    this.#thumbnailOverlays.retarget(this.#animations, motion.frame);
   }
 
   #beginDrag(wheelDirection = 0) {
@@ -772,6 +799,7 @@ export class DomViewerDriver<
         ),
       },
     });
+    this.#thumbnailOverlays.set("dragging", progress, matrix);
     this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
     if (
       state.wheelTarget &&
@@ -839,15 +867,25 @@ export class DomViewerDriver<
       this.#media.animate(motion.image, this.#motionOptions(duration)),
       this.#frame.animate(motion.radius, this.#motionOptions(duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(duration)),
+      ...this.#thumbnailOverlays.animations(
+        motion.frame,
+        duration,
+        this.#thumbnailOverlays.currentProgress(dragProgress(state)),
+        0,
+      ),
     ];
     this.#synchronizeStart(animations);
-    void this.#play(animations, this.#lifetime.signal).then(() => this.#strip?.resume());
+    void this.#play(animations, this.#lifetime.signal).then(() => {
+      this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
+      this.#strip?.resume();
+    });
   }
 
   #finishClose() {
     this.#strip?.resume();
     delete this.#portal.overlay.dataset.lightboxEdgeReleased;
     this.#removeFlight();
+    this.#thumbnailOverlays.finishClose();
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
     this.#setState("closed");

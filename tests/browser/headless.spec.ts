@@ -78,9 +78,11 @@ test("plain runtime preserves the painted frame when open and close reverse", as
   const samples = await page.evaluate(async () => {
     const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const bounds = () => {
-      const frame = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
-      )!;
+      const frame =
+        document.querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-frame]") ??
+        document.querySelector<HTMLElement>(
+          '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+        )!;
       const rect = frame.getBoundingClientRect();
       return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
     };
@@ -98,9 +100,13 @@ test("plain runtime preserves the painted frame when open and close reverse", as
     void window.headlessViewer.close();
     const openingAfter = bounds();
 
+    await nextFrame();
     setMotionTime(90);
+    await nextFrame();
     const closingBefore = bounds();
     void window.headlessViewer.open({ id: "one" });
+    await Promise.resolve();
+    await Promise.resolve();
     const closingAfter = bounds();
     return { openingBefore, openingAfter, closingBefore, closingAfter };
   });
@@ -238,6 +244,86 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
   await expect(page.locator("[data-lightbox-zoom-viewport]")).toHaveCount(1);
   await page.keyboard.press("0");
   await expect(dialog).not.toHaveAttribute("data-zoomed", "");
+});
+
+test("plain runtime drives host and traveling thumbnail overlays through the painted motion", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/headless.html");
+  await page.evaluate(() => {
+    const host = document.createElement("span");
+    host.dataset.testThumbnailOverlay = "";
+    document.querySelector('[data-photo-id="one"]')!.append(host);
+    window.headlessViewer.registerThumbnailOverlay("one", {
+      behavior: "travel",
+      element: host,
+      renderer: {
+        mount({ target, item, signal }) {
+          const badge = document.createElement("strong");
+          badge.dataset.testTravelingOverlay = "";
+          badge.textContent = `Traveling ${item.id}`;
+          target.append(badge);
+          signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
+            once: true,
+          });
+          return () => (host.dataset.rendererDisposed = "");
+        },
+      },
+    });
+  });
+
+  const opening = await page.evaluate(async () => {
+    void window.headlessViewer.open({ id: "one" });
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      animation.currentTime = 120;
+    }
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const host = document.querySelector<HTMLElement>("[data-test-thumbnail-overlay]")!;
+    const travel = document.querySelector<HTMLElement>("[data-lightbox-transition-content]")!;
+    return {
+      hostPhase: host.dataset.lightboxPhase,
+      hostProgress: Number(getComputedStyle(host).getPropertyValue("--lightbox-progress")),
+      travelPhase: travel.dataset.lightboxPhase,
+      travelProgress: Number(getComputedStyle(travel).getPropertyValue("--lightbox-progress")),
+      travelTransform: getComputedStyle(travel).transform,
+      text: travel.textContent,
+    };
+  });
+  expect(opening.hostPhase).toBe("opening");
+  expect(opening.travelPhase).toBe("opening");
+  expect(opening.hostProgress).toBeGreaterThan(0);
+  expect(opening.hostProgress).toBeLessThan(1);
+  expect(opening.travelProgress).toBeCloseTo(opening.hostProgress, 2);
+  expect(opening.travelTransform).not.toBe("none");
+  expect(opening.text).toBe("Traveling one");
+
+  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await expect(page.locator("[data-test-thumbnail-overlay]")).toHaveAttribute(
+    "data-lightbox-phase",
+    "open",
+  );
+  await expect(page.locator("[data-lightbox-transition-content]")).toHaveCSS(
+    "--lightbox-progress",
+    "0",
+  );
+
+  await page.evaluate(() => void window.headlessViewer.close());
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-lightbox-transition-content]")).toHaveCount(0);
+  const host = page.locator("[data-test-thumbnail-overlay]");
+  await expect(host).toHaveAttribute("data-lightbox-phase", "preview");
+  await expect(host).toHaveCSS("--lightbox-progress", "1");
+  await expect(host).toHaveAttribute("data-renderer-aborted", "");
+  await expect(host).toHaveAttribute("data-renderer-disposed", "");
 });
 
 test("plain runtime keeps a 100k source bounded without custom elements", async ({ page }) => {
