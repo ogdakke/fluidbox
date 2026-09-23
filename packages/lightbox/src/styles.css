@@ -547,6 +547,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-filmstrip] {
   --lightbox-filmstrip-item-size: 52px;
+  --lightbox-filmstrip-gap: 5px;
   position: relative;
   inset-inline: 0;
   align-self: start;
@@ -608,7 +609,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-filmstrip-scroll] {
   display: flex;
-  gap: 5px;
+  gap: var(--lightbox-filmstrip-gap);
   height: 100%;
   padding-inline: calc(50vw - 26px);
   overflow-x: auto;
@@ -673,9 +674,9 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   }
   :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-filmstrip] {
     --lightbox-filmstrip-item-size: 38px;
+    --lightbox-filmstrip-gap: 3px;
   }
   :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-filmstrip-scroll] {
-    gap: 3px;
     padding-inline: calc(50vw - 19px);
     scroll-padding-inline: calc(50vw - 19px);
   }

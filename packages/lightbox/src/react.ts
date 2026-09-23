@@ -17,12 +17,14 @@ import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode, Ref } from
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { createLightbox } from "./create-lightbox";
+import { markedVisualOrigin } from "./origin-geometry";
 import type {
   LightboxCommandResult,
   LightboxController,
   LightboxDispose,
   LightboxItem,
   LightboxItemId,
+  LightboxMountContext,
   LightboxOptions,
   LightboxOrigin,
   LightboxRenderer,
@@ -274,7 +276,12 @@ function Trigger({ asChild = false, children, onClick, ...attributes }: Lightbox
     disposeRef.current = undefined;
     setForwardedRef(childRef, element);
     if (!element) return;
-    const visual = element.querySelector<HTMLElement>("[data-lightbox-origin]") ?? element;
+    const visual =
+      element.querySelector<HTMLElement>("[data-lightbox-origin]") ??
+      markedVisualOrigin(element) ??
+      (element.matches("img, video")
+        ? element
+        : (element.querySelector<HTMLElement>("img, video") ?? element));
     const thumbnail = visual.matches("img")
       ? (visual as HTMLImageElement)
       : (visual.querySelector("img") ?? undefined);
@@ -324,11 +331,23 @@ const ThumbnailOverlay = forwardRef<HTMLSpanElement, LightboxThumbnailOverlayPro
       disposeRef.current?.();
       disposeRef.current = undefined;
       setForwardedRef(forwardedRef, element);
-      if (element)
-        disposeRef.current = store.controller.registerThumbnailOverlay(id, {
-          behavior,
-          element,
-        });
+      if (element) {
+        const registration =
+          behavior === "travel"
+            ? {
+                behavior,
+                element,
+                renderer: {
+                  mount(context: LightboxMountContext) {
+                    const root = createRoot(context.target);
+                    root.render(children);
+                    return () => root.unmount();
+                  },
+                },
+              }
+            : { behavior, element };
+        disposeRef.current = store.controller.registerThumbnailOverlay(id, registration);
+      }
     };
     useEffect(() => () => disposeRef.current?.(), []);
     return createElement(
@@ -385,10 +404,18 @@ function Filmstrip<TItem extends LightboxItem>({
   const { store } = useLightboxContext();
   const state = useLightboxState((current) => current);
   const selectedIndex = state.requestedIndex ?? state.activeIndex ?? 0;
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const scrollFrame = useRef(0);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const scrollMode = useRef<"idle" | "commanded" | "user">("commanded");
+  const commandedLeft = useRef<number | null>(null);
+  const touching = useRef(false);
+  const initializing = useRef(true);
   const [windowCenter, setWindowCenter] = useState(selectedIndex);
   const [visibleCount, setVisibleCount] = useState(31);
+  const [filmstripGeometry, setFilmstripGeometry] = useState({ size: 52, step: 57 });
 
   const readGeometry = (scroller: HTMLDivElement) => {
     const filmstrip = scroller.parentElement;
@@ -404,44 +431,149 @@ function Filmstrip<TItem extends LightboxItem>({
     return { size, step: size + gap, padding };
   };
 
+  const nearestIndex = (scroller: HTMLDivElement) => {
+    const { size, step, padding } = readGeometry(scroller);
+    const center = scroller.scrollLeft + scroller.clientWidth / 2;
+    return Math.max(0, Math.min(state.count - 1, Math.round((center - padding - size / 2) / step)));
+  };
+
+  const centerIndex = (scroller: HTMLDivElement, index: number, smooth: boolean) => {
+    const { size, step, padding } = readGeometry(scroller);
+    const left = padding + index * step + size / 2 - scroller.clientWidth / 2;
+    commandedLeft.current = Math.max(
+      0,
+      Math.min(left, scroller.scrollWidth - scroller.clientWidth),
+    );
+    scrollMode.current = "commanded";
+    scroller.scrollTo({
+      left: commandedLeft.current,
+      behavior: smooth ? "smooth" : "instant",
+    });
+  };
+
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const dialog = scroller.closest<HTMLElement>("[data-lightbox-dialog]");
     dialog?.setAttribute("data-filmstrip", "");
     const updateWindow = () => {
-      cancelAnimationFrame(scrollFrame.current);
+      if (scrollFrame.current) return;
       scrollFrame.current = requestAnimationFrame(() => {
-        const { size, step, padding } = readGeometry(scroller);
-        const center = Math.round(
-          (scroller.scrollLeft + scroller.clientWidth / 2 - padding - size / 2) / step,
-        );
-        setWindowCenter(Math.max(0, Math.min(state.count - 1, center)));
+        scrollFrame.current = 0;
+        const center = nearestIndex(scroller);
+        setWindowCenter(center);
+        if (
+          !initializing.current &&
+          scrollMode.current === "user" &&
+          store.state.requestedIndex !== center
+        ) {
+          void store.controller.goTo({ index: center }, { reason: "filmstrip" });
+        }
       });
     };
+    const takeControl = () => {
+      commandedLeft.current = null;
+      scrollMode.current = "user";
+    };
+    const settle = () => {
+      clearTimeout(settleTimer.current);
+      if (initializing.current || touching.current) return;
+      if (scrollMode.current === "commanded") {
+        if (Math.abs(scroller.scrollLeft - (commandedLeft.current ?? 0)) > 1) {
+          settleTimer.current = setTimeout(settle, 160);
+          return;
+        }
+        commandedLeft.current = null;
+        scrollMode.current = "idle";
+        return;
+      }
+      if (scrollMode.current !== "user") return;
+      const index = nearestIndex(scroller);
+      if (store.state.requestedIndex !== index) {
+        void store.controller.goTo({ index }, { reason: "filmstrip" });
+      }
+      scrollMode.current = "idle";
+    };
+    const scheduleSettle = () => {
+      clearTimeout(settleTimer.current);
+      if (!touching.current) settleTimer.current = setTimeout(settle, 160);
+    };
+    const onScroll = () => {
+      if (touching.current || scrollMode.current === "idle") takeControl();
+      updateWindow();
+      scheduleSettle();
+    };
+    const onTouchStart = () => {
+      touching.current = true;
+      clearTimeout(settleTimer.current);
+      takeControl();
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      if (event.touches.length) return;
+      touching.current = false;
+      scheduleSettle();
+    };
+    const onWheel = (event: WheelEvent) => {
+      takeControl();
+      if (Math.abs(event.deltaY) > Math.abs(event.deltaX) && event.cancelable) {
+        event.preventDefault();
+      }
+    };
     const resize = new ResizeObserver(() => {
-      const { step } = readGeometry(scroller);
+      const { size, step } = readGeometry(scroller);
+      setFilmstripGeometry({ size, step });
       setVisibleCount(Math.ceil(scroller.clientWidth / step) * 2 + 9);
       updateWindow();
+      if (scrollMode.current !== "user") {
+        centerIndex(scroller, selectedIndexRef.current, false);
+      }
     });
     resize.observe(scroller);
-    scroller.addEventListener("scroll", updateWindow, { passive: true });
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    scroller.addEventListener("scrollend", settle);
+    scroller.addEventListener("touchstart", onTouchStart, { passive: true });
+    scroller.addEventListener("touchend", onTouchEnd, { passive: true });
+    scroller.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    scroller.addEventListener("pointerdown", takeControl, { capture: true, passive: true });
+    scroller.addEventListener("keydown", takeControl, { capture: true, passive: true });
+    scroller.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    const { size, step } = readGeometry(scroller);
+    setFilmstripGeometry({ size, step });
+    centerIndex(scroller, selectedIndexRef.current, false);
     updateWindow();
+    let mountReadyFrame = 0;
+    const mountFrame = requestAnimationFrame(() => {
+      centerIndex(scroller, selectedIndexRef.current, false);
+      mountReadyFrame = requestAnimationFrame(() => {
+        initializing.current = false;
+        scrollMode.current = "idle";
+      });
+    });
     return () => {
       dialog?.removeAttribute("data-filmstrip");
       resize.disconnect();
-      scroller.removeEventListener("scroll", updateWindow);
+      scroller.removeEventListener("scroll", onScroll);
+      scroller.removeEventListener("scrollend", settle);
+      scroller.removeEventListener("touchstart", onTouchStart);
+      scroller.removeEventListener("touchend", onTouchEnd);
+      scroller.removeEventListener("touchcancel", onTouchEnd);
+      scroller.removeEventListener("pointerdown", takeControl, true);
+      scroller.removeEventListener("keydown", takeControl, true);
+      scroller.removeEventListener("wheel", onWheel, true);
       cancelAnimationFrame(scrollFrame.current);
+      cancelAnimationFrame(mountFrame);
+      cancelAnimationFrame(mountReadyFrame);
+      clearTimeout(settleTimer.current);
     };
-  }, [state.count]);
+  }, [state.count, store]);
 
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller || state.count === 0) return;
-    const { size, step, padding } = readGeometry(scroller);
-    const left = padding + selectedIndex * step + size / 2 - scroller.clientWidth / 2;
     setWindowCenter(selectedIndex);
-    scroller.scrollTo({ left: Math.max(0, left), behavior: "instant" });
+    if (!initializing.current && scrollMode.current !== "user") {
+      centerIndex(scroller, selectedIndex, false);
+    }
   }, [selectedIndex, state.count]);
 
   const radius = Math.max(15, Math.ceil(visibleCount / 2));
@@ -466,8 +598,12 @@ function Filmstrip<TItem extends LightboxItem>({
           "data-lightbox-filmstrip-item": "",
           "data-index": index,
           "data-lightbox-selected": selected ? "" : undefined,
-          style: { left: `calc(${index} * (var(--lightbox-filmstrip-item-size) + 5px))` },
-          onClick: () => void store.controller.goTo({ index }, { reason: "filmstrip" }),
+          style: { left: `${index * filmstripGeometry.step}px` },
+          onClick: () => {
+            const scroller = scrollerRef.current;
+            if (scroller) centerIndex(scroller, index, false);
+            void store.controller.goTo({ index }, { reason: "filmstrip" });
+          },
         },
         renderItem
           ? renderItem({ item, index, selected })
@@ -505,7 +641,11 @@ function Filmstrip<TItem extends LightboxItem>({
           {
             "data-lightbox-filmstrip-track": "",
             style: {
-              width: `calc(${state.count} * (var(--lightbox-filmstrip-item-size) + 5px) - 5px)`,
+              width: `${Math.max(
+                0,
+                state.count * filmstripGeometry.step -
+                  (filmstripGeometry.step - filmstripGeometry.size),
+              )}px`,
             },
           },
           children ?? items,
