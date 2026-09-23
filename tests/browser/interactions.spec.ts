@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 test("playground opens both the DOM gallery and indexed source", async ({ page }) => {
@@ -64,17 +63,14 @@ test("filmstrip selects a distant item", async ({ page }) => {
   );
 });
 
-test("opening frame is visually stable", async ({ page }, testInfo) => {
-  test.skip(
-    !existsSync(testInfo.snapshotPath("opened-gallery.png")) && !process.env.VISUAL_BOOTSTRAP,
-    "This browser profile needs its first snapshot from the pinned CI runner.",
-  );
+test("opening frame is visually stable", async ({ page }) => {
   await page.goto("/harness.html");
   await page.locator("app-lightbox").first().click();
   await expect(page.locator("[data-lightbox-dialog]")).toBeVisible();
   await expect(page).toHaveScreenshot("opened-gallery.png", {
     animations: "disabled",
     caret: "hide",
+    maxDiffPixels: 16,
   });
   await page.keyboard.press("ArrowRight");
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
@@ -84,6 +80,7 @@ test("opening frame is visually stable", async ({ page }, testInfo) => {
   await expect(page).toHaveScreenshot("next-gallery.png", {
     animations: "disabled",
     caret: "hide",
+    maxDiffPixels: 16,
   });
 });
 

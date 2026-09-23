@@ -44,8 +44,6 @@ jobs:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
       - run: bunx playwright install --with-deps chromium firefox webkit
-      - name: Generate missing WebKit visual references
-        run: VISUAL_BOOTSTRAP=1 bunx playwright test tests/browser/interactions.spec.ts --grep 'visually stable' --project=webkit --project=iphone-13 --project=ipad-pro-11 --update-snapshots
       - run: bun run test:browser:baseline
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}

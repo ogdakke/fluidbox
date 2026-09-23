@@ -37,4 +37,4 @@ STRESS_COUNT=10000 bun run test:browser:baseline --project=chromium --grep 'larg
 
 To recapture the pre-virtualization behavior exactly, check out commit `892f1c0` in a separate worktree and run the capture there. The commands above capture the current renderer into ignored `test-results/capture/`.
 
-The visual snapshots live under `tests/browser/interactions.spec.ts-snapshots/` and are compared in CI on Ubuntu 26.04. This local machine lacks WebKit runtime libraries and has no passwordless sudo, so WebKit, iPhone, and iPad baselines are set up to be captured by the CI workflow's manual `baseline` job. New captures default to `test-results/capture/`, keeping this committed baseline immutable. The new repository has no remote yet, so the CI job has not run.
+The visual snapshots live under `tests/browser/interactions.spec.ts-snapshots/` and are compared by all six browser projects on Ubuntu 26.04. WebKit, iPhone, and iPad references were captured after installing Playwright's host dependencies. New captures default to `test-results/capture/`, keeping this committed baseline immutable. The new repository has no remote yet, so the CI job has not run.

@@ -52,6 +52,8 @@ export class GalleryStrip {
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #rebaseFrame = 0;
   #rebasing = false;
+  #instantTarget: number | null = null;
+  #instantFrame = 0;
   #onChange: (index: number, settled: boolean) => void;
   #onProgress: (position: number) => void;
   #opening = true;
@@ -174,7 +176,12 @@ export class GalleryStrip {
       this.element.scrollTo({ left: (scrollIndex - base) * this.#width, behavior: "instant" });
     }
     cancelAnimationFrame(this.#rebaseFrame);
-    this.#rebaseFrame = requestAnimationFrame(() => (this.#rebasing = false));
+    this.#rebaseFrame = requestAnimationFrame(() => {
+      this.#rebasing = false;
+      // A commanded scroll can finish while rebase events are suppressed.
+      // Read its final position even if the browser emits no later scroll event.
+      this.#onScroll();
+    });
   }
 
   mount() {
@@ -217,22 +224,64 @@ export class GalleryStrip {
     );
     if (!this.slides.has(this.#requestedIndex))
       this.#renderWindow(this.#requestedIndex, this.#index);
-    this.element.scrollTo({
-      left: (this.#requestedIndex - this.#base) * this.#width,
-      behavior: reducedMotion ? "instant" : "smooth",
-    });
-    if (reducedMotion) this.sync();
+    if (reducedMotion) this.#jumpTo(this.#requestedIndex);
+    else {
+      if (this.#instantTarget !== null) {
+        this.element.scrollTo({
+          left: (this.#instantTarget - this.#base) * this.#width,
+          behavior: "instant",
+        });
+        this.#finishInstant();
+      }
+      this.element.scrollTo({
+        left: (this.#requestedIndex - this.#base) * this.#width,
+        behavior: "smooth",
+      });
+    }
   }
 
   select(index: number, smooth = false) {
     this.#requestedIndex = Math.max(0, Math.min(this.items.length - 1, index));
     if (!this.slides.has(this.#requestedIndex))
       this.#renderWindow(this.#requestedIndex, this.#requestedIndex);
-    this.element.scrollTo({
-      left: (this.#requestedIndex - this.#base) * this.#width,
-      behavior: smooth ? "smooth" : "instant",
-    });
-    this.sync();
+    if (!smooth) this.#jumpTo(this.#requestedIndex);
+    else {
+      this.element.scrollTo({
+        left: (this.#requestedIndex - this.#base) * this.#width,
+        behavior: "smooth",
+      });
+      this.sync();
+    }
+  }
+
+  #jumpTo(index: number) {
+    // WebKit can report the old scrollLeft until after an instant scroll event.
+    // Keep the requested item authoritative while the native track catches up.
+    this.#instantTarget = index;
+    this.element.style.scrollSnapType = "none";
+    this.element.scrollTo({ left: (index - this.#base) * this.#width, behavior: "instant" });
+    this.sync(index);
+    cancelAnimationFrame(this.#instantFrame);
+    this.#instantFrame = requestAnimationFrame(this.#alignInstant);
+  }
+
+  #alignInstant = () => {
+    const index = this.#instantTarget;
+    if (index === null) return;
+    const left = (index - this.#base) * this.#width;
+    if (Math.abs(this.element.scrollLeft - left) > 1) {
+      this.element.scrollTo({ left, behavior: "instant" });
+      this.#instantFrame = requestAnimationFrame(this.#alignInstant);
+    } else {
+      this.#finishInstant();
+    }
+  };
+
+  #finishInstant() {
+    this.#instantTarget = null;
+    cancelAnimationFrame(this.#instantFrame);
+    this.#instantFrame = 0;
+    this.element.style.removeProperty("scroll-snap-type");
   }
 
   freeze() {
@@ -253,13 +302,12 @@ export class GalleryStrip {
     this.element.scrollTo({ left: (this.#index - this.#base) * this.#width, behavior: "instant" });
   }
 
-  sync() {
+  sync(forcedIndex?: number) {
     if (!this.#width) return;
     const left = this.#frozen ? this.#frozenLeft : this.element.scrollLeft;
-    const index = Math.max(
-      0,
-      Math.min(this.items.length - 1, this.#base + Math.round(left / this.#width)),
-    );
+    const index =
+      forcedIndex ??
+      Math.max(0, Math.min(this.items.length - 1, this.#base + Math.round(left / this.#width)));
     if (index === this.#index) return;
     const previous = this.slides.get(this.#index);
     previous?.element.setAttribute("aria-hidden", "true");
@@ -277,6 +325,11 @@ export class GalleryStrip {
       this.element.style.setProperty("--lightbox-scroll-compensation", `${offset}px`);
       return;
     }
+    if (this.#instantTarget !== null) {
+      const targetLeft = (this.#instantTarget - this.#base) * this.#width;
+      if (Math.abs(this.element.scrollLeft - targetLeft) > 1) return;
+      this.#finishInstant();
+    }
     if (this.#rebasing) return;
     if (this.#width) this.#onProgress(this.#base + this.element.scrollLeft / this.#width);
     this.sync();
@@ -285,7 +338,7 @@ export class GalleryStrip {
   };
 
   #settled = () => {
-    if (this.#opening || this.#frozen || this.#rebasing) return;
+    if (this.#opening || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
     clearTimeout(this.#settleTimer);
     this.sync();
     this.#requestedIndex = this.#index;
@@ -400,6 +453,8 @@ export class GalleryStrip {
     this.#controller.abort();
     this.#observer.disconnect();
     cancelAnimationFrame(this.#rebaseFrame);
+    cancelAnimationFrame(this.#instantFrame);
+    this.element.style.removeProperty("scroll-snap-type");
     clearTimeout(this.#settleTimer);
     for (const [index, slide] of this.slides) {
       slide.request?.abort();
