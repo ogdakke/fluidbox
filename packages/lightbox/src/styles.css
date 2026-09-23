@@ -332,13 +332,13 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   isolation: isolate;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
-  color: var(--color);
+  color: var(--color, white);
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-backdrop] {
   position: fixed;
   inset: 0;
-  background: var(--background);
+  background: var(--lightbox-backdrop-background, var(--background, #111));
   opacity: var(--lightbox-backdrop-opacity, 1);
   transform: translateZ(0);
   will-change: opacity;
@@ -455,8 +455,8 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   height: 32px;
   border-radius: 50%;
   border: none;
-  background: var(--background);
-  color: var(--color);
+  background: var(--background, #111);
+  color: var(--color, white);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -720,9 +720,43 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery]
-  > [data-lightbox-close] {
+  [data-lightbox-close] {
   top: 16px;
   right: 16px;
+}
+
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-gallery]
+  :is([data-lightbox-previous], [data-lightbox-next]) {
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent, rgb(20 20 20 / 0.72));
+  color: var(--color, white);
+  font: inherit;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-previous] {
+  left: 16px;
+}
+
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-next] {
+  right: 16px;
+}
+
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  :is([data-lightbox-previous], [data-lightbox-next]):disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery][data-opening]

@@ -1,11 +1,7 @@
 import type { ReactElement } from "react";
 import { arraySource } from "../packages/lightbox/src/index";
 import type { LightboxItem } from "../packages/lightbox/src/index";
-import type {
-  LightboxReactParts,
-  UseLightbox,
-  UseLightboxState,
-} from "../packages/lightbox/src/react";
+import { Lightbox, useLightbox, useLightboxState } from "../packages/lightbox/src/react";
 
 const items = [
   {
@@ -14,10 +10,6 @@ const items = [
   },
 ] as const satisfies readonly LightboxItem[];
 const source = arraySource(items);
-
-declare const Lightbox: LightboxReactParts;
-declare const useLightbox: UseLightbox;
-declare const useLightboxState: UseLightboxState;
 
 function ContractExample(): ReactElement {
   const controller = useLightbox<(typeof items)[number]>();
@@ -37,6 +29,11 @@ function ContractExample(): ReactElement {
       </Lightbox.Item>
       <Lightbox.Portal>
         <Lightbox.Content />
+        <Lightbox.Filmstrip
+          renderItem={({ item, selected }) => (
+            <img src={item.thumbnail?.src} alt="" data-selected={selected} />
+          )}
+        />
         <Lightbox.Previous>Previous</Lightbox.Previous>
         <Lightbox.Next>Next</Lightbox.Next>
         <Lightbox.Close>Close</Lightbox.Close>

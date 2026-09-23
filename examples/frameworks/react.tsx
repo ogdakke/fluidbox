@@ -1,25 +1,30 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { FluidboxGallery } from "@ogdakke/fluidbox/react";
-import type { AppGallery } from "@ogdakke/fluidbox";
-import { alternateSource, source } from "./source";
+import { Lightbox } from "@ogdakke/fluidbox/react";
+import { alternateRuntimeSource, runtimeSource } from "./source";
 import "./site.css";
 
 function App() {
-  const gallery = useRef<AppGallery | null>(null);
-  const [currentSource, setCurrentSource] = useState(source);
+  const [currentSource, setCurrentSource] = useState(runtimeSource);
   return (
-    <main>
-      <h1>React gallery</h1>
-      <button type="button" onClick={() => setCurrentSource(alternateSource)}>
-        Switch source
-      </button>
-      <FluidboxGallery source={currentSource} ref={gallery}>
-        <button type="button" onClick={() => gallery.current?.open(0)}>
-          Open gallery
+    <Lightbox.Root source={currentSource}>
+      <main>
+        <h1>React gallery</h1>
+        <button type="button" onClick={() => setCurrentSource(alternateRuntimeSource)}>
+          Switch source
         </button>
-      </FluidboxGallery>
-    </main>
+        <Lightbox.Item id="0">
+          <Lightbox.Trigger>
+            <span>Open gallery</span>
+          </Lightbox.Trigger>
+        </Lightbox.Item>
+        <Lightbox.Portal>
+          <Lightbox.Previous />
+          <Lightbox.Next />
+          <Lightbox.Close />
+        </Lightbox.Portal>
+      </main>
+    </Lightbox.Root>
   );
 }
 

@@ -147,7 +147,7 @@ a {
   margin: 12px 0 0;
 }
 
-app-gallery {
+[data-lightbox-overlay] {
   display: block;
   --background: #171b20;
   --color: #f8f7f2;

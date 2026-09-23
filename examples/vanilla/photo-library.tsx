@@ -1,8 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FluidboxGallery, useFluidboxElements } from "@ogdakke/fluidbox/react";
-import type { AppGallery, LightboxGallerySource, LightboxSourceItem } from "@ogdakke/fluidbox";
+import { Lightbox, useLightbox } from "@ogdakke/fluidbox/react";
+import type {
+  LightboxController,
+  LightboxEvent,
+  LightboxOriginAdapter,
+  LightboxSource,
+} from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/styles.css";
 import "./photo-library.css";
 
@@ -24,17 +29,37 @@ function photoId(index: number): string {
   return `synthetic-photo-${index}`;
 }
 
-function photoAt(index: number): LightboxSourceItem {
+function photoAt(index: number) {
   const fixture = fixtures[(index * 17 + Math.floor(index / sectionSize)) % fixtures.length];
   return {
     id: photoId(index),
-    src: fixture.src,
-    thumbnailSrc: fixture.src,
-    previewSrc: fixture.src,
-    alt: `Synthetic ${fixture.shape} illustration, photo ${index + 1}`,
-    width: fixture.width,
-    height: fixture.height,
+    media: {
+      type: "image" as const,
+      src: fixture.src,
+      alt: `Synthetic ${fixture.shape} illustration, photo ${index + 1}`,
+      width: fixture.width,
+      height: fixture.height,
+    },
+    thumbnail: { src: fixture.src, width: fixture.width, height: fixture.height },
+    preview: { src: fixture.src, width: fixture.width, height: fixture.height },
   };
+}
+
+type PhotoItem = ReturnType<typeof photoAt>;
+
+function ControllerBridge({
+  controllerRef,
+}: {
+  controllerRef: React.RefObject<LightboxController<PhotoItem> | null>;
+}) {
+  const controller = useLightbox<PhotoItem>();
+  useEffect(() => {
+    controllerRef.current = controller;
+    return () => {
+      if (controllerRef.current === controller) controllerRef.current = null;
+    };
+  }, [controller, controllerRef]);
+  return null;
 }
 
 function makeRows(count: number, columns: number) {
@@ -66,9 +91,8 @@ function columnsFor(width: number): number {
 }
 
 function Library() {
-  useFluidboxElements();
   const count = new URLSearchParams(location.search).get("count") === "100000" ? 100_000 : 10_000;
-  const gallery = useRef<AppGallery | null>(null);
+  const gallery = useRef<LightboxController<PhotoItem> | null>(null);
   const scrollElement = useRef<HTMLDivElement | null>(null);
   const origins = useRef(new Map<string, HTMLButtonElement>());
   const revealOrigin = useRef<
@@ -80,21 +104,37 @@ function Library() {
   const [lastViewed, setLastViewed] = useState<number | null>(null);
   const pendingResizeAnchor = useRef<number | null>(null);
   const { rows, photoToRow } = useMemo(() => makeRows(count, columns), [count, columns]);
-  const source = useMemo<LightboxGallerySource>(
+  const source = useMemo<LightboxSource<PhotoItem>>(
     () => ({
       count,
       getItem(index) {
         return photoAt(index);
       },
+      getIndex(id) {
+        const index = Number(id.slice("synthetic-photo-".length));
+        return Number.isInteger(index) && index >= 0 && index < count && photoId(index) === id
+          ? index
+          : null;
+      },
+    }),
+    [count],
+  );
+  const originAdapter = useMemo<LightboxOriginAdapter>(
+    () => ({
       getOrigin(id) {
         const element = origins.current.get(id);
-        return element?.isConnected && element.dataset.photoId === id ? element : null;
+        if (!element?.isConnected || element.dataset.photoId !== id) return null;
+        return {
+          trigger: element,
+          visual: element,
+          thumbnail: element.querySelector("img") ?? undefined,
+        };
       },
       revealOrigin(id, index, context) {
         return revealOrigin.current?.(id, index, context);
       },
     }),
-    [count],
+    [],
   );
   const getScrollElement = useCallback(() => scrollElement.current, []);
   const getItemKey = useCallback((index: number) => rows[index].key, [rows]);
@@ -153,16 +193,14 @@ function Library() {
     });
   };
 
-  useEffect(() => {
-    const element = gallery.current;
-    if (!element) return;
-    const onChange = (event: Event) => {
-      const index = (event as CustomEvent<{ index: number }>).detail?.index;
-      if (Number.isInteger(index) && index >= 0 && index < count) setLastViewed(index);
-    };
-    element.addEventListener("lightbox-change", onChange);
-    return () => element.removeEventListener("lightbox-change", onChange);
-  }, [count]);
+  const onLightboxEvent = useCallback(
+    (event: LightboxEvent) => {
+      if (event.type === "selection-settle" && event.index >= 0 && event.index < count) {
+        setLastViewed(event.index);
+      }
+    },
+    [count],
+  );
 
   useLayoutEffect(() => {
     const element = scrollElement.current;
@@ -190,7 +228,7 @@ function Library() {
 
   function openPhoto(index: number) {
     setLastViewed(index);
-    gallery.current?.open(index);
+    void gallery.current?.open({ index });
   }
 
   function scrollToPhoto(index: number) {
@@ -207,74 +245,80 @@ function Library() {
   const visibleEnd = lastRow?.kind === "photos" ? lastRow.firstPhoto + lastRow.count : visibleStart;
 
   return (
-    <main className="library-page" data-library-count={count}>
-      <header className="library-header">
-        <div>
-          <p className="eyebrow">Fluidbox × TanStack Virtual</p>
-          <h1>A long photo library</h1>
-          <p>
-            Scroll the host grid, open a thumbnail, then navigate in the viewer. These are repeated
-            local SVG illustrations with mixed dimensions, useful for geometry and DOM checks. They
-            are not a photo decoding or transfer benchmark.
-          </p>
-        </div>
-        <a href="/">Back to playground</a>
-      </header>
+    <Lightbox.Root source={source} origins={originAdapter} onEvent={onLightboxEvent}>
+      <ControllerBridge controllerRef={gallery} />
+      <main className="library-page" data-library-count={count}>
+        <header className="library-header">
+          <div>
+            <p className="eyebrow">Fluidbox × TanStack Virtual</p>
+            <h1>A long photo library</h1>
+            <p>
+              Scroll the host grid, open a thumbnail, then navigate in the viewer. These are
+              repeated local SVG illustrations with mixed dimensions, useful for geometry and DOM
+              checks. They are not a photo decoding or transfer benchmark.
+            </p>
+          </div>
+          <a href="/">Back to playground</a>
+        </header>
 
-      <div className="library-controls">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (validRequested) scrollToPhoto(requested);
-          }}
-        >
-          <label htmlFor="photo-number">Photo number</label>
-          <input
-            id="photo-number"
-            type="number"
-            min="1"
-            max={count}
-            value={requestedNumber}
-            onChange={(event) => setRequestedNumber(event.target.value)}
-          />
-          <button type="submit" disabled={!validRequested}>
-            Jump in library
-          </button>
-          <button type="button" disabled={!validRequested} onClick={() => openPhoto(requested)}>
-            Open number
-          </button>
-        </form>
-        <div className="library-controls-end">
-          <label className="library-checkbox">
-            <input
-              type="checkbox"
-              checked={showFilmstrip}
-              onChange={(event) => setShowFilmstrip(event.target.checked)}
-            />
-            Show filmstrip on next open
-          </label>
-          <a href={count === 10_000 ? "?count=100000" : "?count=10000"}>
-            {count === 10_000 ? "Try 100,000 items" : "Back to 10,000 items"}
-          </a>
-          <button
-            type="button"
-            disabled={lastViewed === null}
-            onClick={() => lastViewed !== null && scrollToPhoto(lastViewed)}
+        <div className="library-controls">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (validRequested) scrollToPhoto(requested);
+            }}
           >
-            Reveal last viewed
-          </button>
+            <label htmlFor="photo-number">Photo number</label>
+            <input
+              id="photo-number"
+              type="number"
+              min="1"
+              max={count}
+              value={requestedNumber}
+              onChange={(event) => setRequestedNumber(event.target.value)}
+            />
+            <button type="submit" disabled={!validRequested}>
+              Jump in library
+            </button>
+            <button type="button" disabled={!validRequested} onClick={() => openPhoto(requested)}>
+              Open number
+            </button>
+          </form>
+          <div className="library-controls-end">
+            <label className="library-checkbox">
+              <input
+                type="checkbox"
+                checked={showFilmstrip}
+                onChange={(event) => setShowFilmstrip(event.target.checked)}
+              />
+              Show filmstrip on next open
+            </label>
+            <a href={count === 10_000 ? "?count=100000" : "?count=10000"}>
+              {count === 10_000 ? "Try 100,000 items" : "Back to 10,000 items"}
+            </a>
+            <button
+              type="button"
+              disabled={lastViewed === null}
+              onClick={() => lastViewed !== null && scrollToPhoto(lastViewed)}
+            >
+              Reveal last viewed
+            </button>
+          </div>
         </div>
-      </div>
 
-      <p className="library-count">
-        {count.toLocaleString()} synthetic items. Rows near the viewport are mounted with three-row
-        overscan.{" "}
-        <span aria-live="off">
-          Mounted range {visibleStart}–{visibleEnd}.
-        </span>
-      </p>
-      <FluidboxGallery source={source} ref={gallery} aria-label="Synthetic photo library">
-        {showFilmstrip && React.createElement("app-filmstrip")}
+        <p className="library-count">
+          {count.toLocaleString()} synthetic items. Rows near the viewport are mounted with
+          three-row overscan.{" "}
+          <span aria-live="off">
+            Mounted range {visibleStart}–{visibleEnd}.
+          </span>
+        </p>
+        <Lightbox.Portal>
+          {showFilmstrip && <Lightbox.Filmstrip />}
+          <Lightbox.Previous aria-label="Previous photo">←</Lightbox.Previous>
+          <Lightbox.Next aria-label="Next photo">→</Lightbox.Next>
+          <Lightbox.Close aria-label="Close">×</Lightbox.Close>
+        </Lightbox.Portal>
         <div className="library-scroll" ref={scrollElement} tabIndex={0} aria-label="Photo library">
           <div className="library-track" style={{ height: virtualizer.getTotalSize() }}>
             {virtualRows.map((virtualRow) => {
@@ -308,34 +352,37 @@ function Library() {
                         const index = row.firstPhoto + offset;
                         const photo = photoAt(index);
                         return (
-                          <button
-                            key={photo.id}
-                            type="button"
-                            className="library-photo"
-                            data-lightbox-preview=""
-                            data-photo-id={photo.id}
-                            data-photo-index={index}
-                            aria-label={`Open ${photo.alt}, item ${index + 1} of ${count}`}
-                            ref={(node) => {
-                              if (!node) return;
-                              origins.current.set(photo.id, node);
-                              return () => {
-                                if (origins.current.get(photo.id) === node)
-                                  origins.current.delete(photo.id);
-                              };
-                            }}
-                            onClick={() => openPhoto(index)}
-                          >
-                            <img
-                              src={photo.thumbnailSrc}
-                              alt=""
-                              width={photo.width}
-                              height={photo.height}
-                              loading="lazy"
-                              decoding="async"
-                            />
-                            <span>{String(index + 1).padStart(5, "0")}</span>
-                          </button>
+                          <Lightbox.Item key={photo.id} id={photo.id}>
+                            <Lightbox.Trigger asChild>
+                              <button
+                                type="button"
+                                className="library-photo"
+                                data-lightbox-preview=""
+                                data-photo-id={photo.id}
+                                data-photo-index={index}
+                                aria-label={`Open ${photo.media.alt}, item ${index + 1} of ${count}`}
+                                ref={(node) => {
+                                  if (!node) return;
+                                  origins.current.set(photo.id, node);
+                                  return () => {
+                                    if (origins.current.get(photo.id) === node)
+                                      origins.current.delete(photo.id);
+                                  };
+                                }}
+                                onClick={() => setLastViewed(index)}
+                              >
+                                <img
+                                  src={photo.thumbnail.src}
+                                  alt=""
+                                  width={photo.media.width}
+                                  height={photo.media.height}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                                <span>{String(index + 1).padStart(5, "0")}</span>
+                              </button>
+                            </Lightbox.Trigger>
+                          </Lightbox.Item>
                         );
                       })}
                     </div>
@@ -345,12 +392,12 @@ function Library() {
             })}
           </div>
         </div>
-      </FluidboxGallery>
-      <p className="library-note">
-        The grid follows the selected photo on open and after viewer navigation. “Reveal last
-        viewed” recenters it if you scroll elsewhere after closing.
-      </p>
-    </main>
+        <p className="library-note">
+          The grid follows the selected photo on open and after viewer navigation. “Reveal last
+          viewed” recenters it if you scroll elsewhere after closing.
+        </p>
+      </main>
+    </Lightbox.Root>
   );
 }
 
