@@ -15,6 +15,7 @@ import {
   type ThumbnailPose,
 } from "./transition-geometry";
 import { createViewerPortal, ViewerModalIsolation } from "./viewer-portal";
+import { ViewerOwnership } from "./viewer-ownership";
 import {
   backdropVisibility,
   boundDismissVelocity,
@@ -49,7 +50,6 @@ class AppLightbox extends HTMLElement {
 
   #controller: AbortController | undefined;
   #zoom: LightboxZoom | undefined;
-  static #active: AppLightbox | null = null;
   #overlay: HTMLDivElement | null = null;
   #dialog: HTMLDivElement | null = null;
   #backdrop: HTMLDivElement | null = null;
@@ -1020,12 +1020,12 @@ class AppLightbox extends HTMLElement {
         "The lightbox requires browser support for inert and the Web Animations API.",
       );
     }
-    const switchingImage = AppLightbox.#active !== null;
-    if (AppLightbox.#active) {
-      AppLightbox.#active.close();
-      if (AppLightbox.#active) AppLightbox.#active.#finishClose();
+    const previous = activeViewer.claim(this);
+    const switchingImage = previous !== null;
+    if (previous) {
+      previous.close();
+      previous.#finishClose();
     }
-    AppLightbox.#active = this;
     this.#mountPortableContent();
     for (const image of this.#standaloneImage?.querySelectorAll<HTMLImageElement>(
       "img[data-src]",
@@ -2504,7 +2504,7 @@ class AppLightbox extends HTMLElement {
     this.#phase = "closed";
     this.#sessionSource = null;
     this.#setPresentationState("closed");
-    if (AppLightbox.#active === this) AppLightbox.#active = null;
+    activeViewer.release(this);
     if (this.#returnFocus?.isConnected) this.#returnFocus.focus({ preventScroll: true });
     this.#returnFocus = null;
     this.#applyPendingImage();
@@ -2583,6 +2583,8 @@ class AppLightbox extends HTMLElement {
     this.#imageLoaded = true;
   }
 }
+
+const activeViewer = new ViewerOwnership<AppLightbox>();
 
 if (!customElements.get("app-lightbox")) {
   customElements.define("app-lightbox", AppLightbox);
