@@ -1,0 +1,401 @@
+{
+  "video": "/home/dw/dev/lightbox/baseline/current/chromium/diagnostic.webm",
+  "frameCount": 79,
+  "frames": [
+    {
+      "index": 0,
+      "videoTimeSeconds": 0,
+      "durationSeconds": 0
+    },
+    {
+      "index": 1,
+      "videoTimeSeconds": 0.04,
+      "durationSeconds": 0
+    },
+    {
+      "index": 2,
+      "videoTimeSeconds": 0.08,
+      "durationSeconds": 0
+    },
+    {
+      "index": 3,
+      "videoTimeSeconds": 0.12,
+      "durationSeconds": 0
+    },
+    {
+      "index": 4,
+      "videoTimeSeconds": 0.16,
+      "durationSeconds": 0
+    },
+    {
+      "index": 5,
+      "videoTimeSeconds": 0.2,
+      "durationSeconds": 0
+    },
+    {
+      "index": 6,
+      "videoTimeSeconds": 0.24,
+      "durationSeconds": 0
+    },
+    {
+      "index": 7,
+      "videoTimeSeconds": 0.28,
+      "durationSeconds": 0
+    },
+    {
+      "index": 8,
+      "videoTimeSeconds": 0.32,
+      "durationSeconds": 0
+    },
+    {
+      "index": 9,
+      "videoTimeSeconds": 0.36,
+      "durationSeconds": 0
+    },
+    {
+      "index": 10,
+      "videoTimeSeconds": 0.4,
+      "durationSeconds": 0
+    },
+    {
+      "index": 11,
+      "videoTimeSeconds": 0.44,
+      "durationSeconds": 0
+    },
+    {
+      "index": 12,
+      "videoTimeSeconds": 0.48,
+      "durationSeconds": 0
+    },
+    {
+      "index": 13,
+      "videoTimeSeconds": 0.52,
+      "durationSeconds": 0
+    },
+    {
+      "index": 14,
+      "videoTimeSeconds": 0.56,
+      "durationSeconds": 0
+    },
+    {
+      "index": 15,
+      "videoTimeSeconds": 0.6,
+      "durationSeconds": 0
+    },
+    {
+      "index": 16,
+      "videoTimeSeconds": 0.64,
+      "durationSeconds": 0
+    },
+    {
+      "index": 17,
+      "videoTimeSeconds": 0.68,
+      "durationSeconds": 0
+    },
+    {
+      "index": 18,
+      "videoTimeSeconds": 0.72,
+      "durationSeconds": 0
+    },
+    {
+      "index": 19,
+      "videoTimeSeconds": 0.76,
+      "durationSeconds": 0
+    },
+    {
+      "index": 20,
+      "videoTimeSeconds": 0.8,
+      "durationSeconds": 0
+    },
+    {
+      "index": 21,
+      "videoTimeSeconds": 0.84,
+      "durationSeconds": 0
+    },
+    {
+      "index": 22,
+      "videoTimeSeconds": 0.88,
+      "durationSeconds": 0
+    },
+    {
+      "index": 23,
+      "videoTimeSeconds": 0.92,
+      "durationSeconds": 0
+    },
+    {
+      "index": 24,
+      "videoTimeSeconds": 0.96,
+      "durationSeconds": 0
+    },
+    {
+      "index": 25,
+      "videoTimeSeconds": 1,
+      "durationSeconds": 0
+    },
+    {
+      "index": 26,
+      "videoTimeSeconds": 1.04,
+      "durationSeconds": 0
+    },
+    {
+      "index": 27,
+      "videoTimeSeconds": 1.08,
+      "durationSeconds": 0
+    },
+    {
+      "index": 28,
+      "videoTimeSeconds": 1.12,
+      "durationSeconds": 0
+    },
+    {
+      "index": 29,
+      "videoTimeSeconds": 1.16,
+      "durationSeconds": 0
+    },
+    {
+      "index": 30,
+      "videoTimeSeconds": 1.2,
+      "durationSeconds": 0
+    },
+    {
+      "index": 31,
+      "videoTimeSeconds": 1.24,
+      "durationSeconds": 0
+    },
+    {
+      "index": 32,
+      "videoTimeSeconds": 1.28,
+      "durationSeconds": 0
+    },
+    {
+      "index": 33,
+      "videoTimeSeconds": 1.32,
+      "durationSeconds": 0
+    },
+    {
+      "index": 34,
+      "videoTimeSeconds": 1.36,
+      "durationSeconds": 0
+    },
+    {
+      "index": 35,
+      "videoTimeSeconds": 1.4,
+      "durationSeconds": 0
+    },
+    {
+      "index": 36,
+      "videoTimeSeconds": 1.44,
+      "durationSeconds": 0
+    },
+    {
+      "index": 37,
+      "videoTimeSeconds": 1.48,
+      "durationSeconds": 0
+    },
+    {
+      "index": 38,
+      "videoTimeSeconds": 1.52,
+      "durationSeconds": 0
+    },
+    {
+      "index": 39,
+      "videoTimeSeconds": 1.56,
+      "durationSeconds": 0
+    },
+    {
+      "index": 40,
+      "videoTimeSeconds": 1.6,
+      "durationSeconds": 0
+    },
+    {
+      "index": 41,
+      "videoTimeSeconds": 1.64,
+      "durationSeconds": 0
+    },
+    {
+      "index": 42,
+      "videoTimeSeconds": 1.68,
+      "durationSeconds": 0
+    },
+    {
+      "index": 43,
+      "videoTimeSeconds": 1.72,
+      "durationSeconds": 0
+    },
+    {
+      "index": 44,
+      "videoTimeSeconds": 1.76,
+      "durationSeconds": 0
+    },
+    {
+      "index": 45,
+      "videoTimeSeconds": 1.8,
+      "durationSeconds": 0
+    },
+    {
+      "index": 46,
+      "videoTimeSeconds": 1.84,
+      "durationSeconds": 0
+    },
+    {
+      "index": 47,
+      "videoTimeSeconds": 1.88,
+      "durationSeconds": 0
+    },
+    {
+      "index": 48,
+      "videoTimeSeconds": 1.92,
+      "durationSeconds": 0
+    },
+    {
+      "index": 49,
+      "videoTimeSeconds": 1.96,
+      "durationSeconds": 0
+    },
+    {
+      "index": 50,
+      "videoTimeSeconds": 2,
+      "durationSeconds": 0
+    },
+    {
+      "index": 51,
+      "videoTimeSeconds": 2.04,
+      "durationSeconds": 0
+    },
+    {
+      "index": 52,
+      "videoTimeSeconds": 2.08,
+      "durationSeconds": 0
+    },
+    {
+      "index": 53,
+      "videoTimeSeconds": 2.12,
+      "durationSeconds": 0
+    },
+    {
+      "index": 54,
+      "videoTimeSeconds": 2.16,
+      "durationSeconds": 0
+    },
+    {
+      "index": 55,
+      "videoTimeSeconds": 2.2,
+      "durationSeconds": 0
+    },
+    {
+      "index": 56,
+      "videoTimeSeconds": 2.24,
+      "durationSeconds": 0
+    },
+    {
+      "index": 57,
+      "videoTimeSeconds": 2.28,
+      "durationSeconds": 0
+    },
+    {
+      "index": 58,
+      "videoTimeSeconds": 2.32,
+      "durationSeconds": 0
+    },
+    {
+      "index": 59,
+      "videoTimeSeconds": 2.36,
+      "durationSeconds": 0
+    },
+    {
+      "index": 60,
+      "videoTimeSeconds": 2.4,
+      "durationSeconds": 0
+    },
+    {
+      "index": 61,
+      "videoTimeSeconds": 2.44,
+      "durationSeconds": 0
+    },
+    {
+      "index": 62,
+      "videoTimeSeconds": 2.48,
+      "durationSeconds": 0
+    },
+    {
+      "index": 63,
+      "videoTimeSeconds": 2.52,
+      "durationSeconds": 0
+    },
+    {
+      "index": 64,
+      "videoTimeSeconds": 2.56,
+      "durationSeconds": 0
+    },
+    {
+      "index": 65,
+      "videoTimeSeconds": 2.6,
+      "durationSeconds": 0
+    },
+    {
+      "index": 66,
+      "videoTimeSeconds": 2.64,
+      "durationSeconds": 0
+    },
+    {
+      "index": 67,
+      "videoTimeSeconds": 2.68,
+      "durationSeconds": 0
+    },
+    {
+      "index": 68,
+      "videoTimeSeconds": 2.72,
+      "durationSeconds": 0
+    },
+    {
+      "index": 69,
+      "videoTimeSeconds": 2.76,
+      "durationSeconds": 0
+    },
+    {
+      "index": 70,
+      "videoTimeSeconds": 2.8,
+      "durationSeconds": 0
+    },
+    {
+      "index": 71,
+      "videoTimeSeconds": 2.84,
+      "durationSeconds": 0
+    },
+    {
+      "index": 72,
+      "videoTimeSeconds": 2.88,
+      "durationSeconds": 0
+    },
+    {
+      "index": 73,
+      "videoTimeSeconds": 2.92,
+      "durationSeconds": 0
+    },
+    {
+      "index": 74,
+      "videoTimeSeconds": 2.96,
+      "durationSeconds": 0
+    },
+    {
+      "index": 75,
+      "videoTimeSeconds": 3,
+      "durationSeconds": 0
+    },
+    {
+      "index": 76,
+      "videoTimeSeconds": 3.04,
+      "durationSeconds": 0
+    },
+    {
+      "index": 77,
+      "videoTimeSeconds": 3.08,
+      "durationSeconds": 0
+    },
+    {
+      "index": 78,
+      "videoTimeSeconds": 3.12,
+      "durationSeconds": 0
+    }
+  ]
+}

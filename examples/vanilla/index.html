@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightbox example</title>
+    <script type="module" src="/main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <h1>Lightbox example</h1>
+      <p>Open either image. Use arrow keys or swipe to change images.</p>
+      <app-gallery aria-label="Example gallery">
+        <app-lightbox src="/first.svg" alt="Blue and green circles" close-button>
+          <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
+        </app-lightbox>
+        <app-lightbox src="/second.svg" alt="Pink and orange squares" close-button>
+          <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
+        </app-lightbox>
+      </app-gallery>
+    </main>
+  </body>
+</html>
