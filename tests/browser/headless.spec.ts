@@ -97,6 +97,27 @@ test("plain runtime does not take native horizontal swipe ownership", async ({ p
   expect(sample.snapOverride).toBe("none");
 });
 
+test("plain runtime reveals the selected mounted origin without a host callback", async ({
+  page,
+}) => {
+  await page.goto("/headless.html");
+  await page.evaluate(() => {
+    const second = document.querySelector<HTMLElement>('[data-photo-id="two"]')!;
+    second.scrollIntoView = () => {
+      second.dataset.testRevealed = "";
+    };
+  });
+  await page.locator('[data-photo-id="one"]').click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await page.locator("[data-demo-next]").click();
+  const second = page.locator('[data-photo-id="two"]');
+  await expect(second).toHaveAttribute("data-test-revealed", "");
+  await expect(second.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+});
+
 test("plain runtime preserves the painted frame when open and close reverse", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/headless.html");

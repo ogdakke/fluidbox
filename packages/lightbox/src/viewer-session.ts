@@ -470,11 +470,21 @@ export class ViewerSession<
   #requestReveal(id: string, index: number, reason: "open" | "selection") {
     this.#abortReveal();
     const adapter = this.#originAdapter;
-    if (!adapter?.revealOrigin) return;
+    if (!adapter) return;
     const controller = new AbortController();
     this.#revealController = controller;
     try {
-      void Promise.resolve(adapter.revealOrigin(id, index, { signal: controller.signal, reason }))
+      const reveal = adapter.revealOrigin
+        ? adapter.revealOrigin(id, index, { signal: controller.signal, reason })
+        : (() => {
+            const origin = adapter.getOrigin(id);
+            origin?.trigger.scrollIntoView({
+              behavior: "instant",
+              block: "nearest",
+              inline: "nearest",
+            });
+          })();
+      void Promise.resolve(reveal)
         .then(() => {
           if (!controller.signal.aborted && this.#state.activeId === id) {
             this.#origins.hideThumbnail(id);
