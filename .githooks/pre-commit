@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -eu
+
+cd "$(git rev-parse --show-toplevel)"
+mapfile -d '' staged_files < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+if ((${#staged_files[@]} == 0)); then
+  exit 0
+fi
+
+echo "Formatting staged files..."
+./node_modules/.bin/oxfmt "${staged_files[@]}"
+git add -- "${staged_files[@]}"
+echo "Code formatted and staged."
