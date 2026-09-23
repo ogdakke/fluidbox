@@ -98,6 +98,7 @@ export class DomViewerDriver<
   #zoom: import("./lightbox-zoom").LightboxZoom | undefined;
   #zoomLoad: Promise<import("./lightbox-zoom").LightboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
+  #viewportWidth = 0;
   #destroyed = false;
 
   constructor(ownerDocument: Document, zoomOptions: false | LightboxZoomOptions | undefined) {
@@ -156,7 +157,9 @@ export class DomViewerDriver<
       capture: true,
       signal: this.#lifetime.signal,
     });
-    ownerDocument.defaultView?.addEventListener("resize", this.#scheduleCloseTargetUpdate, {
+    const ownerWindow = ownerDocument.defaultView;
+    ownerWindow?.addEventListener("resize", this.#onResize, { signal: this.#lifetime.signal });
+    ownerWindow?.visualViewport?.addEventListener("resize", this.#onResize, {
       signal: this.#lifetime.signal,
     });
     if (zoomOptions !== false) {
@@ -238,6 +241,9 @@ export class DomViewerDriver<
     this.#assertImage(context.item);
     void this.#loadZoom();
     this.#cancelAnimations(true);
+    const view = this.#portal.overlay.ownerDocument.defaultView!;
+    this.#viewportWidth = view.innerWidth;
+    this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
     await this.#strip?.select(context.index, false);
     this.#render(context.item, context.index);
     this.#returnFocus =
@@ -695,6 +701,33 @@ export class DomViewerDriver<
         this.#updateCloseTarget();
       });
     });
+  };
+
+  #onResize = () => {
+    const view = this.#portal.overlay.ownerDocument.defaultView;
+    if (!view) return;
+    const widthChanged = view.innerWidth !== this.#viewportWidth;
+    if (this.#controller?.state.status === "closing") {
+      if (widthChanged) {
+        this.#viewportWidth = view.innerWidth;
+        this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+      }
+      this.#updateCloseTarget();
+      this.#scheduleCloseTargetUpdate();
+      return;
+    }
+    if (!widthChanged) return;
+    if (this.#dragGesture.active) this.#endDrag(true);
+    this.#viewportWidth = view.innerWidth;
+    this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    if (this.#zoom?.zoomed) {
+      this.#zoom.reset();
+      return;
+    }
+    if (this.#controller?.state.status === "opening") {
+      this.#cancelAnimations(false);
+      this.#clearMotionStyles();
+    }
   };
 
   #updateCloseTarget() {

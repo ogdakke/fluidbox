@@ -149,6 +149,24 @@ test("plain runtime settles immediately when reduced motion is requested", async
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
 });
 
+test("plain runtime keeps session height stable through mobile browser chrome changes", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  const overlay = page.locator("[data-lightbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+  await expect(overlay).toHaveCSS("--lightbox-height", "700px");
+
+  await page.setViewportSize({ width: 1000, height: 620 });
+  await expect(overlay).toHaveCSS("--lightbox-height", "700px");
+
+  await page.setViewportSize({ width: 820, height: 620 });
+  await expect(overlay).toHaveCSS("--lightbox-height", "620px");
+  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+});
+
 test("plain runtime preserves the painted frame when open and close reverse", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/headless.html");
@@ -432,6 +450,10 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
 
   const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
   await expect(active).toHaveAttribute("aria-label", "Item 90001 of 100000");
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
   expect(await page.locator("[data-lightbox-slide]").count()).toBeLessThanOrEqual(31);
   expect(await page.locator("[data-lightbox-media][src]").count()).toBeLessThanOrEqual(3);
 
