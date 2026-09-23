@@ -41,6 +41,32 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
 });
 
+test("plain runtime contains focus and applies the established gallery keyboard policy", async ({
+  page,
+}) => {
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  const overlay = page.locator("[data-lightbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+  await expect(page.locator("[data-lightbox-dialog]")).toBeFocused();
+
+  await page.keyboard.press("Tab");
+  await expect(page.locator("[data-demo-next]")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.locator("[data-demo-close]")).toBeFocused();
+
+  await page.locator("h1").evaluate((heading) => {
+    heading.closest("main")!.removeAttribute("inert");
+    heading.setAttribute("tabindex", "-1");
+    (heading as HTMLElement).focus();
+  });
+  await expect(page.locator("[data-lightbox-dialog]")).toBeFocused();
+
+  await page.keyboard.press("PageDown");
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
+});
+
 test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();

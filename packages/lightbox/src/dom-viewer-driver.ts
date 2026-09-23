@@ -152,6 +152,10 @@ export class DomViewerDriver<
       capture: true,
       signal: this.#lifetime.signal,
     });
+    ownerDocument.addEventListener("focusin", this.#onFocus, {
+      capture: true,
+      signal: this.#lifetime.signal,
+    });
     ownerDocument.defaultView?.addEventListener("resize", this.#scheduleCloseTargetUpdate, {
       signal: this.#lifetime.signal,
     });
@@ -318,7 +322,7 @@ export class DomViewerDriver<
     this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
     delete this.#portal.dialog.dataset.filmstripRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
-    this.#portal.dialog.focus({ preventScroll: true });
+    this.#focus();
   }
 
   async select(context: ViewerSessionMotionContext<TItem>) {
@@ -919,6 +923,7 @@ export class DomViewerDriver<
     if (!this.#portal.overlay.isConnected) return;
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
       void this.#controller?.close({ reason: "keyboard" });
     } else if (["+", "=", "-", "0"].includes(event.key) && !event.metaKey && !event.ctrlKey) {
       event.preventDefault();
@@ -926,16 +931,60 @@ export class DomViewerDriver<
         if (event.key === "0") zoom?.reset();
         else zoom?.zoomBy(event.key === "-" ? 1 / 1.5 : 1.5);
       });
-    } else if (event.key === "ArrowRight") {
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      const controls = Array.from(
+        this.#portal.dialog.querySelectorAll<HTMLElement>(
+          'a[href], button, input, select, textarea, summary, video[controls], audio[controls], iframe, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter(
+        (control) =>
+          !control.hasAttribute("disabled") &&
+          !control.hasAttribute("hidden") &&
+          !control.closest("[hidden], [aria-hidden=true]") &&
+          getComputedStyle(control).pointerEvents !== "none" &&
+          (this.#controller?.state.status !== "closing" ||
+            !control.closest("[data-lightbox-slides]")),
+      );
+      const active = this.#portal.overlay.ownerDocument.activeElement;
+      const index = controls.findIndex((control) => control === active);
+      const nextIndex =
+        index < 0
+          ? event.shiftKey
+            ? controls.length - 1
+            : 0
+          : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+      const next = controls[nextIndex];
+      if (next) next.focus({ preventScroll: true });
+      else this.#focus();
+    } else if (
+      (this.#controller?.state.count ?? 0) > 1 &&
+      ["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown"].includes(event.key)
+    ) {
+      void this.#controller?.close({ reason: "keyboard" });
+    } else if (event.key === "ArrowRight" && this.#controller?.state.status === "open") {
       event.preventDefault();
       this.#zoom?.suspend();
       void this.#controller?.next({ reason: "keyboard" });
-    } else if (event.key === "ArrowLeft") {
+    } else if (event.key === "ArrowLeft" && this.#controller?.state.status === "open") {
       event.preventDefault();
       this.#zoom?.suspend();
       void this.#controller?.previous({ reason: "keyboard" });
     }
   };
+
+  #onFocus = (event: FocusEvent) => {
+    if (!this.#portal.overlay.isConnected || event.composedPath().includes(this.#portal.dialog))
+      return;
+    this.#focus();
+  };
+
+  #focus() {
+    const close = this.#portal.dialog.querySelector<HTMLElement>("[data-lightbox-close]");
+    (close && !close.hasAttribute("hidden") ? close : this.#portal.dialog).focus({
+      preventScroll: true,
+    });
+  }
 
   #onPointerDown = (event: PointerEvent) => {
     if (
