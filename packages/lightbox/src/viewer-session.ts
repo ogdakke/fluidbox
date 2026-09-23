@@ -34,6 +34,7 @@ export interface ViewerSessionCloseContext {
 
 /** DOM motion and portal ownership supplied by the runtime adapter. */
 export interface ViewerSessionDriver<TItem extends LightboxItem = LightboxItem> {
+  setSource?(source: LightboxSource<TItem>): void;
   open(context: ViewerSessionMotionContext<TItem>): void | Promise<void>;
   select(context: ViewerSessionMotionContext<TItem>): void | Promise<void>;
   close(context: ViewerSessionCloseContext): void | Promise<void>;
@@ -118,6 +119,7 @@ export class ViewerSession<
     this.#onBeforeCommand = options.onBeforeCommand;
     this.#onEvent = options.onEvent;
     this.#state = stateFor(this.#source, "closed", null, null);
+    this.#driver.setSource?.(this.#source);
   }
 
   get state(): LightboxState {
@@ -191,6 +193,7 @@ export class ViewerSession<
     const previousId = this.#state.activeId;
     const previousIndex = this.#state.activeIndex;
     this.#source = source;
+    this.#driver.setSource?.(source);
 
     if (source.count === 0) {
       if (this.#state.status === "closed") {

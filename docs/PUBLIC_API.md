@@ -179,6 +179,9 @@ The runtime owns the body portal, measured frame, transforms, clipping, native s
 surfaces, focus containment, inert background, and accessibility status. Applications own controls,
 captions, thumbnail decorations, and every framework-created descendant.
 
+An indexed `LightboxSource` is also the gallery API. The runtime renders a bounded native-scrolling
+window around the active item, so callers do not create a second gallery object or mount every item.
+
 `LightboxOptions.portal` mounts application controls and captions once into a stable target inside the
 body portal. It receives the controller and a lifetime signal and may return an idempotent disposer.
 The runtime calls the disposer before removing the target. Plain JavaScript appends DOM there; React,

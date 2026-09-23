@@ -14,6 +14,7 @@ import type {
   LightboxImageMedia,
   LightboxItem,
   LightboxPortalRenderer,
+  LightboxSource,
 } from "./public-api";
 import type {
   ViewerSessionCloseContext,
@@ -25,6 +26,7 @@ import {
   ViewerModalIsolation,
   type ViewerPortalElements,
 } from "./viewer-portal";
+import { ViewerStrip } from "./viewer-strip";
 
 const OPEN_DURATION = 260;
 const CLOSE_DURATION = 220;
@@ -70,19 +72,15 @@ function frameKeyframe(pose: PaintedPose): Keyframe {
   };
 }
 
-function candidateSet(candidates: readonly { src: string; width: number }[] | undefined) {
-  return candidates?.map((candidate) => `${candidate.src} ${candidate.width}w`).join(", ") ?? "";
-}
-
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 export class DomViewerDriver<
   TItem extends LightboxItem = LightboxItem,
 > implements ViewerSessionDriver<TItem> {
   readonly #portal: ViewerPortalElements;
-  readonly #picture: HTMLPictureElement;
   readonly #isolation: ViewerModalIsolation;
   readonly #lifetime = new AbortController();
   #controller: LightboxController<TItem> | undefined;
+  #strip: ViewerStrip<TItem> | undefined;
   #portalDispose: LightboxDispose | undefined;
   #animations: Animation[] = [];
   #interruptedPose: PaintedPose | undefined;
@@ -100,11 +98,6 @@ export class DomViewerDriver<
 
   constructor(ownerDocument: Document) {
     this.#portal = createViewerPortal(ownerDocument, { defaultCloseButton: false });
-    this.#picture = ownerDocument.createElement("picture");
-    this.#picture.dataset.lightboxPicture = "";
-    this.#picture.style.display = "contents";
-    this.#portal.frame.insertBefore(this.#picture, this.#portal.media);
-    this.#picture.append(this.#portal.media);
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
     this.#portal.dialog.dataset.lightboxHeadless = "";
     this.#portal.container.addEventListener(
@@ -162,9 +155,26 @@ export class DomViewerDriver<
       }) ?? undefined;
   }
 
+  setSource(source: LightboxSource<TItem>) {
+    if (this.#strip) {
+      this.#strip.setSource(source);
+      this.#portal.dialog.toggleAttribute("data-lightbox-gallery", source.count > 1);
+      return;
+    }
+    this.#strip = new ViewerStrip(this.#portal.overlay.ownerDocument, source, (index) => {
+      const controller = this.#controller;
+      if (controller?.state.status === "open" && controller.state.requestedIndex !== index) {
+        void controller.goTo({ index }, { reason: "pointer" });
+      }
+    });
+    this.#portal.frame.replaceWith(this.#strip.element);
+    this.#portal.dialog.toggleAttribute("data-lightbox-gallery", source.count > 1);
+  }
+
   async open(context: ViewerSessionMotionContext<TItem>) {
     this.#assertImage(context.item);
     this.#cancelAnimations(true);
+    await this.#strip?.select(context.index, false);
     this.#render(context.item, context.index);
     this.#returnFocus =
       context.origin?.trigger ??
@@ -174,6 +184,7 @@ export class DomViewerDriver<
     if (!this.#portal.overlay.isConnected) {
       this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
     }
+    this.#strip?.mount();
     this.#isolation.activate();
     this.#setState("opening");
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -181,7 +192,7 @@ export class DomViewerDriver<
 
     const interruptedPose = this.#takeInterruptedPose();
     const origin = context.origin?.visual;
-    const target = this.#portal.frame.getBoundingClientRect();
+    const target = this.#frame.getBoundingClientRect();
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
     const frameMotion: Keyframe[] = interruptedPose
       ? [frameKeyframe(interruptedPose), { transform: "none", borderRadius: "0px", opacity: 1 }]
@@ -200,7 +211,7 @@ export class DomViewerDriver<
           ];
     await this.#play(
       [
-        this.#portal.frame.animate(frameMotion, {
+        this.#frame.animate(frameMotion, {
           duration: OPEN_DURATION,
           easing: EASING,
           fill: "both",
@@ -225,10 +236,13 @@ export class DomViewerDriver<
     this.#assertImage(context.item);
     this.#cancelAnimations(true);
     this.#takeInterruptedPose();
+    const selected = this.#strip?.index === context.index;
+    await this.#strip?.select(context.index, !selected && context.reason !== "source-update");
     this.#render(context.item, context.index);
+    if (selected) return;
     await this.#play(
       [
-        this.#portal.media.animate([{ opacity: 0.35 }, { opacity: 1 }], {
+        this.#media.animate([{ opacity: 0.35 }, { opacity: 1 }], {
           duration: 160,
           easing: EASING,
         }),
@@ -244,7 +258,7 @@ export class DomViewerDriver<
     if (context.origin?.trigger.isConnected) this.#returnFocus = context.origin.trigger;
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const frame = this.#portal.frame.getBoundingClientRect();
+    const frame = this.#frame.getBoundingClientRect();
     const frameMotion: Keyframe[] = from
       ? [
           interruptedPose
@@ -262,7 +276,7 @@ export class DomViewerDriver<
         ];
     await this.#play(
       [
-        this.#portal.frame.animate(frameMotion, {
+        this.#frame.animate(frameMotion, {
           duration: CLOSE_DURATION,
           easing: EASING,
           fill: "both",
@@ -291,35 +305,22 @@ export class DomViewerDriver<
     this.#cancelAnimations(false);
     this.#portalDispose?.();
     this.#portalDispose = undefined;
+    this.#strip?.destroy();
+    this.#strip = undefined;
     this.#finishClose();
+  }
+
+  get #frame() {
+    return this.#strip?.active.frame ?? this.#portal.frame;
+  }
+
+  get #media() {
+    return this.#strip?.active.image ?? this.#portal.media;
   }
 
   #render(item: TItem, index: number) {
     this.#assertImage(item);
     const media = item.media;
-    for (const source of this.#picture.querySelectorAll("source")) source.remove();
-    for (const resource of media.sources ?? []) {
-      const source = this.#portal.overlay.ownerDocument.createElement("source");
-      source.srcset = candidateSet(resource.candidates);
-      if (resource.sizes) source.sizes = resource.sizes;
-      if (resource.media) source.media = resource.media;
-      if (resource.type) source.type = resource.type;
-      this.#picture.insertBefore(source, this.#portal.media);
-    }
-    this.#portal.media.srcset = candidateSet(media.candidates);
-    if (media.sizes) this.#portal.media.sizes = media.sizes;
-    else this.#portal.media.removeAttribute("sizes");
-    this.#portal.media.src = media.src;
-    this.#portal.media.alt = media.alt;
-    this.#portal.media.width = media.width;
-    this.#portal.media.height = media.height;
-    this.#portal.media.decoding = "async";
-    this.#portal.media.loading = "eager";
-    this.#portal.media.fetchPriority = "high";
-    this.#portal.media.style.setProperty(
-      "--lightbox-media-aspect",
-      `${media.width} / ${media.height}`,
-    );
     this.#portal.dialog.setAttribute("aria-label", media.alt || "Image viewer");
     this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
   }
@@ -339,7 +340,7 @@ export class DomViewerDriver<
   #cancelAnimations(preserve: boolean) {
     if (preserve && this.#animations.length > 0) {
       this.#interruptedPose = this.#paintedPose();
-      Object.assign(this.#portal.frame.style, {
+      Object.assign(this.#frame.style, {
         transform: this.#interruptedPose.transform,
         opacity: this.#interruptedPose.opacity,
         borderTopLeftRadius: this.#interruptedPose.borderTopLeftRadius,
@@ -369,10 +370,10 @@ export class DomViewerDriver<
       "border-bottom-right-radius",
       "border-bottom-left-radius",
     ]) {
-      this.#portal.frame.style.removeProperty(property);
+      this.#frame.style.removeProperty(property);
     }
     this.#portal.backdrop.style.removeProperty("opacity");
-    this.#portal.media.style.removeProperty("opacity");
+    this.#media.style.removeProperty("opacity");
     for (const property of [
       "--lightbox-drag-x",
       "--lightbox-drag-y",
@@ -387,7 +388,7 @@ export class DomViewerDriver<
   }
 
   #paintedPose(): PaintedPose {
-    const frame = getComputedStyle(this.#portal.frame);
+    const frame = getComputedStyle(this.#frame);
     return {
       transform: frame.transform,
       opacity: frame.opacity,
@@ -401,7 +402,7 @@ export class DomViewerDriver<
 
   #beginDrag(wheelDirection = 0) {
     if (this.#dragGesture.active || this.#controller?.state.status !== "open") return;
-    const frame = this.#portal.frame;
+    const frame = this.#frame;
     const style = getComputedStyle(frame);
     const number = (value: string) => Number.parseFloat(value) || 0;
     const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
@@ -441,7 +442,7 @@ export class DomViewerDriver<
     this.#portal.overlay.style.setProperty("--lightbox-drag-x", `${state.x}px`);
     this.#portal.overlay.style.setProperty("--lightbox-drag-y", `${state.y}px`);
     this.#portal.overlay.style.setProperty("--lightbox-dismiss-progress", String(progress));
-    this.#portal.frame.style.transform = `translate(${state.x}px, ${state.y}px) scale(${scale})`;
+    this.#frame.style.transform = `translate(${state.x}px, ${state.y}px) scale(${scale})`;
     this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
     if (
       state.wheelTarget &&
@@ -478,14 +479,14 @@ export class DomViewerDriver<
       void this.#controller?.close({ reason: "pointer" });
       return;
     }
-    const transform = getComputedStyle(this.#portal.frame).transform;
+    const transform = getComputedStyle(this.#frame).transform;
     const opacity = getComputedStyle(this.#portal.backdrop).opacity;
     const settleX = boundDismissVelocity(state.x, velocityX, "x");
     const settleY = boundDismissVelocity(state.y, velocityY, "y");
     const duration = Math.max(140, 220 - Math.min(80, Math.hypot(settleX, settleY) * 50));
     void this.#play(
       [
-        this.#portal.frame.animate([{ transform }, { transform: "none" }], {
+        this.#frame.animate([{ transform }, { transform: "none" }], {
           duration,
           easing: EASING,
           fill: "both",

@@ -6,13 +6,13 @@ The check builds six small consumer entries with tsdown as minified browser ESM 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | CSS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | -------: | -----------------------: |
-| Root           |         8,140 B |           29,126 B |  3,612 B |                 32,738 B |
+| Root           |         9,486 B |           30,504 B |  3,612 B |                 34,116 B |
 | Elements       |        22,643 B |           22,643 B |  3,612 B |                 26,255 B |
 | React          |           348 B |           22,991 B |  3,612 B |                 26,603 B |
 | Solid          |           261 B |           22,904 B |  3,612 B |                 26,516 B |
 | Vue            |           383 B |           23,026 B |  3,612 B |                 26,638 B |
 | Angular        |           250 B |           22,893 B |  3,612 B |                 26,505 B |
 
-The root now includes `createLightbox`; its 9,000 B initial ceiling leaves 860 B, about 10.6%. Its conservative activation graph also includes the optional custom-element registration chunk. The 30,000 B activation ceiling leaves 874 B, about 3%, and the 34,000 B combined ceiling leaves 1,262 B, about 3.9%. Every other entry retains a 24,500 B activation ceiling and a 28,500 B combined ceiling. Their largest current values leave 1,474 B for activation JS and 1,862 B with CSS. Initial limits remain 25,000 B for elements and 1,500 B for each framework binding; the CSS limit remains 5,000 B.
+The root includes `createLightbox` and its bounded native gallery strip. Its 10,500 B initial ceiling leaves 1,014 B, about 10.7%. Its conservative activation graph also includes the optional custom-element registration chunk. The 31,500 B activation ceiling leaves 996 B, about 3.3%, and the 35,500 B combined ceiling leaves 1,384 B, about 4.1%. Every other entry retains a 24,500 B activation ceiling and a 28,500 B combined ceiling. Their largest current values leave 1,474 B for activation JS and 1,862 B with CSS. Initial limits remain 25,000 B for elements and 1,500 B for each framework binding; the CSS limit remains 5,000 B.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

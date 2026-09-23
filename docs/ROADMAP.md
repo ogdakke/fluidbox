@@ -46,6 +46,10 @@ Work has started in bounded, reviewed parts. Stage 0 is still incomplete.
   through the shared spring controller, publishes drag state through data attributes and CSS variables,
   and builds native responsive image candidates and picture sources. `createLightbox` is exported from
   the SSR-safe root; custom elements remain available as a compatibility binding.
+- `createLightbox({ source })` now owns a native horizontal gallery strip without custom elements.
+  It keeps at most 31 slide shells, loads the active image and its immediate neighbors, rebases around
+  distant selections, and has browser coverage against a 100,000-item source. This is the gallery
+  JavaScript API; a separate `createGallery` factory is unnecessary.
 - Added deterministic open/close interruption geometry checks, focus/inert restoration checks, and trace/video evidence in `tests/browser/motion.spec.ts`. This protects pose continuity at command handoff, not gesture velocity or compositor performance.
 - Fixed indexed-source opening preparation to resolve mounted thumbnails before the gallery becomes active; added opening-pose and missing-origin scale/fade regressions.
 - Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.

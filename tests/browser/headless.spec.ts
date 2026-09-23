@@ -12,25 +12,29 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   await first.click();
 
   const overlay = page.locator("[data-lightbox-overlay]");
+  const activeMedia = page.locator(
+    '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+  );
   await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
-  await expect(page.locator("[data-lightbox-media]")).toHaveAttribute("alt", "Blue square study");
-  await expect(page.locator("[data-lightbox-picture] source")).toHaveCount(1);
-  await expect(page.locator("[data-lightbox-media]")).toHaveAttribute(
+  await expect(activeMedia).toHaveAttribute("alt", "Blue square study");
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-picture] source'),
+  ).toHaveCount(1);
+  await expect(activeMedia).toHaveAttribute(
     "srcset",
     "/photo-square.svg 400w, /photo-square.svg 800w",
   );
-  await expect(page.locator("[data-lightbox-media]")).toHaveAttribute("sizes", "min(100vw, 800px)");
+  await expect(activeMedia).toHaveAttribute("sizes", "min(100vw, 800px)");
   await expect(page.locator("[data-demo-caption]")).toHaveText("one");
 
   await page.locator("[data-demo-next]").click();
   await expect(page.locator("[data-demo-caption]")).toHaveText("two");
-  await expect(page.locator("[data-lightbox-media]")).toHaveAttribute(
-    "alt",
-    "Orange portrait study",
-  );
-  await expect(page.locator("[data-lightbox-picture] source")).toHaveCount(0);
-  await expect(page.locator("[data-lightbox-media]")).not.toHaveAttribute("srcset", /.+/);
-  await expect(page.locator("[data-lightbox-media]")).not.toHaveAttribute("sizes", /.+/);
+  await expect(activeMedia).toHaveAttribute("alt", "Orange portrait study");
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-picture] source'),
+  ).toHaveCount(0);
+  await expect(activeMedia).not.toHaveAttribute("srcset", /.+/);
+  await expect(activeMedia).not.toHaveAttribute("sizes", /.+/);
 
   await page.locator("[data-demo-close]").click();
   await expect(overlay).toHaveCount(0);
@@ -44,7 +48,9 @@ test("plain runtime preserves the painted frame when open and close reverse", as
   const samples = await page.evaluate(async () => {
     const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const bounds = () => {
-      const frame = document.querySelector<HTMLElement>("[data-lightbox-frame]")!;
+      const frame = document.querySelector<HTMLElement>(
+        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+      )!;
       const rect = frame.getBoundingClientRect();
       return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
     };
@@ -89,7 +95,7 @@ test("plain runtime publishes drag state and dismisses from a touch pointer", as
   const overlay = page.locator("[data-lightbox-overlay]");
   await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
 
-  const frame = page.locator("[data-lightbox-frame]");
+  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
   const center = await frame.boundingBox();
   expect(center).not.toBeNull();
   const x = center!.x + center!.width / 2;
@@ -135,7 +141,8 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
   const overlay = page.locator("[data-lightbox-overlay]");
   await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
 
-  const progress = await page.locator("[data-lightbox-frame]").evaluate(async (element) => {
+  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const progress = await frame.evaluate(async (element) => {
     let maximum = 0;
     for (let index = 0; index < 3; index++) {
       element.dispatchEvent(
@@ -151,11 +158,51 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
     return maximum;
   });
   expect(progress).toBeGreaterThan(0);
-  await page.locator("[data-lightbox-frame]").dispatchEvent("wheel", {
+  await frame.dispatchEvent("wheel", {
     deltaX: 0,
     deltaY: 160,
     deltaMode: 0,
   });
   await expect(overlay).toHaveCount(0);
   await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
+});
+
+test("plain runtime keeps a 100k source bounded without custom elements", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.evaluate(() => {
+    const count = 100_000;
+    void window.headlessViewer.setSource({
+      count,
+      getItem(index) {
+        return {
+          id: `large-${index}`,
+          media: {
+            type: "image",
+            src: "/photo-square.svg",
+            alt: `Large item ${index + 1}`,
+            width: 800,
+            height: 800,
+          },
+        };
+      },
+      getIndex(id) {
+        const index = Number(String(id).replace("large-", ""));
+        return Number.isInteger(index) && index >= 0 && index < count ? index : null;
+      },
+    });
+    void window.headlessViewer.open({ index: 90_000 });
+  });
+
+  const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+  await expect(active).toHaveAttribute("aria-label", "Item 90001 of 100000");
+  expect(await page.locator("[data-lightbox-slide]").count()).toBeLessThanOrEqual(31);
+  expect(await page.locator("[data-lightbox-media][src]").count()).toBeLessThanOrEqual(3);
+
+  await page.keyboard.press("ArrowRight");
+  await expect(active).toHaveAttribute("aria-label", "Item 90002 of 100000");
+  expect(await page.locator("[data-lightbox-slide]").count()).toBeLessThanOrEqual(31);
+  expect(await page.locator("[data-lightbox-media][src]").count()).toBeLessThanOrEqual(3);
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
 });
