@@ -9,7 +9,7 @@
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
     "test": "bun run --bun vitest run --pool=threads --maxWorkers=1",
-    "dev": "bun run build && concurrently --kill-others --names package,example \"bun run --cwd packages/lightbox build --watch\" \"vite examples/vanilla\"",
+    "dev": "bun run build && concurrently --kill-others --names package,example \"bun run --cwd packages/lightbox build --watch --no-clean\" \"vite examples/vanilla\"",
     "build:example": "bun run build && bun run --cwd examples/vanilla build",
     "build:frameworks": "bun run build && bun run --cwd examples/frameworks build",
     "build": "bun run --cwd packages/lightbox build",
@@ -39,8 +39,7 @@
     "@types/bun": "^1.4.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^5",
-    "@vitejs/plugin-vue": "^6",
+    "@vitejs/plugin-react": "^6",
     "concurrently": "^10.0.5",
     "oxfmt": "^0.57.0",
     "oxlint": "^1.85.0",

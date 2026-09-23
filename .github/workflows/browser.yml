@@ -17,7 +17,11 @@ jobs:
       - run: bun run format:check
       - run: bun run lint:all
       - run: bun run test
+      - run: bun run build
+      - run: bun run test:bundle
+      - run: bun run test:ssr
       - run: bun run build:example
+      - run: bun run build:frameworks
       - run: bunx playwright install --with-deps chromium firefox webkit
       - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
       - run: bun run test:browser
@@ -43,6 +47,7 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      - run: bun run build
       - run: bunx playwright install --with-deps chromium firefox webkit
       - run: bun run test:browser:baseline
       - uses: actions/upload-artifact@v4

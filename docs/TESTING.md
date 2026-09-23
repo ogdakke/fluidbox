@@ -13,13 +13,15 @@ The current baseline is documented in [`baseline/README.md`](../baseline/README.
 
 Playwright device profiles emulate viewport, user agent, and touch on desktop browser builds. They do not replace real phones or tablets. CPU figures from a shared CI VM should be treated as trends, not hard absolute limits.
 
+The four framework pages in `examples/frameworks` exercise built `/react`, `/solid`, `/vue`, and `/angular` exports. `bun run test:ssr` imports those entries without browser globals. `bun run test:bundle` uses tsdown to build one consumer entry at a time and fails when a subpath imports an unrelated framework, the root eagerly includes custom elements, or an entry exceeds its gzip budget. Current limits are 600 B for the root, 25 kB for elements, 1.5 kB for each binding, and 5 kB for CSS. These limits exclude each framework and the external `unlazy` dependency. tsdown reports raw and gzip artifact sizes during `bun run build`; publint and attw validate exports and declarations.
+
 ## Scenario matrix to build out
 
 - Open/close and interrupted reverse transitions; drag, wheel, keyboard, swipe, zoom and pinch.
 - Light DOM, open shadow roots, nested scroll containers, transformed ancestors, right-to-left layout, reduced motion, high contrast, and focus return.
 - Images of mixed dimensions and formats; delayed, failed, retried, and decoded media; video and both same-origin and cross-origin iframes.
 - 1, 1k, 10k, and 100k items; jump to distant indices; rapid direction changes; source insertion/removal; recycled or missing origin element while open.
-- Client-only use, SSR import without DOM globals, hydration, and framework binding smoke examples.
+- Hydration and framework source updates after mount.
 - Cleanup after repeated open/close, aborts, detached media, listeners, heap growth, and background network work.
 
 Each interaction test should assert state and accessibility, then retain a trace on failure. Stable keyframes use `toHaveScreenshot`. Motion tests need videos plus timestamped geometry; exact one-frame pixel defects need frame extraction or deterministic animation sampling. Performance tests must record the runner model, browser/version, viewport, scenario, warm/cold state, and raw samples alongside summaries.

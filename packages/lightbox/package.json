@@ -2,19 +2,74 @@
   "name": "@ogdakke/fluidbox",
   "version": "0.0.0",
   "private": true,
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "type": "module",
+  "sideEffects": [
+    "./src/elements.ts",
+    "./src/lightbox.ts",
+    "./src/gallery.ts",
+    "./src/filmstrip.ts",
+    "./src/styles.css",
+    "./dist/elements.js",
+    "./dist/styles.css"
+  ],
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./elements": {
-      "types": "./src/elements.ts",
-      "import": "./src/elements.ts"
+      "types": "./dist/elements.d.ts",
+      "import": "./dist/elements.js"
     },
-    "./styles.css": "./src/styles.css"
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./solid": {
+      "types": "./dist/solid.d.ts",
+      "import": "./dist/solid.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./angular": {
+      "types": "./dist/angular.d.ts",
+      "import": "./dist/angular.js"
+    },
+    "./styles.css": {
+      "types": "./dist/styles.css.d.ts",
+      "default": "./dist/styles.css"
+    }
+  },
+  "scripts": {
+    "build": "tsdown"
   },
   "dependencies": {
     "unlazy": "^2.0.1"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=20 <23",
+    "react": ">=18 <20",
+    "solid-js": "^1.9.0",
+    "vue": "^3.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "solid-js": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
   }
 }

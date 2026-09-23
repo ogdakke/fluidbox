@@ -7,13 +7,17 @@
     "verbatimModuleSyntax": true,
     "strict": true,
     "experimentalDecorators": true,
+    "jsx": "preserve",
+    "jsxImportSource": "react",
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["bun"]
   },
   "include": [
     "packages/**/*.ts",
+    "packages/**/*.tsx",
     "examples/**/*.ts",
+    "examples/**/*.tsx",
     "tests/**/*.ts",
     "playwright.config.ts",
     "types.d.ts",

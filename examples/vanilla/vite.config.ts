@@ -5,5 +5,9 @@ const allowedHosts = [process.env.PORTLESS_URL, process.env.PORTLESS_TAILSCALE_U
   .map((url) => new URL(url).hostname);
 
 export default defineConfig({
-  server: { allowedHosts },
+  server: {
+    allowedHosts,
+    port: Number(process.env.PORT) || 5173,
+    strictPort: Boolean(process.env.PORT),
+  },
 });

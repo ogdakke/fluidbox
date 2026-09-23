@@ -35,7 +35,7 @@ import { registerLightboxElements } from "@ogdakke/fluidbox";
 await registerLightboxElements();
 ```
 
-The package also exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue`, and `/angular`.
+The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue`, and `/angular`. Install only `@ogdakke/fluidbox` alongside the framework your app already uses. The framework packages are optional peers, and each binding has its own export. See [framework bindings](docs/BINDINGS.md) for working examples.
 
 ## Indexed galleries
 
@@ -71,15 +71,22 @@ gallery.open(0);
 
 ## Development
 
-This repository uses Bun. The package lives in `packages/lightbox`, and `examples/vanilla` is a local playground.
+This repository uses Bun. The package lives in `packages/lightbox`. The vanilla and framework examples use its built exports.
 
 ```sh
 bun install
-bun run dev
+bun run build
+bun run dev                 # builds the package, then watches package code and runs Vite
 bun run build:example
+bun run build:frameworks
 bun run test
+bun run test:ssr
+bun run test:bundle
+bun run test:browser
 bun run lint:all
 bun run format:check
 ```
 
-The playground includes a small gallery and an indexed gallery with 100,000 items. See [browser testing](docs/TESTING.md) for test commands and visual baselines.
+The vanilla playground includes a small gallery and an indexed gallery with 100,000 items. Run `bun run --cwd examples/frameworks dev` to open the React, Solid, Vue, and Angular pages. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
+
+Portfolio declares `"@ogdakke/fluidbox": "file:../lightbox/packages/lightbox"`, so a fresh checkout works after building this package and running `bun install` in `portfolio-v4`. For a live directory link during development, run `bun link` in `packages/lightbox`, then `bun link @ogdakke/fluidbox` in `portfolio-v4`. Reapply the consumer link after reinstalling dependencies.

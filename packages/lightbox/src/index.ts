@@ -1,11 +1,8 @@
-/** Register the browser custom elements after hydration or on a client-only page. */
-export async function registerLightboxElements(): Promise<void> {
-  if (typeof customElements === "undefined") return;
-  await import("./elements");
-}
+export { registerLightboxElements } from "./register";
 
 export type { AppLightbox } from "./lightbox";
 export type { GalleryItem } from "./gallery-strip";
 
 export type { LightboxGallerySource, LightboxSourceItem } from "./source";
 export type { AppGallery } from "./gallery";
+export { bindGallerySource } from "./binding";
