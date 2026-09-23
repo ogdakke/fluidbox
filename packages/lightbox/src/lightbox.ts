@@ -14,6 +14,7 @@ import {
   type ImageClip,
   type ThumbnailPose,
 } from "./transition-geometry";
+import { createViewerPortal, ViewerModalIsolation } from "./viewer-portal";
 import {
   backdropVisibility,
   boundDismissVelocity,
@@ -53,8 +54,7 @@ class AppLightbox extends HTMLElement {
   #dialog: HTMLDivElement | null = null;
   #backdrop: HTMLDivElement | null = null;
   #modalController: AbortController | undefined;
-  #observer: MutationObserver | undefined;
-  #inertElements = new Map<Element, boolean>();
+  #modalIsolation: ViewerModalIsolation | undefined;
   #returnFocus: HTMLElement | null = null;
   #animations: Animation[] = [];
   #phase: "closed" | "open" | "closing" = "closed";
@@ -217,28 +217,21 @@ class AppLightbox extends HTMLElement {
 
     // A body-level portal avoids transformed or clipped ancestors while staying
     // in the same style tree as authored shared elements.
-    this.#overlay = document.createElement("div");
-    this.#overlay.dataset.lightboxOverlay = "";
-    this.#overlay.innerHTML = `
-      <div data-lightbox-container>
-        <div data-lightbox-backdrop></div>
-        <div data-lightbox-dialog role="dialog" aria-modal="true"
-             aria-label="Image viewer" tabindex="-1">
-          <div data-lightbox-frame><img data-lightbox-media part="image" /></div>
-          <button type="button" data-lightbox-close aria-label="Close">&times;</button>
-          <span data-lightbox-status role="status" aria-live="polite" aria-atomic="true"></span>
-        </div>
-      </div>
-    `;
-    this.#dialog = this.#overlay.querySelector("[data-lightbox-dialog]");
-    this.#backdrop = this.#overlay.querySelector("[data-lightbox-backdrop]");
-    this.#image = this.#overlay.querySelector("[data-lightbox-media]");
+    const portal = createViewerPortal(this.ownerDocument);
+    this.#overlay = portal.overlay;
+    this.#dialog = portal.dialog;
+    this.#backdrop = portal.backdrop;
+    this.#image = portal.media;
     this.#standaloneImage = this.#image;
-    this.#status = this.#overlay.querySelector("[data-lightbox-status]");
-    this.#closeButton = this.#overlay.querySelector("[data-lightbox-close]");
+    this.#status = portal.status;
+    this.#closeButton = portal.closeButton;
     this.#closeButton!.hidden = !this.hasAttribute("close-button");
-    this.#standaloneFrame = this.#overlay.querySelector("[data-lightbox-frame]");
+    this.#standaloneFrame = portal.frame;
     this.#frame = this.#standaloneFrame;
+    this.#modalIsolation = new ViewerModalIsolation(
+      this.#overlay,
+      () => this.#transitionContent ?? null,
+    );
     this.#imageLoaded = false;
     const initialThumbnail = this.#ownThumbnail;
     this.#decodedPreviewSrc = initialThumbnail?.currentSrc || initialThumbnail?.src || "";
@@ -1071,11 +1064,9 @@ class AppLightbox extends HTMLElement {
     this.#setPresentationState("opening");
     this.#triggerElement!.setAttribute("aria-expanded", "true");
     this.#dialog!.setAttribute("aria-label", this.#contentLabel);
-    this.#isolateBackground();
+    this.#modalIsolation?.activate();
     if (!this.#preparedOverlay) this.#gallery?.mount();
     this.#preparedOverlay = false;
-    this.#observer = new MutationObserver(() => this.#isolateBackground());
-    this.#observer.observe(document.body, { childList: true });
     this.#modalController = new AbortController();
     const { signal } = this.#modalController;
     document.addEventListener("keydown", this.#onKeydown, { capture: true, signal });
@@ -1926,19 +1917,6 @@ class AppLightbox extends HTMLElement {
     this.#completeOpening();
   };
 
-  #isolateBackground() {
-    for (const element of document.body.children) {
-      if (
-        element === this.#overlay ||
-        element === this.#transitionContent ||
-        this.#inertElements.has(element)
-      )
-        continue;
-      this.#inertElements.set(element, element.hasAttribute("inert"));
-      element.setAttribute("inert", "");
-    }
-  }
-
   #cancelAnimations() {
     for (const animation of this.#animations) animation.cancel();
     this.#animations = [];
@@ -2486,7 +2464,7 @@ class AppLightbox extends HTMLElement {
     this.#preparedOverlay = false;
     this.#preparedOpening = false;
     this.#modalController?.abort();
-    this.#observer?.disconnect();
+    this.#modalIsolation?.deactivate();
     this.#overlay?.remove();
     if (this.#flightUsesLiveContent && this.#image && this.#standaloneFrame) {
       this.#standaloneFrame.append(this.#image);
@@ -2523,10 +2501,6 @@ class AppLightbox extends HTMLElement {
         this.#image.style.removeProperty(property);
       }
     }
-    for (const [element, wasInert] of this.#inertElements) {
-      element.toggleAttribute("inert", wasInert);
-    }
-    this.#inertElements.clear();
     this.#phase = "closed";
     this.#sessionSource = null;
     this.#setPresentationState("closed");

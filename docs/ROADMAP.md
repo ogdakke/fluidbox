@@ -31,8 +31,10 @@ Work has started in bounded, reviewed parts. Stage 0 is still incomplete.
 - Added the internal plain TypeScript viewer session behind a motion-driver boundary. Unit tests now
   cover synchronous validation, immutable state, event order, prevention, command sharing and
   supersession, external abort, source reconciliation, host-reveal cancellation, overlay ownership,
-  runtime failure, and teardown. Connecting the compatibility element and then the public factory
-  to this session remains the next extraction work.
+  runtime failure, and teardown.
+- Extracted body-portal construction and modal background isolation into a runtime-owned module;
+  the compatibility element now consumes that shell. Connecting its command and motion flow to the
+  viewer session, then exposing the public factory, remains the next extraction work.
 - Added deterministic open/close interruption geometry checks, focus/inert restoration checks, and trace/video evidence in `tests/browser/motion.spec.ts`. This protects pose continuity at command handoff, not gesture velocity or compositor performance.
 - Fixed indexed-source opening preparation to resolve mounted thumbnails before the gallery becomes active; added opening-pose and missing-origin scale/fade regressions.
 - Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.
