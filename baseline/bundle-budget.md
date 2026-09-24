@@ -6,13 +6,13 @@ The check builds six small consumer entries with tsdown as minified browser ESM 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | CSS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | -------: | -----------------------: |
-| Root           |        17,101 B |           38,690 B |  3,754 B |                 42,444 B |
-| Elements       |        22,727 B |           22,727 B |  3,754 B |                 26,481 B |
-| React          |        20,013 B |           23,780 B |  3,754 B |                 27,534 B |
-| Solid          |           260 B |           22,987 B |  3,754 B |                 26,741 B |
-| Vue            |           383 B |           23,110 B |  3,754 B |                 26,864 B |
-| Angular        |           249 B |           22,976 B |  3,754 B |                 26,730 B |
+| Root           |        17,101 B |           38,997 B |  3,754 B |                 42,751 B |
+| Elements       |        23,007 B |           23,007 B |  3,754 B |                 26,761 B |
+| React          |        20,156 B |           23,923 B |  3,754 B |                 27,677 B |
+| Solid          |           260 B |           23,267 B |  3,754 B |                 27,021 B |
+| Vue            |           382 B |           23,389 B |  3,754 B |                 27,143 B |
+| Angular        |           250 B |           23,257 B |  3,754 B |                 27,011 B |
 
-The root includes `createLightbox` and its bounded native gallery strip. Its limits are 17,120 B for initial JS, 38,710 B for activated JS, and 42,470 B with CSS. React limits are 20,030 B, 23,800 B, and 27,550 B respectively. The 2026-09-24 increases record the decoded-origin cache, deferred full-image loading, finite interrupted-pose guard, and framework-independent filmstrip arbitration. Elements retain a 25,000 B initial limit. Solid, Vue, and Angular retain 1,500 B initial limits. All other activation limits remain 24,500 B without CSS and 28,500 B with CSS. The CSS limit remains 5,000 B.
+The root includes `createLightbox` and its bounded native gallery strip. Its limits are 17,130 B for initial JS, 39,020 B for activated JS, and 42,780 B with CSS. React limits are 20,180 B, 23,950 B, and 27,700 B respectively. The 2026-09-24 increases record the decoded-origin cache, deferred full-image loading, finite interrupted-pose guard, and the complete filmstrip arbitration surface now shared by React and the custom-element adapter. Elements retain a 25,000 B initial limit. Solid, Vue, and Angular retain 1,500 B initial limits. All other activation limits remain 24,500 B without CSS and 28,500 B with CSS. The CSS limit remains 5,000 B.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

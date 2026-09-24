@@ -49,10 +49,10 @@ second full-image transition while the filmstrip continues under native momentum
 | Abort thumbnail loads when an item leaves the window                             | `filmstrip-thumbnail.ts` and React item cleanup           | Migrated                                                                                                                          |
 | Derive `/media/*-160w.webp` by filename convention                               | Source metadata                                           | Intentionally removed. Applications declare thumbnail candidates; the runtime does not rewrite arbitrary URLs.                    |
 
-React now renders items into the window reported by `FilmstripRuntime`; touch, wheel, commanded
-centering, resize, provisional selection, and settlement no longer live in `react.ts`. The legacy
-custom-element `FilmstripSession` still has its older copy of those rules and should delegate to the
-same runtime before the element adapter is considered thin.
+React and the compatibility element now render items into the window reported by
+`FilmstripRuntime`; touch, wheel, commanded centering, resize, provisional selection, and settlement
+live in one runtime. `FilmstripSession` retains only element DOM, thumbnail loading, selection
+painting, and the legacy `/media/*-160w.webp` URL convention.
 
 ## Viewer lifecycle and portal
 

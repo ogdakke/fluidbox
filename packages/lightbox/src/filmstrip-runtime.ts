@@ -1,4 +1,4 @@
-interface FilmstripLayout {
+export interface FilmstripLayout {
   readonly size: number;
   readonly step: number;
   readonly visibleCount: number;
@@ -17,7 +17,8 @@ interface FilmstripRuntimeOptions {
   readonly count: number;
   readonly index: number;
   readonly onSelect: (index: number, settled: boolean) => void;
-  readonly onWindowChange: (center: number, layout: FilmstripLayout) => void;
+  readonly onWindowChange: (center: number, layout: FilmstripLayout, force: boolean) => void;
+  readonly deferActivation?: boolean;
 }
 
 type ScrollMode = "idle" | "commanded" | "user";
@@ -40,6 +41,7 @@ export class FilmstripRuntime {
   #commandedLeft: number | null = null;
   #touching = false;
   #initializing = true;
+  readonly #deferActivation: boolean;
   #scrollFrame = 0;
   #mountFrame = 0;
   #readyFrame = 0;
@@ -52,6 +54,7 @@ export class FilmstripRuntime {
     this.#index = options.index;
     this.#onSelect = options.onSelect;
     this.#onWindowChange = options.onWindowChange;
+    this.#deferActivation = options.deferActivation ?? false;
     const { signal } = this.#controller;
     this.#scroller.addEventListener("scroll", this.#onScroll, { passive: true, signal });
     this.#scroller.addEventListener("scrollend", this.#onSettled, { signal });
@@ -86,29 +89,50 @@ export class FilmstripRuntime {
     this.#observer.observe(this.#scroller);
     this.#mountFrame = requestAnimationFrame(() => {
       this.#readGeometry();
-      this.#publishWindow(this.#index);
+      this.#publishWindow(this.#index, true);
       this.#center(this.#index);
-      this.#readyFrame = requestAnimationFrame(() => {
-        this.#initializing = false;
-        this.#mode = "idle";
-        this.#readyFrame = 0;
-      });
+      if (!this.#deferActivation) this.#queueActivation();
       this.#mountFrame = 0;
     });
   }
 
-  sync(index: number) {
-    if (index === this.#index) return;
+  activate(index = this.#index) {
+    const previous = this.#index;
     this.#index = index;
     this.#publishWindow(index);
-    if (!this.#initializing && this.#mode !== "user") this.#center(index);
+    if (index !== previous || this.#initializing) this.#center(index);
+    this.#queueActivation();
   }
 
-  choose(index: number) {
+  sync(index: number, center = true, smooth = false) {
+    if ((this.#initializing && this.#deferActivation) || index === this.#index) return false;
+    this.#index = index;
+    this.#publishWindow(index);
+    if (!this.#initializing && center && this.#mode !== "user") this.#center(index, smooth);
+    return true;
+  }
+
+  choose(index: number, settled = true) {
     this.#index = index;
     this.#publishWindow(index);
     this.#center(index);
-    this.#onSelect(index, true);
+    this.#onSelect(index, settled);
+  }
+
+  get controlling() {
+    return this.#mode === "user";
+  }
+
+  settle(index: number) {
+    if (this.#initializing) return false;
+    this.#index = index;
+    this.#publishWindow(index);
+    return true;
+  }
+
+  scrollTo(index: number, smooth: boolean) {
+    this.#publishWindow(index);
+    this.#center(index, smooth);
   }
 
   destroy() {
@@ -129,15 +153,28 @@ export class FilmstripRuntime {
     this.#padding = parseFloat(scrollerStyle.paddingLeft) || 0;
   }
 
-  #publishWindow(center: number) {
-    this.#onWindowChange(center, {
-      size: this.#size,
-      step: this.#step,
-      visibleCount: Math.ceil(this.#scroller.clientWidth / this.#step) * 2 + 9,
+  #publishWindow(center: number, force = false) {
+    this.#onWindowChange(
+      center,
+      {
+        size: this.#size,
+        step: this.#step,
+        visibleCount: Math.ceil(this.#scroller.clientWidth / this.#step) * 2 + 9,
+      },
+      force,
+    );
+  }
+
+  #queueActivation() {
+    cancelAnimationFrame(this.#readyFrame);
+    this.#readyFrame = requestAnimationFrame(() => {
+      this.#initializing = false;
+      this.#mode = "idle";
+      this.#readyFrame = 0;
     });
   }
 
-  #center(index: number) {
+  #center(index: number, smooth = false) {
     const left =
       this.#padding + index * this.#step + this.#size / 2 - this.#scroller.clientWidth / 2;
     this.#commandedLeft = Math.max(
@@ -145,7 +182,10 @@ export class FilmstripRuntime {
       Math.min(left, this.#scroller.scrollWidth - this.#scroller.clientWidth),
     );
     this.#mode = "commanded";
-    this.#scroller.scrollTo({ left: this.#commandedLeft, behavior: "instant" });
+    this.#scroller.scrollTo({
+      left: this.#commandedLeft,
+      behavior: smooth ? "smooth" : "instant",
+    });
   }
 
   #nearestIndex() {
@@ -169,7 +209,10 @@ export class FilmstripRuntime {
     const previousStep = this.#step;
     const previousWidth = this.#viewportWidth;
     this.#readGeometry();
-    this.#publishWindow(this.#index);
+    this.#publishWindow(
+      this.#index,
+      previousStep !== this.#step || previousWidth !== this.#viewportWidth,
+    );
     if (
       (previousStep !== this.#step || previousWidth !== this.#viewportWidth) &&
       this.#mode !== "user"
@@ -179,6 +222,7 @@ export class FilmstripRuntime {
   };
 
   #onScroll = () => {
+    this.#publishWindow(this.#nearestIndex());
     if (this.#touching || this.#mode === "idle") this.#takeControl();
     if (!this.#scrollFrame) {
       this.#scrollFrame = requestAnimationFrame(() => {
