@@ -705,6 +705,40 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
   await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
 
   await media.dblclick({ position: { x: 260, y: 260 } });
+  const handoff = await media.evaluate(async (element) => {
+    const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    let animation: Animation | undefined;
+    for (let frame = 0; frame < 10 && !animation; frame += 1) {
+      animation = element.getAnimations().find((candidate) => {
+        const duration = Number(candidate.effect?.getComputedTiming().duration);
+        return Number.isFinite(duration) && duration > 0;
+      });
+      if (!animation) await nextFrame();
+    }
+    if (!animation) return null;
+    animation.pause();
+    const duration = Number(animation.effect?.getComputedTiming().duration);
+    animation.currentTime = Math.max(0, duration - 1);
+    await nextFrame();
+    const before = element.getBoundingClientRect();
+    animation.finish();
+    await Promise.resolve();
+    await Promise.resolve();
+    await nextFrame();
+    const moved = document.querySelector<HTMLElement>(
+      "[data-lightbox-zoom-viewport] [data-lightbox-media]",
+    );
+    const after = moved?.getBoundingClientRect();
+    return {
+      before: { x: before.x, y: before.y, width: before.width, height: before.height },
+      after: after ? { x: after.x, y: after.y, width: after.width, height: after.height } : null,
+    };
+  });
+  expect(handoff).not.toBeNull();
+  expect(handoff?.after).not.toBeNull();
+  for (const property of ["x", "y", "width", "height"] as const) {
+    expect(Math.abs(handoff!.before[property] - handoff!.after![property])).toBeLessThan(3);
+  }
   await expect(dialog).toHaveAttribute("data-zoomed", "");
   const zoomViewport = page.locator("[data-lightbox-zoom-viewport]");
   await expect(zoomViewport).toHaveCount(1);
