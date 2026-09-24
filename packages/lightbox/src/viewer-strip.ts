@@ -35,7 +35,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   readonly #slides = new Map<number, ViewerSlide>();
   readonly #observer: ResizeObserver;
   readonly #controller = new AbortController();
-  readonly #onSelect: (index: number) => void;
+  readonly #onSelect: (index: number, settled: boolean) => void;
   readonly #renderers: Readonly<Record<string, LightboxRenderer<TItem>>>;
   #source: LightboxSource<TItem>;
   #index = 0;
@@ -48,6 +48,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   #instantTarget: number | null = null;
   #frozen = false;
   #frozenLeft = 0;
+  #userOwned = false;
+  #userScrolled = false;
+  #touching = false;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #selection:
     | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
@@ -56,7 +59,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   constructor(
     ownerDocument: Document,
     source: LightboxSource<TItem>,
-    onSelect: (index: number) => void,
+    onSelect: (index: number, settled: boolean) => void,
     renderers: Readonly<Record<string, LightboxRenderer<TItem>>> = {},
   ) {
     this.#ownerDocument = ownerDocument;
@@ -70,6 +73,20 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     const { signal } = this.#controller;
     this.element.addEventListener("scroll", this.#onScroll, { passive: true, signal });
     this.element.addEventListener("scrollend", this.#settled, { signal });
+    for (const type of ["pointerdown", "touchstart", "wheel"] as const) {
+      this.element.addEventListener(type, this.#takeControl, {
+        capture: true,
+        passive: true,
+        signal,
+      });
+    }
+    for (const type of ["pointerup", "pointercancel", "touchend", "touchcancel"] as const) {
+      this.element.addEventListener(type, this.#releaseControl, {
+        capture: true,
+        passive: true,
+        signal,
+      });
+    }
     this.#observer = new ResizeObserver(([entry]) => {
       if (!entry || entry.contentRect.width === this.#width) return;
       this.#width = entry.contentRect.width;
@@ -359,7 +376,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#instantTarget = index;
     this.element.style.scrollSnapType = "none";
     this.#align(index);
-    this.#sync(index);
+    this.#sync(index, false);
     cancelAnimationFrame(this.#instantFrame);
     this.#instantFrame = requestAnimationFrame(this.#alignInstant);
   }
@@ -383,7 +400,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.element.scrollTo({ left: (index - this.#base) * this.#width, behavior: "instant" });
   }
 
-  #sync(forcedIndex?: number) {
+  #sync(forcedIndex?: number, notify = true) {
     if (!this.#source.count) return;
     const left = this.#frozen ? this.#frozenLeft : this.element.scrollLeft;
     const index =
@@ -402,7 +419,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     const activeRetry = this.active.error.querySelector("button");
     if (activeRetry) activeRetry.tabIndex = 0;
     this.#loadWindow();
-    this.#onSelect(index);
+    if (notify) this.#onSelect(index, false);
   }
 
   #loadWindow() {
@@ -550,15 +567,19 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       this.element.style.removeProperty("scroll-snap-type");
     }
     if (this.#rebasing || !this.#width) return;
-    this.#sync();
+    if (this.#userOwned) this.#userScrolled = true;
+    this.#sync(undefined, this.#userOwned);
     clearTimeout(this.#settleTimer);
-    this.#settleTimer = setTimeout(this.#settled, 180);
+    if (!this.#touching) this.#settleTimer = setTimeout(this.#settled, 180);
   };
 
   #settled = () => {
-    if (this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
+    if (this.#touching || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
     clearTimeout(this.#settleTimer);
-    this.#sync();
+    this.#sync(undefined, this.#userOwned);
+    if (this.#userOwned) this.#onSelect(this.#index, true);
+    this.#userOwned = false;
+    this.#userScrolled = false;
     if (this.#selection?.index === this.#index) this.#resolveSelection();
     if (this.#index - this.#base < 8 || this.#index - this.#base >= this.#slides.size - 8) {
       this.#renderWindow(this.#index, this.#index);
@@ -571,4 +592,20 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#selection.resolve();
     this.#selection = undefined;
   }
+
+  #takeControl = (event: Event) => {
+    this.#userOwned = true;
+    this.#userScrolled = false;
+    this.#touching = event.type === "pointerdown" || event.type === "touchstart";
+  };
+
+  #releaseControl = () => {
+    this.#touching = false;
+    if (!this.#userScrolled) {
+      this.#userOwned = false;
+      return;
+    }
+    clearTimeout(this.#settleTimer);
+    this.#settleTimer = setTimeout(this.#settled, 180);
+  };
 }

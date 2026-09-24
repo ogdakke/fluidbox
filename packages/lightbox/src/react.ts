@@ -504,7 +504,7 @@ function Filmstrip<TItem extends LightboxItem>({
   const [visibleCount, setVisibleCount] = useState(31);
   const [filmstripGeometry, setFilmstripGeometry] = useState({ size: 52, step: 57 });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     const element = scroller?.parentElement;
     if (!scroller || !element) return;

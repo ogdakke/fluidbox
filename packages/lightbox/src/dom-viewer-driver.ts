@@ -32,6 +32,7 @@ import type {
   ViewerSessionDriver,
   ViewerSessionMotionContext,
 } from "./viewer-session";
+import { viewerSelectionCommandOptions } from "./viewer-session";
 import {
   createViewerPortal,
   ViewerModalIsolation,
@@ -295,10 +296,13 @@ export class DomViewerDriver<
     this.#strip = new ViewerStrip(
       this.#portal.overlay.ownerDocument,
       source,
-      (index) => {
+      (index, settled) => {
         const controller = this.#controller;
-        if (controller?.state.status === "open" && controller.state.requestedIndex !== index) {
-          void controller.goTo({ index }, { reason: "pointer" });
+        if (
+          controller?.state.status === "open" &&
+          (controller.state.requestedIndex !== index || settled)
+        ) {
+          void controller.goTo({ index }, viewerSelectionCommandOptions("pointer", settled));
         }
       },
       this.#renderers,
@@ -1384,6 +1388,7 @@ export class DomViewerDriver<
       event.pointerType !== "touch" ||
       !event.isPrimary ||
       this.#controller?.state.status !== "open" ||
+      this.#zoom?.zoomed ||
       this.#eventUsesNativeInteraction(event)
     ) {
       return;
@@ -1400,6 +1405,10 @@ export class DomViewerDriver<
   #onPointerMove = (event: PointerEvent) => {
     const pointer = this.#pointer;
     if (!pointer || event.pointerId !== pointer.id) return;
+    if (this.#zoom?.zoomed) {
+      this.#pointer = undefined;
+      return;
+    }
     const x = event.clientX - pointer.x;
     const y = event.clientY - pointer.y;
     if (Math.max(Math.abs(x), Math.abs(y)) < touchAxisThreshold) return;
@@ -1433,6 +1442,7 @@ export class DomViewerDriver<
     }
     if (
       event.ctrlKey ||
+      this.#zoom?.zoomed ||
       this.#controller?.state.status !== "open" ||
       Math.abs(event.deltaY) <= Math.abs(event.deltaX) * 1.3 ||
       this.#eventUsesNativeInteraction(event, false) ||

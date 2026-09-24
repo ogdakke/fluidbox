@@ -309,8 +309,14 @@ test("plain runtime does not take native horizontal swipe ownership", async ({ p
     const element = scroller as HTMLElement;
     const width = element.clientWidth;
     element.style.scrollSnapType = "none";
+    const start = new Event("touchstart", { bubbles: true });
+    Object.defineProperty(start, "touches", { value: [{}] });
+    element.dispatchEvent(start);
     element.scrollLeft = width * 0.62;
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const end = new Event("touchend", { bubbles: true });
+    Object.defineProperty(end, "touches", { value: [] });
+    element.dispatchEvent(end);
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     return {
       position: element.scrollLeft / width,
@@ -707,6 +713,35 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
     return new DOMMatrix(transform === "none" ? undefined : transform).a;
   });
   expect(scale).toBeGreaterThan(1.5);
+
+  const zoomedMedia = zoomViewport.locator("[data-lightbox-media]");
+  const bounds = await zoomedMedia.boundingBox();
+  expect(bounds).not.toBeNull();
+  const x = bounds!.x + bounds!.width / 2;
+  const y = bounds!.y + bounds!.height / 2;
+  await zoomedMedia.dispatchEvent("pointerdown", {
+    pointerId: 19,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x,
+    clientY: y,
+  });
+  await zoomedMedia.dispatchEvent("pointermove", {
+    pointerId: 19,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: x,
+    clientY: y + 140,
+  });
+  const wheelPrevented = await zoomedMedia.evaluate((element) => {
+    const event = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 160 });
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(wheelPrevented).toBe(false);
+  await expect(dialog).not.toHaveAttribute("data-dragging", "");
+  await expect(dialog).not.toHaveAttribute("data-dismissing", "");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
 
   await page.keyboard.press("0");
   await expect(dialog).not.toHaveAttribute("data-zoomed", "");

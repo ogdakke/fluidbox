@@ -7,7 +7,7 @@ export interface FilmstripLayout {
 export function filmstripCommandOptions(settled: boolean) {
   return {
     reason: "filmstrip" as const,
-    __fluidboxFilmstripSettled: settled,
+    __fluidboxSettled: settled,
   };
 }
 
@@ -223,7 +223,11 @@ export class FilmstripRuntime {
 
   #onScroll = () => {
     this.#publishWindow(this.#nearestIndex());
-    if (this.#touching || this.#mode === "idle") this.#takeControl();
+    // A scroll event is not proof of user intent. WebKit can deliver delayed
+    // events for an earlier instant/programmatic scroll after activation. If
+    // those events take control here, the passing thumbnail becomes a new
+    // selection and starts a center -> select -> center feedback loop.
+    // Touch, pointer, wheel, and keyboard input claim ownership explicitly.
     if (!this.#scrollFrame) {
       this.#scrollFrame = requestAnimationFrame(() => {
         this.#scrollFrame = 0;

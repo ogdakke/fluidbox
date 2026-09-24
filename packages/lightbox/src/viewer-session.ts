@@ -67,9 +67,12 @@ const completed = (changed: boolean): LightboxCommandResult => ({ status: "compl
 const prevented = (): LightboxCommandResult => ({ status: "prevented" });
 const aborted = (): LightboxCommandResult => ({ status: "aborted" });
 
-function isSettledFilmstripCommand(options: LightboxCommandOptions) {
-  return (options as LightboxCommandOptions & { __fluidboxFilmstripSettled?: boolean })
-    .__fluidboxFilmstripSettled;
+export function viewerSelectionCommandOptions(reason: LightboxCommandReason, settled: boolean) {
+  return { reason, __fluidboxSettled: settled };
+}
+
+function selectionCommandSettled(options: LightboxCommandOptions) {
+  return (options as LightboxCommandOptions & { __fluidboxSettled?: boolean }).__fluidboxSettled;
 }
 
 function stateFor<TItem extends LightboxItem>(
@@ -299,7 +302,7 @@ export class ViewerSession<
     const key = `${this.#state.status === "open" ? "select" : "open"}:${item.id}`;
     const repeated = this.#samePending(key, options.signal);
     if (repeated) {
-      if (reason === "filmstrip" && isSettledFilmstripCommand(options)) {
+      if (selectionCommandSettled(options)) {
         return repeated.then((result) => {
           if (result.status === "completed" && this.#state.activeId === item.id) {
             this.#requestReveal(item.id, index, "selection");
@@ -320,7 +323,7 @@ export class ViewerSession<
     const enteringOpening = this.#state.status !== "opening";
     const changed = this.#state.activeIndex !== index || opening;
     if (!changed && this.#state.status === "open") {
-      if (reason === "filmstrip" && isSettledFilmstripCommand(options)) {
+      if (selectionCommandSettled(options)) {
         this.#requestReveal(item.id, index, "selection");
       }
       return Promise.resolve(completed(false));
@@ -350,7 +353,7 @@ export class ViewerSession<
         this.#publish("open", index, index);
         this.#emit({ type: "status-change", status: "open" });
       }
-      if (reason !== "filmstrip" || isSettledFilmstripCommand(options)) {
+      if (selectionCommandSettled(options) !== false) {
         this.#requestReveal(item.id, index, opening ? "open" : "selection");
       }
       this.#emitSelection("selection-settle", index, reason);
