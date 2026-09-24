@@ -119,10 +119,14 @@ test("filmstrip selects a distant item", async ({ page }) => {
   );
 });
 
-test("opening frame is visually stable", async ({ page }) => {
+test("settled gallery frame matches its visual baseline", async ({ page }) => {
   await page.goto("/harness.html");
   await page.locator("app-lightbox").first().click();
-  await expect(page.locator("[data-lightbox-dialog]")).toBeVisible();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await page
+    .locator('[data-lightbox-slide][aria-hidden="false"] img:not([data-lightbox-content-preview])')
+    .evaluate((image: HTMLImageElement) => image.decode());
   await expect(page).toHaveScreenshot("opened-gallery.png", {
     animations: "disabled",
     caret: "hide",
@@ -133,6 +137,9 @@ test("opening frame is visually stable", async ({ page }) => {
     "aria-label",
     "Item 2 of 3",
   );
+  await page
+    .locator('[data-lightbox-slide][aria-hidden="false"] img:not([data-lightbox-content-preview])')
+    .evaluate((image: HTMLImageElement) => image.decode());
   await expect(page).toHaveScreenshot("next-gallery.png", {
     animations: "disabled",
     caret: "hide",
