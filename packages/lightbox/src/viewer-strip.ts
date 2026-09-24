@@ -5,6 +5,7 @@ import type {
   LightboxRenderer,
   LightboxSource,
 } from "./public-api";
+import { observeDecodedPreview } from "./decoded-preview";
 
 const WINDOW_SIZE = 31;
 const LOAD_RADIUS = 1;
@@ -17,6 +18,7 @@ interface ViewerSlide {
   readonly error: HTMLDivElement;
   loaded: boolean;
   opening: boolean;
+  deferFull: boolean;
   decoded: boolean;
   controller?: AbortController;
   dispose?: LightboxDispose;
@@ -268,6 +270,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       error,
       loaded: false,
       opening: false,
+      deferFull: false,
       decoded: false,
     } satisfies ViewerSlide;
   }
@@ -277,7 +280,13 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     const item = this.#source.getItem(index);
     if (!slide || item.media.type !== "image" || !(slide.image instanceof HTMLImageElement)) return;
     slide.opening = true;
-    const preview = origin?.currentSrc || origin?.src || item.preview?.src || item.thumbnail?.src;
+    const decodedPreview = origin ? observeDecodedPreview(origin) : null;
+    const preview =
+      decodedPreview ||
+      item.preview?.src ||
+      item.thumbnail?.src ||
+      origin?.currentSrc ||
+      origin?.src;
     if (preview) {
       for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
       slide.image.removeAttribute("srcset");
@@ -288,6 +297,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.controller = undefined;
     slide.loaded = false;
     slide.decoded = false;
+    slide.deferFull = decodedPreview !== null;
     this.#load(index, slide);
   }
 
@@ -295,7 +305,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     const slide = this.#slides.get(index);
     if (!slide) return;
     slide.opening = false;
+    slide.deferFull = false;
     if (slide.decoded) this.#applyImage(index, slide);
+    else this.#load(index, slide);
   }
 
   #renderWindow(anchor: number, scrollIndex: number) {
@@ -389,6 +401,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   }
 
   #load(index: number, slide: ViewerSlide) {
+    if (slide.deferFull) return;
     if (slide.loaded) {
       if (slide.image instanceof HTMLImageElement)
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
@@ -457,6 +470,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.dispose?.();
     slide.dispose = undefined;
     slide.opening = false;
+    slide.deferFull = false;
     slide.decoded = false;
     slide.error.hidden = true;
     for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();

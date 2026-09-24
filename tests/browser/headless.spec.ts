@@ -384,6 +384,67 @@ test("plain runtime keeps the preview painted until the full image can replace i
   await expect(media).toHaveAttribute("src", "/photo-square.svg");
 });
 
+test("plain runtime retains the last decoded origin when its next source is pending", async ({
+  page,
+}) => {
+  let fullRequests = 0;
+  await page.route("**/pending-origin.svg", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await route.abort();
+  });
+  await page.route("**/deferred-full.svg", async (route) => {
+    fullRequests += 1;
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="green"/></svg>',
+    });
+  });
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 1,
+      getItem() {
+        return {
+          id: "one",
+          media: {
+            type: "image",
+            src: "/deferred-full.svg",
+            alt: "Deferred full image",
+            width: 800,
+            height: 800,
+          },
+        };
+      },
+      getIndex(id) {
+        return id === "one" ? 0 : null;
+      },
+    });
+    const trigger = document.querySelector<HTMLElement>('[data-photo-id="one"]')!;
+    const thumbnail = trigger.querySelector<HTMLImageElement>("img")!;
+    await thumbnail.decode();
+    window.headlessViewer.registerOrigin("one", { trigger, visual: thumbnail, thumbnail });
+    thumbnail.src = "/pending-origin.svg";
+    void window.headlessViewer.open({ id: "one" });
+  });
+
+  const activeMedia = page.locator(
+    '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+  );
+  await expect(activeMedia).toHaveAttribute("src", /photo-square\.svg/);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "opening",
+  );
+  expect(fullRequests).toBe(0);
+  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await expect.poll(() => fullRequests).toBe(1);
+  await expect(activeMedia).toHaveAttribute("src", "/deferred-full.svg");
+});
+
 test("plain runtime keeps the preview available while a failed full image is retried", async ({
   page,
 }) => {

@@ -4,6 +4,7 @@ import type {
   LightboxOrigin,
   LightboxOriginAdapter,
 } from "./public-api";
+import { observeDecodedPreview } from "./decoded-preview";
 
 interface OriginRegistration {
   readonly origin: LightboxOrigin;
@@ -26,7 +27,9 @@ export class OriginRegistry {
     if (registered) return registered.origin;
 
     try {
-      return this.#adapter?.getOrigin(id) ?? null;
+      const origin = this.#adapter?.getOrigin(id) ?? null;
+      if (origin?.thumbnail) observeDecodedPreview(origin.thumbnail);
+      return origin;
     } catch {
       return null;
     }
@@ -34,6 +37,7 @@ export class OriginRegistry {
 
   register(id: LightboxItemId, origin: LightboxOrigin): LightboxDispose {
     const token = {};
+    if (origin.thumbnail) observeDecodedPreview(origin.thumbnail);
     this.#registrations.set(id, { origin, token });
     if (id === this.#hiddenId) this.#hideOriginThumbnail(origin);
     let disposed = false;
