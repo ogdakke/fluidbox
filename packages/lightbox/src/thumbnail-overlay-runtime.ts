@@ -153,6 +153,27 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     return Number.isFinite(value) ? value : fallback;
   }
 
+  prepareControlsReveal(delay: number) {
+    const target = this.#active?.target;
+    const actions = target?.querySelector<HTMLElement>("[data-lightbox-video-actions]");
+    if (!target || !actions) return undefined;
+    target.style.setProperty("--lightbox-controls-reveal-delay", `${delay}ms`);
+    target.dataset.lightboxControlsRevealing = "";
+    return actions
+      .getAnimations()
+      .find(
+        (animation) =>
+          (animation as CSSAnimation).animationName === "lightbox-video-actions-reveal",
+      );
+  }
+
+  finishControlsReveal() {
+    const target = this.#active?.target;
+    if (!target) return;
+    delete target.dataset.lightboxControlsRevealing;
+    target.style.removeProperty("--lightbox-controls-reveal-delay");
+  }
+
   retarget(animations: readonly Animation[], frameMotion: Keyframe[]) {
     const target = this.#active?.target;
     if (!target) return;
@@ -239,6 +260,8 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
   #disposeActive() {
     const active = this.#active;
     if (!active) return;
+    delete active.target?.dataset.lightboxControlsRevealing;
+    active.target?.style.removeProperty("--lightbox-controls-reveal-delay");
     active.controller?.abort();
     active.dispose?.();
     active.target?.remove();

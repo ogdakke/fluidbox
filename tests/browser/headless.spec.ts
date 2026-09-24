@@ -750,7 +750,9 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
           const badge = document.createElement("strong");
           badge.dataset.testTravelingOverlay = "";
           badge.textContent = `Traveling ${item.id}`;
-          target.append(badge);
+          const actions = document.createElement("span");
+          actions.dataset.lightboxVideoActions = "";
+          target.append(badge, actions);
           signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
             once: true,
           });
@@ -779,6 +781,13 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
       travelProgress: Number(getComputedStyle(travel).getPropertyValue("--lightbox-progress")),
       travelTransform: getComputedStyle(travel).transform,
       text: travel.textContent,
+      controlsDelay: getComputedStyle(travel).getPropertyValue("--lightbox-controls-reveal-delay"),
+      hasControlsReveal: document
+        .getAnimations()
+        .some(
+          (animation) =>
+            (animation as CSSAnimation).animationName === "lightbox-video-actions-reveal",
+        ),
     };
   });
   expect(opening.hostPhase).toBe("opening");
@@ -788,8 +797,31 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
   expect(opening.travelProgress).toBeCloseTo(opening.hostProgress, 2);
   expect(opening.travelTransform).not.toBe("none");
   expect(opening.text).toBe("Traveling one");
+  expect(opening.controlsDelay).toMatch(/ms$/);
+  expect(opening.hasControlsReveal).toBe(true);
 
-  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
+  await page.evaluate(() =>
+    document
+      .getAnimations()
+      .filter(
+        (animation) =>
+          (animation as CSSAnimation).animationName !== "lightbox-video-actions-reveal",
+      )
+      .forEach((animation) => animation.finish()),
+  );
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "opening",
+  );
+  await page.evaluate(() =>
+    document
+      .getAnimations()
+      .find(
+        (animation) =>
+          (animation as CSSAnimation).animationName === "lightbox-video-actions-reveal",
+      )
+      ?.finish(),
+  );
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",

@@ -430,6 +430,10 @@ export class DomViewerDriver<
       "opening",
       overlayFrom,
     );
+    const controlsReady = motion.backdrop.find((keyframe) => Number(keyframe.opacity) >= 0.85);
+    const controlsReveal = this.#thumbnailOverlays.prepareControlsReveal(
+      Number(controlsReady?.offset ?? 0.7) * motion.duration,
+    );
     applyImageTransitionPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = interruptedPose?.frameOpacity ?? (!from ? "0" : "1");
     this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
@@ -449,11 +453,15 @@ export class DomViewerDriver<
     delete this.#portal.overlay.dataset.lightboxPrepared;
     await this.#play(animations, context.signal);
     if (context.signal.aborted) return;
-    await this.#waitForFilmstripReveal(context.signal);
+    await Promise.all([
+      this.#waitForFilmstripReveal(context.signal),
+      this.#waitForAnimation(controlsReveal, context.signal),
+    ]);
     if (context.signal.aborted) return;
     this.#setState("open");
     this.#strip?.completeOpening(context.index);
     this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
+    this.#thumbnailOverlays.finishControlsReveal();
     delete this.#portal.dialog.dataset.filmstripRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
     this.#focus();
@@ -688,6 +696,10 @@ export class DomViewerDriver<
       .find(
         (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
       );
+    await this.#waitForAnimation(animation, signal);
+  }
+
+  async #waitForAnimation(animation: Animation | undefined, signal: AbortSignal) {
     if (!animation) return;
     await new Promise<void>((resolve) => {
       const done = () => {
