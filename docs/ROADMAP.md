@@ -1,6 +1,6 @@
 # Roadmap to 1.0
 
-This is the proposed contract and order of work, not a description of APIs that already ship.
+This records the implemented beta contract, remaining migration work, and release gates.
 
 Fluidbox is a headless lightbox interaction library. Its purpose is to provide exceptionally fluid opening, closing, navigation, zoom, and media handoff across touch, trackpad, mouse, and keyboard. Applications compose their own viewer UI on the same runtime. Framework bindings must make that composition idiomatic without reimplementing interaction behavior.
 
@@ -8,36 +8,49 @@ The first public beta targets plain JavaScript, custom elements, and composed Re
 
 ## Where the project stands
 
-The package is private at `0.0.0`. It already has a body-level custom portal, animated image handoff, interrupted transitions, gestures, zoom, native gallery scrolling, a virtualized slide window and filmstrip, an indexed source for galleries with unmounted thumbnails, CSS hooks, and SSR-safe root and framework imports. Browser tests exercise Chromium, Firefox, WebKit, and device profiles. The four framework entries build and have example pages. The portfolio consumes a sibling `file:` package and keeps its own Markdown plugins and media registry.
+The package is private at `0.0.0`. The root now exports an SSR-safe `createLightbox()` runtime with
+finite indexed sources, origin registration, host reveal, source replacement, command settlement,
+thumbnail overlays, responsive images, video, iframe, custom renderers, gestures, zoom, a body
+portal, and a bounded native slide strip. The composed React parts use that runtime and do not
+register custom elements. The Photos-style example combines it with TanStack Virtual at 10,000 and
+100,000 items.
 
-The public model is still centered on custom elements. The root exports registration, `bindGallerySource`, and types; `./elements` registers `<app-gallery>`, `<app-lightbox>`, and `<app-filmstrip>`. React and Vue wrap a gallery element. Solid and Angular offer setup helpers. These integrations are not yet the intended headless composition APIs.
+Custom elements remain as a compatibility binding. Solid, Vue, and Angular still wrap that binding
+and must move to the headless runtime. Shared behavior tests also still contain custom-element
+fixtures; retain adapter-contract coverage, but move interaction assertions to the direct runtime as
+each area is migrated. The audited behavior mapping is in
+[CUSTOM_ELEMENT_PARITY.md](CUSTOM_ELEMENT_PARITY.md).
 
-Indexed sources currently require synchronous lookups and stable count and IDs for the open session. Their descriptors contain image URLs and dimensions; richer picture, video, iframe, and custom content uses the DOM/template path. The stylesheet mixes structural rules and appearance. SSR checks establish import safety, not full framework hydration correctness.
+The current source contract requires synchronous lookups, a stable count, and stable IDs for each
+revision. Media descriptors support responsive pictures, video, iframe, and custom renderer keys.
+The stylesheet exposes data attributes and CSS variables without `@scope`, but structural and
+appearance exports are not split yet.
 
-The tests establish bounded DOM size, navigation, and selected visual states. The synchronous `open()` timing gate detects gallery-size-dependent work; it does not measure first paint, decode stalls, or gesture latency. Exact DOM cleanup does not prove bounded heap, decoded-image memory, or listener cleanup. The broader matrix in [TESTING.md](TESTING.md) remains unfinished. Comparative interaction superiority and real-device release readiness still need evidence.
+Automated tests cover bounded DOM, navigation, transition interruption, crop and radius continuity,
+thumbnail hiding, virtual-host reveal, source replacement, loading failures, teardown, and desktop
+and iPhone browser profiles. They still do not establish physical iOS quality, Android quality,
+bounded decoded-image memory, or comparative performance. The matrix in [TESTING.md](TESTING.md)
+remains a release gate.
 
 ## Implementation checkpoint
 
-Work has started in bounded, reviewed parts. Stage 0 is still incomplete.
+The plain runtime and React contract spike are working. Stage 0 measurement and the remaining
+binding migration are incomplete.
 
-- Added the first headless API contract in [PUBLIC_API.md](PUBLIC_API.md), exported its source,
-  controller, renderer, origin, and overlay types, and implemented the SSR-safe `arraySource()`
-  snapshot helper. `createLightbox()` and composed framework values remain implementation work;
-  the package does not expose a non-functional stub.
+- Locked and implemented the first headless API contract in [PUBLIC_API.md](PUBLIC_API.md), including
+  `arraySource()`, `createLightbox()`, the controller, renderers, origins, overlays, and composed
+  React parts.
 - Began the runtime extraction behind the compatibility elements. Origin marker resolution,
   clipping visibility, abortable host reveal ownership, and crop/radius transition geometry now
   live in independent modules, with the existing motion and virtualized-source suites protecting
   their behavior.
-- Added the internal plain TypeScript viewer session behind a motion-driver boundary. Unit tests now
+- Added the plain TypeScript viewer session behind a motion-driver boundary. Unit tests now
   cover synchronous validation, immutable state, event order, prevention, command sharing and
   supersession, external abort, source reconciliation, host-reveal cancellation, overlay ownership,
   runtime failure, and teardown.
-- Extracted body-portal construction and modal background isolation into a runtime-owned module;
-  the compatibility element now consumes that shell. Single-active-viewer ownership is also an
-  independent token-safe coordinator, so stale close cleanup cannot release a replacement viewer.
-  An abort-aware semantic completion channel and three-command compatibility driver now bridge
-  element motion without DOM polling or adding element APIs. Connecting that bridge to the viewer
-  session, then exposing the public factory, remains the next extraction work.
+- Extracted body-portal construction, modal isolation, active-viewer ownership, origin resolution,
+  source reconciliation, and direct DOM motion into runtime modules. `createLightbox()` constructs
+  those modules without loading or registering custom elements.
 - Added the first plain DOM image driver and a plain-JavaScript composition example using the proposed
   `createLightbox`, source, origin, controller, portal-renderer, data-attribute, and CSS-variable
   contracts. It opens, navigates, closes, restores current-origin focus, and passes all six browser
@@ -58,28 +71,32 @@ Work has started in bounded, reviewed parts. Stage 0 is still incomplete.
 - Removed stylesheet dependence on `@scope`. Viewer selectors use data-attribute roots, with tests for outside-element isolation, stylesheet override order, and host theme copying. [Styling documentation](LIGHTBOX.md) distinguishes author inputs from runtime-published motion values.
 - Recorded the recent-browser target and available physical devices in [browser support policy](BROWSER_SUPPORT.md). Exact supported versions and physical-device results remain pending.
 
-The immediate milestone is to prove the proposed public API before extracting the whole viewer session. The source, controller, origin, renderer, event, overlay, and React-part signatures now have concrete type fixtures and documentation. Runtime lifecycle tests, plain-JavaScript and composed-React examples, renderer ownership tests, and a declaration/export baseline still gate the lock. Existing custom-element APIs remain usable during migration.
-
-Internal extraction has begun now that the interaction patch passes its browser checks. Origin resolution, abortable host scrolling, and transition geometry are the first completed seams. Next, move viewer lifecycle and interaction coordination into a plain TypeScript session, with custom elements as adapters. Each part must preserve existing behavior and pass its affected regression tests. The plain JavaScript runtime must work without custom-element registration before claiming decoupling is complete.
+The immediate milestone is to finish behavior ownership after the public API lock. Make the legacy
+filmstrip element reuse the extracted runtime, restore pointerdown preparation through a clean
+controller API, migrate the Solid, Vue, and Angular bindings, and reduce the custom elements to
+declarative adapters. Keep compatibility-specific tests, while making the direct runtime the
+canonical interaction suite.
 
 Stage 0 measurement work continues alongside that extraction: pinch-to-pan and wheel ownership coverage, broader recycled-origin cases, a second independent host virtualizer, and cold-media/first-useful-paint measurements. Pending physical-device checks and performance benchmarks do not block a bounded internal extraction. They remain release gates and are required before making comparative performance claims.
 
-## Next milestone: public API lock
+## Public API lock
 
-Lock the supported contract before moving the viewer lifecycle into the new session. Internal helper extraction may proceed without adding exports. A split into smaller files alone does not establish a headless API.
-
-Deliver one reviewed API specification with these concrete artifacts:
+The initial plain JavaScript and React contract is locked in [PUBLIC_API.md](PUBLIC_API.md). It has
+these concrete artifacts:
 
 1. An export list for the root, custom-element adapter, each framework binding, and styles. Mark current compatibility exports separately from new APIs. Do not treat every existing class member, internal `GalleryItem` field, DOM node, or CSS variable as a permanent extension point.
 2. Type signatures and examples for `createLightbox`, source creation/replacement, origin registration, host reveal, subscriptions, commands, and destruction. Specify synchronous validation, command results, cancellation, event order, and accepted versus settled selection. Closing must never wait for host reveal.
 3. A source contract covering image, video, iframe, and custom-content identity, responsive media metadata, stable IDs, synchronous lookup, missing origins, and source replacement. Keep remote fetching and CDN-specific URL generation outside metadata lookup. Separate the supported initial source model from later asynchronous pagination.
 4. A renderer ownership table and working plain-JavaScript and composed-React examples. Identify runtime-owned measurement/portal nodes, framework-owned descendants, ref attachment and disposal, and the lifecycle of virtualized content. Application code in either example must use only the proposed public interfaces, without custom-element registration or private runtime fields. The contract spike may adapt the existing runtime internally; complete internal decoupling is the subsequent extraction milestone.
-5. Exact names, types, defaults, and event semantics for the composed parts and hooks. Prove controlled open/selection with delayed acceptance, rejection, interrupted motion, and teardown before locking those props. Keep the existing element wrappers working during this migration.
+5. Exact names, types, defaults, and event semantics for the composed React parts and hooks.
+   Controlled open/selection props remain outside the locked API until delayed acceptance,
+   rejection, interruption, and teardown behavior is proven.
 6. An explicit public list of data attributes and CSS variables. Give each variable its publishing part, units, lifetime, and input/output ownership. Specify required structural styles and optional appearance styles, selector specificity, and supported override behavior without `@scope`.
 
-The lock is complete when the examples run through the proposed public interfaces, positive and invalid consumer type fixtures pass, lifecycle tests assert the specified event and command outcomes, and the generated declaration/export baseline matches the specification. Record the agreed contract as the implementation target. Any later breaking change must update the contract and migration notes explicitly rather than emerging from refactoring.
-
-After that gate, extract a plain TypeScript viewer session and make custom elements adapters over it. Keep the existing interaction tests active throughout. SSR import safety, framework-native rendering ownership, and body-level portal behavior are acceptance criteria for the decoupled runtime.
+The plain and React examples run through these interfaces, type fixtures and lifecycle tests pass,
+and the declaration/export baseline matches the specification. Any breaking change must update the
+contract and migration notes explicitly. The lock does not include controlled React props, composed
+Solid/Vue/Angular APIs, a structural/theme stylesheet split, or a CDN adapter.
 
 ## Product and ownership contract
 
@@ -320,30 +337,31 @@ Audit every current CSS rule into required behavior, optional appearance, or por
 
 ## Delivery order and exit criteria
 
-| Stage                             | Work                                                                                                                                                                | Exit condition                                                                                                                                                                                                                                 |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0. Protect interactions           | Add motion/ownership regression scenarios, physical-device baseline, supported-browser policy, and calibrated performance measurements                              | Baseline artifacts and thresholds checked in; automated continuity tests cover interruptions, zoom handoff, rebasing, and stale origins; physical-device results recorded                                                                      |
-| 1. Contract spike                 | Write source, media, state, command-result, renderer, and part attachment types; runnable JS and composed React prototypes                                          | Both consume the same responsive-image source; demonstrate portal controls, framework context, bounded custom-content mounting, source replacement, interrupted commands, and failed loading; unresolved decisions below have recorded answers |
-| 2. Incremental runtime extraction | Introduce controller behind existing elements, transfer session/portal ownership, then connect existing gesture/zoom/gallery modules and expose direct construction | Existing DOM interactions and media remain usable; stage 0 gates pass; no physics rewrite bundled into extraction; SSR imports, cleanup, and dependency boundaries pass                                                                        |
-| 3. Headless image beta            | Complete responsive loading, composed JS/React/element APIs, source updates, accessibility, structural CSS, labels, captions, and documentation                     | Two distinct custom UIs pass without a theme; hydration/Strict Mode and virtualized-source examples pass; cold/warm loading and total activation budgets pass; publish a prerelease                                                            |
-| 4. Integration and media          | Use beta in portfolio and an independent consumer; complete video/iframe/custom renderer lifecycle; pilot one demanded CDN provider                                 | Consumer feedback resolves API ownership issues; mixed-media lifecycle/native-input tests and physical-device checks pass; adapter has provider tests and remains optional                                                                     |
-| 5. Framework parity               | Implement idiomatic composed Solid, Vue, and Angular APIs over the proven contract                                                                                  | Each binding passes the same source/lifecycle/portal scenarios plus framework-specific hydration, context, updates, and teardown checks                                                                                                        |
-| 6. Stable release                 | Finalize names, license, exports, migration guide, browser support, docs, clean installs, CDN module example, changelog, and semver                                 | CI and physical-device gates pass; clean consumer installs and portfolio integration pass; public claims match measured evidence; tag 1.0                                                                                                      |
+| Stage                         | Status      | Remaining exit work                                                                                                                      |
+| ----------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 0. Protect interactions       | In progress | Record physical iPhone/Mac results and calibrated cold-load, frame-gap, memory, and repeated-session budgets.                            |
+| 1. Contract spike             | Complete    | Plain JS and React use the locked source, controller, renderer, origin, overlay, styling, and composition contracts.                     |
+| 2. Finish behavior extraction | In progress | Delegate custom elements to runtime modules, restore pointerdown preparation, and move shared regressions off element fixtures.          |
+| 3. Headless image beta        | In progress | Add a second custom UI, Strict Mode/hydration coverage, the behavior/theme CSS decision, and beta documentation.                         |
+| 4. Integration and media      | In progress | Finish portfolio adoption, independent-consumer feedback, physical mixed-media checks, and one demanded optional CDN adapter.            |
+| 5. Framework parity           | Not started | Replace the Solid, Vue, and Angular element wrappers with native bindings and run their lifecycle, portal, update, and hydration suites. |
+| 6. Stable release             | Not started | Finalize names, license, migration guide, browser matrix, CDN module example, changelog, clean installs, and release evidence.           |
 
 Stages 0–3 define the image beta. All listed framework bindings remain the 1.0 target; they do not delay image-beta feedback. Named CDN provider count and a registry recipe are not release gates. A later shadcn recipe should install editable composition/style code depending on the maintained runtime, never a copied gesture implementation.
 
-## Decisions to close in the contract spike
+## Open contract decisions
 
-These need runnable evidence, not only names in a type definition:
+The first lock settled renderer attachment, portal ownership, command abort results, synchronous
+source validation, finite navigation, one-active-viewer ownership, recycled origin identity, host
+reveal cancellation, and immediate close fallback. These remain open:
 
-1. Exact part attachment and renderer signatures, including how portal controls and bounded custom-content targets are exposed consistently to plain JS and frameworks.
-2. Controlled-state callback order and the point at which an unaccepted gesture returns to committed state. Test delayed acceptance without positional jumps. Specify proactive host reveal timing and cancellation. Closing must remain immediate and fall back when the matching origin is unavailable.
-3. Abort behavior for each command and metadata lookup failure recovery. Supply event traces for all terminal outcomes and interruption combinations.
-4. Origin registration/identity validation across recycled DOM and open shadow roots, including caller-selected focus fallback.
-5. Responsive picture art direction, missing dimensions, and source changes while zoomed. Document fallback sizing and when geometry can change.
-6. Finite gallery boundaries, optional looping scope, and the semantics of previous/next during pending navigation. Finite navigation is the initial implementation; looping requires separate rebase/continuity proof.
-7. Multiple viewers and application overlays. Define active-session ownership, focus/inert restoration, and stacking without replacing the body portal.
-8. Required behavior styles, supported customization constraints, final part/element names, and migration from current tags.
+1. Controlled React state and its delayed-acceptance callback order.
+2. Caller-selected focus fallback and open-shadow-root origin discovery. The current fallback uses
+   the nearest explicitly focusable host.
+3. Geometry changes when responsive art direction or source replacement changes aspect ratio while
+   zoomed.
+4. Whether looping belongs in the runtime. The locked beta navigation is finite.
+5. The structural/theme stylesheet split and final custom-element tag names.
 
 ## Deferred work
 

@@ -1,9 +1,8 @@
 # Public API contract
 
-This document is the implementation contract for the headless Fluidbox beta. Types that already
-ship from the package root are identified below. `createLightbox()` and composed framework parts
-remain implementation work until their runtime and ownership tests pass; their signatures are
-locked here so extraction does not inherit the current custom-element design by accident.
+This document is the implementation contract for the headless Fluidbox beta. The plain JavaScript
+runtime and composed React binding described here are implemented. Solid, Vue, and Angular still
+use compatibility adapters and are not part of the locked composed-binding contract yet.
 
 ## Package exports
 
@@ -14,8 +13,7 @@ The stable headless root exports:
 
 - `arraySource()` and the source, media, origin, controller, event, renderer, and overlay types in
   `src/public-api.ts`.
-- `createLightbox()` once the plain TypeScript session is implemented. Calling it requires a DOM;
-  importing it does not.
+- `createLightbox()`. Calling it requires a DOM; importing it does not.
 
 The existing `registerLightboxElements`, `bindGallerySource`, `AppGallery`, `AppLightbox`,
 `LightboxGallerySource`, `LightboxSourceItem`, and `GalleryItem` exports are compatibility APIs.
@@ -59,13 +57,13 @@ const source = arraySource([
 ```
 
 IDs are non-empty and unique within a snapshot. `arraySource()` copies the input array, builds its ID
-map once, and throws for an empty or duplicate ID. `getItem()` throws `RangeError` for an invalid
-index. `getIndex()` returns `null` when the ID is absent.
+map once, and throws for an empty or duplicate item ID. An empty source is valid. `getItem()` throws
+`RangeError` for an invalid index. `getIndex()` returns `null` when the ID is absent.
 
-Image descriptors are the first supported headless media implementation. Video, iframe, and custom
-descriptors reserve the shared identity and renderer contract. They are not a beta parity claim
-until their lifecycle scenarios pass. A custom descriptor stores a renderer key, never a React,
-Vue, Solid, or Angular node.
+Image, video, iframe, and custom descriptors use the same bounded strip. A custom descriptor stores
+a renderer key, never a React, Vue, Solid, or Angular node. Automated lifecycle checks cover mount,
+eviction, teardown, native interaction ownership, and live-content close flight. Physical mobile
+video/fullscreen behavior remains a release check.
 
 `setSource(snapshot)` creates a new source revision. It preserves the active ID if present. If the ID
 was removed, it selects the old index clamped to the new range. An empty source closes with reason
@@ -280,12 +278,8 @@ focus visibility, and modal isolation remain structural behavior even when appea
 
 ## Compatibility and versioning
 
-The headless contract begins before the package's first public beta. Until `createLightbox()` and the
-composed React example pass runtime tests, exported controller types describe the implementation
-target and are marked as such in their declaration comments. The package does not export a
-non-functional `createLightbox` stub.
-
-Once the runtime function ships, changes to command results, source semantics, event ordering,
-renderer ownership, public selectors, or custom-property meaning require a documented migration.
-Additive media descriptor fields and new optional parts may ship in a minor release. Internal DOM,
-animation objects, and unlisted styling hooks may change without notice.
+`createLightbox()` and the composed React binding are the implemented beta contract. Changes to
+command results, source semantics, event ordering, renderer ownership, public selectors, or
+custom-property meaning require a documented migration. Additive media descriptor fields and new
+optional parts may ship in a minor release. Internal DOM, animation objects, and unlisted styling
+hooks may change without notice.

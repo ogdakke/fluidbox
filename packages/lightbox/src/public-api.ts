@@ -251,7 +251,7 @@ export interface LightboxController<TItem extends LightboxItem = LightboxItem> {
   destroy(): void;
 }
 
-/** Signature implemented by the plain TypeScript runtime in the extraction milestone. */
+/** Framework-independent lightbox constructor exported from the package root. */
 export type CreateLightbox = <TItem extends LightboxItem = LightboxItem>(
   options: LightboxOptions<TItem>,
 ) => LightboxController<TItem>;
