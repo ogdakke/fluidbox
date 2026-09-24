@@ -62,6 +62,12 @@ const LEGACY_THEME_PROPERTIES = new Set([
   "--border",
   "--primary",
 ]);
+const FOCUSABLE_HOST_SELECTOR =
+  "[tabindex], a[href], button, input, select, textarea, summary, video[controls], audio[controls], iframe";
+
+function focusableHostFor(element: HTMLElement | null) {
+  return element?.parentElement?.closest<HTMLElement>(FOCUSABLE_HOST_SELECTOR) ?? null;
+}
 
 interface PaintedPose extends ImageTransitionPose {
   readonly frameOpacity: string;
@@ -129,6 +135,7 @@ export class DomViewerDriver<
   #zoom: import("./lightbox-zoom").LightboxZoom | undefined;
   #zoomLoad: Promise<import("./lightbox-zoom").LightboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
+  #returnFocusFallback: HTMLElement | null = null;
   #viewportWidth = 0;
   readonly #themeProperties = new Set<string>();
   #forceImmediateClose = false;
@@ -303,6 +310,7 @@ export class DomViewerDriver<
       (this.#portal.overlay.ownerDocument.activeElement instanceof HTMLElement
         ? this.#portal.overlay.ownerDocument.activeElement
         : null);
+    this.#returnFocusFallback = focusableHostFor(this.#returnFocus);
     if (!this.#portal.overlay.isConnected) {
       this.#portal.overlay.dataset.lightboxPrepared = "";
       this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
@@ -437,7 +445,10 @@ export class DomViewerDriver<
     const interruptedPose = this.#takeInterruptedPose(false);
     this.#setState("closing");
     this.#setActiveTrigger(null);
-    if (context.origin?.trigger.isConnected) this.#returnFocus = context.origin.trigger;
+    if (context.origin?.trigger.isConnected) {
+      this.#returnFocus = context.origin.trigger;
+      this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
+    }
     if (this.#forceImmediateClose || this.#prefersReducedMotion()) {
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
@@ -1126,8 +1137,14 @@ export class DomViewerDriver<
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
     this.#setState("closed");
-    if (this.#returnFocus?.isConnected) this.#returnFocus.focus({ preventScroll: true });
+    const returnFocus = this.#returnFocus?.isConnected
+      ? this.#returnFocus
+      : this.#returnFocusFallback?.isConnected
+        ? this.#returnFocusFallback
+        : null;
+    returnFocus?.focus({ preventScroll: true });
     this.#returnFocus = null;
+    this.#returnFocusFallback = null;
   }
 
   #setState(state: "closed" | "opening" | "open" | "closing") {

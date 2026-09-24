@@ -82,6 +82,23 @@ test("plain runtime contains focus and applies the established gallery keyboard 
   await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
 });
 
+test("plain runtime returns focus to a virtualized origin host", async ({ page }) => {
+  await page.goto("/headless.html");
+  const gallery = page.locator(".headless-grid");
+  await gallery.evaluate((element) => element.setAttribute("tabindex", "0"));
+  await page.locator('[data-photo-id="one"]').click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  await page.locator('[data-photo-id="one"]').evaluate((element) => element.remove());
+  await page.evaluate(() => void window.headlessViewer.close());
+
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(gallery).toBeFocused();
+});
+
 test("plain controllers hand body-level ownership to the newest viewer", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
