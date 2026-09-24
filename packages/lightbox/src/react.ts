@@ -17,6 +17,7 @@ import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode, Ref } from
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { createLightbox } from "./create-lightbox";
+import { FilmstripRuntime, filmstripCommandOptions } from "./filmstrip-runtime";
 import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
 import { markedVisualOrigin } from "./origin-geometry";
 import type {
@@ -246,7 +247,7 @@ function Root<TItem extends LightboxItem>({
     };
   }, [onBeforeCommand, onEvent, origins, renderers, store]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     void store.setSource(source);
   }, [source, store]);
 
@@ -425,177 +426,45 @@ function Filmstrip<TItem extends LightboxItem>({
   const { store } = useLightboxContext();
   const state = useLightboxState((current) => current);
   const selectedIndex = state.requestedIndex ?? state.activeIndex ?? 0;
-  const selectedIndexRef = useRef(selectedIndex);
-  selectedIndexRef.current = selectedIndex;
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  const scrollFrame = useRef(0);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const scrollMode = useRef<"idle" | "commanded" | "user">("commanded");
-  const commandedLeft = useRef<number | null>(null);
-  const touching = useRef(false);
-  const initializing = useRef(true);
+  const runtimeRef = useRef<FilmstripRuntime | null>(null);
   const [windowCenter, setWindowCenter] = useState(selectedIndex);
   const [visibleCount, setVisibleCount] = useState(31);
   const [filmstripGeometry, setFilmstripGeometry] = useState({ size: 52, step: 57 });
 
-  const readGeometry = (scroller: HTMLDivElement) => {
-    const filmstrip = scroller.parentElement;
-    const size =
-      parseFloat(
-        filmstrip
-          ? getComputedStyle(filmstrip).getPropertyValue("--lightbox-filmstrip-item-size")
-          : "",
-      ) || 52;
-    const style = getComputedStyle(scroller);
-    const gap = parseFloat(style.columnGap) || 0;
-    const padding = parseFloat(style.paddingLeft) || 0;
-    return { size, step: size + gap, padding };
-  };
-
-  const nearestIndex = (scroller: HTMLDivElement) => {
-    const { size, step, padding } = readGeometry(scroller);
-    const center = scroller.scrollLeft + scroller.clientWidth / 2;
-    return Math.max(0, Math.min(state.count - 1, Math.round((center - padding - size / 2) / step)));
-  };
-
-  const centerIndex = (scroller: HTMLDivElement, index: number, smooth: boolean) => {
-    const { size, step, padding } = readGeometry(scroller);
-    const left = padding + index * step + size / 2 - scroller.clientWidth / 2;
-    commandedLeft.current = Math.max(
-      0,
-      Math.min(left, scroller.scrollWidth - scroller.clientWidth),
-    );
-    scrollMode.current = "commanded";
-    scroller.scrollTo({
-      left: commandedLeft.current,
-      behavior: smooth ? "smooth" : "instant",
-    });
-  };
-
   useEffect(() => {
     const scroller = scrollerRef.current;
-    if (!scroller) return;
+    const element = scroller?.parentElement;
+    if (!scroller || !element) return;
     const dialog = scroller.closest<HTMLElement>("[data-lightbox-dialog]");
     dialog?.setAttribute("data-filmstrip", "");
-    const updateWindow = () => {
-      if (scrollFrame.current) return;
-      scrollFrame.current = requestAnimationFrame(() => {
-        scrollFrame.current = 0;
-        const center = nearestIndex(scroller);
+    const runtime = new FilmstripRuntime({
+      element,
+      scroller,
+      count: state.count,
+      index: selectedIndex,
+      onSelect(index, settled) {
+        if (!settled && store.state.requestedIndex === index) return;
+        void store.controller.goTo({ index }, filmstripCommandOptions(settled));
+      },
+      onWindowChange(center, layout) {
         setWindowCenter(center);
-        if (
-          !initializing.current &&
-          scrollMode.current === "user" &&
-          store.state.requestedIndex !== center
-        ) {
-          void store.controller.goTo({ index: center }, { reason: "filmstrip" });
-        }
-      });
-    };
-    const takeControl = () => {
-      commandedLeft.current = null;
-      scrollMode.current = "user";
-    };
-    const settle = () => {
-      clearTimeout(settleTimer.current);
-      if (initializing.current || touching.current) return;
-      if (scrollMode.current === "commanded") {
-        if (Math.abs(scroller.scrollLeft - (commandedLeft.current ?? 0)) > 1) {
-          settleTimer.current = setTimeout(settle, 160);
-          return;
-        }
-        commandedLeft.current = null;
-        scrollMode.current = "idle";
-        return;
-      }
-      if (scrollMode.current !== "user") return;
-      const index = nearestIndex(scroller);
-      if (store.state.requestedIndex !== index) {
-        void store.controller.goTo({ index }, { reason: "filmstrip" });
-      }
-      scrollMode.current = "idle";
-    };
-    const scheduleSettle = () => {
-      clearTimeout(settleTimer.current);
-      if (!touching.current) settleTimer.current = setTimeout(settle, 160);
-    };
-    const onScroll = () => {
-      if (touching.current || scrollMode.current === "idle") takeControl();
-      updateWindow();
-      scheduleSettle();
-    };
-    const onTouchStart = () => {
-      touching.current = true;
-      clearTimeout(settleTimer.current);
-      takeControl();
-    };
-    const onTouchEnd = (event: TouchEvent) => {
-      if (event.touches.length) return;
-      touching.current = false;
-      scheduleSettle();
-    };
-    const onWheel = (event: WheelEvent) => {
-      takeControl();
-      if (Math.abs(event.deltaY) > Math.abs(event.deltaX) && event.cancelable) {
-        event.preventDefault();
-      }
-    };
-    const resize = new ResizeObserver(() => {
-      const { size, step } = readGeometry(scroller);
-      setFilmstripGeometry({ size, step });
-      setVisibleCount(Math.ceil(scroller.clientWidth / step) * 2 + 9);
-      updateWindow();
-      if (scrollMode.current !== "user") {
-        centerIndex(scroller, selectedIndexRef.current, false);
-      }
+        setVisibleCount(layout.visibleCount);
+        setFilmstripGeometry({ size: layout.size, step: layout.step });
+      },
     });
-    resize.observe(scroller);
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    scroller.addEventListener("scrollend", settle);
-    scroller.addEventListener("touchstart", onTouchStart, { passive: true });
-    scroller.addEventListener("touchend", onTouchEnd, { passive: true });
-    scroller.addEventListener("touchcancel", onTouchEnd, { passive: true });
-    scroller.addEventListener("pointerdown", takeControl, { capture: true, passive: true });
-    scroller.addEventListener("keydown", takeControl, { capture: true, passive: true });
-    scroller.addEventListener("wheel", onWheel, { capture: true, passive: false });
-    const { size, step } = readGeometry(scroller);
-    setFilmstripGeometry({ size, step });
-    centerIndex(scroller, selectedIndexRef.current, false);
-    updateWindow();
-    let mountReadyFrame = 0;
-    const mountFrame = requestAnimationFrame(() => {
-      centerIndex(scroller, selectedIndexRef.current, false);
-      mountReadyFrame = requestAnimationFrame(() => {
-        initializing.current = false;
-        scrollMode.current = "idle";
-      });
-    });
+    runtimeRef.current = runtime;
+    runtime.mount();
     return () => {
       dialog?.removeAttribute("data-filmstrip");
-      resize.disconnect();
-      scroller.removeEventListener("scroll", onScroll);
-      scroller.removeEventListener("scrollend", settle);
-      scroller.removeEventListener("touchstart", onTouchStart);
-      scroller.removeEventListener("touchend", onTouchEnd);
-      scroller.removeEventListener("touchcancel", onTouchEnd);
-      scroller.removeEventListener("pointerdown", takeControl, true);
-      scroller.removeEventListener("keydown", takeControl, true);
-      scroller.removeEventListener("wheel", onWheel, true);
-      cancelAnimationFrame(scrollFrame.current);
-      cancelAnimationFrame(mountFrame);
-      cancelAnimationFrame(mountReadyFrame);
-      clearTimeout(settleTimer.current);
+      runtime.destroy();
+      if (runtimeRef.current === runtime) runtimeRef.current = null;
     };
   }, [state.count, store]);
 
   useLayoutEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller || state.count === 0) return;
-    setWindowCenter(selectedIndex);
-    if (!initializing.current && scrollMode.current !== "user") {
-      centerIndex(scroller, selectedIndex, false);
-    }
-  }, [selectedIndex, state.count]);
+    runtimeRef.current?.sync(selectedIndex);
+  }, [selectedIndex]);
 
   const radius = Math.max(15, Math.ceil(visibleCount / 2));
   const start = Math.max(0, Math.min(windowCenter - radius, state.count - (radius * 2 + 1)));
@@ -620,11 +489,7 @@ function Filmstrip<TItem extends LightboxItem>({
           "data-index": index,
           "data-lightbox-selected": selected ? "" : undefined,
           style: { left: `${index * filmstripGeometry.step}px` },
-          onClick: () => {
-            const scroller = scrollerRef.current;
-            if (scroller) centerIndex(scroller, index, false);
-            void store.controller.goTo({ index }, { reason: "filmstrip" });
-          },
+          onClick: () => runtimeRef.current?.choose(index),
         },
         renderItem
           ? renderItem({ item, index, selected })

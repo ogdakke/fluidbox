@@ -74,6 +74,21 @@ interface PaintedPose extends ImageTransitionPose {
   readonly backdropOpacity: string;
 }
 
+function finitePose(pose: PaintedPose) {
+  const { transform, clip } = pose;
+  return [
+    transform.a,
+    transform.b,
+    transform.c,
+    transform.d,
+    transform.e,
+    transform.f,
+    clip.x,
+    clip.y,
+    ...clip.radii,
+  ].every(Number.isFinite);
+}
+
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 export class DomViewerDriver<
   TItem extends LightboxItem = LightboxItem,
@@ -636,11 +651,22 @@ export class DomViewerDriver<
   #cancelAnimations(preserve: boolean) {
     if (preserve && this.#animations.length > 0) {
       this.#thumbnailOverlays.preservePaint();
-      this.#interruptedPose = this.#flightFrame ? this.#paintedFlightPose() : this.#paintedPose();
+      let pose: PaintedPose | undefined;
+      try {
+        pose = this.#flightFrame ? this.#paintedFlightPose() : this.#paintedPose();
+      } catch {
+        // A source replacement can recycle an unmeasured frame while the old
+        // animation is still settling. There is no painted pose to preserve.
+      }
       this.#removeFlight();
-      applyImageTransitionPose(this.#frame, this.#media, this.#interruptedPose);
-      this.#frame.style.opacity = this.#interruptedPose.frameOpacity;
-      this.#portal.backdrop.style.opacity = this.#interruptedPose.backdropOpacity;
+      if (pose && finitePose(pose) && this.#media.offsetWidth && this.#media.offsetHeight) {
+        this.#interruptedPose = pose;
+        applyImageTransitionPose(this.#frame, this.#media, pose);
+        this.#frame.style.opacity = pose.frameOpacity;
+        this.#portal.backdrop.style.opacity = pose.backdropOpacity;
+      } else {
+        this.#interruptedPose = undefined;
+      }
     }
     for (const animation of this.#animations) animation.cancel();
     this.#animations = [];

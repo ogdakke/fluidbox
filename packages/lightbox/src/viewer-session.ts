@@ -66,6 +66,11 @@ const completed = (changed: boolean): LightboxCommandResult => ({ status: "compl
 const prevented = (): LightboxCommandResult => ({ status: "prevented" });
 const aborted = (): LightboxCommandResult => ({ status: "aborted" });
 
+function isSettledFilmstripCommand(options: LightboxCommandOptions) {
+  return (options as LightboxCommandOptions & { __fluidboxFilmstripSettled?: boolean })
+    .__fluidboxFilmstripSettled;
+}
+
 function stateFor<TItem extends LightboxItem>(
   source: LightboxSource<TItem>,
   status: LightboxState["status"],
@@ -282,7 +287,17 @@ export class ViewerSession<
     const reason = options.reason ?? "api";
     const key = `${this.#state.status === "open" ? "select" : "open"}:${item.id}`;
     const repeated = this.#samePending(key, options.signal);
-    if (repeated) return repeated;
+    if (repeated) {
+      if (reason === "filmstrip" && isSettledFilmstripCommand(options)) {
+        return repeated.then((result) => {
+          if (result.status === "completed" && this.#state.activeId === item.id) {
+            this.#requestReveal(item.id, index, "selection");
+          }
+          return result;
+        });
+      }
+      return repeated;
+    }
     if (this.#prevented(command, target, reason)) return Promise.resolve(prevented());
     this.#emit({ type: command === "open" ? "open-request" : "change-request", target, reason });
 
@@ -293,7 +308,12 @@ export class ViewerSession<
     const opening = this.#state.status !== "open";
     const enteringOpening = this.#state.status !== "opening";
     const changed = this.#state.activeIndex !== index || opening;
-    if (!changed && this.#state.status === "open") return Promise.resolve(completed(false));
+    if (!changed && this.#state.status === "open") {
+      if (reason === "filmstrip" && isSettledFilmstripCommand(options)) {
+        this.#requestReveal(item.id, index, "selection");
+      }
+      return Promise.resolve(completed(false));
+    }
 
     const previousState = this.#state;
     const operation = this.#begin(key, options.signal, () =>
@@ -319,7 +339,9 @@ export class ViewerSession<
         this.#publish("open", index, index);
         this.#emit({ type: "status-change", status: "open" });
       }
-      this.#requestReveal(item.id, index, opening ? "open" : "selection");
+      if (reason !== "filmstrip" || isSettledFilmstripCommand(options)) {
+        this.#requestReveal(item.id, index, opening ? "open" : "selection");
+      }
       this.#emitSelection("selection-settle", index, reason);
       this.#finish(operation, completed(true));
     });

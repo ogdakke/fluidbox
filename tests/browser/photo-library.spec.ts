@@ -282,6 +282,51 @@ test("filmstrip preference applies to the next open", async ({ page }) => {
   expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
 });
 
+test("filmstrip scrubbing reveals the host only after touch settlement", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  await page.locator('[data-photo-index="0"]').click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  const selectedIndex = 5_000;
+  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  const provisional = await filmstrip.evaluate(async (element, index) => {
+    const start = new Event("touchstart", { bubbles: true });
+    Object.defineProperty(start, "touches", { value: [] });
+    element.dispatchEvent(start);
+    const size = parseFloat(
+      getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
+    );
+    const gap = parseFloat(getComputedStyle(element).columnGap);
+    const padding = parseFloat(getComputedStyle(element).paddingLeft);
+    element.scrollTo({
+      left: padding + index * (size + gap) + size / 2 - element.clientWidth / 2,
+      behavior: "instant",
+    });
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    return {
+      activeLabel: document
+        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        ?.getAttribute("aria-label"),
+      hostMounted: document.querySelector(`[data-photo-index="${index}"]`) !== null,
+    };
+  }, selectedIndex);
+
+  expect(provisional).toEqual({
+    activeLabel: `Item ${selectedIndex + 1} of 10000`,
+    hostMounted: false,
+  });
+  await filmstrip.evaluate((element) => {
+    const event = new Event("touchend", { bubbles: true });
+    Object.defineProperty(event, "touches", { value: [] });
+    element.dispatchEvent(event);
+  });
+  await expect(page.locator(`[data-photo-index="${selectedIndex}"]`)).toHaveCount(1);
+});
+
 test("opening remains active until the delayed filmstrip reveal settles", async ({ page }) => {
   await page.goto("/photo-library.html");
   await page.locator("[data-photo-index]").first().click();
