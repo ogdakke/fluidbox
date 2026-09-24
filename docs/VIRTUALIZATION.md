@@ -14,16 +14,23 @@ Assets are repeated local SVG illustrations with landscape, portrait, and square
 
 ## Current public contract
 
-Use `LightboxGallerySource` and a gallery element or the existing framework binding. The composed framework APIs and controller in ROADMAP.md are still proposed.
+Use a `LightboxSource` with `createLightbox()` or the composed React binding. The photo-library
+example uses `arraySource()`, `Lightbox.Root`, `Lightbox.Item`, and `Lightbox.Trigger`; it does not
+register custom elements.
 
 - `count` is the full source count, not the number of mounted thumbnails.
-- `getItem(index)` synchronously returns image metadata with a stable, unique ID. Keep metadata lookup independent of DOM mounting and avoid scanning every item during a scroll or navigation.
-- `getOrigin(id)` returns the currently mounted matching origin, or `null`. Recheck identity and connection on each lookup; a cached element reference may now represent a different item.
+- `getItem(index)` synchronously returns media metadata with a stable, unique ID. Keep metadata lookup independent of DOM mounting and avoid scanning every item during a scroll or navigation.
+- Register mounted origins through `controller.registerOrigin(id, origin)`, or supply an origin adapter whose `getOrigin(id)` returns the currently mounted match. Recheck identity and connection on each lookup; a cached element reference may now represent a different item.
 - `revealOrigin(id, index, { signal, reason })` optionally asks the host to scroll or mount the selected item. Reasons are `open` and `selection`. It may return a promise, but viewer motion never waits for it. Check the abort signal before deferred work changes the host.
 - Mount only the host virtualizer's visible/overscan range. Fluidbox resolves source items even when their thumbnails are absent.
-- Keep the source object, count, IDs, and metadata stable while open. Live insertion/removal/reordering and asynchronous metadata lookup are not supported by the current contract. Fetch data separately and update while closed until the planned snapshot-update API exists.
+- Treat each source as an immutable snapshot. `controller.setSource(snapshot)` supports insertion,
+  removal, and reordering while open while preserving the active ID when possible. Asynchronous
+  metadata lookup and mutation of an existing snapshot are outside the beta contract.
 
-The gallery uses a persistent controller independent of thumbnail mounting. A missing image origin uses a scale-and-fade transition. Closing returns focus to the selected origin if available, or to the gallery fallback. The host should keep that gallery mounted for the session lifetime.
+The viewer uses a persistent controller independent of thumbnail mounting. A missing image origin
+uses a scale-and-fade transition. Closing returns focus to the selected origin when available, then
+to the opening trigger's retained focusable ancestor. Hosts that need a different fallback must keep
+an appropriate focus target mounted for the session lifetime.
 
 ## Register origins by identity
 
