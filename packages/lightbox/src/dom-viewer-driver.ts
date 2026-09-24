@@ -96,8 +96,9 @@ export class DomViewerDriver<
   #activeTrigger: HTMLElement | null = null;
   #flight: HTMLDivElement | undefined;
   #flightFrame: HTMLDivElement | undefined;
-  #flightMedia: HTMLImageElement | undefined;
+  #flightMedia: HTMLElement | undefined;
   #flightSource: HTMLElement | undefined;
+  #flightMarker: Comment | undefined;
   #flightOrigin = { x: 0, y: 0, width: 0, height: 0 };
   #flightViewerOrigin = { x: 0, y: 0 };
   #closeStart: ImageTransitionPose | undefined;
@@ -467,7 +468,7 @@ export class DomViewerDriver<
     const duration = Math.min(480, 220 + Math.sqrt(Math.max(0, travel - 240)) * 4);
     let frame = this.#frame;
     let media = this.#media;
-    if (from && media instanceof HTMLImageElement) {
+    if (from) {
       const flight = this.#createCloseFlight(start, from, media);
       frame = flight.frame;
       media = flight.media;
@@ -713,7 +714,7 @@ export class DomViewerDriver<
     return { image: this.#media, frame: this.#frame };
   }
 
-  #createCloseFlight(start: ImageTransitionPose, origin: HTMLElement, source: HTMLImageElement) {
+  #createCloseFlight(start: ImageTransitionPose, origin: HTMLElement, source: HTMLElement) {
     const ownerDocument = this.#portal.overlay.ownerDocument;
     const view = ownerDocument.defaultView!;
     const bounds = source.getBoundingClientRect();
@@ -740,8 +741,15 @@ export class DomViewerDriver<
     frame.style.setProperty("--lightbox-flight-top", `${this.#flightOrigin.y}px`);
     frame.style.setProperty("--lightbox-flight-width", `${source.offsetWidth}px`);
     frame.style.setProperty("--lightbox-flight-item-height", `${source.offsetHeight}px`);
-    const media = source.cloneNode(true) as HTMLImageElement;
-    media.removeAttribute("style");
+    const media =
+      source instanceof HTMLImageElement ? (source.cloneNode(true) as HTMLImageElement) : source;
+    if (media !== source) {
+      media.removeAttribute("style");
+      source.dataset.lightboxFlightSourceHidden = "";
+    } else {
+      this.#flightMarker = ownerDocument.createComment("lightbox-flight-home");
+      source.before(this.#flightMarker);
+    }
     media.dataset.lightboxMedia = "";
     frame.append(media);
     flight.append(frame);
@@ -750,7 +758,6 @@ export class DomViewerDriver<
     this.#flightFrame = frame;
     this.#flightMedia = media;
     this.#flightSource = source;
-    source.dataset.lightboxFlightSourceHidden = "";
     applyImageTransitionPose(frame, media, start);
     const target = this.#flightTargetPose(origin, media);
     return { frame, media, target };
@@ -787,6 +794,10 @@ export class DomViewerDriver<
 
   #removeFlight() {
     if (this.#flightSource) delete this.#flightSource.dataset.lightboxFlightSourceHidden;
+    if (this.#flightMarker?.parentNode && this.#flightSource) {
+      this.#flightMarker.replaceWith(this.#flightSource);
+    }
+    this.#flightMarker = undefined;
     this.#flight?.remove();
     this.#flight = undefined;
     this.#flightFrame = undefined;

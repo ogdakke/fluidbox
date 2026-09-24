@@ -215,7 +215,7 @@ test("destroy unloads mounted custom media before removing the viewer", async ({
       count: 1,
       getItem() {
         return {
-          id: "custom",
+          id: "one",
           media: {
             type: "custom",
             renderer: "demo",
@@ -226,10 +226,10 @@ test("destroy unloads mounted custom media before removing the viewer", async ({
         };
       },
       getIndex(id) {
-        return id === "custom" ? 0 : null;
+        return id === "one" ? 0 : null;
       },
     });
-    await window.headlessViewer.open({ id: "custom" });
+    await window.headlessViewer.open({ id: "one" });
     window.headlessViewer.destroy();
   });
 
@@ -237,6 +237,47 @@ test("destroy unloads mounted custom media before removing the viewer", async ({
   await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-aborts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-disposals", "1");
+});
+
+test("custom media uses the document close flight and returns to its retained slide", async ({
+  page,
+}) => {
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 1,
+      getItem() {
+        return {
+          id: "one",
+          media: {
+            type: "custom",
+            renderer: "demo",
+            title: "Custom study",
+            width: 800,
+            height: 600,
+          },
+        };
+      },
+      getIndex(id) {
+        return id === "one" ? 0 : null;
+      },
+    });
+    await window.headlessViewer.open({ id: "one" });
+    void window.headlessViewer.close();
+  });
+
+  await expect(page.locator("[data-lightbox-flight] [data-test-custom-media]")).toHaveText(
+    "Custom one",
+  );
+  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+
+  await page.evaluate(() => void window.headlessViewer.open({ id: "one" }));
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-test-custom-media]'),
+  ).toHaveText("Custom one");
+  await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
+  await page.evaluate(() => window.headlessViewer.destroy());
 });
 
 test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
