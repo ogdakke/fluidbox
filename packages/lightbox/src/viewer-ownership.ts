@@ -21,7 +21,7 @@ export class ViewerOwnership<TOwner extends object> {
 }
 
 export interface ActiveViewerOwner {
-  closeImmediately(): void;
+  closeImmediately(): boolean;
 }
 
 /** One owner across direct, framework, and custom-element bindings. */

@@ -50,6 +50,7 @@ class AppLightbox extends HTMLElement {
     closeImmediately: () => {
       this.close();
       this.#finishClose();
+      return true;
     },
   };
   static observedAttributes = ["src", "alt", "loading", "close-button"];
@@ -1030,8 +1031,9 @@ class AppLightbox extends HTMLElement {
     }
     const previous = activeViewer.claim(this.#viewerOwner);
     const switchingImage = previous !== null;
-    if (previous) {
-      previous.closeImmediately();
+    if (previous && !previous.closeImmediately()) {
+      activeViewer.claim(previous);
+      return;
     }
     this.#mountPortableContent();
     for (const image of this.#standaloneImage?.querySelectorAll<HTMLImageElement>(

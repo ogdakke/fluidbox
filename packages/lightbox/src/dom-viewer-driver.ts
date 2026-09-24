@@ -70,9 +70,12 @@ export class DomViewerDriver<
   readonly #renderers: Readonly<Record<string, LightboxRenderer<TItem>>>;
   readonly #viewerOwner = {
     closeImmediately: () => {
-      void this.#controller?.close({ reason: "api" });
-      this.#cancelAnimations(false);
-      this.#finishClose();
+      const controller = this.#controller;
+      if (!controller || controller.state.status === "closed") return true;
+      this.#forceImmediateClose = true;
+      void controller.close({ reason: "api" });
+      this.#forceImmediateClose = false;
+      return controller.state.status !== "open";
     },
   };
   readonly #lifetime = new AbortController();
@@ -118,6 +121,7 @@ export class DomViewerDriver<
   #zoomLoad: Promise<import("./lightbox-zoom").LightboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
   #viewportWidth = 0;
+  #forceImmediateClose = false;
   #destroyed = false;
 
   constructor(
@@ -267,7 +271,11 @@ export class DomViewerDriver<
   }
 
   async open(context: ViewerSessionMotionContext<TItem>) {
-    activeViewer.claim(this.#viewerOwner)?.closeImmediately();
+    const previous = activeViewer.claim(this.#viewerOwner);
+    if (previous && !previous.closeImmediately()) {
+      activeViewer.claim(previous);
+      return false;
+    }
     this.#endWheelHandoff();
     void this.#loadZoom();
     this.#cancelAnimations(true);
@@ -418,7 +426,7 @@ export class DomViewerDriver<
     this.#setState("closing");
     this.#setActiveTrigger(null);
     if (context.origin?.trigger.isConnected) this.#returnFocus = context.origin.trigger;
-    if (this.#prefersReducedMotion()) {
+    if (this.#forceImmediateClose || this.#prefersReducedMotion()) {
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
       this.#finishClose();

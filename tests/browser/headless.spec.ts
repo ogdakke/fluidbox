@@ -99,6 +99,34 @@ test("plain controllers hand body-level ownership to the newest viewer", async (
   await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
 });
 
+test("active viewer ownership honors a prevented close", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.evaluate(() => void window.headlessProtectedViewer.open({ id: "one" }));
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const result = await page.evaluate(() => window.headlessSecondaryViewer.open({ id: "two" }));
+
+  expect(result).toEqual({ status: "prevented" });
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(1);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]'),
+  ).toHaveAttribute("alt", "Blue square study");
+  const states = await page.evaluate(() => ({
+    protected: window.headlessProtectedViewer.state.status,
+    secondary: window.headlessSecondaryViewer.state.status,
+  }));
+  expect(states).toEqual({ protected: "open", secondary: "closed" });
+  await page.evaluate(() => window.headlessProtectedViewer.destroy());
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+});
+
 test("plain runtime owns video and iframe media while custom renderers own descendants", async ({
   page,
 }) => {

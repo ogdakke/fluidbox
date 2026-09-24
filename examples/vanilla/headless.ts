@@ -111,6 +111,14 @@ const secondaryViewer: LightboxController<DemoItem> = createLightbox({
   origins,
   renderers,
 });
+const protectedViewer: LightboxController<DemoItem> = createLightbox({
+  source,
+  origins,
+  renderers,
+  onBeforeCommand(event) {
+    if (event.command === "close") event.preventDefault();
+  },
+});
 
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
   trigger.addEventListener("click", () => {
@@ -122,8 +130,10 @@ declare global {
   interface Window {
     headlessViewer: typeof viewer;
     headlessSecondaryViewer: typeof secondaryViewer;
+    headlessProtectedViewer: typeof protectedViewer;
   }
 }
 
 window.headlessViewer = viewer;
 window.headlessSecondaryViewer = secondaryViewer;
+window.headlessProtectedViewer = protectedViewer;

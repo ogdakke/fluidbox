@@ -35,7 +35,7 @@ export interface ViewerSessionCloseContext {
 /** DOM motion and portal ownership supplied by the runtime adapter. */
 export interface ViewerSessionDriver<TItem extends LightboxItem = LightboxItem> {
   setSource?(source: LightboxSource<TItem>): void;
-  open(context: ViewerSessionMotionContext<TItem>): void | Promise<void>;
+  open(context: ViewerSessionMotionContext<TItem>): void | boolean | Promise<void | boolean>;
   select(context: ViewerSessionMotionContext<TItem>): void | Promise<void>;
   close(context: ViewerSessionCloseContext): void | Promise<void>;
   registerThumbnailOverlay?(
@@ -404,9 +404,18 @@ export class ViewerSession<
     return operation;
   }
 
-  async #run(operation: PendingCommand, run: () => void | Promise<void>): Promise<boolean> {
+  async #run(
+    operation: PendingCommand,
+    run: () => void | boolean | Promise<void | boolean>,
+  ): Promise<boolean> {
     try {
-      await run();
+      const accepted = await run();
+      if (accepted === false) {
+        operation.restore?.();
+        this.#origins.restoreThumbnail();
+        this.#finish(operation, prevented());
+        return false;
+      }
     } catch (error) {
       if (operation.controller.signal.aborted) return false;
       operation.restore?.();
