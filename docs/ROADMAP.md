@@ -71,11 +71,11 @@ binding migration are incomplete.
 - Removed stylesheet dependence on `@scope`. Viewer selectors use data-attribute roots, with tests for outside-element isolation, stylesheet override order, and host theme copying. [Styling documentation](LIGHTBOX.md) distinguishes author inputs from runtime-published motion values.
 - Recorded the recent-browser target and available physical devices in [browser support policy](BROWSER_SUPPORT.md). Exact supported versions and physical-device results remain pending.
 
-The immediate milestone is to finish behavior ownership after the public API lock. Make the legacy
-filmstrip element reuse the extracted runtime, restore pointerdown preparation through a clean
-controller API, migrate the Solid, Vue, and Angular bindings, and reduce the custom elements to
-declarative adapters. Keep compatibility-specific tests, while making the direct runtime the
-canonical interaction suite.
+The immediate milestone is to finish behavior ownership after the public API lock. Migrate the
+Solid, Vue, and Angular bindings and reduce the custom elements to declarative adapters. The legacy
+filmstrip now reuses the extracted runtime, and pointerdown opening preparation is available through
+the controller API. Keep compatibility-specific tests, while making the direct runtime the canonical
+interaction suite.
 
 Stage 0 measurement work continues alongside that extraction: pinch-to-pan and wheel ownership coverage, broader recycled-origin cases, a second independent host virtualizer, and cold-media/first-useful-paint measurements. Pending physical-device checks and performance benchmarks do not block a bounded internal extraction. They remain release gates and are required before making comparative performance claims.
 

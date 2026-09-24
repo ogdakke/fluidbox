@@ -116,6 +116,18 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#loadWindow();
   }
 
+  unmount() {
+    if (!this.#mounted) return;
+    this.#mounted = false;
+    this.#observer.disconnect();
+    this.#resolveSelection();
+    for (const slide of this.#slides.values()) {
+      slide.opening = false;
+      slide.deferFull = false;
+      this.#unload(slide);
+    }
+  }
+
   select(index: number, smooth: boolean): Promise<void> {
     if (!Number.isInteger(index) || index < 0 || index >= this.#source.count) {
       throw new RangeError(`Viewer strip index ${index} is out of range.`);

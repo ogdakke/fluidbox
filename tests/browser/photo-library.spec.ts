@@ -15,6 +15,39 @@ async function firstVisiblePhotoIndex(page: Page, includeWindow = true): Promise
   }, includeWindow);
 }
 
+test("React trigger prepares on pointerdown and discards a cancelled open", async ({ page }) => {
+  await page.goto("/photo-library.html?count=100");
+  const trigger = page.locator("[data-photo-index]").first();
+  await trigger.dispatchEvent("pointerdown", { button: 0, isPrimary: true, pointerId: 1 });
+  const prepared = page.locator("[data-lightbox-overlay][data-lightbox-prepared]");
+  await expect(prepared).toHaveCount(1);
+  await expect(prepared).toHaveCSS("visibility", "hidden");
+  await expect(trigger).not.toHaveAttribute("data-open", "");
+  await expect(trigger.locator("img")).not.toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+
+  await trigger.dispatchEvent("pointercancel", { button: 0, isPrimary: true, pointerId: 1 });
+  await expect(prepared).toHaveCount(0);
+
+  const reuse = await trigger.evaluate((element: HTMLElement) => {
+    element.dispatchEvent(
+      new PointerEvent("pointerdown", { bubbles: true, button: 0, isPrimary: true, pointerId: 2 }),
+    );
+    const preparedAnimations = document.getAnimations();
+    const paused = preparedAnimations.every(
+      (animation) => animation.playState === "paused" && animation.currentTime === 0,
+    );
+    element.click();
+    const openingAnimations = document.getAnimations();
+    return {
+      count: preparedAnimations.length,
+      paused,
+      reused: preparedAnimations.every((animation) => openingAnimations.includes(animation)),
+    };
+  });
+  expect(reuse).toEqual({ count: 4, paused: true, reused: true });
+  await expect(page.locator("[data-lightbox-dialog][data-lightbox-state='open']")).toBeVisible();
+});
+
 for (const count of [10_000, 100_000]) {
   test(`TanStack host scrolls and Fluidbox resolves stable origins across ${count} items`, async ({
     page,

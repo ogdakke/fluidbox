@@ -44,6 +44,7 @@ const composedController = createLightbox({
   },
 });
 void composedController;
+controller.prepare({ id: "one" })();
 void controller.open({ id: "one" }, { reason: "api" });
 void controller.goTo({ index: 0 });
 void controller.close();

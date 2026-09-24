@@ -13,7 +13,13 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { MouseEvent as ReactMouseEvent, ReactElement, ReactNode, Ref } from "react";
+import type {
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactElement,
+  ReactNode,
+  Ref,
+} from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { createLightbox } from "./create-lightbox";
@@ -89,6 +95,7 @@ class ReactLightboxStore<TItem extends LightboxItem = LightboxItem> {
     this.#state = closedState(source.count);
     const controller = {
       state: this.#state,
+      prepare: (target) => this.#controller?.prepare(target) ?? (() => {}),
       open: (target, options) => this.#command((runtime) => runtime.open(target, options)),
       close: (options) => this.#command((runtime) => runtime.close(options)),
       goTo: (target, options) => this.#command((runtime) => runtime.goTo(target, options)),
@@ -262,11 +269,21 @@ function Item({ id, children }: LightboxItemProps): ReactElement {
   return createElement(ItemContext.Provider, { value: id }, children);
 }
 
-function Trigger({ asChild = false, children, onClick, ...attributes }: LightboxTriggerProps) {
+function Trigger({
+  asChild = false,
+  children,
+  onClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+  ...attributes
+}: LightboxTriggerProps) {
   const { store } = useLightboxContext();
   const id = useContext(ItemContext);
   if (!id) throw new Error("<Lightbox.Trigger> must be rendered inside <Lightbox.Item>.");
   const disposeRef = useRef<LightboxDispose | undefined>(undefined);
+  const preparationRef = useRef<LightboxDispose | undefined>(undefined);
+  const preparationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const child = Children.only(children);
   const childProps = isValidElement<Record<string, unknown>>(child) ? child.props : {};
   const childRef =
@@ -290,7 +307,47 @@ function Trigger({ asChild = false, children, onClick, ...attributes }: Lightbox
     const origin: LightboxOrigin = { trigger: element, visual, thumbnail };
     disposeRef.current = store.controller.registerOrigin(id, origin);
   };
-  useEffect(() => () => disposeRef.current?.(), []);
+  useEffect(
+    () => () => {
+      disposeRef.current?.();
+      preparationRef.current?.();
+      clearTimeout(preparationTimer.current);
+    },
+    [],
+  );
+  const discardPreparation = () => {
+    clearTimeout(preparationTimer.current);
+    preparationTimer.current = undefined;
+    preparationRef.current?.();
+    preparationRef.current = undefined;
+  };
+  const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const childHandler = childProps.onPointerDown as
+      | ((event: ReactPointerEvent<HTMLButtonElement>) => void)
+      | undefined;
+    childHandler?.(event);
+    onPointerDown?.(event);
+    if (event.defaultPrevented || !event.isPrimary || event.button !== 0) return;
+    discardPreparation();
+    preparationRef.current = store.controller.prepare({ id });
+  };
+  const handlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const childHandler = childProps.onPointerUp as
+      | ((event: ReactPointerEvent<HTMLButtonElement>) => void)
+      | undefined;
+    childHandler?.(event);
+    onPointerUp?.(event);
+    clearTimeout(preparationTimer.current);
+    preparationTimer.current = setTimeout(discardPreparation, 250);
+  };
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const childHandler = childProps.onPointerCancel as
+      | ((event: ReactPointerEvent<HTMLButtonElement>) => void)
+      | undefined;
+    childHandler?.(event);
+    onPointerCancel?.(event);
+    discardPreparation();
+  };
   const handleClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
     const childClick = childProps.onClick as
       | ((event: ReactMouseEvent<HTMLButtonElement>) => void)
@@ -301,11 +358,26 @@ function Trigger({ asChild = false, children, onClick, ...attributes }: Lightbox
   };
 
   if (asChild) {
-    return cloneElement(child, { ...attributes, ref: setRef, onClick: handleClick } as never);
+    return cloneElement(child, {
+      ...attributes,
+      ref: setRef,
+      onClick: handleClick,
+      onPointerDown: handlePointerDown,
+      onPointerUp: handlePointerUp,
+      onPointerCancel: handlePointerCancel,
+    } as never);
   }
   return createElement(
     "button",
-    { ...attributes, ref: setRef, onClick: handleClick, type: attributes.type ?? "button" },
+    {
+      ...attributes,
+      ref: setRef,
+      onClick: handleClick,
+      onPointerDown: handlePointerDown,
+      onPointerUp: handlePointerUp,
+      onPointerCancel: handlePointerCancel,
+      type: attributes.type ?? "button",
+    },
     child,
   );
 }

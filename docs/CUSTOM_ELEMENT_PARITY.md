@@ -62,7 +62,7 @@ painting, and the legacy `/media/*-160w.webp` URL convention.
 | Enforce one active viewer and hand ownership to a new viewer                                     | `viewer-ownership.ts`                                                               | Migrated; close veto is honored                                                                                     |
 | Track closed, opening, open, and closing state                                                   | `ViewerSession` and `DomViewerDriver`                                               | Migrated                                                                                                            |
 | Prepare opening geometry before the portal becomes visible                                       | `DomViewerDriver.open()`                                                            | Migrated                                                                                                            |
-| Prebuild and measure opening on primary pointerdown, then cancel on pointer cancellation         | Runtime/controller and trigger bindings                                             | Missing. The direct runtime starts on click or `open()`, losing the old pointerdown head start on iOS.              |
+| Prebuild and measure opening on primary pointerdown, then cancel on pointer cancellation         | `LightboxController.prepare()` and trigger bindings                                 | Migrated. Preparation keeps state/background ownership unchanged, pauses the opening animations, and is disposable. |
 | Reverse an unfinished open or close from the painted pose                                        | `DomViewerDriver` plus `image-transition-motion.ts`                                 | Migrated with timestamped geometry coverage                                                                         |
 | Copy theme variables from the scoped trigger into the body portal                                | `DomViewerDriver.#applyTheme()`                                                     | Migrated for all `--lightbox-*` inputs and legacy aliases                                                           |
 | Keep filmstrip controls hidden until the opening backdrop is ready                               | `DomViewerDriver.#waitForFilmstripReveal()`                                         | Migrated                                                                                                            |
@@ -102,15 +102,15 @@ crop, radius, and decoration behavior.
 
 ## Loading and media
 
-| Old responsibility                                                   | Headless owner                               | Status                                                                |
-| -------------------------------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
-| Warm a small preview before full media                               | Explicit `thumbnail` and `preview` resources | Migrated without URL conventions                                      |
-| Apply `srcset`, `sizes`, and picture sources after preview handoff   | `ViewerStrip`                                | Migrated                                                              |
-| Avoid loading full media while closed                                | `ViewerStrip` mount/load lifecycle           | Migrated                                                              |
-| Honor declarative eager loading while closed                         | Custom-element adapter                       | Compatibility-only. The headless source has no eager-load policy yet. |
-| Retry failed media without losing the opening preview                | `ViewerStrip`                                | Migrated                                                              |
-| Support video, iframe, and custom content through one indexed source | Media descriptors and renderer contract      | Migrated                                                              |
-| Preserve live non-image state through close                          | Live-node document flight                    | Migrated                                                              |
+| Old responsibility                                                        | Headless owner                               | Status                                                                                     |
+| ------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Warm a small preview before full media                                    | Explicit `thumbnail` and `preview` resources | Migrated without URL conventions                                                           |
+| Apply `srcset`, `sizes`, and picture sources after preview handoff        | `ViewerStrip`                                | Migrated                                                                                   |
+| Avoid loading full media before first open or after cancelled preparation | `ViewerStrip` mount/load lifecycle           | Migrated. A completed session currently retains its bounded active window for fast reopen. |
+| Honor declarative eager loading while closed                              | Custom-element adapter                       | Compatibility-only. The headless source has no eager-load policy yet.                      |
+| Retry failed media without losing the opening preview                     | `ViewerStrip`                                | Migrated                                                                                   |
+| Support video, iframe, and custom content through one indexed source      | Media descriptors and renderer contract      | Migrated                                                                                   |
+| Preserve live non-image state through close                               | Live-node document flight                    | Migrated                                                                                   |
 
 ## Compatibility boundary
 

@@ -36,6 +36,12 @@ function deferred(): Deferred {
 }
 
 class TestDriver implements ViewerSessionDriver<(typeof items)[number]> {
+  readonly preparations: Array<{
+    item: (typeof items)[number];
+    index: number;
+    origin: null;
+  }> = [];
+  preparationDisposed = false;
   readonly opens: ViewerSessionMotionContext<(typeof items)[number]>[] = [];
   readonly selections: ViewerSessionMotionContext<(typeof items)[number]>[] = [];
   readonly closes: AbortSignal[] = [];
@@ -44,6 +50,13 @@ class TestDriver implements ViewerSessionDriver<(typeof items)[number]> {
   registerThumbnailOverlay: NonNullable<
     ViewerSessionDriver<(typeof items)[number]>["registerThumbnailOverlay"]
   > = () => {};
+
+  prepare(context: { item: (typeof items)[number]; index: number; origin: null }) {
+    this.preparations.push(context);
+    return () => {
+      this.preparationDisposed = true;
+    };
+  }
 
   open(context: ViewerSessionMotionContext<(typeof items)[number]>) {
     this.opens.push(context);
@@ -80,6 +93,19 @@ function eventLabel(event: LightboxEvent) {
 }
 
 describe("ViewerSession", () => {
+  it("prepares a valid closed target without publishing state", () => {
+    const driver = new TestDriver();
+    const session = new ViewerSession({ source: arraySource(items) }, driver);
+
+    const dispose = session.prepare({ id: "two" });
+
+    expect(driver.preparations).toEqual([{ item: items[1], index: 1, origin: null }]);
+    expect(session.state).toMatchObject({ status: "closed", activeId: null });
+    dispose();
+    expect(driver.preparationDisposed).toBe(true);
+    expect(() => session.prepare({ id: "missing" })).toThrow(RangeError);
+  });
+
   it("publishes the specified open lifecycle and immutable state", async () => {
     const driver = new TestDriver();
     const order: string[] = [];

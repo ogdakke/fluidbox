@@ -74,6 +74,16 @@ interface PaintedPose extends ImageTransitionPose {
   readonly backdropOpacity: string;
 }
 
+interface PreparedOpen<TItem extends LightboxItem> {
+  readonly token: object;
+  readonly item: TItem;
+  readonly index: number;
+  readonly origin: HTMLElement | null;
+  readonly animations: Animation[];
+  readonly start: PaintedPose;
+  readonly motion: ReturnType<typeof createImageTransitionMotion>;
+}
+
 function finitePose(pose: PaintedPose) {
   const { transform, clip } = pose;
   return [
@@ -152,6 +162,7 @@ export class DomViewerDriver<
   #returnFocus: HTMLElement | null = null;
   #returnFocusFallback: HTMLElement | null = null;
   #viewportWidth = 0;
+  #preparedOpen: PreparedOpen<TItem> | undefined;
   readonly #themeProperties = new Set<string>();
   #forceImmediateClose = false;
   #destroyed = false;
@@ -275,6 +286,7 @@ export class DomViewerDriver<
   }
 
   setSource(source: LightboxSource<TItem>) {
+    this.#discardPreparation();
     if (this.#strip) {
       this.#strip.setSource(source);
       this.#portal.dialog.toggleAttribute("data-lightbox-gallery", source.count > 1);
@@ -302,22 +314,74 @@ export class DomViewerDriver<
     return this.#thumbnailOverlays.register(id, registration);
   }
 
+  prepare(context: Omit<ViewerSessionMotionContext<TItem>, "signal" | "reason">) {
+    this.#discardPreparation();
+    if (this.#destroyed || this.#controller?.state.status !== "closed" || activeViewer.active) {
+      return () => {};
+    }
+    const view = this.#portal.overlay.ownerDocument.defaultView!;
+    this.#viewportWidth = view.innerWidth;
+    this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    this.#applyTheme(context.origin?.trigger ?? null);
+    void this.#strip?.select(context.index, false);
+    this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
+    this.#render(context.item, context.index);
+    this.#portal.overlay.dataset.lightboxPrepared = "";
+    this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
+    this.#strip?.mount();
+
+    const origin = context.origin?.visual;
+    const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    const start = this.#openingStart(from);
+    const motion = this.#openingMotion(start, !!from);
+    applyImageTransitionPose(this.#frame, this.#media, start);
+    this.#frame.style.opacity = start.frameOpacity;
+    this.#portal.backdrop.style.opacity = start.backdropOpacity;
+    const animations = this.#openingAnimations(motion);
+    for (const animation of animations) {
+      animation.pause();
+      animation.currentTime = 0;
+    }
+    const token = {};
+    this.#preparedOpen = {
+      token,
+      item: context.item,
+      index: context.index,
+      origin: from,
+      animations,
+      start,
+      motion,
+    };
+    return () => {
+      if (this.#preparedOpen?.token === token) this.#discardPreparation();
+    };
+  }
+
   async open(context: ViewerSessionMotionContext<TItem>) {
     const previous = activeViewer.claim(this.#viewerOwner);
     if (previous && !previous.closeImmediately()) {
       activeViewer.claim(previous);
+      this.#discardPreparation();
       return false;
     }
     this.#endWheelHandoff();
     void this.#loadZoom();
     this.#cancelAnimations(true);
+    const prepared =
+      this.#preparedOpen?.item.id === context.item.id && this.#preparedOpen.index === context.index
+        ? this.#preparedOpen
+        : undefined;
+    if (!prepared) this.#discardPreparation();
+    else this.#preparedOpen = undefined;
     const view = this.#portal.overlay.ownerDocument.defaultView!;
     this.#viewportWidth = view.innerWidth;
     this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
     const focused = this.#portal.overlay.ownerDocument.activeElement;
     this.#applyTheme(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
-    await this.#strip?.select(context.index, false);
-    this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
+    if (!prepared) {
+      await this.#strip?.select(context.index, false);
+      this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
+    }
     this.#render(context.item, context.index);
     this.#setActiveTrigger(context.origin?.trigger ?? null);
     this.#returnFocus =
@@ -333,9 +397,10 @@ export class DomViewerDriver<
     this.#strip?.mount();
     this.#isolation.activate();
     this.#setState("opening");
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (context.signal.aborted) return;
     if (this.#prefersReducedMotion()) {
+      for (const animation of prepared?.animations ?? []) animation.cancel();
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
       this.#thumbnailOverlays.prepare(context.item, context.index, this.#frame, "open", 0);
@@ -348,37 +413,15 @@ export class DomViewerDriver<
 
     const interruptedPose = this.#takeInterruptedPose(false);
     const origin = context.origin?.visual;
-    const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    const from =
+      prepared?.origin ?? (origin && origin.isConnected && originIsVisible(origin) ? origin : null);
     this.#activeOrigin = from;
-    const openPose = openImageTransitionPose();
-    const start = interruptedPose
-      ? interruptedPose
-      : from
-        ? poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, openPose))
-        : {
-            transform: new DOMMatrix()
-              .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
-              .scale(0.96),
-            clip: openPose.clip,
-            frameOpacity: "0",
-            backdropOpacity: "0",
-          };
-    const response = matchMedia("(hover: none) and (pointer: coarse)").matches
-      ? TOUCH_OPENING_SPRING_RESPONSE
-      : OPENING_SPRING_RESPONSE;
-    const motion = createImageTransitionMotion({
-      opening: true,
-      from: start,
-      to: openPose,
-      width: this.#media.offsetWidth,
-      height: this.#media.offsetHeight,
-      backdropFrom: Number(interruptedPose?.backdropOpacity ?? 0),
-      backdropTo: 1,
-      duration: OPEN_DURATION,
-      response,
-      samples: 24,
-      fadeFrame: !from && !interruptedPose,
-    });
+    const start =
+      prepared && !interruptedPose ? prepared.start : this.#openingStart(from, interruptedPose);
+    const motion =
+      prepared && !interruptedPose
+        ? prepared.motion
+        : this.#openingMotion(start, !!from, interruptedPose);
     const overlayFrom = interruptedPose ? this.#thumbnailOverlays.currentProgress(1) : 1;
     this.#thumbnailOverlays.prepare(
       context.item,
@@ -391,10 +434,7 @@ export class DomViewerDriver<
     this.#frame.style.opacity = interruptedPose?.frameOpacity ?? (!from ? "0" : "1");
     this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
     const animations = [
-      this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
-      this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
-      this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
-      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+      ...(prepared && !interruptedPose ? prepared.animations : this.#openingAnimations(motion)),
       ...this.#thumbnailOverlays.animations(motion.frame, motion.duration, overlayFrom, 0),
     ];
     if (this.#portal.dialog.hasAttribute("data-filmstrip")) {
@@ -542,6 +582,7 @@ export class DomViewerDriver<
     this.#dragGesture.cancel();
     this.#endWheelHandoff();
     this.#zoom?.destroy();
+    this.#discardPreparation();
     this.#thumbnailOverlays.destroy();
     this.#cancelAnimations(false);
     this.#portalDispose?.();
@@ -564,6 +605,64 @@ export class DomViewerDriver<
     const label = media.type === "image" ? media.alt : media.title;
     this.#portal.dialog.setAttribute("aria-label", label || "Media viewer");
     this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
+  }
+
+  #openingStart(from: HTMLElement | null, interrupted?: PaintedPose): PaintedPose {
+    if (interrupted) return interrupted;
+    const openPose = openImageTransitionPose();
+    if (from) {
+      return {
+        ...poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, openPose)),
+        frameOpacity: "1",
+        backdropOpacity: "0",
+      };
+    }
+    return {
+      transform: new DOMMatrix()
+        .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+        .scale(0.96),
+      clip: openPose.clip,
+      frameOpacity: "0",
+      backdropOpacity: "0",
+    };
+  }
+
+  #openingMotion(start: PaintedPose, hasOrigin: boolean, interrupted?: PaintedPose) {
+    const response = matchMedia("(hover: none) and (pointer: coarse)").matches
+      ? TOUCH_OPENING_SPRING_RESPONSE
+      : OPENING_SPRING_RESPONSE;
+    return createImageTransitionMotion({
+      opening: true,
+      from: start,
+      to: openImageTransitionPose(),
+      width: this.#media.offsetWidth,
+      height: this.#media.offsetHeight,
+      backdropFrom: Number(start.backdropOpacity),
+      backdropTo: 1,
+      duration: OPEN_DURATION,
+      response,
+      samples: 24,
+      fadeFrame: !hasOrigin && !interrupted,
+    });
+  }
+
+  #openingAnimations(motion: ReturnType<typeof createImageTransitionMotion>) {
+    return [
+      this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
+      this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
+      this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
+      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+    ];
+  }
+
+  #discardPreparation() {
+    const prepared = this.#preparedOpen;
+    if (!prepared) return;
+    this.#preparedOpen = undefined;
+    for (const animation of prepared.animations) animation.cancel();
+    this.#strip?.unmount();
+    this.#clearMotionStyles();
+    this.#portal.overlay.remove();
   }
 
   #applyTheme(source: HTMLElement | null) {

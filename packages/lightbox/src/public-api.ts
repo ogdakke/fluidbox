@@ -236,6 +236,8 @@ export interface LightboxOptions<TItem extends LightboxItem = LightboxItem> {
 
 export interface LightboxController<TItem extends LightboxItem = LightboxItem> {
   readonly state: LightboxState;
+  /** Prepare a closed viewer for a likely open. Dispose to cancel unused work. */
+  prepare(target: LightboxTarget): LightboxDispose;
   open(target: LightboxTarget, options?: LightboxCommandOptions): Promise<LightboxCommandResult>;
   close(options?: LightboxCommandOptions): Promise<LightboxCommandResult>;
   goTo(target: LightboxTarget, options?: LightboxCommandOptions): Promise<LightboxCommandResult>;

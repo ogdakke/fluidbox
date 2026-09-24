@@ -124,11 +124,20 @@ const viewer = createLightbox({
   },
 });
 
+const cancelPreparation = viewer.prepare({ id: "photo-1" });
 await viewer.open({ id: "photo-1" });
+cancelPreparation();
 await viewer.next({ reason: "api" });
 await viewer.close();
 viewer.destroy();
 ```
+
+`prepare(target)` is the optional pointer-down latency path. It synchronously validates the target,
+mounts and measures a hidden portal, prepares the opening preview, and pauses the opening animations
+at time zero. It does not publish state, hide the thumbnail, isolate the document, or claim active
+viewer ownership. Its disposer cancels unused preparation; calling it after `open()` has consumed the
+preparation is a no-op. Bindings should prepare only for a primary activation pointer and discard on
+pointer cancellation. `open()` works identically without prior preparation.
 
 Commands validate their target before returning a promise. An invalid or missing target throws
 `RangeError`; a destroyed controller throws `InvalidStateError`. A valid command resolves only when
