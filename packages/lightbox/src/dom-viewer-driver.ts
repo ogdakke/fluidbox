@@ -54,6 +54,14 @@ const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
 const WHEEL_HANDOFF_TIMEOUT = 1200;
+const LEGACY_THEME_PROPERTIES = new Set([
+  "--radius",
+  "--background",
+  "--color",
+  "--accent",
+  "--border",
+  "--primary",
+]);
 
 interface PaintedPose extends ImageTransitionPose {
   readonly frameOpacity: string;
@@ -121,6 +129,7 @@ export class DomViewerDriver<
   #zoomLoad: Promise<import("./lightbox-zoom").LightboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
   #viewportWidth = 0;
+  readonly #themeProperties = new Set<string>();
   #forceImmediateClose = false;
   #destroyed = false;
 
@@ -282,6 +291,8 @@ export class DomViewerDriver<
     const view = this.#portal.overlay.ownerDocument.defaultView!;
     this.#viewportWidth = view.innerWidth;
     this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    const focused = this.#portal.overlay.ownerDocument.activeElement;
+    this.#applyTheme(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     await this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
     this.#render(context.item, context.index);
@@ -526,6 +537,22 @@ export class DomViewerDriver<
     const label = media.type === "image" ? media.alt : media.title;
     this.#portal.dialog.setAttribute("aria-label", label || "Media viewer");
     this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
+  }
+
+  #applyTheme(source: HTMLElement | null) {
+    for (const property of this.#themeProperties) {
+      this.#portal.overlay.style.removeProperty(property);
+    }
+    this.#themeProperties.clear();
+    if (!source) return;
+    const style = getComputedStyle(source);
+    for (const property of style) {
+      if (!property.startsWith("--lightbox-") && !LEGACY_THEME_PROPERTIES.has(property)) continue;
+      const value = style.getPropertyValue(property);
+      if (!value) continue;
+      this.#portal.overlay.style.setProperty(property, value);
+      this.#themeProperties.add(property);
+    }
   }
 
   async #waitForFilmstripReveal(signal: AbortSignal) {

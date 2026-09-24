@@ -9,6 +9,10 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
     .poll(() => page.evaluate(() => customElements.get("app-lightbox") === undefined))
     .toBe(true);
   const first = page.locator('[data-photo-id="one"]');
+  await first.evaluate((trigger) => {
+    trigger.style.setProperty("--lightbox-backdrop-background", "rgb(12 34 56)");
+    trigger.style.setProperty("--accent", "rgb(78 90 123)");
+  });
   await first.click();
 
   const overlay = page.locator("[data-lightbox-overlay]");
@@ -26,6 +30,11 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   );
   await expect(activeMedia).toHaveAttribute("sizes", "min(100vw, 800px)");
   await expect(page.locator("[data-demo-caption]")).toHaveText("one");
+  await expect(page.locator("[data-lightbox-backdrop]")).toHaveCSS(
+    "background-color",
+    "rgb(12, 34, 56)",
+  );
+  await expect(overlay).toHaveCSS("--accent", "rgb(78 90 123)");
   await expect(first).toHaveAttribute("aria-haspopup", "dialog");
   await expect(first).toHaveAttribute("aria-expanded", "true");
   await expect(first).toHaveAttribute("data-lightbox-state", "open");
