@@ -147,6 +147,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     cancelAnimationFrame(this.#instantFrame);
     clearTimeout(this.#settleTimer);
     this.#resolveSelection();
+    for (const slide of this.#slides.values()) this.#unload(slide);
     this.#slides.clear();
     this.element.remove();
   }
@@ -206,9 +207,19 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       image.height = item.media.height;
       image.decoding = "async";
       image.draggable = false;
-      image.addEventListener("load", () => (error.hidden = true), {
-        signal: this.#controller.signal,
-      });
+      image.addEventListener(
+        "load",
+        () => {
+          if (
+            new URL(image.currentSrc || image.src, this.#ownerDocument.baseURI).href ===
+            new URL(item.media.type === "image" ? item.media.src : "", this.#ownerDocument.baseURI)
+              .href
+          ) {
+            error.hidden = true;
+          }
+        },
+        { signal: this.#controller.signal },
+      );
       image.addEventListener(
         "error",
         () => {
@@ -317,7 +328,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       this.#rebasing = false;
       this.#onScroll();
     });
-    this.#loadWindow();
+    if (this.#mounted) this.#loadWindow();
   }
 
   #jump(index: number) {

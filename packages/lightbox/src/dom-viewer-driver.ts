@@ -82,6 +82,7 @@ export class DomViewerDriver<
   #animations: Animation[] = [];
   #interruptedPose: PaintedPose | undefined;
   #activeOrigin: HTMLElement | null = null;
+  #activeTrigger: HTMLElement | null = null;
   #flight: HTMLDivElement | undefined;
   #flightFrame: HTMLDivElement | undefined;
   #flightMedia: HTMLImageElement | undefined;
@@ -276,6 +277,7 @@ export class DomViewerDriver<
     await this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
     this.#render(context.item, context.index);
+    this.#setActiveTrigger(context.origin?.trigger ?? null);
     this.#returnFocus =
       context.origin?.trigger ??
       (this.#portal.overlay.ownerDocument.activeElement instanceof HTMLElement
@@ -364,6 +366,8 @@ export class DomViewerDriver<
     delete this.#portal.overlay.dataset.lightboxPrepared;
     await this.#play(animations, context.signal);
     if (context.signal.aborted) return;
+    await this.#waitForFilmstripReveal(context.signal);
+    if (context.signal.aborted) return;
     this.#setState("open");
     this.#strip?.completeOpening(context.index);
     this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
@@ -379,6 +383,7 @@ export class DomViewerDriver<
     this.#takeInterruptedPose();
     const origin = context.origin?.visual;
     this.#activeOrigin = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    this.#setActiveTrigger(context.origin?.trigger ?? null);
     const selected = this.#strip?.index === context.index;
     // A native swipe updates the strip before it reports the selected index.
     // Sending that selection back into the strip would snap an in-progress
@@ -411,6 +416,7 @@ export class DomViewerDriver<
     this.#cancelAnimations(true);
     const interruptedPose = this.#takeInterruptedPose(false);
     this.#setState("closing");
+    this.#setActiveTrigger(null);
     if (context.origin?.trigger.isConnected) this.#returnFocus = context.origin.trigger;
     if (this.#prefersReducedMotion()) {
       this.#takeInterruptedPose();
@@ -512,6 +518,40 @@ export class DomViewerDriver<
     const label = media.type === "image" ? media.alt : media.title;
     this.#portal.dialog.setAttribute("aria-label", label || "Media viewer");
     this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
+  }
+
+  async #waitForFilmstripReveal(signal: AbortSignal) {
+    const filmstrip = this.#portal.dialog.querySelector<HTMLElement>("[data-lightbox-filmstrip]");
+    const animation = filmstrip
+      ?.getAnimations()
+      .find(
+        (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+      );
+    if (!animation) return;
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        signal.removeEventListener("abort", done);
+        resolve();
+      };
+      signal.addEventListener("abort", done, { once: true });
+      void animation.finished.then(done, done);
+    });
+  }
+
+  #setActiveTrigger(trigger: HTMLElement | null) {
+    if (this.#activeTrigger && this.#activeTrigger !== trigger) {
+      this.#paintTrigger(this.#activeTrigger, false);
+    }
+    this.#activeTrigger = trigger;
+    if (trigger) this.#paintTrigger(trigger, true);
+  }
+
+  #paintTrigger(trigger: HTMLElement, open: boolean) {
+    trigger.dataset.lightboxState = open ? "open" : "closed";
+    trigger.toggleAttribute("data-open", open);
+    trigger.toggleAttribute("data-closed", !open);
+    trigger.setAttribute("aria-haspopup", "dialog");
+    trigger.setAttribute("aria-expanded", String(open));
   }
 
   async #play(animations: Animation[], signal: AbortSignal) {
@@ -1035,6 +1075,7 @@ export class DomViewerDriver<
     delete this.#portal.overlay.dataset.lightboxEdgeReleased;
     this.#removeFlight();
     this.#thumbnailOverlays.finishClose();
+    this.#setActiveTrigger(null);
     activeViewer.release(this.#viewerOwner);
     this.#isolation.deactivate();
     this.#portal.overlay.remove();

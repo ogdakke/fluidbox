@@ -281,3 +281,37 @@ test("filmstrip preference applies to the next open", async ({ page }) => {
   await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
   expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
 });
+
+test("opening remains active until the delayed filmstrip reveal settles", async ({ page }) => {
+  await page.goto("/photo-library.html");
+  await page.locator("[data-photo-index]").first().click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  const filmstrip = page.locator("[data-lightbox-filmstrip]");
+  const paused = await filmstrip.evaluate(async (element) => {
+    for (let frame = 0; frame < 60; frame += 1) {
+      const animation = element
+        .getAnimations()
+        .find(
+          (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+        );
+      if (animation) {
+        animation.pause();
+        return true;
+      }
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+    return false;
+  });
+  expect(paused).toBe(true);
+  await page.waitForTimeout(600);
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "opening");
+  await filmstrip.evaluate((element) => {
+    element
+      .getAnimations()
+      .find(
+        (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+      )
+      ?.finish();
+  });
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+});

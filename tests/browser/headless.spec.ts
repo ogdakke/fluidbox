@@ -26,6 +26,9 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   );
   await expect(activeMedia).toHaveAttribute("sizes", "min(100vw, 800px)");
   await expect(page.locator("[data-demo-caption]")).toHaveText("one");
+  await expect(first).toHaveAttribute("aria-haspopup", "dialog");
+  await expect(first).toHaveAttribute("aria-expanded", "true");
+  await expect(first).toHaveAttribute("data-lightbox-state", "open");
 
   await page.locator("[data-demo-next]").click();
   await expect(page.locator("[data-demo-caption]")).toHaveText("two");
@@ -35,10 +38,13 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   ).toHaveCount(0);
   await expect(activeMedia).not.toHaveAttribute("srcset", /.+/);
   await expect(activeMedia).not.toHaveAttribute("sizes", /.+/);
+  await expect(first).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator('[data-photo-id="two"]')).toHaveAttribute("aria-expanded", "true");
 
   await page.locator("[data-demo-close]").click();
   await expect(overlay).toHaveCount(0);
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
+  await expect(page.locator('[data-photo-id="two"]')).toHaveAttribute("aria-expanded", "false");
 });
 
 test("plain runtime contains focus and applies the established gallery keyboard policy", async ({
@@ -165,6 +171,37 @@ test("plain runtime owns video and iframe media while custom renderers own desce
   await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
 });
 
+test("destroy unloads mounted custom media before removing the viewer", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 1,
+      getItem() {
+        return {
+          id: "custom",
+          media: {
+            type: "custom",
+            renderer: "demo",
+            title: "Custom study",
+            width: 800,
+            height: 600,
+          },
+        };
+      },
+      getIndex(id) {
+        return id === "custom" ? 0 : null;
+      },
+    });
+    await window.headlessViewer.open({ id: "custom" });
+    window.headlessViewer.destroy();
+  });
+
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
+  await expect(page.locator("body")).toHaveAttribute("data-custom-aborts", "1");
+  await expect(page.locator("body")).toHaveAttribute("data-custom-disposals", "1");
+});
+
 test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
@@ -255,17 +292,13 @@ test("plain runtime keeps the preview painted until the full image can replace i
 test("plain runtime keeps the preview available while a failed full image is retried", async ({
   page,
 }) => {
-  let serveFullImage = false;
-  await page.route("**/retry-full.svg", async (route) => {
-    if (!serveFullImage) {
-      await route.abort("failed");
-      return;
-    }
-    await route.fulfill({
+  const fullImageRoute = "**/retry-full.svg";
+  await page.route(fullImageRoute, (route) => route.abort("failed"));
+  const serveFullImage = (route: import("@playwright/test").Route) =>
+    route.fulfill({
       contentType: "image/svg+xml",
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="green"/></svg>',
     });
-  });
   await page.goto("/headless.html");
   await page.evaluate(async () => {
     await window.headlessViewer.setSource({
@@ -296,7 +329,8 @@ test("plain runtime keeps the preview available while a failed full image is ret
   await expect(error).toBeVisible();
   await expect(media).toHaveAttribute("src", "/photo-portrait.svg");
 
-  serveFullImage = true;
+  await page.unroute(fullImageRoute);
+  await page.route(fullImageRoute, serveFullImage);
   await error.getByRole("button", { name: "Retry" }).focus();
   await page.keyboard.press("Enter");
   await expect(error).toBeHidden();
