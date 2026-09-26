@@ -56,8 +56,14 @@ export function applyImageTransitionPose(
   frame: HTMLElement,
   image: HTMLElement,
   pose: ImageTransitionPose,
+  size?: { readonly width: number; readonly height: number },
 ) {
-  const crop = cropPose(pose.transform, pose.clip, image.offsetWidth, image.offsetHeight);
+  const crop = cropPose(
+    pose.transform,
+    pose.clip,
+    size?.width ?? image.offsetWidth,
+    size?.height ?? image.offsetHeight,
+  );
   frame.style.transform = crop.frame.toString();
   frame.style.borderRadius = crop.borderRadius;
   image.style.transform = crop.image.toString();

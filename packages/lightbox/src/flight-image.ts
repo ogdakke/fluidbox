@@ -3,8 +3,9 @@ export async function handoffDecodedFlightImage(
   source: HTMLElement,
   flight: HTMLImageElement,
   isCurrent: () => boolean,
+  ready: Promise<unknown> = flight.decode(),
 ) {
-  await flight.decode().catch(() => {});
+  await ready.catch(() => {});
   if (!isCurrent()) return false;
   source.dataset.lightboxFlightSourceHidden = "";
   return true;

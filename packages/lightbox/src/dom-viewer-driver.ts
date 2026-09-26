@@ -131,6 +131,9 @@ export class DomViewerDriver<
   #flightMedia: HTMLElement | undefined;
   #flightSource: HTMLElement | undefined;
   #flightMarker: Comment | undefined;
+  #preparedFlight:
+    | { source: HTMLImageElement; image: HTMLImageElement; ready: Promise<boolean> }
+    | undefined;
   #flightOrigin = { x: 0, y: 0, width: 0, height: 0 };
   #flightViewerOrigin = { x: 0, y: 0 };
   #closeStart: ImageTransitionPose | undefined;
@@ -288,6 +291,7 @@ export class DomViewerDriver<
 
   setSource(source: LightboxSource<TItem>) {
     this.#discardPreparation();
+    this.#preparedFlight = undefined;
     if (this.#strip) {
       this.#strip.setSource(source);
       this.#portal.dialog.toggleAttribute("data-lightbox-gallery", source.count > 1);
@@ -362,6 +366,7 @@ export class DomViewerDriver<
   }
 
   async open(context: ViewerSessionMotionContext<TItem>) {
+    this.#preparedFlight = undefined;
     const previous = activeViewer.claim(this.#viewerOwner);
     if (previous && !previous.closeImmediately()) {
       activeViewer.claim(previous);
@@ -480,6 +485,7 @@ export class DomViewerDriver<
   }
 
   async select(context: ViewerSessionMotionContext<TItem>) {
+    this.#preparedFlight = undefined;
     this.#cancelAnimations(true);
     this.#zoom?.suspend();
     void this.#loadZoom();
@@ -516,6 +522,7 @@ export class DomViewerDriver<
       this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
     }
     if (this.#forceImmediateClose || this.#prefersReducedMotion()) {
+      this.#preparedFlight = undefined;
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
       this.#finishClose();
@@ -547,7 +554,14 @@ export class DomViewerDriver<
     let media = this.#media;
     if (from) {
       const source = media;
-      const flight = this.#createCloseFlight(start, from, media);
+      const prepared =
+        source instanceof HTMLImageElement &&
+        this.#preparedFlight?.source === source &&
+        this.#preparedFlight.image.src === (source.currentSrc || source.src)
+          ? this.#preparedFlight
+          : undefined;
+      this.#preparedFlight = undefined;
+      const flight = this.#createCloseFlight(start, from, media, prepared?.image);
       frame = flight.frame;
       media = flight.media;
       target = flight.target;
@@ -556,11 +570,16 @@ export class DomViewerDriver<
           source,
           media as HTMLImageElement,
           () => !context.signal.aborted,
+          prepared?.ready.then(async (decoded) => {
+            if (!decoded) await (media as HTMLImageElement).decode();
+          }),
         );
         if (!handedOff) return this.#removeFlight();
       }
       this.#closeOriginObserver = new ResizeObserver(this.#scheduleCloseTargetUpdate);
       this.#closeOriginObserver.observe(from);
+    } else {
+      this.#preparedFlight = undefined;
     }
     this.#closeStart = start;
     this.#closeTargetOrigin = from;
@@ -600,6 +619,7 @@ export class DomViewerDriver<
     this.#lifetime.abort();
     clearTimeout(this.#suppressClickTimer);
     this.#dragGesture.cancel();
+    this.#preparedFlight = undefined;
     this.#endWheelHandoff();
     this.#zoom?.destroy();
     this.#discardPreparation();
@@ -887,7 +907,12 @@ export class DomViewerDriver<
     return { image: this.#media, frame: this.#frame };
   }
 
-  #createCloseFlight(start: ImageTransitionPose, origin: HTMLElement, source: HTMLElement) {
+  #createCloseFlight(
+    start: ImageTransitionPose,
+    origin: HTMLElement,
+    source: HTMLElement,
+    prepared?: HTMLImageElement,
+  ) {
     const ownerDocument = this.#portal.overlay.ownerDocument;
     const view = ownerDocument.defaultView!;
     const bounds = source.getBoundingClientRect();
@@ -915,7 +940,8 @@ export class DomViewerDriver<
     frame.style.setProperty("--lightbox-flight-width", `${source.offsetWidth}px`);
     frame.style.setProperty("--lightbox-flight-item-height", `${source.offsetHeight}px`);
     const media =
-      source instanceof HTMLImageElement ? (source.cloneNode(true) as HTMLImageElement) : source;
+      prepared ??
+      (source instanceof HTMLImageElement ? (source.cloneNode(true) as HTMLImageElement) : source);
     if (media !== source) {
       media.removeAttribute("style");
     } else {
@@ -1066,16 +1092,17 @@ export class DomViewerDriver<
     const current = readImageTransitionPose(frame, this.#media);
     const matrix = current.transform;
     this.#strip?.freeze();
+    this.#preparedFlight = undefined;
     const origin = this.#activeOrigin;
-    const target =
-      origin && origin.isConnected && originIsVisible(origin)
-        ? poseFromThumbnail(thumbnailTransitionPose(origin, frame, this.#media, current))
-        : {
-            transform: new DOMMatrix()
-              .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
-              .scale(0.96),
-            clip: current.clip,
-          };
+    const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    const target = from
+      ? poseFromThumbnail(thumbnailTransitionPose(from, frame, this.#media, current))
+      : {
+          transform: new DOMMatrix()
+            .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+            .scale(0.96),
+          clip: current.clip,
+        };
     const wheelTarget = wheelDirection ? new DOMMatrix(target.transform.toString()) : undefined;
     const wheelOffset = !wheelTarget
       ? 0
@@ -1109,6 +1136,27 @@ export class DomViewerDriver<
       target.dataset.dismissing = "";
     }
     this.#paintDrag(state);
+    if (from && this.#media instanceof HTMLImageElement) {
+      this.#prepareCloseFlight(this.#media);
+    }
+  }
+
+  #prepareCloseFlight(source: HTMLImageElement) {
+    const url = source.currentSrc || source.src;
+    if (!url) return;
+    const image = source.cloneNode(true) as HTMLImageElement;
+    // Keep the selected resource when the clone leaves its picture or sizes context.
+    image.removeAttribute("srcset");
+    image.removeAttribute("sizes");
+    image.src = url;
+    this.#preparedFlight = {
+      source,
+      image,
+      ready: image.decode().then(
+        () => true,
+        () => false,
+      ),
+    };
   }
 
   #paintDrag(state: LightboxDragState) {
@@ -1146,17 +1194,22 @@ export class DomViewerDriver<
     const radiusProgress = state.wheelTarget
       ? Math.min(1, progress / DISMISS_RADIUS_END)
       : dismissRadiusProgress(state.x, state.y);
-    applyImageTransitionPose(this.#frame, this.#media, {
-      transform: matrix,
-      clip: {
-        x: state.clipX + (state.targetClipX - state.clipX) * progress,
-        y: state.clipY + (state.targetClipY - state.clipY) * progress,
-        radii: mapRadii(
-          state.borderRadii,
-          (radius, index) => radius + (state.targetRadii[index]! - radius) * radiusProgress,
-        ),
+    applyImageTransitionPose(
+      this.#frame,
+      this.#media,
+      {
+        transform: matrix,
+        clip: {
+          x: state.clipX + (state.targetClipX - state.clipX) * progress,
+          y: state.clipY + (state.targetClipY - state.clipY) * progress,
+          radii: mapRadii(
+            state.borderRadii,
+            (radius, index) => radius + (state.targetRadii[index]! - radius) * radiusProgress,
+          ),
+        },
       },
-    });
+      state,
+    );
     this.#thumbnailOverlays.set("dragging", progress, matrix);
     this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
     if (
@@ -1165,6 +1218,7 @@ export class DomViewerDriver<
       Math.abs(dragDistance(state)) < 0.1
     ) {
       this.#dragGesture.finish();
+      this.#preparedFlight = undefined;
       this.#clearMotionStyles();
       this.#strip?.resume();
     }
@@ -1252,6 +1306,7 @@ export class DomViewerDriver<
       void this.#controller?.close({ reason: "pointer" });
       return;
     }
+    this.#preparedFlight = undefined;
     const current = readImageTransitionPose(this.#frame, this.#media);
     const opacity = Number(getComputedStyle(this.#portal.backdrop).opacity);
     const settleX = boundDismissVelocity(state.x, velocityX, "x");

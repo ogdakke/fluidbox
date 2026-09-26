@@ -136,6 +136,166 @@ test("indexed close keeps the live image painted until its flight clone decodes"
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 
+test("touch dismissal decodes its flight image during the drag", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  await page.evaluate(() => {
+    const originalDecode = (image: HTMLImageElement) =>
+      HTMLImageElement.prototype.decode.call(image);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    Object.assign(window, { __releasePreparedDecode: release, __preparedDecodeCalls: 0 });
+    HTMLImageElement.prototype.decode = function () {
+      if (!this.isConnected) {
+        this.dataset.preparedFlight = "";
+        (window as unknown as { __preparedDecodeCalls: number }).__preparedDecodeCalls++;
+        return gate;
+      }
+      return originalDecode(this);
+    };
+  });
+
+  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const bounds = await frame.boundingBox();
+  expect(bounds).not.toBeNull();
+  const x = bounds!.x + bounds!.width / 2;
+  const y = bounds!.y + bounds!.height / 2;
+  const pointer = { pointerId: 12, pointerType: "touch", isPrimary: true, clientX: x };
+  await frame.dispatchEvent("pointerdown", { ...pointer, clientY: y });
+  await frame.dispatchEvent("pointermove", { ...pointer, clientY: y + 40 });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __preparedDecodeCalls: number }).__preparedDecodeCalls,
+      ),
+    )
+    .toBe(1);
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(0);
+
+  await page.evaluate(() => {
+    (window as unknown as { __releasePreparedDecode(): void }).__releasePreparedDecode();
+  });
+  await frame.dispatchEvent("pointermove", { ...pointer, clientY: y + 100 });
+  await frame.dispatchEvent("pointerup", { ...pointer, clientY: y + 100 });
+  await expect(page.locator("[data-lightbox-flight] [data-prepared-flight]")).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __preparedDecodeCalls: number }).__preparedDecodeCalls,
+      ),
+    )
+    .toBe(1);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
+test("wheel dismissal reuses the image decoded during the wheel spring", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  await page.evaluate(() => {
+    const originalDecode = (image: HTMLImageElement) =>
+      HTMLImageElement.prototype.decode.call(image);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    Object.assign(window, { __releasePreparedDecode: release, __preparedDecodeCalls: 0 });
+    HTMLImageElement.prototype.decode = function () {
+      if (!this.isConnected) {
+        this.dataset.preparedFlight = "";
+        (window as unknown as { __preparedDecodeCalls: number }).__preparedDecodeCalls++;
+        return gate;
+      }
+      return originalDecode(this);
+    };
+  });
+
+  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  await frame.dispatchEvent("wheel", { deltaY: -20, bubbles: true, cancelable: true });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __preparedDecodeCalls: number }).__preparedDecodeCalls,
+      ),
+    )
+    .toBe(1);
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(0);
+
+  await page.evaluate(() => {
+    (window as unknown as { __releasePreparedDecode(): void }).__releasePreparedDecode();
+  });
+  await frame.dispatchEvent("wheel", { deltaY: -400, bubbles: true, cancelable: true });
+  await expect(page.locator("[data-lightbox-flight] [data-prepared-flight]")).toHaveCount(1);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
+test("failed early decode keeps the source painted until the mounted flight decodes", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="1"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  await page.evaluate(() => {
+    const originalDecode = (image: HTMLImageElement) =>
+      HTMLImageElement.prototype.decode.call(image);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    Object.assign(window, { __releaseMountedDecode: release, __earlyDecodeCalls: 0 });
+    HTMLImageElement.prototype.decode = function () {
+      if (!this.isConnected) {
+        (window as unknown as { __earlyDecodeCalls: number }).__earlyDecodeCalls++;
+        return Promise.reject(new Error("Detached decode failed"));
+      }
+      if (this.closest("[data-lightbox-flight]")) return gate;
+      return originalDecode(this);
+    };
+  });
+
+  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const source = frame.locator("[data-lightbox-media]");
+  await frame.dispatchEvent("wheel", { deltaY: -20, bubbles: true, cancelable: true });
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __earlyDecodeCalls: number }).__earlyDecodeCalls),
+    )
+    .toBe(1);
+  await frame.dispatchEvent("wheel", { deltaY: -400, bubbles: true, cancelable: true });
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
+  await expect(source).not.toHaveAttribute("data-lightbox-flight-source-hidden", "");
+
+  await page.evaluate(() => {
+    (window as unknown as { __releaseMountedDecode(): void }).__releaseMountedDecode();
+  });
+  await expect(source).toHaveAttribute("data-lightbox-flight-source-hidden", "");
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
 test("indexed item without a mounted origin uses scale and fade", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/harness.html?virtual&count=1000&no-filmstrip");
