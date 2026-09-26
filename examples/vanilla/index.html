@@ -26,11 +26,25 @@
           <p>Tap either image to open the viewer.</p>
         </div>
         <app-gallery class="photo-grid" aria-label="Example gallery">
-          <app-lightbox src="/first.svg" alt="Blue and green circles" close-button>
-            <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
+          <app-lightbox item-id="first">
+            <button slot="trigger" type="button">
+              <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
+            </button>
+            <template slot="content">
+              <picture>
+                <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
+              </picture>
+            </template>
           </app-lightbox>
-          <app-lightbox src="/second.svg" alt="Pink and orange squares" close-button>
-            <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
+          <app-lightbox item-id="second">
+            <button slot="trigger" type="button">
+              <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
+            </button>
+            <template slot="content">
+              <picture>
+                <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
+              </picture>
+            </template>
           </app-lightbox>
           <app-filmstrip></app-filmstrip>
         </app-gallery>

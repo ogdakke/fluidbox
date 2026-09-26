@@ -49,9 +49,6 @@
   "scripts": {
     "build": "tsdown"
   },
-  "dependencies": {
-    "unlazy": "^2.0.1"
-  },
   "peerDependencies": {
     "@angular/core": ">=20 <23",
     "react": ">=18 <20",

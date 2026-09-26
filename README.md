@@ -15,11 +15,19 @@ Add a gallery to the page:
 
 ```html
 <app-gallery aria-label="Photos">
-  <app-lightbox src="/photos/first.jpg" alt="A mountain at dusk" close-button>
-    <img src="/photos/first-thumb.jpg" alt="A mountain at dusk" width="300" height="200" />
-  </app-lightbox>
-  <app-lightbox src="/photos/second.jpg" alt="A lake in the morning" close-button>
-    <img src="/photos/second-thumb.jpg" alt="A lake in the morning" width="300" height="200" />
+  <app-lightbox item-id="mountain">
+    <button slot="trigger" type="button">
+      <img src="/photos/mountain-thumb.jpg" alt="A mountain at dusk" width="300" height="200" />
+    </button>
+    <template slot="content">
+      <picture>
+        <source
+          type="image/avif"
+          srcset="/photos/mountain-1200.avif 1200w, /photos/mountain-2400.avif 2400w"
+        />
+        <img src="/photos/mountain.jpg" width="2400" height="1600" alt="A mountain at dusk" />
+      </picture>
+    </template>
   </app-lightbox>
   <app-filmstrip></app-filmstrip>
 </app-gallery>
@@ -42,29 +50,42 @@ The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `
 An indexed source lets a gallery open items whose thumbnails are not currently in the DOM. This is useful with virtual lists. The viewer and filmstrip keep a bounded number of elements mounted.
 
 ```ts
-import type { AppGallery, LightboxGallerySource } from "@ogdakke/fluidbox";
+import type { AppGallery, LightboxOriginAdapter, LightboxSource } from "@ogdakke/fluidbox";
 
 const gallery = document.querySelector<AppGallery>("app-gallery")!;
-const source: LightboxGallerySource = {
+const source: LightboxSource = {
   count: photos.length,
   getItem(index) {
     const photo = photos[index]!;
     return {
       id: photo.id,
-      src: photo.full,
-      thumbnailSrc: photo.thumb,
-      alt: photo.alt,
-      width: photo.width,
-      height: photo.height,
+      media: {
+        type: "image",
+        src: photo.full,
+        alt: photo.alt,
+        width: photo.width,
+        height: photo.height,
+      },
+      thumbnail: { src: photo.thumb },
     };
   },
+  getIndex(id) {
+    const index = photos.findIndex((photo) => photo.id === id);
+    return index < 0 ? null : index;
+  },
+};
+const origins: LightboxOriginAdapter = {
   getOrigin(id) {
-    return document.querySelector(`[data-photo-id="${CSS.escape(id)}"]`);
+    const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${CSS.escape(id)}"]`);
+    return trigger
+      ? { trigger, visual: trigger, thumbnail: trigger.querySelector("img") ?? undefined }
+      : null;
   },
 };
 
 gallery.source = source;
-gallery.open(0);
+gallery.origins = origins;
+void gallery.open({ index: 0 });
 ```
 
 `getOrigin` is optional. When an item has no mounted thumbnail, the viewer uses a scale and fade transition. Keep IDs, item count, and item metadata stable while the viewer is open. The source API is synchronous; it does not currently handle asynchronous pagination or mutation notifications.

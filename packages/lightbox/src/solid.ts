@@ -3,7 +3,7 @@ import type { Accessor } from "solid-js";
 import { bindGallerySource } from "./binding";
 import { registerLightboxElements } from "./register";
 import type { AppGallery } from "./gallery";
-import type { LightboxGallerySource } from "./source";
+import type { LightboxItem, LightboxSource } from "./public-api";
 
 /** Register custom elements on the client for standalone markup. */
 export function useFluidboxElements(): void {
@@ -14,7 +14,7 @@ export function useFluidboxElements(): void {
 
 /** Returns a Solid ref callback for an indexed `<app-gallery>`. */
 export function useFluidboxGallery(
-  source: Accessor<LightboxGallerySource | null>,
+  source: Accessor<LightboxSource<LightboxItem> | null>,
 ): (element: AppGallery) => void {
   let element: AppGallery | undefined;
 

@@ -2,7 +2,7 @@
 
 All bindings live in `@ogdakke/fluidbox`. Import `@ogdakke/fluidbox/styles.css` once in the client app. The root and framework entries can be imported during server rendering; they register elements after mount. The `./elements` entry runs in the browser only.
 
-Each binding accepts a `LightboxGallerySource` and writes it to an `<app-gallery>` after the element upgrades. The source can cover items outside the host framework's rendered list. Call `gallery.open(index)` from a thumbnail or button handler.
+The current Solid, Vue, and Angular adapters accept the canonical `LightboxSource` and write it to an `<app-gallery>` after the element upgrades. Call `gallery.open({ index })` from a thumbnail or button handler. React already uses `createLightbox()` directly.
 
 ## React
 
@@ -13,7 +13,7 @@ import type { AppGallery } from "@ogdakke/fluidbox";
 
 const gallery = useRef<AppGallery | null>(null);
 <FluidboxGallery source={source} ref={gallery}>
-  <button onClick={() => gallery.current?.open(0)}>Open</button>
+  <button onClick={() => void gallery.current?.open({ index: 0 })}>Open</button>
 </FluidboxGallery>;
 ```
 
@@ -33,7 +33,7 @@ const bind = useFluidboxGallery(() => source);
     bind(gallery);
   }}
 >
-  <button onClick={() => gallery?.open(0)}>Open</button>
+  <button onClick={() => void gallery?.open({ index: 0 })}>Open</button>
 </app-gallery>;
 ```
 
@@ -57,7 +57,7 @@ Use `CUSTOM_ELEMENTS_SCHEMA` on the host component. Call `useFluidboxGallery()` 
 ```ts
 import { Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef, inject, signal } from "@angular/core";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/angular";
-import type { AppGallery, LightboxGallerySource } from "@ogdakke/fluidbox";
+import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
 
 @Component({
   selector: "photo-page",
@@ -67,7 +67,7 @@ import type { AppGallery, LightboxGallerySource } from "@ogdakke/fluidbox";
 })
 export class PhotoPage {
   readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  readonly source = signal<LightboxGallerySource | null>(gallerySource);
+  readonly source = signal<LightboxSource<LightboxItem> | null>(gallerySource);
 
   constructor() {
     useFluidboxGallery(() => this.gallery(), this.source);
@@ -78,7 +78,7 @@ export class PhotoPage {
   }
 
   open(): void {
-    this.gallery()?.open(0);
+    void this.gallery()?.open({ index: 0 });
   }
 }
 ```

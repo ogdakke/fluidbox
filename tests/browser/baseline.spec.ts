@@ -386,9 +386,9 @@ test("indexed source timing and frame capture", async ({ page, browserName }, te
   }
   const openMs = await page
     .locator("app-gallery")
-    .evaluate((gallery: HTMLElement & { open(index: number): void }) => {
+    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) => {
       const start = performance.now();
-      gallery.open(99_990);
+      gallery.open({ index: 99_990 });
       return performance.now() - start;
     });
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(

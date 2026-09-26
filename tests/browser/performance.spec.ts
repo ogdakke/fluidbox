@@ -25,11 +25,14 @@ test("indexed source open cost stays near constant with gallery size", async ({
     for (let iteration = 0; iteration < 6; iteration++) {
       const elapsed = await page
         .locator("app-gallery")
-        .evaluate((gallery: HTMLElement & { open(index: number): void }, target: number) => {
-          const start = performance.now();
-          gallery.open(target);
-          return performance.now() - start;
-        }, count - 10);
+        .evaluate(
+          (gallery: HTMLElement & { open(target: { index: number }): void }, target: number) => {
+            const start = performance.now();
+            gallery.open({ index: target });
+            return performance.now() - start;
+          },
+          count - 10,
+        );
       await expect(page.locator("[data-lightbox-dialog]")).toBeVisible();
       maxViewerNodes = Math.max(
         maxViewerNodes,

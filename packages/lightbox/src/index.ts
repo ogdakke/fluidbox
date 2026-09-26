@@ -41,8 +41,5 @@ export type {
 } from "./public-api";
 
 export type { AppLightbox } from "./lightbox";
-export type { GalleryItem } from "./gallery-strip";
-
-export type { LightboxGallerySource, LightboxSourceItem } from "./source";
 export type { AppGallery } from "./gallery";
 export { bindGallerySource } from "./binding";

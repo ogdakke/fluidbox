@@ -28,6 +28,16 @@ function candidateSet(candidates: readonly LightboxImageCandidate[] | undefined)
   return candidates?.map((candidate) => `${candidate.src} ${candidate.width}w`).join(", ") ?? "";
 }
 
+function resourceSet(resource: {
+  readonly candidates?: readonly LightboxImageCandidate[];
+  readonly srcset?: string;
+}) {
+  if (resource.srcset && resource.candidates?.length) {
+    throw new TypeError("Lightbox image resources cannot define both srcset and candidates.");
+  }
+  return resource.srcset ?? candidateSet(resource.candidates);
+}
+
 /** Bounded native-scrolling gallery for the plain DOM runtime. */
 export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   readonly element: HTMLDivElement;
@@ -526,13 +536,13 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     for (const source of slide.picture.querySelectorAll("source")) source.remove();
     for (const resource of item.media.sources ?? []) {
       const source = this.#ownerDocument.createElement("source");
-      source.srcset = candidateSet(resource.candidates);
+      source.srcset = resourceSet(resource);
       if (resource.sizes) source.sizes = resource.sizes;
       if (resource.media) source.media = resource.media;
       if (resource.type) source.type = resource.type;
       slide.picture.insertBefore(source, slide.image);
     }
-    slide.image.srcset = candidateSet(item.media.candidates);
+    slide.image.srcset = resourceSet(item.media);
     if (item.media.sizes) slide.image.sizes = item.media.sizes;
     else slide.image.removeAttribute("sizes");
     slide.image.loading = index === this.#index ? "eager" : "lazy";

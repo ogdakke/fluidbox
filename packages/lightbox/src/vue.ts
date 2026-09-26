@@ -3,7 +3,7 @@ import type { PropType } from "vue";
 import { bindGallerySource } from "./binding";
 import { registerLightboxElements } from "./register";
 import type { AppGallery } from "./gallery";
-import type { LightboxGallerySource } from "./source";
+import type { LightboxItem, LightboxSource } from "./public-api";
 
 /** Register custom elements on mount for standalone Vue templates. */
 export function useFluidboxElements(): void {
@@ -17,7 +17,7 @@ export const FluidboxGallery = defineComponent({
   name: "FluidboxGallery",
   inheritAttrs: false,
   props: {
-    source: { type: Object as PropType<LightboxGallerySource | null>, default: null },
+    source: { type: Object as PropType<LightboxSource<LightboxItem> | null>, default: null },
   },
   setup(props, { attrs, slots }) {
     const element = shallowRef<AppGallery | null>(null);

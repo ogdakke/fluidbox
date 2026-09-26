@@ -1369,11 +1369,17 @@ export class DomViewerDriver<
       ["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown"].includes(event.key)
     ) {
       void this.#controller?.close({ reason: "keyboard" });
-    } else if (event.key === "ArrowRight" && this.#controller?.state.status === "open") {
+    } else if (
+      event.key === "ArrowRight" &&
+      ["opening", "open"].includes(this.#controller?.state.status ?? "closed")
+    ) {
       event.preventDefault();
       this.#zoom?.suspend();
       void this.#controller?.next({ reason: "keyboard" });
-    } else if (event.key === "ArrowLeft" && this.#controller?.state.status === "open") {
+    } else if (
+      event.key === "ArrowLeft" &&
+      ["opening", "open"].includes(this.#controller?.state.status ?? "closed")
+    ) {
       event.preventDefault();
       this.#zoom?.suspend();
       void this.#controller?.previous({ reason: "keyboard" });

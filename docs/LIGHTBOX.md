@@ -4,32 +4,35 @@
 
 ## Authoring content
 
-Use `slot="trigger"` for the closed preview and `slot="content"` for the open content. A template keeps the content out of the page layout; `data-src` and `data-srcset` defer its full-size requests until opening. A live element keeps interactive state and moves into the overlay while open.
+Every `<app-lightbox>` requires a stable `item-id`, one trigger, and one inert content template. The gallery compiles this markup into the same `LightboxItem` model used by `createLightbox()`. Standard `src`, `srcset`, `sizes`, `type`, and `media` attributes pass through to the generated viewer `<picture>`.
 
 ```html
-<app-lightbox aria-label="Mountain photo" close-button>
-  <button slot="trigger" type="button">
-    <img src="/media/mountain-768w.webp" alt="Mountain" width="768" height="512" />
-  </button>
-  <template slot="content">
-    <picture width="1536" height="1024">
-      <source
-        type="image/avif"
-        data-srcset="/media/mountain-768w.avif 768w, /media/mountain.avif 1536w"
-        sizes="100vw"
-      />
-      <source
-        type="image/webp"
-        data-srcset="/media/mountain-768w.webp 768w, /media/mountain.webp 1536w"
-        sizes="100vw"
-      />
-      <img data-src="/media/mountain.webp" src="/media/mountain-768w.webp" alt="Mountain" />
-    </picture>
-  </template>
-</app-lightbox>
+<app-gallery aria-label="Photos">
+  <app-lightbox item-id="mountain">
+    <button slot="trigger" type="button">
+      <img src="/media/mountain-768w.webp" alt="Mountain" width="768" height="512" />
+    </button>
+    <template slot="content">
+      <picture>
+        <source
+          type="image/avif"
+          srcset="/media/mountain-768w.avif 768w, /media/mountain.avif 1536w"
+          sizes="100vw"
+        />
+        <source
+          type="image/webp"
+          srcset="/media/mountain-768w.webp 768w, /media/mountain.webp 1536w"
+          sizes="100vw"
+        />
+        <img src="/media/mountain.webp" width="1536" height="1024" alt="Mountain" />
+      </picture>
+    </template>
+  </app-lightbox>
+  <app-filmstrip></app-filmstrip>
+</app-gallery>
 ```
 
-The component animates from the trigger's decoded image to the open frame, then reveals content after its image decodes. Content can also be a live section with text and controls. The older `src` attribute and `template[data-lightbox-content]` remain supported.
+The template is inert, so full-size resources do not load while the gallery is closed. `<app-gallery>` owns one `createLightbox()` controller. `<app-lightbox>` only describes an item and its transition origin. Non-image template content uses the core custom-media renderer and is cloned into the bounded slide window.
 
 ## Parts
 
@@ -65,7 +68,7 @@ mark its visual box with `data-lightbox-preview`. If that box contains a more pr
 target, mark the nested element with `data-lightbox-target`; it takes precedence over the preview
 box. `data-lightbox-thumbnail` remains the optional image source for loading and filmstrip artwork.
 
-An indexed `LightboxGallerySource` can return a mounted trigger from `getOrigin(id)`. Mark its visible clipped box with `data-lightbox-preview`; a nested `data-lightbox-target` takes precedence when it is the more precise visual target. The descendant image remains the media preview even when a wrapper supplies geometry and corner radius. If the host virtualizes triggers, it may also provide `revealOrigin(id, index, { signal, reason })`, where `reason` is `"open"` or `"selection"`. The runtime calls it after opening motion starts and after a new selection settles. It aborts the previous signal as soon as selection changes, and aborts on close, source replacement, or teardown. The callback may return a promise, but viewer motion never waits for it; handle `signal.aborted` before deferred host scrolling. A source without this callback uses `scrollIntoView` on a connected origin. Closing starts immediately and uses the current visible origin, or the scale-and-fade fallback if that origin has not mounted or remains outside a scroll viewport.
+An indexed gallery assigns a canonical `LightboxSource` to `gallery.source` and a `LightboxOriginAdapter` to `gallery.origins`. Mark a mounted trigger's visible clipped box with `data-lightbox-origin`. The descendant image remains the media preview even when a wrapper supplies geometry and corner radius. A virtualized host can implement `revealOrigin(id, index, { signal, reason })`. Viewer motion never waits for it, and the runtime aborts stale reveals on selection, close, source replacement, and teardown.
 
 ## State
 

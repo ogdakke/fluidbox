@@ -3,38 +3,40 @@ import { expect, test } from "@playwright/test";
 test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=1000");
   const gallery = page.locator("app-gallery");
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) =>
-    element.open(10),
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
+    element.open({ index: 10 }),
   );
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",
   );
-  const handoff = await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => {
-    const scroller = document.querySelector<HTMLElement>("[data-lightbox-filmstrip-scroll]")!;
-    const style = getComputedStyle(scroller);
-    const filmstrip = scroller.closest<HTMLElement>("[data-lightbox-filmstrip]")!;
-    const size = Number.parseFloat(
-      getComputedStyle(filmstrip).getPropertyValue("--lightbox-filmstrip-item-size"),
-    );
-    const step = size + Number.parseFloat(style.columnGap);
-    const selectedLabel = () =>
-      document
-        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
-        ?.getAttribute("aria-label");
-    const beginUnsettledScroll = () => {
-      scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: -80 }));
-      scroller.scrollTo({ left: 9 * step, behavior: "instant" });
-    };
-    beginUnsettledScroll();
-    element.open(10);
-    scroller.dispatchEvent(new Event("scrollend"));
-    const sameIndex = selectedLabel();
-    beginUnsettledScroll();
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
-    scroller.dispatchEvent(new Event("scrollend"));
-    return { sameIndex, afterKeyboard: selectedLabel() };
-  });
+  const handoff = await gallery.evaluate(
+    (element: HTMLElement & { open(target: { index: number }): void }) => {
+      const scroller = document.querySelector<HTMLElement>("[data-lightbox-filmstrip-scroll]")!;
+      const style = getComputedStyle(scroller);
+      const filmstrip = scroller.closest<HTMLElement>("[data-lightbox-filmstrip]")!;
+      const size = Number.parseFloat(
+        getComputedStyle(filmstrip).getPropertyValue("--lightbox-filmstrip-item-size"),
+      );
+      const step = size + Number.parseFloat(style.columnGap);
+      const selectedLabel = () =>
+        document
+          .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+          ?.getAttribute("aria-label");
+      const beginUnsettledScroll = () => {
+        scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: -80 }));
+        scroller.scrollTo({ left: 9 * step, behavior: "instant" });
+      };
+      beginUnsettledScroll();
+      element.open({ index: 10 });
+      scroller.dispatchEvent(new Event("scrollend"));
+      const sameIndex = selectedLabel();
+      beginUnsettledScroll();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      scroller.dispatchEvent(new Event("scrollend"));
+      return { sameIndex, afterKeyboard: selectedLabel() };
+    },
+  );
   expect(handoff.sameIndex).toBe("Item 11 of 1000");
   expect(handoff.afterKeyboard).toBe("Item 11 of 1000");
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
@@ -63,13 +65,15 @@ test("a mounted indexed origin follows selection inside its scroll container", a
     gallery.prepend(scroller);
   });
   const gallery = page.locator("app-gallery");
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => element.open(0));
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
+    element.open({ index: 0 }),
+  );
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",
   );
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) =>
-    element.open(10),
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
+    element.open({ index: 10 }),
   );
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -80,28 +84,21 @@ test("a mounted indexed origin follows selection inside its scroll container", a
     .toBeGreaterThan(500);
 
   // A mounted origin outside a nested scrollport is not a usable close target.
-  const close = await gallery.evaluate(() => {
-    document.querySelector<HTMLElement>("#host-scroll")!.scrollTop = 0;
-    const controller = document.querySelector<HTMLElement & { close(): void }>(
-      "[data-lightbox-source-controller]",
-    )!;
-    controller.close();
-    const flight = document.querySelector<HTMLElement>(
-      "[data-lightbox-flight] > [data-lightbox-frame]",
-    )!;
-    const animation = flight.getAnimations()[0]!;
-    const duration = Number(animation.effect?.getComputedTiming().duration);
-    for (const track of document.getAnimations()) {
-      track.pause();
-      track.currentTime = duration - 1;
-    }
-    const endOpacity = Number(getComputedStyle(flight).opacity);
-    for (const track of document.getAnimations()) track.play();
-    return endOpacity;
-  });
-  expect(close).toBeLessThan(0.1);
+  const close = await gallery.evaluate(
+    async (element: HTMLElement & { close(): Promise<unknown> }) => {
+      document.querySelector<HTMLElement>("#host-scroll")!.scrollTop = 0;
+      const started = performance.now();
+      await element.close();
+      return {
+        elapsed: performance.now() - started,
+        flightMounted: !!document.querySelector("[data-lightbox-flight]"),
+      };
+    },
+  );
+  expect(close.elapsed).toBeLessThan(1000);
+  expect(close.flightMounted).toBe(false);
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
-  await expect(gallery).toBeFocused();
+  await expect(gallery.locator('[data-virtual-index="10"]')).toBeFocused();
 });
 
 test("stale async reveals abort on rapid selection and close never waits", async ({ page }) => {
@@ -109,10 +106,8 @@ test("stale async reveals abort on rapid selection and close never waits", async
   await page.evaluate(() => {
     const gallery = document.querySelector<
       HTMLElement & {
-        source: {
-          count: number;
-          getItem(index: number): { id: string; src: string };
-          getOrigin?(id: string): HTMLElement | null;
+        origins: {
+          getOrigin(id: string): null;
           revealOrigin?: (
             id: string,
             index: number,
@@ -121,7 +116,6 @@ test("stale async reveals abort on rapid selection and close never waits", async
         };
       }
     >("app-gallery")!;
-    const original = gallery.source;
     const events: {
       id: string;
       reason: string;
@@ -130,9 +124,7 @@ test("stale async reveals abort on rapid selection and close never waits", async
       attempt(): void;
     }[] = [];
     Object.assign(window, { __revealEvents: events });
-    gallery.source = {
-      count: original.count,
-      getItem: (index) => original.getItem(index),
+    gallery.origins = {
       getOrigin: () => null,
       revealOrigin(id, _index, { signal, reason }) {
         return new Promise<void>((resolve) => {
@@ -160,14 +152,16 @@ test("stale async reveals abort on rapid selection and close never waits", async
     };
   });
   const gallery = page.locator("app-gallery");
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => element.open(0));
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
+    element.open({ index: 0 }),
+  );
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",
   );
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => {
-    element.open(1);
-    element.open(0);
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) => {
+    element.open({ index: 1 });
+    element.open({ index: 0 });
   });
   await expect
     .poll(() =>
@@ -180,31 +174,19 @@ test("stale async reveals abort on rapid selection and close never waits", async
       ),
     )
     .toBe(1);
-  const afterClose = await gallery.evaluate(() => {
-    const controller = document.querySelector<HTMLElement & { close(): void }>(
-      "[data-lightbox-source-controller]",
-    )!;
-    controller.close();
-    const frame = document.querySelector<HTMLElement>(
-      "[data-lightbox-flight] > [data-lightbox-frame]",
-    )!;
-    const duration = Number(frame.getAnimations()[0]?.effect?.getComputedTiming().duration);
-    for (const animation of document.getAnimations()) {
-      animation.pause();
-      animation.currentTime = duration - 1;
-    }
-    const fallbackEndOpacity = Number(getComputedStyle(frame).opacity);
-    for (const animation of document.getAnimations()) animation.play();
-    return {
-      flightMounted: !!document.querySelector("[data-lightbox-flight]"),
-      fallbackEndOpacity,
-      events: (window as unknown as { __revealEvents: { aborted: boolean }[] }).__revealEvents.map(
-        (event) => event.aborted,
-      ),
-    };
-  });
-  expect(afterClose.flightMounted).toBe(true);
-  expect(afterClose.fallbackEndOpacity).toBeLessThan(0.1);
+  const afterClose = await gallery.evaluate(
+    async (element: HTMLElement & { close(): Promise<unknown> }) => {
+      const started = performance.now();
+      await element.close();
+      return {
+        elapsed: performance.now() - started,
+        events: (
+          window as unknown as { __revealEvents: { aborted: boolean }[] }
+        ).__revealEvents.map((event) => event.aborted),
+      };
+    },
+  );
+  expect(afterClose.elapsed).toBeLessThan(1000);
   expect(afterClose.events[0]).toBe(true);
   expect(afterClose.events.at(-1)).toBe(true);
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
@@ -226,33 +208,38 @@ test("stale async reveals abort on rapid selection and close never waits", async
   expect(events.every((event) => !event.completed)).toBe(true);
 });
 
-test("source replacement and teardown abort reveals; a new session uses the new source", async ({
-  page,
-}) => {
+test("source replacement and disconnect abort pending origin reveals", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=2&no-filmstrip");
-  const events = await page.evaluate(() => {
+  const events = await page.evaluate(async () => {
     const gallery = document.querySelector<
       HTMLElement & {
         source: {
           count: number;
-          getItem(index: number): { id: string; src: string };
-          getOrigin?(id: string): HTMLElement | null;
-          revealOrigin?: (
+          getItem(index: number): { id: string };
+          getIndex(id: string): number | null;
+        } | null;
+        origins: {
+          getOrigin(id: string): null;
+          revealOrigin(
             id: string,
             index: number,
             context: { signal: AbortSignal; reason: "open" | "selection" },
-          ) => Promise<void>;
-        } | null;
-        open(index: number): void;
+          ): Promise<void>;
+        };
+        open(target: { index: number }): Promise<unknown>;
+        close(): Promise<unknown>;
       }
     >("app-gallery")!;
     const original = gallery.source!;
     const events: { source: string; aborted: boolean }[] = [];
     Object.assign(window, { __swapEvents: events });
-    const makeSource = (name: string) => ({
+    const makeSource = () => ({
       count: original.count,
       getItem: (index: number) => original.getItem(index),
-      getOrigin: (id: string) => original.getOrigin?.(id) ?? null,
+      getIndex: (id: string) => original.getIndex(id),
+    });
+    const makeOrigins = (name: string) => ({
+      getOrigin: () => null,
       revealOrigin(_id: string, _index: number, { signal }: { signal: AbortSignal }) {
         const event = { source: name, aborted: false };
         events.push(event);
@@ -268,35 +255,21 @@ test("source replacement and teardown abort reveals; a new session uses the new 
         });
       },
     });
-    gallery.source = makeSource("old");
-    gallery.open(0);
-    gallery.source = makeSource("new");
+    gallery.origins = makeOrigins("old");
+    gallery.source = makeSource();
+    await Promise.resolve();
+    await gallery.open({ index: 0 });
+    gallery.origins = makeOrigins("new");
+    gallery.source = makeSource();
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const oldAbortedOnReplace = events[0]?.aborted;
-    const controller = gallery.querySelector<HTMLElement & { close(): void }>(
-      "[data-lightbox-source-controller]",
-    )!;
-    controller.close();
-    return { oldAbortedOnReplace, events };
+    if (events.length < 2) throw new Error("replacement source did not request an origin reveal");
+    gallery.remove();
+    return { oldAbortedOnReplace, events: events.map((event) => ({ ...event })) };
   });
   expect(events.oldAbortedOnReplace).toBe(true);
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
-  const gallery = page.locator("app-gallery");
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => element.open(0));
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
-    "open",
-  );
-  const state = await gallery.evaluate((element: HTMLElement & { source: unknown }) => {
-    const controller = element.querySelector<HTMLElement>("[data-lightbox-source-controller]")!;
-    element.source = null;
-    return {
-      controllerConnected: controller.isConnected,
-      events: (window as unknown as { __swapEvents: { source: string; aborted: boolean }[] })
-        .__swapEvents,
-    };
-  });
-  expect(state.controllerConnected).toBe(false);
-  expect(state.events).toEqual([
+  expect(events.events).toEqual([
     { source: "old", aborted: true },
     { source: "new", aborted: true },
   ]);
@@ -310,44 +283,34 @@ test("one-item indexed source handles reveal failures without leaking its sessio
   page.on("pageerror", (error) => pageErrors.push(error));
   await page.goto("/harness.html?virtual&count=1&no-filmstrip");
   const gallery = page.locator("app-gallery");
-  await gallery.evaluate((element: HTMLElement & { source: unknown }) => {
-    const original = element.source as {
-      count: number;
-      getItem(index: number): { id: string; src: string };
-      getOrigin?(id: string): HTMLElement | null;
-    };
-    element.source = {
-      count: original.count,
-      getItem: (index: number) => original.getItem(index),
-      getOrigin: (id: string) => original.getOrigin?.(id) ?? null,
+  await gallery.evaluate((element: HTMLElement & { origins: unknown }) => {
+    element.origins = {
+      getOrigin: () => null,
       revealOrigin() {
         return Promise.reject(new Error("intentional reveal failure"));
       },
     };
   });
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => element.open(0));
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
+    element.open({ index: 0 }),
+  );
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 1 of 1",
   );
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
-  await gallery.evaluate((element: HTMLElement & { source: unknown }) => {
-    const original = element.source as {
-      count: number;
-      getItem(index: number): { id: string; src: string };
-      getOrigin?(id: string): HTMLElement | null;
-    };
-    element.source = {
-      count: original.count,
-      getItem: (index: number) => original.getItem(index),
-      getOrigin: (id: string) => original.getOrigin?.(id) ?? null,
+  await gallery.evaluate((element: HTMLElement & { origins: unknown }) => {
+    element.origins = {
+      getOrigin: () => null,
       revealOrigin() {
         throw new Error("intentional synchronous reveal failure");
       },
     };
   });
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) => element.open(0));
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
+    element.open({ index: 0 }),
+  );
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",

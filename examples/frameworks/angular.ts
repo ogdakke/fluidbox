@@ -9,7 +9,7 @@ import {
 } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/angular";
-import type { AppGallery, LightboxGallerySource } from "@ogdakke/fluidbox";
+import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
 import { alternateSource, source } from "./source";
 import "./site.css";
 
@@ -26,7 +26,7 @@ import "./site.css";
   </main>`,
 })
 class App {
-  readonly source = signal<LightboxGallerySource | null>(source);
+  readonly source = signal<LightboxSource<LightboxItem> | null>(source);
   readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   constructor() {
@@ -37,7 +37,7 @@ class App {
   }
 
   open(): void {
-    this.host.nativeElement.querySelector<AppGallery>("app-gallery")?.open(0);
+    void this.host.nativeElement.querySelector<AppGallery>("app-gallery")?.open({ index: 0 });
   }
 
   switchSource(): void {

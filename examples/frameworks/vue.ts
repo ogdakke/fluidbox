@@ -20,7 +20,7 @@ createApp({
             "button",
             {
               type: "button",
-              onClick: () => document.querySelector<AppGallery>("app-gallery")?.open(0),
+              onClick: () => document.querySelector<AppGallery>("app-gallery")?.open({ index: 0 }),
             },
             "Open gallery",
           ),

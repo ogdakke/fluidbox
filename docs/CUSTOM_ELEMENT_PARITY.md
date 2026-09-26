@@ -1,15 +1,14 @@
 # Custom-element behavior parity
 
-This is the migration ledger for the custom-element implementation at commit `769b397`. The audit
-covers `lightbox.ts`, `gallery-strip.ts`, `filmstrip.ts`, and `gallery.ts`. It tracks behavior rather
-than preserving the old class layout. The headless runtime must own each interaction rule. The
-custom elements may translate attributes, events, and DOM-authored content into that runtime.
+This ledger records where custom-element behavior lives after the declarative authoring migration.
+The runtime owns interaction rules. The custom elements compile DOM-authored content into the same
+source, origin, renderer, and controller contracts used by framework bindings.
 
 ## Gallery host
 
 | Old responsibility                                                          | Headless owner                                       | Status                                                                                                                                                                              |
 | --------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Discover DOM-authored children and adapt their media/content                | Custom-element adapter                               | Compatibility-only and still implemented by `AppLightbox.#prepareGallery()`                                                                                                         |
+| Discover DOM-authored children and adapt their media/content                | Custom-element adapter                               | `AppLightbox.compile()` reads an explicit trigger and inert content template                                                                                                        |
 | Read an indexed source without mounting every thumbnail                     | `LightboxSource`, `arraySource()`, and `ViewerStrip` | Migrated                                                                                                                                                                            |
 | Validate an indexed open and select an item in an existing session          | `ViewerSession.open()` and `goTo()`                  | Migrated                                                                                                                                                                            |
 | Keep stable item identity across source changes                             | `ViewerSession.setSource()`                          | Migrated and covered by command tests                                                                                                                                               |
@@ -17,8 +16,8 @@ custom elements may translate attributes, events, and DOM-authored content into 
 | Focus the gallery when a virtualizer has removed the selected trigger       | `DomViewerDriver` focus-host fallback                | Migrated when the original trigger had a connected focusable ancestor. Originless opens have no caller-selected fallback.                                                           |
 | Redirect and warm a hidden teaser tile through `data-lightbox-preview-more` | Host origin/overlay adapter                          | Partial. The engine does not encode a gallery layout convention, and no direct example yet recreates the old proxy source, picture hiding, alt update, warming, and reset behavior. |
 
-`AppGallery` remains a declarative compatibility adapter. It is not the gallery engine for
-`createLightbox()` or the React binding.
+`AppGallery` is a declarative adapter over one `createLightbox()` controller. It does not implement
+a second gallery engine.
 
 ## Full-image strip
 
@@ -49,10 +48,10 @@ second full-image transition while the filmstrip continues under native momentum
 | Abort thumbnail loads when an item leaves the window                             | `filmstrip-thumbnail.ts` and React item cleanup           | Migrated                                                                                                                          |
 | Derive `/media/*-160w.webp` by filename convention                               | Source metadata                                           | Intentionally removed. Applications declare thumbnail candidates; the runtime does not rewrite arbitrary URLs.                    |
 
-React and the compatibility element now render items into the window reported by
+React and the custom-element adapter render items into the window reported by
 `FilmstripRuntime`; touch, wheel, commanded centering, resize, provisional selection, and settlement
-live in one runtime. `FilmstripSession` retains only element DOM, thumbnail loading, selection
-painting, and the legacy `/media/*-160w.webp` URL convention.
+live in one runtime. `FilmstripSession` retains only element DOM, thumbnail loading, and selection
+painting.
 
 ## Viewer lifecycle and portal
 
@@ -107,21 +106,17 @@ crop, radius, and decoration behavior.
 | Warm a small preview before full media                                    | Explicit `thumbnail` and `preview` resources | Migrated without URL conventions                                                           |
 | Apply `srcset`, `sizes`, and picture sources after preview handoff        | `ViewerStrip`                                | Migrated                                                                                   |
 | Avoid loading full media before first open or after cancelled preparation | `ViewerStrip` mount/load lifecycle           | Migrated. A completed session currently retains its bounded active window for fast reopen. |
-| Honor declarative eager loading while closed                              | Custom-element adapter                       | Compatibility-only. The headless source has no eager-load policy yet.                      |
+| Keep declarative full media inert while closed                            | Custom-element adapter                       | `<template slot="content">` prevents eager full-media loading                              |
 | Retry failed media without losing the opening preview                     | `ViewerStrip`                                | Migrated                                                                                   |
 | Support video, iframe, and custom content through one indexed source      | Media descriptors and renderer contract      | Migrated                                                                                   |
 | Preserve live non-image state through close                               | Live-node document flight                    | Migrated                                                                                   |
 
-## Compatibility boundary
+## Adapter boundary
 
-The target boundary allows custom-element files to contain only declarative compatibility behavior:
-attribute/property translation, DOM-content adaptation, element registration, and legacy event
-names. The current `lightbox.ts` still owns gesture, zoom, transition, and gallery orchestration, so
-the compatibility binding has not reached that boundary. New interaction behavior belongs in the
-headless runtime first.
+Custom-element files contain declarative adaptation, element registration, portal controls, and
+filmstrip DOM. Gesture, zoom, transition, source selection, origin reveal, and portal behavior stay
+in the runtime. New interaction behavior belongs in the runtime first.
 
-The dedicated `headless.html`, photo-library, and React examples use no custom elements. The main
-vanilla playground still demonstrates the compatibility elements. Compatibility-specific tests may
-keep element fixtures, but shared motion, gallery, filmstrip, media, focus, and teardown regressions
-must run against `createLightbox()` or a composed binding. Solid, Vue, and Angular still use the old
-element adapter today; migrating those bindings is required before 1.0.
+The dedicated `headless.html`, photo-library, and React examples use `createLightbox()` directly.
+The vanilla playground demonstrates declarative elements. Solid, Vue, and Angular accept the
+canonical `LightboxSource` and currently compose the same `AppGallery` adapter.

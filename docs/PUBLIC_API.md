@@ -15,10 +15,9 @@ The stable headless root exports:
   `src/public-api.ts`.
 - `createLightbox()`. Calling it requires a DOM; importing it does not.
 
-The existing `registerLightboxElements`, `bindGallerySource`, `AppGallery`, `AppLightbox`,
-`LightboxGallerySource`, `LightboxSourceItem`, and `GalleryItem` exports are compatibility APIs.
-They remain usable during migration, but their current class members and internal item shape are
-not the headless contract. `@ogdakke/fluidbox/elements` remains the only eager custom-element
+`registerLightboxElements`, `AppGallery`, and `AppLightbox` expose the custom-element adapter.
+Declarative items compile directly to `LightboxItem`; indexed galleries accept `LightboxSource` and
+`LightboxOriginAdapter`. `@ogdakke/fluidbox/elements` remains the only eager custom-element
 registration entry.
 
 Framework bindings remain subpath exports. React is the first composed binding. Solid, Vue, and

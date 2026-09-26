@@ -30,7 +30,7 @@ function App() {
           bind(gallery);
         }}
       >
-        <button type="button" onClick={() => gallery?.open(0)}>
+        <button type="button" onClick={() => gallery?.open({ index: 0 })}>
           Open gallery
         </button>
       </app-gallery>

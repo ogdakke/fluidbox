@@ -9,7 +9,9 @@ export interface LightboxImageCandidate {
 export interface LightboxImageSource {
   readonly media?: string;
   readonly type?: string;
-  readonly candidates: readonly LightboxImageCandidate[];
+  readonly candidates?: readonly LightboxImageCandidate[];
+  /** Native srcset text. Use this or candidates, never both. */
+  readonly srcset?: string;
   readonly sizes?: string;
 }
 
@@ -18,6 +20,8 @@ export interface LightboxImageResource {
   readonly width?: number;
   readonly height?: number;
   readonly candidates?: readonly LightboxImageCandidate[];
+  /** Native srcset text. Use this or candidates, never both. */
+  readonly srcset?: string;
   readonly sizes?: string;
   readonly sources?: readonly LightboxImageSource[];
 }

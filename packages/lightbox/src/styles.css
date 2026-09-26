@@ -11,7 +11,7 @@ app-lightbox[data-lightbox-preview-hidden] {
   display: none;
 }
 
-app-lightbox > [slot="content"] {
+app-lightbox > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: none;
 }
 

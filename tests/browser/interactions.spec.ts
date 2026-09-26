@@ -92,9 +92,15 @@ test("picture content stays within the viewport after placeholder replacement", 
   await expect(active).toHaveAttribute("aria-label", "Item 1 of 3");
   await page.keyboard.press("ArrowRight");
   await expect(active).toHaveAttribute("aria-label", "Item 2 of 3");
-  const picture = active.locator("[data-lightbox-content] picture");
+  const picture = active.locator("[data-lightbox-picture]");
   await expect(picture).toBeVisible();
-  const { width, height } = await picture.boundingBox().then((box) => box!);
+  await expect(picture.locator("source")).toHaveAttribute("type", "image/svg+xml");
+  await expect(picture.locator("source")).toHaveAttribute("srcset", /1x, .*\?large 2x/);
+  await expect(picture.locator("img")).toHaveAttribute("srcset", /1x, .*\?large 2x/);
+  const { width, height } = await picture
+    .locator("img")
+    .boundingBox()
+    .then((box) => box!);
   const viewport = page.viewportSize()!;
   expect(width).toBeLessThanOrEqual(viewport.width);
   expect(height).toBeLessThanOrEqual(viewport.height);
@@ -143,6 +149,7 @@ test("filmstrip selects a distant item", async ({ page }) => {
       getComputedStyle(scroller.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
+    scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
     scroller.scrollTo({ left: 20 * (size + gap), behavior: "instant" });
   });
   await page.locator('[data-lightbox-filmstrip-item][data-index="20"]').click();
@@ -192,6 +199,7 @@ test("filmstrip DOM stays bounded while scrolling a large gallery", async ({ pag
       getComputedStyle(scroller.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
+    scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
     scroller.scrollTo({ left: 900 * (size + gap), behavior: "instant" });
   });
   const target = page.locator('[data-lightbox-filmstrip-item][data-index="900"]');
@@ -221,14 +229,18 @@ test("indexed source survives host thumbnail recycling", async ({ page }) => {
   });
   await page
     .locator("app-gallery")
-    .evaluate((gallery: HTMLElement & { open(index: number): void }) => gallery.open(501));
+    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) =>
+      gallery.open({ index: 501 }),
+    );
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 502 of 10000",
   );
   await page
     .locator("app-gallery")
-    .evaluate((gallery: HTMLElement & { open(index: number): void }) => gallery.open(9000));
+    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) =>
+      gallery.open({ index: 9000 }),
+    );
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 9001 of 10000",
@@ -249,7 +261,9 @@ test("100k indexed items retain a bounded viewer DOM", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=100000");
   await page
     .locator("app-gallery")
-    .evaluate((gallery: HTMLElement & { open(index: number): void }) => gallery.open(99990));
+    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) =>
+      gallery.open({ index: 99990 }),
+    );
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 99991 of 100000",
@@ -274,6 +288,7 @@ test("iframe content survives slide window eviction", async ({ page }) => {
       getComputedStyle(scroller.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
+    scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
     scroller.scrollTo({ left: 35 * (size + gap), behavior: "instant" });
   });
   await expect(page.locator("[data-lightbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
@@ -283,7 +298,7 @@ test("iframe content survives slide window eviction", async ({ page }) => {
     "Item 36 of 40",
   );
   await expect(
-    page.locator('app-lightbox[data-test-index="1"] [slot="content"] iframe'),
+    page.locator('app-lightbox[data-test-index="1"] template[slot="content"]'),
   ).toHaveCount(1);
 });
 
@@ -298,6 +313,7 @@ test("custom iframe media mounts only near the active slide", async ({ page }) =
       getComputedStyle(scroller.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
+    scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
     scroller.scrollTo({ left: 80 * (size + gap), behavior: "instant" });
   });
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
@@ -315,8 +331,8 @@ test("indexed source works inside a shadow root", async ({ page }) => {
     "aria-label",
     "Item 1 of 10000",
   );
-  await gallery.evaluate((element: HTMLElement & { open(index: number): void }) =>
-    element.open(5000),
+  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
+    element.open({ index: 5000 }),
   );
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
