@@ -514,6 +514,8 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   min-width: 0;
   display: grid;
   place-items: center;
+  grid-template-rows: var(--lightbox-content-height);
+  align-content: start;
   scroll-snap-align: center;
   transform: translateX(var(--lightbox-scroll-compensation, 0px));
 }
@@ -534,6 +536,11 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   [data-lightbox-slides] {
   height: var(--lightbox-content-height);
   min-height: 0;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-gallery][data-filmstrip][data-dismissing]
+  [data-lightbox-slides] {
+  height: 100%;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-filmstrip-dock] {
   position: absolute;
@@ -565,15 +572,21 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
     opacity var(--lightbox-filmstrip-zoom-duration, 180ms) linear,
     transform var(--lightbox-filmstrip-zoom-duration, 180ms) ease-out;
 }
+:where([data-lightbox-overlay][data-lightbox-prepared]) [data-lightbox-filmstrip] {
+  visibility: hidden;
+  pointer-events: none;
+}
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery][data-opening]
   [data-lightbox-filmstrip] {
   opacity: 0;
+  transition-property: transform;
   pointer-events: none;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery][data-opening][data-filmstrip-revealing]
   [data-lightbox-filmstrip] {
+  visibility: visible;
   animation: lightbox-filmstrip-appear 180ms linear var(--lightbox-filmstrip-reveal-delay, 210ms)
     both;
 }
@@ -619,6 +632,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-x;
+  overflow-anchor: none;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-filmstrip-scroll]::-webkit-scrollbar {

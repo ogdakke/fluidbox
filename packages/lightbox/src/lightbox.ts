@@ -3,6 +3,7 @@ import { triggerLoad } from "unlazy";
 import { GalleryStrip, type GalleryItem, type GalleryItemSource } from "./gallery-strip";
 import { AppGallery } from "./gallery";
 import { AppFilmstrip, type FilmstripSession } from "./filmstrip";
+import { handoffDecodedFlightImage } from "./flight-image";
 import { markedVisualOrigin, originIsVisible } from "./origin-geometry";
 import { OriginRevealCoordinator } from "./origin-reveal";
 import type { LightboxGallerySource } from "./source";
@@ -975,7 +976,7 @@ class AppLightbox extends HTMLElement {
     document.body.append(this.#overlay);
     prepared.gallery.mount();
     this.#preparedOverlay = true;
-    this.#animate(true, undefined, true);
+    void this.#animate(true, undefined, true);
     this.#preparedOpening = true;
   }
 
@@ -1146,7 +1147,7 @@ class AppLightbox extends HTMLElement {
       }
     } else {
       this.#hideThumbnail();
-      this.#animate(true);
+      void this.#animate(true);
     }
     if (this.#filmstrip && this.#dialog?.hasAttribute("data-opening")) {
       this.#dialog.dataset.filmstripRevealing = "";
@@ -1226,7 +1227,7 @@ class AppLightbox extends HTMLElement {
     }
     this.#phase = "open";
     this.#setTriggerState(this.#gallery?.item.trigger || this, true);
-    this.#animate(true, {
+    void this.#animate(true, {
       transform,
       opacity,
       closeOpacity,
@@ -1267,7 +1268,7 @@ class AppLightbox extends HTMLElement {
     this.#phase = "closing";
     this.#setPresentationState("closing");
     this.#triggerElement!.setAttribute("aria-expanded", "false");
-    this.#animate(false);
+    void this.#animate(false);
     this.dispatchEvent(new CustomEvent("lightbox-close", { bubbles: true }));
     if (this.#gallery) this.#setTriggerState(this.#gallery.item.trigger, false);
   }
@@ -1632,7 +1633,7 @@ class AppLightbox extends HTMLElement {
       // Keep neighboring slides hidden until #completeOpening swaps the
       // temporary offset for its selected snap point.
       const current = this.#readCropPose();
-      this.#animate(true, {
+      void this.#animate(true, {
         transform: current.transform.toString(),
         opacity: getComputedStyle(this.#backdrop!).opacity,
         closeOpacity: getComputedStyle(this.#closeButton!).opacity,
@@ -2018,7 +2019,7 @@ class AppLightbox extends HTMLElement {
     return pose;
   }
 
-  #animate(
+  async #animate(
     opening: boolean,
     resume?: {
       transform: string;
@@ -2109,7 +2110,14 @@ class AppLightbox extends HTMLElement {
       document.body.append(this.#flight);
       this.#flightFrame = frame;
       this.#flightImage = image;
-      if (!this.#flightUsesLiveContent) this.#image!.dataset.lightboxFlightSourceHidden = "";
+      if (!this.#flightUsesLiveContent) {
+        const handedOff = await handoffDecodedFlightImage(
+          this.#image!,
+          image as HTMLImageElement,
+          () => revision === this.#revision,
+        );
+        if (!handedOff) return;
+      }
       if (this.#gallery) this.#gallery.element.dataset.lightboxFlightSourceHidden = "";
     }
     const transitionLayer = this.#mountTransitionLayer(frame);

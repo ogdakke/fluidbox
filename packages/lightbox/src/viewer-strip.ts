@@ -567,7 +567,15 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       this.element.style.removeProperty("scroll-snap-type");
     }
     if (this.#rebasing || !this.#width) return;
+    if (!this.#userOwned && !this.#selection) {
+      this.#align(this.#index);
+      return;
+    }
     if (this.#userOwned) this.#userScrolled = true;
+    // Delayed events from an instant align are not navigation. Let only a
+    // native gesture or a pending smooth selection derive an index from the
+    // physical scroll position. The forced sync in #jump already made an
+    // instant selection authoritative.
     this.#sync(undefined, this.#userOwned);
     clearTimeout(this.#settleTimer);
     if (!this.#touching) this.#settleTimer = setTimeout(this.#settled, 180);
@@ -576,8 +584,8 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   #settled = () => {
     if (this.#touching || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
     clearTimeout(this.#settleTimer);
-    this.#sync(undefined, this.#userOwned);
-    if (this.#userOwned) this.#onSelect(this.#index, true);
+    if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
+    if (this.#userOwned && this.#userScrolled) this.#onSelect(this.#index, true);
     this.#userOwned = false;
     this.#userScrolled = false;
     if (this.#selection?.index === this.#index) this.#resolveSelection();
@@ -599,10 +607,18 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#touching = event.type === "pointerdown" || event.type === "touchstart";
   };
 
-  #releaseControl = () => {
+  #releaseControl = (event: Event) => {
     this.#touching = false;
     if (!this.#userScrolled) {
-      this.#userOwned = false;
+      // A browser taking over a native pan emits pointercancel before its
+      // first scroll event. Keep ownership briefly so that scroll is treated
+      // as the user's swipe instead of being aligned back to the old slide.
+      if (event.type === "pointercancel") {
+        clearTimeout(this.#settleTimer);
+        this.#settleTimer = setTimeout(this.#settled, 180);
+      } else {
+        this.#userOwned = false;
+      }
       return;
     }
     clearTimeout(this.#settleTimer);

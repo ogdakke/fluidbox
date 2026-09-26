@@ -1,7 +1,7 @@
 :root {
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
-  --background: Canvas;
+  --background: #0b0b0b;
   --color: CanvasText;
   --accent: color-mix(in srgb, CanvasText 12%, Canvas);
 }

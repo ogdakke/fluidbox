@@ -21,7 +21,7 @@ interface FilmstripRuntimeOptions {
   readonly deferActivation?: boolean;
 }
 
-type ScrollMode = "idle" | "commanded" | "user";
+type ScrollMode = "idle" | "user";
 
 /** Native filmstrip scroll ownership shared by framework renderers. */
 export class FilmstripRuntime {
@@ -37,12 +37,14 @@ export class FilmstripRuntime {
   #step = 57;
   #padding = 0;
   #viewportWidth = 0;
-  #mode: ScrollMode = "commanded";
-  #commandedLeft: number | null = null;
+  #mode: ScrollMode = "idle";
   #touching = false;
+  #userScrolled = false;
+  #windowCenter = -1;
   #initializing = true;
   readonly #deferActivation: boolean;
   #scrollFrame = 0;
+  #centerFrame = 0;
   #mountFrame = 0;
   #readyFrame = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
@@ -69,7 +71,17 @@ export class FilmstripRuntime {
       passive: true,
       signal,
     });
-    this.#scroller.addEventListener("keydown", this.#takeControl, {
+    this.#scroller.addEventListener("pointerup", this.#releaseControl, {
+      capture: true,
+      passive: true,
+      signal,
+    });
+    this.#scroller.addEventListener("pointercancel", this.#releaseControl, {
+      capture: true,
+      passive: true,
+      signal,
+    });
+    this.#scroller.addEventListener("keydown", this.#onKeyDown, {
       capture: true,
       passive: true,
       signal,
@@ -139,6 +151,7 @@ export class FilmstripRuntime {
     this.#controller.abort();
     this.#observer.disconnect();
     cancelAnimationFrame(this.#scrollFrame);
+    cancelAnimationFrame(this.#centerFrame);
     cancelAnimationFrame(this.#mountFrame);
     cancelAnimationFrame(this.#readyFrame);
     clearTimeout(this.#settleTimer);
@@ -154,6 +167,8 @@ export class FilmstripRuntime {
   }
 
   #publishWindow(center: number, force = false) {
+    if (!force && center === this.#windowCenter) return;
+    this.#windowCenter = center;
     this.#onWindowChange(
       center,
       {
@@ -175,15 +190,30 @@ export class FilmstripRuntime {
   }
 
   #center(index: number, smooth = false) {
+    this.#mode = "idle";
+    this.#userScrolled = false;
+    this.#position(index, smooth);
+    cancelAnimationFrame(this.#centerFrame);
+    if (!smooth) {
+      // Rendering a new virtual thumbnail window can make the browser apply
+      // scroll anchoring after the first position write. Reapply the known
+      // selection after the renderer commits its window.
+      this.#centerFrame = requestAnimationFrame(() => {
+        this.#centerFrame = 0;
+        if (this.#mode === "idle") this.#position(this.#index, false);
+      });
+    }
+  }
+
+  #position(index: number, smooth: boolean) {
     const left =
       this.#padding + index * this.#step + this.#size / 2 - this.#scroller.clientWidth / 2;
-    this.#commandedLeft = Math.max(
+    const target = Math.max(
       0,
       Math.min(left, this.#scroller.scrollWidth - this.#scroller.clientWidth),
     );
-    this.#mode = "commanded";
     this.#scroller.scrollTo({
-      left: this.#commandedLeft,
+      left: target,
       behavior: smooth ? "smooth" : "instant",
     });
   }
@@ -222,18 +252,18 @@ export class FilmstripRuntime {
   };
 
   #onScroll = () => {
-    this.#publishWindow(this.#nearestIndex());
     // A scroll event is not proof of user intent. WebKit can deliver delayed
     // events for an earlier instant/programmatic scroll after activation. If
     // those events take control here, the passing thumbnail becomes a new
     // selection and starts a center -> select -> center feedback loop.
     // Touch, pointer, wheel, and keyboard input claim ownership explicitly.
+    if (this.#initializing || this.#mode !== "user") return;
+    this.#userScrolled = true;
+    this.#publishWindow(this.#nearestIndex());
     if (!this.#scrollFrame) {
       this.#scrollFrame = requestAnimationFrame(() => {
         this.#scrollFrame = 0;
-        if (!this.#initializing && this.#mode === "user") {
-          this.#select(this.#nearestIndex(), false);
-        }
+        if (!this.#initializing && this.#mode === "user") this.#select(this.#nearestIndex(), false);
       });
     }
     clearTimeout(this.#settleTimer);
@@ -243,20 +273,12 @@ export class FilmstripRuntime {
   #onSettled = () => {
     clearTimeout(this.#settleTimer);
     if (this.#initializing || this.#touching) return;
-    if (this.#mode === "commanded") {
-      if (Math.abs(this.#scroller.scrollLeft - (this.#commandedLeft ?? 0)) > 1) {
-        this.#settleTimer = setTimeout(this.#onSettled, 160);
-        return;
-      }
-      this.#commandedLeft = null;
-      this.#mode = "idle";
-      return;
-    }
     if (this.#mode !== "user") return;
     cancelAnimationFrame(this.#scrollFrame);
     this.#scrollFrame = 0;
-    this.#select(this.#nearestIndex(), true);
+    if (this.#userScrolled) this.#select(this.#nearestIndex(), true);
     this.#mode = "idle";
+    this.#userScrolled = false;
   };
 
   #onTouchStart = () => {
@@ -273,14 +295,34 @@ export class FilmstripRuntime {
   };
 
   #takeControl = () => {
-    this.#commandedLeft = null;
+    clearTimeout(this.#settleTimer);
+    if (this.#mode !== "user") this.#userScrolled = false;
     this.#mode = "user";
   };
 
+  #releaseControl = () => {
+    if (this.#touching) return;
+    clearTimeout(this.#settleTimer);
+    if (!this.#userScrolled) {
+      this.#mode = "idle";
+      return;
+    }
+    this.#settleTimer = setTimeout(this.#onSettled, 160);
+  };
+
+  #onKeyDown = (event: KeyboardEvent) => {
+    if (!/^(Arrow(Left|Right)|Home|End|Page(Up|Down))$/.test(event.key)) return;
+    this.#takeControl();
+    this.#settleTimer = setTimeout(this.#onSettled, 160);
+  };
+
   #onWheel = (event: WheelEvent) => {
+    if (!event.deltaX && !event.deltaY) return;
     this.#takeControl();
     if (Math.abs(event.deltaY) > Math.abs(event.deltaX) && event.cancelable) {
       event.preventDefault();
+      this.#scroller.scrollLeft += event.deltaY;
     }
+    this.#settleTimer = setTimeout(this.#onSettled, 160);
   };
 }

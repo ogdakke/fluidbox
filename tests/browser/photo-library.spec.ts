@@ -242,8 +242,9 @@ for (const count of [10_000, 100_000]) {
     expect(await page.locator("*").count()).toBeLessThan(600);
     const selectedBounds = await selectedTile.boundingBox();
     expect(selectedBounds).not.toBeNull();
-    const closingEnd = await page.evaluate(() => {
+    const closingEnd = await page.evaluate(async () => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const frame =
         document.querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-frame]") ??
         document.querySelector<HTMLElement>(
@@ -327,6 +328,223 @@ test("filmstrip preference applies to the next open", async ({ page }) => {
   expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
 });
 
+test("opening centers the filmstrip once without changing gallery selection", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  await page.getByLabel("Photo number").fill("5001");
+  await page.getByRole("button", { name: "Open number" }).click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(
+    page.locator('[data-lightbox-filmstrip-item][aria-selected="true"]'),
+  ).toHaveAttribute("data-index", "5000");
+  const initial = await filmstrip.evaluate((element) => element.scrollLeft);
+  await page.waitForTimeout(400);
+  expect(await filmstrip.evaluate((element) => element.scrollLeft)).toBeCloseTo(initial, 0);
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 5001 of 10000",
+  );
+});
+
+test("opening scrolled virtual origins fills and centers the filmstrip", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  const host = page.locator(".library-scroll");
+
+  for (const ratio of [0.08, 0.37, 0.81]) {
+    await host.evaluate((element, nextRatio) => {
+      element.scrollTop = nextRatio * (element.scrollHeight - element.clientHeight);
+    }, ratio);
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    );
+    const visible = page.locator("[data-photo-index]").filter({ visible: true });
+    const count = await visible.count();
+    const trigger = visible.nth(Math.floor(count / 2));
+    const expected = Number(await trigger.getAttribute("data-photo-index"));
+    await trigger.click();
+    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+      "data-lightbox-state",
+      "open",
+    );
+
+    const geometry = await page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element) => {
+      const scroller = element.getBoundingClientRect();
+      const rendered = [...element.querySelectorAll<HTMLElement>("[data-index]")];
+      const selected = element.querySelector<HTMLElement>('[aria-selected="true"]')!;
+      const selectedBounds = selected.getBoundingClientRect();
+      const first = rendered[0]!.getBoundingClientRect();
+      const last = rendered.at(-1)!.getBoundingClientRect();
+      return {
+        selected: Number(selected.dataset.index),
+        centerError: Math.abs(
+          selectedBounds.left + selectedBounds.width / 2 - (scroller.left + scroller.width / 2),
+        ),
+        leftGap: Math.max(0, first.left - scroller.left),
+        rightGap: Math.max(0, scroller.right - last.right),
+        rendered: rendered.map((item) => Number(item.dataset.index)),
+      };
+    });
+    expect(geometry.selected).toBe(expected);
+    expect(geometry.centerError).toBeLessThan(2);
+    expect(geometry.leftGap).toBe(0);
+    expect(geometry.rightGap).toBe(0);
+    expect(geometry.rendered).toContain(expected - 1);
+    expect(geometry.rendered).toContain(expected + 1);
+    await expect
+      .poll(() =>
+        page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element) => {
+          const viewport = element.getBoundingClientRect();
+          return [...element.querySelectorAll<HTMLImageElement>("img")]
+            .filter((image) => {
+              const bounds = image.getBoundingClientRect();
+              return bounds.right > viewport.left && bounds.left < viewport.right;
+            })
+            .filter((image) => !image.complete || image.naturalWidth === 0).length;
+        }),
+      )
+      .toBe(0);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  }
+});
+
+test("full-size strip rejects delayed programmatic drift", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  await page.getByLabel("Photo number").fill("5001");
+  await page.getByRole("button", { name: "Open number" }).click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  const slides = page.locator("[data-lightbox-slides]");
+  await slides.evaluate((element) => {
+    element.scrollLeft += element.clientWidth * 0.72;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect
+    .poll(() => slides.evaluate((element) => element.scrollLeft % element.clientWidth))
+    .toBe(0);
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 5001 of 10000",
+  );
+});
+
+test("stateful virtual-gallery interactions preserve one selected item", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/photo-library.html?count=10000");
+  const host = page.locator(".library-scroll");
+  let seed = 0x51de;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+
+  for (let step = 0; step < 8; step += 1) {
+    const ratio = random() * 0.95;
+    await host.evaluate((element, nextRatio) => {
+      element.scrollTop = nextRatio * (element.scrollHeight - element.clientHeight);
+    }, ratio);
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    );
+    const visible = await page.locator("[data-photo-index]").evaluateAll((elements) => {
+      const viewport = document.querySelector(".library-scroll")!.getBoundingClientRect();
+      return elements
+        .filter((element) => {
+          const bounds = element.getBoundingClientRect();
+          return bounds.top >= viewport.top && bounds.bottom <= viewport.bottom;
+        })
+        .map((element) => Number(element.getAttribute("data-photo-index")));
+    });
+    expect(visible.length).toBeGreaterThan(0);
+    let expected = visible[Math.floor(random() * visible.length)]!;
+    await page.locator(`[data-photo-index="${expected}"]`).click();
+    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+      "data-lightbox-state",
+      "open",
+    );
+
+    if (random() > 0.35) {
+      expected = Math.max(0, Math.min(9_999, expected + Math.floor(random() * 17) - 8));
+      const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+      await filmstrip.evaluate(async (element, index) => {
+        const touch = new Event("touchstart", { bubbles: true });
+        Object.defineProperty(touch, "touches", { value: [{}] });
+        element.dispatchEvent(touch);
+        const size = parseFloat(
+          getComputedStyle(element.parentElement!).getPropertyValue(
+            "--lightbox-filmstrip-item-size",
+          ),
+        );
+        const gap = parseFloat(getComputedStyle(element).columnGap);
+        const padding = parseFloat(getComputedStyle(element).paddingLeft);
+        element.scrollTo({
+          left: padding + index * (size + gap) + size / 2 - element.clientWidth / 2,
+          behavior: "instant",
+        });
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+        const release = new Event("touchend", { bubbles: true });
+        Object.defineProperty(release, "touches", { value: [] });
+        element.dispatchEvent(release);
+      }, expected);
+    }
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const label = document
+            .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+            ?.getAttribute("aria-label");
+          const selected = document
+            .querySelector('[data-lightbox-filmstrip-item][aria-selected="true"]')
+            ?.getAttribute("data-index");
+          const hidden = document
+            .querySelector("[data-lightbox-thumbnail-hidden]")
+            ?.closest("[data-photo-index]")
+            ?.getAttribute("data-photo-index");
+          return {
+            active: Number(label?.match(/^Item (\d+) of/)?.[1] ?? 0) - 1,
+            selected: Number(selected ?? -1),
+            hidden: Number(hidden ?? -1),
+          };
+        }),
+      )
+      .toEqual({ active: expected, selected: expected, hidden: expected });
+    await page.waitForTimeout(250);
+    const stable = await page.evaluate(() => {
+      const label = document
+        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        ?.getAttribute("aria-label");
+      const selected = document
+        .querySelector('[data-lightbox-filmstrip-item][aria-selected="true"]')
+        ?.getAttribute("data-index");
+      const hidden = document
+        .querySelector("[data-lightbox-thumbnail-hidden]")
+        ?.closest("[data-photo-index]")
+        ?.getAttribute("data-photo-index");
+      return {
+        active: Number(label?.match(/^Item (\d+) of/)?.[1] ?? 0) - 1,
+        selected: Number(selected ?? -1),
+        hidden: Number(hidden ?? -1),
+      };
+    });
+    expect(stable).toEqual({ active: expected, selected: expected, hidden: expected });
+
+    if (step % 2 === 0) {
+      await page.locator("[data-lightbox-close]").click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+    await expect(page.locator("[data-lightbox-thumbnail-hidden]")).toHaveCount(0);
+  }
+});
+
 test("filmstrip scrubbing reveals the host only after touch settlement", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
@@ -400,6 +618,110 @@ test("delayed programmatic filmstrip scrolling cannot take navigation ownership"
   await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
 });
 
+test("a pointer gesture without scrolling releases filmstrip ownership", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  await page.getByLabel("Photo number").fill("5001");
+  await page.getByRole("button", { name: "Open number" }).click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  await filmstrip.evaluate(async (element) => {
+    element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1 }));
+    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
+    element.scrollLeft += 40 * 57;
+    element.dispatchEvent(new Event("scroll"));
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
+
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 5001 of 10000",
+  );
+  await page.waitForTimeout(300);
+  await expect(
+    page.locator('[data-lightbox-filmstrip-item][aria-selected="true"]'),
+  ).toHaveAttribute("data-index", "5000");
+});
+
+test("filmstrip input and programmatic sync settle without an event storm", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  await page.getByLabel("Photo number").fill("5001");
+  await page.getByRole("button", { name: "Open number" }).click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  const selectedIndex = await filmstrip.evaluate(async (element) => {
+    let scrollEvents = 0;
+    element.addEventListener("scroll", () => (scrollEvents += 1));
+    for (let step = 0; step < 24; step += 1) {
+      const start = new Event("touchstart", { bubbles: true });
+      Object.defineProperty(start, "touches", { value: [{}] });
+      element.dispatchEvent(start);
+      element.scrollLeft += step % 2 ? -73 : 131;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const end = new Event("touchend", { bubbles: true });
+      Object.defineProperty(end, "touches", { value: [] });
+      element.dispatchEvent(end);
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    const settledEvents = scrollEvents;
+    await new Promise<void>((resolve) => setTimeout(resolve, 400));
+    return {
+      active: document
+        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        ?.getAttribute("aria-label"),
+      selected: document
+        .querySelector('[data-lightbox-filmstrip-item][aria-selected="true"]')
+        ?.getAttribute("data-index"),
+      extraEvents: scrollEvents - settledEvents,
+    };
+  });
+  expect(selectedIndex.extraEvents).toBe(0);
+  expect(selectedIndex.active).toBe(`Item ${Number(selectedIndex.selected) + 1} of 10000`);
+});
+
+test("a vertical wheel burst scrolls and settles the filmstrip once", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  await page.getByLabel("Photo number").fill("5001");
+  await page.getByRole("button", { name: "Open number" }).click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  await filmstrip.evaluate((element) => {
+    for (const deltaY of [90, 120, 0]) {
+      element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY }));
+    }
+  });
+  await expect
+    .poll(() =>
+      page
+        .locator('[data-lightbox-filmstrip-item][aria-selected="true"]')
+        .getAttribute("data-index"),
+    )
+    .not.toBe("5000");
+  const selected = Number(
+    await page
+      .locator('[data-lightbox-filmstrip-item][aria-selected="true"]')
+      .getAttribute("data-index"),
+  );
+  await expect(page.locator(`[data-photo-index="${selected}"]`)).toHaveCount(1);
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    `Item ${selected + 1} of 10000`,
+  );
+});
+
 test("native gallery swiping reveals the virtualized origin only after settlement", async ({
   page,
 }) => {
@@ -441,6 +763,44 @@ test("native gallery swiping reveals the virtualized origin only after settlemen
   await expect(page.locator('[data-photo-index="1"]')).toHaveCount(1);
 });
 
+test("native slide swiping survives the browser pointer-cancel handoff", async ({ page }) => {
+  await page.goto("/photo-library.html?count=10000");
+  await page.locator('[data-photo-index="0"]').click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const slides = page.locator("[data-lightbox-slides]");
+  await slides.evaluate(async (element) => {
+    element.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "touch",
+      }),
+    );
+    element.dispatchEvent(
+      new PointerEvent("pointercancel", {
+        bubbles: true,
+        isPrimary: true,
+        pointerId: 1,
+        pointerType: "touch",
+      }),
+    );
+    element.scrollLeft = element.clientWidth;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
+
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 2 of 10000",
+  );
+});
+
 test("opening remains active until the delayed filmstrip reveal settles", async ({ page }) => {
   await page.goto("/photo-library.html");
   await page.locator("[data-photo-index]").first().click();
@@ -473,4 +833,54 @@ test("opening remains active until the delayed filmstrip reveal settles", async 
       ?.finish();
   });
   await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+});
+
+test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
+  await page.goto("/photo-library.html");
+  await page.evaluate(() => {
+    const measurements = { starts: 0, opacity: [] as number[], sampling: true };
+    Object.assign(window, { __filmstripRevealMeasurements: measurements });
+    document.addEventListener(
+      "animationstart",
+      (event) => {
+        if ((event as AnimationEvent).animationName === "lightbox-filmstrip-appear") {
+          measurements.starts += 1;
+        }
+      },
+      true,
+    );
+    const sample = () => {
+      const filmstrip = document.querySelector<HTMLElement>("[data-lightbox-filmstrip]");
+      if (filmstrip && getComputedStyle(filmstrip).visibility === "visible") {
+        measurements.opacity.push(Number(getComputedStyle(filmstrip).opacity));
+      }
+      if (measurements.sampling) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.locator("[data-photo-index]").first().click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  const measurements = await page.evaluate(() => {
+    const result = (
+      window as unknown as {
+        __filmstripRevealMeasurements: {
+          starts: number;
+          opacity: number[];
+          sampling: boolean;
+        };
+      }
+    ).__filmstripRevealMeasurements;
+    result.sampling = false;
+    return { starts: result.starts, opacity: result.opacity };
+  });
+  expect(measurements.starts).toBe(1);
+  expect(measurements.opacity.some((opacity) => opacity > 0 && opacity < 1)).toBe(true);
+  for (let index = 1; index < measurements.opacity.length; index += 1) {
+    expect(measurements.opacity[index]!).toBeGreaterThanOrEqual(
+      measurements.opacity[index - 1]! - 0.01,
+    );
+  }
 });

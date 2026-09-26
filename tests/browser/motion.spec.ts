@@ -92,6 +92,45 @@ test("indexed image origin opens from its mounted thumbnail", async ({ page }, t
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 
+test("indexed close keeps the live image painted until its flight clone decodes", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  await page.evaluate(() => {
+    const originalDecode = (image: HTMLImageElement) =>
+      HTMLImageElement.prototype.decode.call(image);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    Object.assign(window, { __releaseFlightDecode: release });
+    HTMLImageElement.prototype.decode = function () {
+      if (this.closest("[data-lightbox-flight]")) return gate;
+      return originalDecode(this);
+    };
+  });
+
+  await page.keyboard.press("Escape");
+  const source = page.locator("[data-lightbox-slides] [data-lightbox-media]").first();
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
+  await expect(source).not.toHaveAttribute("data-lightbox-flight-source-hidden", "");
+  await page.waitForTimeout(600);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(1);
+  await expect(source).not.toHaveAttribute("data-lightbox-flight-source-hidden", "");
+
+  await page.evaluate(() => {
+    (window as unknown as { __releaseFlightDecode(): void }).__releaseFlightDecode();
+  });
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
 test("indexed item without a mounted origin uses scale and fade", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/harness.html?virtual&count=1000&no-filmstrip");
@@ -510,13 +549,21 @@ test("direct touch dismissal preserves crop, radii, and native strip position", 
   const drag = await frame.evaluate((element) => {
     const style = getComputedStyle(element);
     const media = element.querySelector<HTMLElement>("[data-lightbox-media]")!;
+    const slides = element.closest<HTMLElement>("[data-lightbox-slides]")!;
     return {
       radius: parseFloat(style.borderTopLeftRadius),
       mediaTransform: getComputedStyle(media).transform,
+      slidesHeight: slides.getBoundingClientRect().height,
+      viewportHeight: innerHeight,
+      centerY: element.getBoundingClientRect().y + element.getBoundingClientRect().height / 2,
     };
   });
   expect(drag.radius).toBeGreaterThan(0);
   expect(drag.mediaTransform).not.toBe("none");
+  expect(drag.slidesHeight).toBe(drag.viewportHeight);
+  const centerTravel = drag.centerY - (bounds!.y + bounds!.height / 2);
+  expect(centerTravel).toBeGreaterThan(25);
+  expect(centerTravel).toBeLessThan(55);
 
   await frame.dispatchEvent("pointercancel", {
     pointerId: 12,
@@ -587,6 +634,36 @@ test("direct close flight retargets after viewport resize", async ({ page }) => 
   });
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
   await expect(page.locator("[data-lightbox-flight]")).toHaveCount(0);
+});
+
+test("square image is prepainted before its close flight hides the source", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/photo-library.html");
+  const origin = page.locator('[data-photo-index="3"]');
+  await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await origin.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const handoff = await page.evaluate(() => {
+    const source = document.querySelector<HTMLElement>(
+      '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+    )!;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    const flight = document.querySelector<HTMLElement>(
+      "[data-lightbox-flight] [data-lightbox-media]",
+    );
+    return {
+      flightMounted: !!flight,
+      cloned: flight !== source,
+      sourceHidden: source.hasAttribute("data-lightbox-flight-source-hidden"),
+    };
+  });
+  expect(handoff).toEqual({ flightMounted: true, cloned: true, sourceHidden: false });
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(origin.locator("img")).not.toHaveAttribute("data-lightbox-thumbnail-hidden", "");
 });
 
 test("nested visual target takes precedence over its preview box", async ({ page }) => {

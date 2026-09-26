@@ -40,6 +40,7 @@ import {
 } from "./viewer-portal";
 import { ViewerStrip } from "./viewer-strip";
 import { activeViewer } from "./viewer-ownership";
+import { handoffDecodedFlightImage } from "./flight-image";
 import { mapRadii } from "./transition-geometry";
 import { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 
@@ -547,10 +548,19 @@ export class DomViewerDriver<
     let frame = this.#frame;
     let media = this.#media;
     if (from) {
+      const source = media;
       const flight = this.#createCloseFlight(start, from, media);
       frame = flight.frame;
       media = flight.media;
       target = flight.target;
+      if (media !== source) {
+        const handedOff = await handoffDecodedFlightImage(
+          source,
+          media as HTMLImageElement,
+          () => !context.signal.aborted,
+        );
+        if (!handedOff) return this.#removeFlight();
+      }
       this.#closeOriginObserver = new ResizeObserver(this.#scheduleCloseTargetUpdate);
       this.#closeOriginObserver.observe(from);
     }
@@ -897,7 +907,6 @@ export class DomViewerDriver<
       source instanceof HTMLImageElement ? (source.cloneNode(true) as HTMLImageElement) : source;
     if (media !== source) {
       media.removeAttribute("style");
-      source.dataset.lightboxFlightSourceHidden = "";
     } else {
       this.#flightMarker = ownerDocument.createComment("lightbox-flight-home");
       source.before(this.#flightMarker);
