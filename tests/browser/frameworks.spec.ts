@@ -15,11 +15,20 @@ test("React binding opens and navigates without custom elements", async ({ page 
     "data-lightbox-state",
     "open",
   );
-  await page.keyboard.press("ArrowRight");
+  await page.getByRole("button", { name: "Next" }).click();
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 2 of 3",
   );
+  const opacityAnimations = await page
+    .locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')
+    .evaluate((media) =>
+      media
+        .getAnimations()
+        .map((animation) => (animation.effect as KeyframeEffect | null)?.getKeyframes() ?? [])
+        .filter((keyframes) => keyframes.some((keyframe) => keyframe.opacity === "0.35")),
+    );
+  expect(opacityAnimations).toEqual([]);
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
   await page.getByRole("button", { name: "Switch source" }).click();

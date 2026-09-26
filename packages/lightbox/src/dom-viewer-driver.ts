@@ -46,7 +46,6 @@ import { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 
 const OPEN_DURATION = 300;
 const TOUCH_DISMISS_DISTANCE = 60;
-const EASING = "cubic-bezier(0.2, 0.7, 0.2, 1)";
 const OPENING_SPRING_RESPONSE = 210;
 const TOUCH_OPENING_SPRING_RESPONSE = 380;
 const DISMISS_RADIUS_END = 0.1;
@@ -436,9 +435,8 @@ export class DomViewerDriver<
       overlayFrom,
     );
     const controlsReady = motion.backdrop.find((keyframe) => Number(keyframe.opacity) >= 0.85);
-    const controlsReveal = this.#thumbnailOverlays.prepareControlsReveal(
-      Number(controlsReady?.offset ?? 0.7) * motion.duration,
-    );
+    const controlsRevealDelay = Number(controlsReady?.offset ?? 0.7) * motion.duration;
+    const controlsReveal = this.#thumbnailOverlays.prepareControlsReveal(controlsRevealDelay);
     applyImageTransitionPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = interruptedPose?.frameOpacity ?? (!from ? "0" : "1");
     this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
@@ -446,11 +444,17 @@ export class DomViewerDriver<
       ...(prepared && !interruptedPose ? prepared.animations : this.#openingAnimations(motion)),
       ...this.#thumbnailOverlays.animations(motion.frame, motion.duration, overlayFrom, 0),
     ];
+    if (this.#portal.dialog.hasAttribute("data-lightbox-gallery")) {
+      this.#portal.dialog.style.setProperty(
+        "--lightbox-gallery-controls-reveal-delay",
+        `${controlsRevealDelay}ms`,
+      );
+      this.#portal.dialog.dataset.galleryControlsRevealing = "";
+    }
     if (this.#portal.dialog.hasAttribute("data-filmstrip")) {
-      const ready = motion.backdrop.find((keyframe) => Number(keyframe.opacity) >= 0.85);
       this.#portal.dialog.style.setProperty(
         "--lightbox-filmstrip-reveal-delay",
-        `${Number(ready?.offset ?? 0.7) * motion.duration}ms`,
+        `${controlsRevealDelay}ms`,
       );
       this.#portal.dialog.dataset.filmstripRevealing = "";
     }
@@ -460,6 +464,7 @@ export class DomViewerDriver<
     if (context.signal.aborted) return;
     await Promise.all([
       this.#waitForFilmstripReveal(context.signal),
+      this.#waitForGalleryControlsReveal(context.signal),
       this.#waitForAnimation(controlsReveal, context.signal),
     ]);
     if (context.signal.aborted) return;
@@ -467,6 +472,8 @@ export class DomViewerDriver<
     this.#strip?.completeOpening(context.index);
     this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
     this.#thumbnailOverlays.finishControlsReveal();
+    delete this.#portal.dialog.dataset.galleryControlsRevealing;
+    this.#portal.dialog.style.removeProperty("--lightbox-gallery-controls-reveal-delay");
     delete this.#portal.dialog.dataset.filmstripRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
     this.#focus();
@@ -496,15 +503,6 @@ export class DomViewerDriver<
     // Filmstrip movement is a direct preview scrub. The full-size image swaps
     // immediately while native scrolling continues under the user's finger.
     if (selected || context.reason === "filmstrip") return;
-    await this.#play(
-      [
-        this.#media.animate([{ opacity: 0.35 }, { opacity: 1 }], {
-          duration: 160,
-          easing: EASING,
-        }),
-      ],
-      context.signal,
-    );
   }
 
   async close(context: ViewerSessionCloseContext) {
@@ -709,6 +707,19 @@ export class DomViewerDriver<
       ?.getAnimations()
       .find(
         (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+      );
+    await this.#waitForAnimation(animation, signal);
+  }
+
+  async #waitForGalleryControlsReveal(signal: AbortSignal) {
+    const control = this.#portal.dialog.querySelector<HTMLElement>(
+      "[data-lightbox-previous], [data-lightbox-next], [data-lightbox-close]",
+    );
+    const animation = control
+      ?.getAnimations()
+      .find(
+        (candidate) =>
+          (candidate as CSSAnimation).animationName === "lightbox-gallery-controls-appear",
       );
     await this.#waitForAnimation(animation, signal);
   }
@@ -1308,6 +1319,8 @@ export class DomViewerDriver<
       target.toggleAttribute("data-dismissing", state === "closing");
     }
     if (state === "closed") {
+      delete this.#portal.dialog.dataset.galleryControlsRevealing;
+      this.#portal.dialog.style.removeProperty("--lightbox-gallery-controls-reveal-delay");
       delete this.#portal.dialog.dataset.filmstripRevealing;
       this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
     }

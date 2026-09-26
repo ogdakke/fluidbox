@@ -101,6 +101,39 @@ test("picture content stays within the viewport after placeholder replacement", 
   expect(width / height).toBeCloseTo(3024 / 4032, 2);
 });
 
+test("gallery controls reveal with the backdrop and arrow selection does not fade", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/harness.html");
+  await page.locator("app-lightbox").first().click({ noWaitAfter: true });
+
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-gallery-controls-revealing", "");
+  const next = dialog.locator("[data-lightbox-next]");
+  const close = dialog.locator("[data-lightbox-close]");
+  await expect(next).toHaveCSS("pointer-events", "none");
+  await expect(close).toHaveCSS("pointer-events", "none");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(next).toHaveCSS("pointer-events", "auto");
+  await expect(close).toHaveCSS("pointer-events", "auto");
+
+  await next.click();
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 2 of 3",
+  );
+  const opacityAnimations = await page
+    .locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')
+    .evaluate((media) =>
+      media
+        .getAnimations()
+        .map((animation) => (animation.effect as KeyframeEffect | null)?.getKeyframes() ?? [])
+        .filter((keyframes) => keyframes.some((keyframe) => keyframe.opacity === "0.35")),
+    );
+  expect(opacityAnimations).toEqual([]);
+});
+
 test("filmstrip selects a distant item", async ({ page }) => {
   await page.goto("/harness.html?count=30");
   await page.locator("app-lightbox").first().click();
