@@ -2,7 +2,7 @@
 // Output is deterministic, so regenerating only changes files when this script changes.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { scenes, type Scene } from "@ogdakke/fluidbox-design/art-scenes";
+import { scenes, tallScenes, type Scene } from "@ogdakke/fluidbox-design/art-scenes";
 
 function random(seed: number) {
   let state = seed >>> 0;
@@ -131,6 +131,7 @@ function render(scene: Scene): string {
 if (import.meta.main) {
   const directory = join(import.meta.dirname, "..", "public", "art");
   mkdirSync(directory, { recursive: true });
-  for (const scene of scenes) writeFileSync(join(directory, `${scene.id}.svg`), render(scene));
-  console.log(`Wrote ${scenes.length} scenes to ${directory}`);
+  const all = [...scenes, ...tallScenes];
+  for (const scene of all) writeFileSync(join(directory, `${scene.id}.svg`), render(scene));
+  console.log(`Wrote ${all.length} scenes to ${directory}`);
 }

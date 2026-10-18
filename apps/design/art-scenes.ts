@@ -110,3 +110,28 @@ export const scenes: Scene[] = [
     stars: true,
   },
 ];
+
+/** Phone-screenshot shapes, kept out of the shared gallery; the sheet lab shows them. */
+export const tallScenes: Scene[] = [
+  {
+    id: "spire",
+    title: "Spire at first light",
+    width: 1179,
+    height: 2556,
+    seed: 71,
+    sky: ["#1d2a4a", "#6a7fb0", "#f2c7a5"],
+    sun: { x: 0.62, y: 0.46, r: 0.07, color: "#fff3e3", glow: "#ffcfa6" },
+    layers: ["#8b8fb8", "#646a96", "#434a74", "#283052", "#151a33"],
+  },
+  {
+    id: "tarn",
+    title: "Tarn under the pines",
+    width: 1080,
+    height: 1920,
+    seed: 83,
+    sky: ["#0f2b2a", "#3f7a6e", "#bfe0c9"],
+    sun: { x: 0.4, y: 0.3, r: 0.05, color: "#f4fff6", glow: "#bdf0d3" },
+    layers: ["#4f8b78", "#33695a", "#1f4a40"],
+    water: "#12302c",
+  },
+];

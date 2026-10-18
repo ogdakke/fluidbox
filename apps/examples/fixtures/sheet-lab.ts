@@ -1,5 +1,6 @@
 import { mountSite } from "../src/site";
-import { artSrc, scenes, type Scene } from "../src/art";
+import { tallScenes } from "@ogdakke/fluidbox-design/art-scenes";
+import { artSrc, scenes as gallery, type Scene } from "../src/art";
 import "./safari-chrome.css";
 import "./sheet-lab.css";
 
@@ -87,7 +88,9 @@ function details(scene: Scene) {
 }
 
 // Gallery.
-const gallery = document.querySelector<HTMLElement>("[data-lab-gallery]")!;
+// The shared gallery plus phone-screenshot shapes, to see tall photos scale and move.
+const scenes = [...gallery, ...tallScenes];
+const galleryGrid = document.querySelector<HTMLElement>("[data-lab-gallery]")!;
 for (const [index, scene] of scenes.entries()) {
   const button = document.createElement("button");
   button.type = "button";
@@ -95,7 +98,7 @@ for (const [index, scene] of scenes.entries()) {
   button.setAttribute("aria-label", `Open ${scene.title}`);
   button.innerHTML = `<img src="${artSrc(scene)}" alt="" />`;
   button.addEventListener("click", () => open(index));
-  gallery.append(button);
+  galleryGrid.append(button);
 }
 
 // Overlay.
@@ -201,8 +204,10 @@ function measure() {
     // The panel rises through the empty space under the photo first, then
     // pushes the photo up with it, a gap ahead of it. The stage holds still for
     // that first stretch. A photo with less room below than the gap moves a
-    // little faster than the scroll instead, over the whole push.
-    const gap = 12;
+    // little faster than the scroll instead, over the whole push. The anchored
+    // panel overlaps a tall enough photo instead, its rounded top over the
+    // photo's bottom edge; the floating pane keeps clear of it.
+    const gap = current.overscroll === "on" ? -24 : 12;
     const hold = Math.min(height - (photo.offsetTop + photo.offsetHeight) - gap, panelHeight);
     slide.style.setProperty("--sl-hold", `${hold}px`);
     slide.style.setProperty("--sl-hold-range", `${hold >= 1 ? hold : panelHeight}px`);
