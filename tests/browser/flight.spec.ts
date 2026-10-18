@@ -287,6 +287,33 @@ test("a close after an idle moment still animates", async ({ page }) => {
   await expect(dialog).toHaveCount(0);
 });
 
+test("the card stays painted until the opening has been on screen for a frame", async ({
+  page,
+}) => {
+  // Safari can paint a freshly shown image one frame late. Hiding the card in
+  // the same frame the overlay appears leaves an empty frame on screen.
+  const trigger = await prepareCase(page, "cover");
+  const frames = page.evaluate(
+    () =>
+      new Promise<string[]>((resolve) => {
+        const image = document.querySelector<HTMLElement>('[data-flight-case="cover"] img')!;
+        const seen: string[] = [];
+        const tick = () => {
+          const overlay = document.querySelector("[data-lightbox-overlay]");
+          const shown = !!overlay && !overlay.hasAttribute("data-lightbox-prepared");
+          if (shown) seen.push(getComputedStyle(image).visibility);
+          if (seen.length < 4) requestAnimationFrame(tick);
+          else resolve(seen);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+  await trigger.click();
+  const seen = await frames;
+  expect(seen[0], "the card is painted in the overlay's first frame").toBe("visible");
+  expect(seen.at(-1), "the card is hidden once the overlay has painted").toBe("hidden");
+});
+
 test("a travelling badge never widens the page", async ({ page }) => {
   // On a phone the card is nearly as wide as the screen, so the growing badge
   // layer passes the right edge. A wider page makes mobile Safari zoom it out.

@@ -455,7 +455,8 @@ export class DomViewerDriver<
     if (!prepared && picture instanceof HTMLVideoElement) {
       this.#strip?.continueVideo(context.index, picture);
     }
-    this.#keepThumbnailVisible(crossfade ? context.origin?.thumbnail : undefined);
+    const keptThumbnail = context.origin?.thumbnail;
+    if (crossfade) this.#keepThumbnailVisible(keptThumbnail);
     const start =
       prepared && !interruptedPose
         ? prepared.start
@@ -504,6 +505,10 @@ export class DomViewerDriver<
     }
     this.#synchronizeStart(animations);
     delete this.#portal.overlay.dataset.lightboxPrepared;
+    // Safari can paint a freshly shown image a frame late. The opening starts
+    // exactly over the card, so the card stays painted underneath until the
+    // overlay has been presented once.
+    if (!crossfade) this.#releaseThumbnailAfterFirstFrame(keptThumbnail, context.signal);
     await this.#play(animations, context.signal, () =>
       this.#thumbnailOverlays.set("opening", 0, new DOMMatrix()),
     );
@@ -749,6 +754,18 @@ export class DomViewerDriver<
       delete this.#crossfadeThumbnail.dataset.lightboxThumbnailCrossfade;
     this.#crossfadeThumbnail = thumbnail;
     if (thumbnail) thumbnail.dataset.lightboxThumbnailCrossfade = "";
+  }
+
+  #releaseThumbnailAfterFirstFrame(thumbnail: HTMLElement | undefined, signal: AbortSignal) {
+    if (!thumbnail) return;
+    const view = this.#portal.overlay.ownerDocument.defaultView!;
+    view.requestAnimationFrame(() =>
+      view.requestAnimationFrame(() => {
+        if (!signal.aborted && this.#crossfadeThumbnail === thumbnail) {
+          this.#keepThumbnailVisible(undefined);
+        }
+      }),
+    );
   }
 
   /** The origin's image, when it shows the item being opened. */
