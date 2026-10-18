@@ -34,28 +34,28 @@ const initialGzipLimits: Record<Entry, number> = {
   vue: 1_500,
   angular: 1_500,
   filmstrip: 3_100,
-  sheet: 3_600,
+  sheet: 6_400,
 };
 const cssGzipLimit = 5_300;
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 33_100,
-  elements: 32_100,
-  react: 31_550,
-  solid: 32_350,
-  vue: 32_450,
-  angular: 32_350,
+  root: 33_250,
+  elements: 32_250,
+  react: 31_700,
+  solid: 32_500,
+  vue: 32_600,
+  angular: 32_500,
   filmstrip: 3_100,
-  sheet: 3_600,
+  sheet: 6_400,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 38_350,
-  elements: 37_350,
-  react: 36_800,
-  solid: 37_600,
-  vue: 37_700,
-  angular: 37_600,
+  root: 38_500,
+  elements: 37_500,
+  react: 36_950,
+  solid: 37_750,
+  vue: 37_850,
+  angular: 37_750,
   filmstrip: 8_400,
-  sheet: 5_100,
+  sheet: 9_300,
 };
 
 type Chunk = Extract<

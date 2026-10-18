@@ -26,7 +26,7 @@ export type LightboxRootProps<TItem extends LightboxItem = LightboxItem> = {
   readonly renderers?: Readonly<Record<string, LightboxReactRenderer<TItem>>>;
   /** From `@ogdakke/fluidbox/filmstrip`. Keep it stable, as with useMemo or a module constant. */
   readonly filmstrip?: LightboxExtension<TItem>;
-  /** From `@ogdakke/fluidbox/sheet`. Render its content with `data-lightbox-sheet` in a Portal. */
+  /** From `@ogdakke/fluidbox/sheet`. Render its content with `data-lightbox-sheet` in a Lightbox.Sheet. */
   readonly sheet?: LightboxExtension<TItem>;
   readonly onBeforeCommand?: (event: LightboxBeforeCommandEvent) => void;
   readonly onEvent?: (event: LightboxEvent) => void;
@@ -66,6 +66,15 @@ export interface LightboxPortalProps {
   readonly children?: ReactNode;
 }
 
+export interface LightboxSheetProps {
+  /** The sheet passed to Root. */
+  readonly sheet: {
+    readonly slot: HTMLElement | null;
+    subscribe(listener: (stop: number) => void): () => void;
+  };
+  readonly children?: ReactNode;
+}
+
 export interface LightboxContentProps extends HTMLAttributes<HTMLDivElement> {}
 
 export interface LightboxThumbnailOverlayProps extends HTMLAttributes<HTMLSpanElement> {
@@ -92,6 +101,7 @@ export interface LightboxReactParts {
   Item: (props: LightboxItemProps) => ReactElement | null;
   Trigger: <TItem extends LightboxItem>(props: LightboxTriggerProps<TItem>) => ReactElement | null;
   Portal: (props: LightboxPortalProps) => ReactElement | null;
+  Sheet: (props: LightboxSheetProps) => ReactElement | null;
   Content: (props: LightboxContentProps) => ReactElement | null;
   ThumbnailOverlay: (props: LightboxThumbnailOverlayProps) => ReactElement | null;
   Close: (props: LightboxActionProps) => ReactElement | null;

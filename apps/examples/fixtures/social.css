@@ -352,8 +352,6 @@
     --x-aside: 0px;
     --x-bar: 0px;
     --lightbox-sheet-enabled: 1;
-    --lightbox-sheet-max-height: 62svh;
-    --lightbox-sheet-radius: 0px;
     --lightbox-sheet-radius: 0px;
   }
   [data-lightbox-dialog]:has(.x-layer) :is([data-lightbox-previous], [data-lightbox-next]),
@@ -363,10 +361,12 @@
   }
   .x-phone {
     position: absolute;
-    inset: auto 0 0;
+    /* The gradient runs on under the browser's bars, where the sheet waits. */
+    inset: auto 0 calc(-1 * var(--lightbox-sheet-reach, 0px));
     z-index: 6;
     display: block;
-    padding: 48px 16px calc(4px + env(safe-area-inset-bottom, 0px));
+    padding: 48px 16px
+      calc(4px + env(safe-area-inset-bottom, 0px) + var(--lightbox-sheet-reach, 0px));
     background: linear-gradient(transparent, rgb(10 10 10 / 0.55) 32px, rgb(10 10 10 / 0.85));
     color: #ededee;
     font-size: 15px;
@@ -375,7 +375,15 @@
   .x-phone__fade {
     opacity: clamp(0, 1 - var(--lightbox-sheet-progress) * 2.5, 1);
   }
-  [data-sheet-raised] .x-phone {
+  /* Swipes on the post go through to the photo's scroller, which raises the
+     replies; only its buttons take touches. */
+  .x-phone {
+    pointer-events: none;
+  }
+  .x-phone :is(button, a) {
+    pointer-events: auto;
+  }
+  [data-sheet-raised] .x-phone :is(button, a) {
     pointer-events: none;
   }
   /* Over the photo the page's light controls would glare; these keep to the dark. */
@@ -405,12 +413,13 @@
     color: inherit;
   }
   .x-sheet {
-    display: block;
+    display: flex;
     font-size: 15px;
     line-height: 1.35;
   }
   .x-sheet__head {
     display: flex;
+    flex: none;
     align-items: baseline;
     gap: 8px;
     padding: 4px 16px 10px;
@@ -424,8 +433,7 @@
     padding: 0 16px;
   }
   .x-sheet .x-composer {
-    position: sticky;
-    bottom: 0;
+    flex: none;
     padding: 10px 16px;
     border-top: 1px solid var(--fb-line);
     border-bottom: 0;
@@ -659,8 +667,6 @@
     --lightbox-sheet-enabled: 1;
     --lightbox-sheet-peek: calc(150px + env(safe-area-inset-bottom, 0px));
     --lightbox-sheet-gap: 0px;
-    --lightbox-sheet-max-height: 55svh;
-    --lightbox-sheet-radius: 0px;
     --lightbox-sheet-radius: 0px;
   }
   [data-lightbox-dialog]:has(.ig-layer) :is([data-lightbox-previous], [data-lightbox-next]),
@@ -669,7 +675,7 @@
     display: none;
   }
   .ig-sheet {
-    display: block;
+    display: flex;
     padding-inline: 12px;
     font-size: 14px;
     line-height: 1.35;
@@ -707,4 +713,78 @@
   max-width: 80ch;
   margin: 0 var(--fb-gutter) 40px;
   padding-left: 1.2em;
+}
+
+/* React Aria's Sheet, styled as X's replies sheet. */
+.ra-overlay {
+  z-index: 20;
+}
+.ra-backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+@keyframes ra-backdrop {
+  from {
+    opacity: 0;
+  }
+}
+.ra-sheet {
+  display: flex;
+  flex-direction: column;
+  /* Content-box: React Aria's overscroll padding runs on below this height. */
+  box-sizing: content-box;
+  width: 100%;
+  max-width: 640px;
+  height: calc(100% - env(safe-area-inset-top, 0px) - 56px);
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  box-shadow:
+    0 -1px 0 rgb(0 0 0 / 0.06),
+    0 -12px 40px rgb(0 0 0 / 0.18);
+  outline: none;
+}
+.ra-handle {
+  flex: none;
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 4px;
+  border-radius: 3px;
+  background: currentColor;
+  opacity: 0.25;
+}
+.ra-sheet .ra-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  /* React Aria's own: room for the keyboard. */
+  padding-bottom: var(--sheet-scroll-padding-y);
+  outline: none;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.ra-sheet .x-sheet__head {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 16px 10px;
+  border-bottom: 1px solid var(--fb-line);
+  font-size: 17px;
+}
+.ra-sheet .ra-replies {
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px;
+  /* As React Aria's starter: only scroll once the sheet is all the way up. */
+  overflow: hidden;
+  overscroll-behavior: auto;
+}
+.ra-overlay[data-expanded] .ra-replies {
+  overflow-y: auto;
+}
+.ra-sheet .x-composer {
+  flex: none;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--fb-line);
+  border-bottom: 0;
 }

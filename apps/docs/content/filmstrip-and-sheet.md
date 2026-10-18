@@ -37,57 +37,79 @@ In React, `Lightbox.Filmstrip` renders the same strip as a component.
 
 ## Sheet
 
-`sheet()` adds a panel that rises over the photo, as the replies on X and the comments on Instagram do on a phone. Swipe or scroll up to raise it and down to lower it. The photo fits into the room left above the sheet.
+`sheet()` adds a panel that rises over the photo, as the replies on X and the comments on Instagram do on a phone. The photo and the sheet share one native scroller with a snap point per stop, so swipes, momentum and rubber-banding are the browser's own. Scroll-driven animations fit the photo into the room left above the sheet, so no script runs while it moves.
 
-The sheet rests at one of three stops:
-
-| Stop    | Sheet                                                               |
-| ------- | ------------------------------------------------------------------- |
-| `photo` | Tucked away, or peeking by `--lightbox-sheet-peek`.                 |
-| `info`  | Its content's height, up to `--lightbox-sheet-max-height`.          |
-| `full`  | Near the top, when the content is taller than the info stop allows. |
-
-Render your own element with `data-lightbox-sheet` into the portal, or pass `render` and the runtime makes one for you and fills it for each item:
+Stop `0` is the sheet at rest: away below the screen, or peeking by `--lightbox-sheet-peek`. Each snap point adds a stop above it, lowest first:
 
 ```ts
-const details = sheet({
-  render({ item, target }) {
-    target.textContent = item.media.type === "image" ? item.media.alt : item.media.title;
-  },
+const replies = sheet({
+  // Pixels, a percentage of the viewer's height, or "content" for the sheet's own height.
+  snapPoints: ["62%", "100%"],
+  // A swipe down on the resting photo: "flight" flies it home, "scroll" scrolls
+  // it off the bottom and closes, "none" keeps the viewer open.
+  dismiss: "flight",
   onChange(stop) {
     console.log("sheet at", stop);
   },
 });
 ```
 
-Give any element `data-lightbox-sheet-stop="info"` or `"full"` to make it raise the sheet when clicked, such as a reply count or a "View all comments" link. Escape, a tap above the sheet and the close button lower it before they close the viewer. Drive it from code with `details.set("full")`, read `details.stop`, and `details.subscribe(listener)` to follow it.
+The default is `["60%", "content"]` with the `"flight"` dismiss. A stop set in pixels or percent is always reachable: the sheet stretches to it when its content is shorter. A `"content"` stop follows the content, so with little content it sits lower and the space above it shows. With `dismiss: "flight"`, a second flick down while the sheet is still lowering goes straight into the flight.
 
-A `data-lightbox-sheet-handle` element inside the sheet draws a grab bar.
+Render your own element with `data-lightbox-sheet` into `replies.slot`, or pass `render` and the runtime makes one and fills it for each item:
+
+```ts
+sheet({
+  render({ item, target }) {
+    target.textContent = item.media.type === "image" ? item.media.alt : item.media.title;
+  },
+});
+```
+
+Inside the sheet:
+
+| Attribute                    | Effect                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| `data-lightbox-sheet-handle` | Draws a grab bar.                                                                           |
+| `data-lightbox-sheet-scroll` | The part that scrolls once the sheet is at its top stop. Without one, the whole sheet does. |
+
+Below the top stop a swipe anywhere on the sheet moves the sheet; at the top, its content scrolls, and a pull down from the top of the content carries on into the sheet, as React Aria's sheet does.
+
+Give any element `data-lightbox-sheet-stop="1"` to raise the sheet to that stop when clicked, such as a reply count or a "View all comments" link. Clicking it again at that stop lowers the sheet. The runtime keeps `aria-expanded` on these triggers and moves focus into the sheet once it settles. Escape, a tap above the sheet and the close button lower it before they close the viewer. Drive it from code with `replies.set(2)`, read `replies.stop`, and `replies.subscribe(listener)` to follow it. The dialog also dispatches `lightbox-sheet-change` with `detail.stop`.
+
+### Text fields and the keyboard
+
+A text field in the sheet works as it does in React Aria's sheet. A tap focuses the field without letting Safari pan the screen. The sheet pads its bottom by the part the keyboard covers, so its end can be brought above the keyboard. Once the keyboard is open, the field scrolls into view inside the sheet. When the sheet starts down, focus leaves the field, so the keyboard goes as the sheet does.
+
+### Why the viewer owns the sheet
+
+A drawer library on top of the viewer would bring a second gesture system that fights the viewer's dismiss and zoom, and couldn't fit the photo to the sheet as it moves. The sheet is the viewer's own scroller instead, so the browser moves the photo and the sheet together. Script runs only to measure, to record the stop when a scroll ends, and for the flight.
 
 ### React
 
-Pass the sheet to `Lightbox.Root` and read its stop with `useLightboxSheet`, for example to set `aria-expanded` on a trigger:
+Pass the sheet to `Lightbox.Root` and render its content with `Lightbox.Sheet`, which portals into the slot. `useLightboxSheet` returns the current stop:
 
 ```tsx
 import { Lightbox, useLightboxSheet } from "@ogdakke/fluidbox/react";
 import { sheet } from "@ogdakke/fluidbox/sheet";
 
 function Viewer() {
-  const replies = useMemo(() => sheet(), []);
+  const replies = useMemo(() => sheet({ snapPoints: ["62%", "100%"] }), []);
   const stop = useLightboxSheet(replies);
   return (
     <Lightbox.Root source={source} sheet={replies}>
       {/* triggers and items */}
       <Lightbox.Portal>
         <Lightbox.Content />
-        <button data-lightbox-sheet-stop="info" aria-expanded={stop !== "photo"}>
-          Replies
-        </button>
+        <button data-lightbox-sheet-stop="1">Replies</button>
+      </Lightbox.Portal>
+      <Lightbox.Sheet sheet={replies}>
         <section data-lightbox-sheet data-lightbox-chrome aria-label="Replies">
           <div data-lightbox-sheet-handle />
-          {/* replies */}
+          <ul data-lightbox-sheet-scroll>{/* replies */}</ul>
+          <ReplyForm />
         </section>
-      </Lightbox.Portal>
+      </Lightbox.Sheet>
     </Lightbox.Root>
   );
 }
@@ -97,18 +119,27 @@ function Viewer() {
 
 Set these on the dialog. The runtime reads the first five, so they can change with a media query.
 
-| Variable                                                         | Default            | Effect                                                         |
-| ---------------------------------------------------------------- | ------------------ | -------------------------------------------------------------- |
-| `--lightbox-sheet-enabled`                                       | `1`                | `0` turns the sheet off, as for a wide screen with a sidebar.  |
-| `--lightbox-sheet-photo`                                         | `fit`              | `fit` shrinks the photo into the room above; `push` slides it. |
-| `--lightbox-sheet-peek`                                          | `0px`              | How much of the sheet shows at the photo stop.                 |
-| `--lightbox-sheet-gap`                                           | `12px`             | Space between the photo and the sheet.                         |
-| `--lightbox-sheet-max-height`                                    | `60svh`            | The info stop's height.                                        |
-| `--lightbox-sheet-top`                                           | safe area + `56px` | Space above the sheet at the full stop.                        |
-| `--lightbox-sheet-fade`                                          | `1`                | `0` keeps the photo showing behind the sheet at the full stop. |
-| `--lightbox-sheet-radius`, `-max-width`, `-background`, `-color` |                    | The panel's look.                                              |
+| Variable                                                         | Default            | Effect                                                            |
+| ---------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------- |
+| `--lightbox-sheet-enabled`                                       | `1`                | `0` turns the sheet off, as for a wide screen with a sidebar.     |
+| `--lightbox-sheet-photo`                                         | `fit`              | `fit` shrinks the photo into the room above; `push` slides it up. |
+| `--lightbox-sheet-peek`                                          | `0px`              | How much of the sheet shows at rest.                              |
+| `--lightbox-sheet-gap`                                           | `12px`             | Space between the photo and the sheet.                            |
+| `--lightbox-sheet-fit-limit`                                     | `55%`              | How much the sheet covers before a fitting photo rises instead.   |
+| `--lightbox-sheet-top`                                           | safe area + `56px` | Space above the sheet at its tallest.                             |
+| `--lightbox-sheet-fade`                                          | `1`                | `0` keeps the photo showing behind the sheet at the top stop.     |
+| `--lightbox-sheet-radius`, `-max-width`, `-background`, `-color` |                    | The panel's look.                                                 |
 
-While it moves, the dialog publishes `--lightbox-sheet-visible` (pixels showing), `--lightbox-sheet-progress` (`0` at photo, `1` at info) and `--lightbox-sheet-expand` (`0` at info, `1` at full), and sets `data-sheet` to the current stop. Use them to fade a caption as the sheet rises:
+As it scrolls, the dialog's state properties follow on the compositor:
+
+| Property                    | Value                                                            |
+| --------------------------- | ---------------------------------------------------------------- |
+| `--lightbox-sheet-visible`  | Pixels of the sheet showing.                                     |
+| `--lightbox-sheet-progress` | `0` at rest to `1` at the first stop.                            |
+| `--lightbox-sheet-expand`   | `0` at the first stop to `1` at the last.                        |
+| `--lightbox-sheet-dismiss`  | `0` at rest to `1` with the photo scrolled away, for `"scroll"`. |
+
+The dialog also gets `data-sheet` with the stop number, `data-sheet-raised` above stop 0 and `data-sheet-expanded` at the top stop. Use them to fade a caption as the sheet rises:
 
 ```css
 .caption {
@@ -123,4 +154,4 @@ While it moves, the dialog publishes `--lightbox-sheet-visible` (pixels showing)
 }
 ```
 
-The [social viewers example](https://fluidbox.local/social.html) builds X's and Instagram's viewers this way: a reply sidebar on a wide screen, and a replies sheet and a peeking caption on a phone.
+The [social viewers example](https://fluidbox.local/social.html) builds X's and Instagram's viewers this way: a reply sidebar on a wide screen, and a replies sheet and a peeking caption on a phone. It also has React Aria's Sheet with the same replies, to compare.

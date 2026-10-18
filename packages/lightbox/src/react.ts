@@ -25,7 +25,7 @@ import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { arraySource } from "./array-source";
-import type { LightboxSheet, LightboxSheetStop } from "./sheet";
+import type { LightboxSheet } from "./sheet";
 import { createLightbox } from "./create-lightbox";
 import { FilmstripRuntime, filmstripCommandOptions } from "./filmstrip-runtime";
 import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
@@ -50,6 +50,7 @@ import type {
   LightboxItemProps,
   LightboxPortalProps,
   LightboxRootProps,
+  LightboxSheetProps,
   LightboxThumbnailOverlayProps,
   LightboxTriggerProps,
 } from "./react-public-api";
@@ -65,6 +66,7 @@ export type {
   LightboxReactRenderer,
   LightboxReactRenderContext,
   LightboxRootProps,
+  LightboxSheetProps,
   LightboxThumbnailOverlayProps,
   LightboxTriggerProps,
   LightboxTriggerRenderContext,
@@ -441,6 +443,19 @@ function Portal({ children }: LightboxPortalProps): ReactElement | null {
   return portalTarget ? createPortal(children, portalTarget) : null;
 }
 
+/**
+ * Renders into the slot of a sheet from `@ogdakke/fluidbox/sheet`, which scrolls
+ * with the photos. Put one element with `data-lightbox-sheet` in it.
+ */
+function Sheet({ sheet, children }: LightboxSheetProps): ReactElement | null {
+  const slot = useSyncExternalStore(
+    (listener) => sheet.subscribe(listener),
+    () => sheet.slot,
+    () => null,
+  );
+  return slot ? createPortal(children, slot) : null;
+}
+
 const Content = forwardRef<HTMLDivElement, LightboxContentProps>(function Content(
   { children, ...attributes },
   ref,
@@ -710,9 +725,7 @@ export function useLightboxState<TSelected>(
 }
 
 /** The stop a sheet from `@ogdakke/fluidbox/sheet` rests at, re-rendering as it changes. */
-export function useLightboxSheet(
-  sheet: Pick<LightboxSheet, "stop" | "subscribe">,
-): LightboxSheetStop {
+export function useLightboxSheet(sheet: Pick<LightboxSheet, "stop" | "subscribe">): number {
   return useSyncExternalStore(
     (listener) => sheet.subscribe(listener),
     () => sheet.stop,
@@ -725,6 +738,7 @@ export const Lightbox = {
   Item,
   Trigger,
   Portal,
+  Sheet,
   Content,
   ThumbnailOverlay,
   Close,

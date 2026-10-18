@@ -378,6 +378,7 @@ export class DomViewerDriver<
     this.#portal.overlay.dataset.lightboxPrepared = "";
     this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
     this.#strip?.mount();
+    for (const extension of this.#extensions) extension.attach?.();
 
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
@@ -453,6 +454,7 @@ export class DomViewerDriver<
       this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
     }
     this.#strip?.mount();
+    for (const extension of this.#extensions) extension.attach?.();
     this.#isolation.activate();
     this.#setState("opening");
     if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -617,7 +619,11 @@ export class DomViewerDriver<
       this.#returnFocus = context.origin.trigger;
       this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
     }
-    if (this.#forceImmediateClose || this.#prefersReducedMotion()) {
+    if (
+      this.#forceImmediateClose ||
+      this.#prefersReducedMotion() ||
+      this.#extensions.some((extension) => extension.closesInPlace?.())
+    ) {
       this.#preparedFlight = undefined;
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
@@ -1726,6 +1732,14 @@ export class DomViewerDriver<
 
   #onKeydown = (event: KeyboardEvent) => {
     if (!this.#portal.overlay.isConnected) return;
+    // Keys typed into a field in the viewer, as in a sheet's reply box, are the
+    // field's; only Escape and Tab still belong to the viewer.
+    const typing =
+      event.target instanceof Element &&
+      !!event.target.closest(
+        "input, textarea, select, [contenteditable]:not([contenteditable=false])",
+      );
+    if (typing && event.key !== "Escape" && event.key !== "Tab") return;
     if (this.#extensions.some((extension) => extension.keydown?.(event))) {
       event.preventDefault();
       event.stopPropagation();
@@ -1749,7 +1763,7 @@ export class DomViewerDriver<
         (control) =>
           !control.hasAttribute("disabled") &&
           !control.hasAttribute("hidden") &&
-          !control.closest("[hidden], [aria-hidden=true]") &&
+          !control.closest("[hidden], [aria-hidden=true], [inert]") &&
           getComputedStyle(control).pointerEvents !== "none" &&
           (this.#controller?.state.status !== "closing" ||
             !control.closest("[data-lightbox-slides]")),
@@ -1905,14 +1919,18 @@ export class DomViewerDriver<
     ) {
       return;
     }
-    event.preventDefault();
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
-    if (
-      !this.#dragGesture.active &&
-      this.#extensions.some((extension) => extension.wheel?.(event.deltaY * unit))
-    ) {
-      return;
+    if (!this.#dragGesture.active) {
+      for (const extension of this.#extensions) {
+        const taken = extension.wheel?.(event.deltaY * unit);
+        if (taken === "native") return;
+        if (taken) {
+          event.preventDefault();
+          return;
+        }
+      }
     }
+    event.preventDefault();
     const direction = Math.sign(-event.deltaY);
     this.#beginDrag(direction);
     this.#dragGesture.moveWheel(event.deltaY * unit);

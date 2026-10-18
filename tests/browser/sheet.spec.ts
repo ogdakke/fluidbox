@@ -14,51 +14,77 @@ test.describe("sheet on a phone", () => {
       "data-lightbox-state",
       "open",
     );
-    await expect(dialog(page)).toHaveAttribute("data-sheet", "photo");
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
 
     const trigger = page.locator(".x-phone [data-lightbox-sheet-stop]");
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
     await trigger.click();
-    await expect(dialog(page)).toHaveAttribute("data-sheet", "info");
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "1");
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
-    // Once the sheet settles, the photo fits into the room above it.
-    await expect
-      .poll(() =>
-        page.evaluate(() => {
-          const media = document
-            .querySelector('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')!
-            .getBoundingClientRect();
-          return Math.round(
-            media.bottom - document.querySelector(".x-sheet")!.getBoundingClientRect().top,
-          );
-        }),
-      )
-      .toBeLessThanOrEqual(1);
+    // Once the sheet settles, the photo fits into the room above it. Without
+    // scroll-driven animations, as in Firefox, the photo stays as it is.
+    const fits = await page.evaluate(() => CSS.supports("animation-timeline: scroll()"));
+    if (fits)
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const media = document
+              .querySelector('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')!
+              .getBoundingClientRect();
+            return Math.round(
+              media.bottom -
+                document.querySelector("[data-lightbox-overlay] .x-sheet")!.getBoundingClientRect()
+                  .top,
+            );
+          }),
+        )
+        .toBeLessThanOrEqual(1);
 
     await page.keyboard.press("Escape");
-    await expect(dialog(page)).toHaveAttribute("data-sheet", "photo");
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
     await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
       "data-lightbox-state",
       "open",
     );
 
     await trigger.click();
-    await expect(dialog(page)).toHaveAttribute("data-sheet", "info");
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "1");
     await page.locator("[data-lightbox-close]").click();
     await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  });
+
+  test("the top stop is reachable however few the replies", async ({ page }) => {
+    await page.goto("/social.html");
+    await page.locator(".x-post").nth(2).locator(".x-grid button").first().click();
+    await expect(dialog(page)).toHaveAttribute("data-lightbox-state", "open");
+    await page.evaluate(() => {
+      const scroller = document.querySelector("[data-lightbox-sheet-scroller]")!;
+      scroller.scrollTo({ top: scroller.scrollHeight, behavior: "instant" });
+    });
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "2");
+    // The sheet stretches to the space under the top inset, 56px here.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Math.round(
+            document.querySelector("[data-lightbox-overlay] .x-sheet")!.getBoundingClientRect().top,
+          ),
+        ),
+      )
+      .toBe(56);
   });
 
   test("the Instagram caption peeks and View all raises the comments", async ({ page }) => {
     await page.goto("/social.html");
     await page.locator(".ig-grid").scrollIntoViewIfNeeded();
     await page.locator(".ig-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-sheet", "photo");
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
     await expect(page.locator(".ig-sheet")).toBeVisible();
 
     await page.locator(".ig-more").click();
-    await expect(dialog(page)).toHaveAttribute("data-sheet", "full");
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "2");
     await page.keyboard.press("Escape");
-    await expect(dialog(page)).toHaveAttribute("data-sheet", "photo");
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
   });
 });
 
@@ -73,7 +99,7 @@ test.describe("sheet on a wide screen", () => {
       "open",
     );
     await expect(page.locator(".x-aside")).toBeVisible();
-    await expect(page.locator(".x-sheet")).toBeHidden();
+    await expect(page.locator("[data-lightbox-overlay] .x-sheet")).toBeHidden();
   });
 });
 

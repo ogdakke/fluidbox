@@ -1,6 +1,8 @@
-/* Sheet extension. Import with @ogdakke/fluidbox/sheet. Every length here is a
-   custom property on the dialog; override any of them in your own CSS. The
-   runtime reads the ones marked "read" and writes the ones marked "state". */
+/* Sheet extension. Import with @ogdakke/fluidbox/sheet. The photos and the sheet
+   share one native scroller with a snap point per stop, so the browser moves
+   both; scroll-driven animations on its timeline, --lightbox-sheet, do the rest.
+   Every length here is a custom property on the dialog; override any of them in
+   your own CSS. The runtime reads the ones marked "read". */
 @property --lightbox-sheet-peek {
   syntax: "<length>";
   inherits: true;
@@ -11,10 +13,101 @@
   inherits: true;
   initial-value: 0px;
 }
-@property --lightbox-sheet-max-height {
+/* State, animated by the scroll: pixels of the sheet showing; 0 at rest to 1 at
+   the first stop; 0 at the first stop to 1 at the last; 1 with the photo
+   scrolled away to 0 at rest. */
+@property --lightbox-sheet-visible {
   syntax: "<length>";
   inherits: true;
   initial-value: 0px;
+}
+@property --lightbox-sheet-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --lightbox-sheet-expand {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --lightbox-sheet-dismiss {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@keyframes lightbox-sheet-visible {
+  from {
+    --lightbox-sheet-visible: var(--lightbox-sheet-visible-start);
+  }
+  to {
+    --lightbox-sheet-visible: calc(
+      var(--lightbox-sheet-visible-start) + var(--lightbox-sheet-range)
+    );
+  }
+}
+@keyframes lightbox-sheet-progress {
+  to {
+    --lightbox-sheet-progress: 1;
+  }
+}
+@keyframes lightbox-sheet-expand {
+  to {
+    --lightbox-sheet-expand: 1;
+  }
+}
+@keyframes lightbox-sheet-dismiss {
+  from {
+    --lightbox-sheet-dismiss: 1;
+  }
+}
+/* The stage holds still while the scroll raises the sheet: a translate that
+   cancels the scroll, not sticky, since Safari tints its bars from sticky layers. */
+@keyframes lightbox-sheet-hold {
+  to {
+    translate: 0 calc(var(--lightbox-sheet-range) - var(--lightbox-sheet-dismiss-distance));
+  }
+}
+@keyframes lightbox-sheet-backdrop {
+  from {
+    opacity: 0;
+  }
+}
+
+:where([data-lightbox-overlay][data-lightbox-sheet-overlay]) {
+  /* The scroller names the timeline; this lets the backdrop, outside it, read it. */
+  timeline-scope: --lightbox-sheet;
+  animation:
+    lightbox-sheet-visible linear both,
+    lightbox-sheet-progress linear both,
+    lightbox-sheet-expand linear both,
+    lightbox-sheet-dismiss linear both;
+  animation-timeline: --lightbox-sheet;
+  animation-range:
+    0px var(--lightbox-sheet-range),
+    var(--lightbox-sheet-dismiss-distance) var(--lightbox-sheet-first-offset),
+    var(--lightbox-sheet-first-offset) var(--lightbox-sheet-range),
+    0px var(--lightbox-sheet-dismiss-distance);
+}
+/* With the scroll dismiss the photo leaves by scrolling, not by flying home,
+   so its thumbnail on the page stays in view while the viewer is open; only a
+   flight, opening or closing, hides it. */
+:root:has([data-lightbox-overlay][data-sheet-dismiss="scroll"][data-lightbox-state="open"])
+  [data-lightbox-thumbnail-hidden] {
+  visibility: visible !important;
+}
+/* A committed scroll dismiss hands touches straight back to the page. */
+:where([data-lightbox-overlay][data-sheet-dismissed]),
+:where([data-lightbox-overlay][data-sheet-dismissed]) * {
+  pointer-events: none !important;
+}
+/* The scroll dismiss fades the backdrop as the photo goes. */
+:where([data-lightbox-overlay][data-lightbox-sheet-overlay][data-sheet-dismiss="scroll"])
+  > [data-lightbox-backdrop] {
+  animation: lightbox-sheet-backdrop linear both;
+  animation-timeline: --lightbox-sheet;
+  animation-range: 0px var(--lightbox-sheet-dismiss-distance);
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight])
@@ -23,68 +116,137 @@
   --lightbox-sheet-enabled: 1;
   /* Read: fit shrinks the photo into the room above the sheet; push slides it up. */
   --lightbox-sheet-photo: fit;
-  /* Read: the sheet showing at the photo stop. */
+  /* Read: the sheet showing at rest. */
   --lightbox-sheet-peek: 0px;
   /* Read: space between the photo and the sheet. */
   --lightbox-sheet-gap: 12px;
-  /* Read: the info stop's height; taller content gets a full stop as well. */
-  --lightbox-sheet-max-height: 60svh;
-  /* Space above the sheet at the full stop. */
+  /* Space above the sheet when it shows all of itself. */
   --lightbox-sheet-top: calc(env(safe-area-inset-top, 0px) + 56px);
   --lightbox-sheet-radius: 18px;
   --lightbox-sheet-max-width: 640px;
   --lightbox-sheet-background: var(--fb-bg, Canvas);
   --lightbox-sheet-color: var(--fb-fg, CanvasText);
-  /* State: --lightbox-sheet-visible (px), --lightbox-sheet-progress (0 at the
-     photo, 1 at info) and --lightbox-sheet-expand (0 at info, 1 at full). */
-  --lightbox-sheet-visible: 0px;
-  --lightbox-sheet-progress: 0;
-  --lightbox-sheet-expand: 0;
   /* The photo keeps clear of the peeking sheet. */
   --lightbox-stage-bottom: var(--lightbox-sheet-peek);
 }
 
-:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet] {
+/* Reaches under the browser's bars at both ends, as the zoom viewport does: a
+   scroller clips to its box, and the sheet should paint under the toolbar. */
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-scroller] {
   position: absolute;
+  inset: calc(-1 * var(--lightbox-sheet-reach, 0px)) 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scroll-timeline: --lightbox-sheet block;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-sheet-scroller]::-webkit-scrollbar {
+  display: none;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-sheet-off]
+  [data-lightbox-sheet-scroller] {
+  overflow: hidden;
+  scroll-snap-type: none;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-space] {
+  height: calc(var(--lightbox-sheet-reach, 0px) + var(--lightbox-sheet-dismiss-distance, 0px));
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-stage] {
+  position: relative;
+  height: calc(100% - 2 * var(--lightbox-sheet-reach, 0px));
+  animation: lightbox-sheet-hold linear both;
+  animation-timeline: --lightbox-sheet;
+  animation-range: var(--lightbox-sheet-dismiss-distance) var(--lightbox-sheet-range);
+}
+/* The dialog's and the strip's own touch-action would keep vertical swipes
+   from the scroller. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  :is(
+    [data-lightbox-dialog][data-lightbox-sheet-host],
+    [data-lightbox-sheet-stage] [data-lightbox-slides]
+  ) {
+  touch-action: pan-x pan-y;
+}
+/* The strip only scrolls sideways; a vertical swipe on it chains on to the scroller. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-sheet-stage]
+  [data-lightbox-slides] {
+  overscroll-behavior-y: auto;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-snap] {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  scroll-snap-align: start;
+  pointer-events: none;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-snap][data-rest] {
+  scroll-snap-stop: always;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-slot] {
+  position: relative;
   z-index: 7;
-  inset: auto 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: calc(var(--lightbox-sheet-lead, 0px) - var(--lightbox-sheet-peek));
+  pointer-events: none;
+}
+
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet] {
+  position: relative;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: var(--lightbox-sheet-max-width);
-  max-height: calc(var(--lightbox-height, 100svh) - var(--lightbox-sheet-top));
-  margin-inline: auto;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* Tall enough for the top stop, whatever the content. */
+  min-height: calc(var(--lightbox-sheet-min-height, 0px) + var(--lightbox-sheet-reach, 0px));
+  max-height: calc(
+    var(--lightbox-height, 100svh) - var(--lightbox-sheet-top) + var(--lightbox-sheet-reach, 0px)
+  );
+  /* Under the toolbar too, so the toolbar shows the sheet and not the photo; and,
+     as React Aria's sheet does, clear of the keyboard, so the end of the sheet
+     can be brought above it. */
+  padding-bottom: calc(
+    env(safe-area-inset-bottom, 0px) + var(--lightbox-sheet-reach, 0px) +
+      var(--lightbox-sheet-keyboard, 0px)
+  );
   overflow: hidden;
-  overscroll-behavior: contain;
   border-radius: var(--lightbox-sheet-radius) var(--lightbox-sheet-radius) 0 0;
   background: var(--lightbox-sheet-background);
   color: var(--lightbox-sheet-color);
   box-shadow:
     0 -1px 0 rgb(0 0 0 / 0.06),
     0 -12px 40px rgb(0 0 0 / 0.18);
-  transform: translateY(calc(100% - var(--lightbox-sheet-visible)));
-  touch-action: none;
+  outline: none;
+  pointer-events: auto;
 }
-/* Tucked away and still: out of sight, out of the tab order. */
-:where([data-lightbox-overlay], [data-lightbox-flight])
-  [data-lightbox-dialog][data-sheet="photo"]:not(
-    [data-sheet-raised],
-    [data-sheet-peeking],
-    [data-sheet-moving],
-    [data-sheet-dragging]
-  )
-  [data-lightbox-sheet] {
-  visibility: hidden;
+/* Below the top stop a swipe anywhere on the sheet moves the sheet; at the top
+   its content scrolls, and at the top of the content a pull down carries on
+   into the sheet. Mark the part that scrolls with data-lightbox-sheet-scroll,
+   or the whole sheet scrolls. */
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-scroll] {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior-y: auto;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
-  [data-lightbox-dialog][data-sheet="full"]:not([data-sheet-moving], [data-sheet-dragging])
-  [data-lightbox-sheet] {
+  [data-lightbox-dialog][data-sheet-expanded]
+  :is([data-lightbox-sheet-scroll], [data-lightbox-sheet]:not(:has([data-lightbox-sheet-scroll]))) {
   overflow-y: auto;
-  touch-action: pan-y;
 }
 
 /* A grab handle; add one as the sheet's first child. */
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-handle] {
+  flex: none;
   display: block;
   width: 36px;
   height: 5px;
@@ -96,15 +258,20 @@
   opacity: 0.25;
 }
 
-/* Choreography: the arrows centre on the photo, the filmstrip gives way, and the
-   photo can't be dismissed or zoomed while the sheet is up. */
+/* Choreography: the arrows centre on the photo and go once the sheet is up,
+   the filmstrip gives way, and the photo fades rather than shrink to a stamp
+   past the first stop. Set --lightbox-sheet-fade: 0 to keep it. */
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-sheet-host]
   :is([data-lightbox-previous], [data-lightbox-next]) {
-  translate: 0 calc(var(--lightbox-sheet-visible) / -2 + var(--lightbox-sheet-peek) / 2);
+  translate: 0 calc(max(0px, var(--lightbox-sheet-visible)) / -2 + var(--lightbox-sheet-peek) / 2);
+  opacity: calc(1 - var(--lightbox-sheet-progress) * 2 - var(--lightbox-sheet-dismiss) * 3);
 }
-/* Past the info stop there is no room left for the photo: it fades out rather
-   than shrink to a stamp. Set --lightbox-sheet-fade: 0 to keep it. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-sheet-raised]
+  :is([data-lightbox-previous], [data-lightbox-next], [data-lightbox-filmstrip-dock]) {
+  pointer-events: none;
+}
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-sheet-host]
   [data-lightbox-slide] {
@@ -113,15 +280,33 @@
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-sheet-host]
   [data-lightbox-filmstrip-dock] {
-  opacity: calc(1 - var(--lightbox-sheet-progress) * 3);
+  opacity: calc(1 - var(--lightbox-sheet-progress) * 3 - var(--lightbox-sheet-dismiss) * 3);
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
-  [data-lightbox-dialog][data-sheet-raised]
-  [data-lightbox-filmstrip-dock] {
+  [data-lightbox-dialog][data-lightbox-sheet-host]
+  [data-lightbox-close] {
+  opacity: calc(1 - var(--lightbox-sheet-dismiss) * 3);
+}
+/* A dismiss fades the controls at once, as without a sheet. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-sheet-host][data-dismissing]
+  :is([data-lightbox-previous], [data-lightbox-next], [data-lightbox-close]) {
+  opacity: 0;
   pointer-events: none;
 }
-:where([data-lightbox-overlay], [data-lightbox-flight])
-  [data-lightbox-dialog][data-sheet="full"]
-  [data-lightbox-close] {
-  background: var(--accent, rgb(20 20 20 / 0.72));
+
+/* Without scroll-driven animations the sheet still scrolls and snaps; the
+   stage holds with sticky instead, and the photo stays the size it is. */
+@supports not (animation-timeline: scroll()) {
+  :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-stage] {
+    position: sticky;
+    top: var(--lightbox-sheet-reach, 0px);
+  }
+  /* Without a timeline these would run once and stop at their end: the stage
+     a whole range down, and every state at 1. */
+  :where([data-lightbox-overlay][data-lightbox-sheet-overlay]),
+  :where([data-lightbox-overlay][data-lightbox-sheet-overlay]) > [data-lightbox-backdrop],
+  :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-stage] {
+    animation: none;
+  }
 }

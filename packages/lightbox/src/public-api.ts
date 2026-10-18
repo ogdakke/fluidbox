@@ -245,17 +245,27 @@ export interface LightboxExtensionContext<TItem extends LightboxItem = LightboxI
 /** What the viewer asks of a mounted extension. Every hook is optional. */
 export interface LightboxExtensionInstance<TItem extends LightboxItem = LightboxItem> {
   setSource?(source: LightboxSource<TItem>): void;
+  /** The overlay has just been put in the document, before the opening is measured. */
+  attach?(): void;
   /** A vertical touch drag on the photo. Return true to take it from the dismiss gesture. */
   claimDrag?(deltaY: number): boolean;
   drag?(phase: "start" | "move" | "end" | "cancel", clientY: number): void;
-  /** A vertical wheel or trackpad scroll over the photo. Return true to consume it. */
-  wheel?(deltaY: number): boolean;
+  /**
+   * A vertical wheel or trackpad scroll over the photo. Return true to consume it,
+   * or "native" to leave it to the browser, as a sheet that scrolls does.
+   */
+  wheel?(deltaY: number): boolean | "native";
   /** Return true to consume the key, as a sheet does with Escape. */
   keydown?(event: KeyboardEvent): boolean;
   /** False while zoom would fight the extension. */
   allowsZoom?(): boolean;
   /** Runs before the closing flight, so the viewer can settle into its resting pose. */
   beforeClose?(): void | Promise<void>;
+  /**
+   * True when the extension has already carried the photo out of sight, as a
+   * sheet's scroll dismiss does; the viewer then closes without a flight.
+   */
+  closesInPlace?(): boolean;
   destroy(): void;
 }
 

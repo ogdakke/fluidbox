@@ -6,9 +6,21 @@ import type {
   LightboxItem,
   LightboxSource,
 } from "./public-api";
+import { PhotoRoom } from "./photo-room";
 
-/** Where the sheet rests: tucked away (or peeking), at its content height, or near the top. */
-export type LightboxSheetStop = "photo" | "info" | "full";
+/**
+ * How much of the sheet shows at a stop: pixels, a percentage of the viewer's
+ * height, or "content" for all of it, up to the space under the top inset.
+ */
+export type LightboxSheetSnapPoint = number | `${number}%` | "content";
+
+/**
+ * What a swipe down on the photo does with the sheet down. "flight" hands it to
+ * the viewer's dismiss, which flies the photo home; "scroll" scrolls the photo
+ * off the bottom of the screen and closes; "none" keeps the viewer open, as for a
+ * caption that always peeks.
+ */
+export type LightboxSheetDismiss = "flight" | "scroll" | "none";
 
 export interface LightboxSheetRenderContext<TItem extends LightboxItem = LightboxItem> {
   readonly item: TItem;
@@ -21,12 +33,19 @@ export interface LightboxSheetRenderContext<TItem extends LightboxItem = Lightbo
 
 export interface LightboxSheetOptions<TItem extends LightboxItem = LightboxItem> {
   /**
+   * The stops above the resting one, lowest first. Stop 0 is the sheet at rest:
+   * away, or showing `--lightbox-sheet-peek`.
+   * @default ["60%", "content"]
+   */
+  readonly snapPoints?: readonly LightboxSheetSnapPoint[];
+  /** @default "flight" */
+  readonly dismiss?: LightboxSheetDismiss;
+  /**
    * Fills a runtime-made sheet for the active item. Leave it out and render your
-   * own element with `data-lightbox-sheet` into the portal instead, as framework
-   * components do.
+   * own element with `data-lightbox-sheet` into `slot`, as framework components do.
    */
   readonly render?: (context: LightboxSheetRenderContext<TItem>) => void | LightboxDispose;
-  readonly onChange?: (stop: LightboxSheetStop) => void;
+  readonly onChange?: (stop: number) => void;
 }
 
 export interface LightboxSheetSetOptions {
@@ -38,58 +57,103 @@ export interface LightboxSheetSetOptions {
 export interface LightboxSheet<
   TItem extends LightboxItem = LightboxItem,
 > extends LightboxExtension<TItem> {
-  /** The stop the sheet rests at, or is heading to. */
-  readonly stop: LightboxSheetStop;
-  /** Move the sheet. Ignored while the viewer is not open or the sheet is disabled. */
-  set(stop: LightboxSheetStop, options?: LightboxSheetSetOptions): void;
-  subscribe(listener: (stop: LightboxSheetStop) => void): LightboxDispose;
+  /** The stop the sheet rests at: 0 at rest, then one per snap point. */
+  readonly stop: number;
+  /** Where to render a `data-lightbox-sheet` element, once the viewer is created. */
+  readonly slot: HTMLElement | null;
+  /** Move the sheet to a stop. Ignored while the viewer is not open or the sheet is off. */
+  set(stop: number, options?: LightboxSheetSetOptions): void;
+  /** Called when the stop changes, and when the slot appears or goes. */
+  subscribe(listener: (stop: number) => void): LightboxDispose;
 }
 
-type Pose = { readonly ty: number; readonly scale: number };
-type Rest = {
-  readonly top: number;
-  readonly bottom: number;
-  readonly height: number;
-  readonly originX: number;
-  readonly originY: number;
-};
-type Stops = { readonly photo: number; readonly info: number; readonly full: number };
+const DEFAULT_SNAP_POINTS: readonly LightboxSheetSnapPoint[] = ["60%", "content"];
+/** Stops closer than this are one stop. */
+const MIN_STOP_GAP = 24;
+/** Finger travel before a touch on the photo counts as a direction. */
+const AXIS_THRESHOLD = 4;
+/** How long the rest of a committed scroll dismiss fades, in milliseconds. */
+const DISMISS_FADE = 180;
+/** Below this share of the first stop, a lowering sheet takes a pull down as the flight. */
+const LANDING = 0.6;
+/** Pixels a sheet must come down, while a field has focus, before the keyboard goes. */
+const LOWERING = 8;
+/** How long the keyboard is followed after a field gains or loses focus, as it slides. */
+const KEYBOARD_TRANSITION = 700;
 
-const STIFFNESS = 520;
-const DAMPING = 44;
-/** Upward speed, in px/ms, past which a release moves on to the next stop. */
-const FLING = 0.35;
-const AXIS_THRESHOLD = 6;
+const NO_KEYBOARD_INPUTS = new Set([
+  "button",
+  "checkbox",
+  "color",
+  "file",
+  "hidden",
+  "image",
+  "radio",
+  "range",
+  "reset",
+  "submit",
+]);
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+/** A field the software keyboard opens for, as React Aria's willOpenKeyboard decides. */
+function opensKeyboard(element: Element | null): element is HTMLElement {
+  if (!(element instanceof HTMLElement)) return false;
+  if (element instanceof HTMLInputElement) return !NO_KEYBOARD_INPUTS.has(element.type);
+  return element instanceof HTMLTextAreaElement || element.isContentEditable;
+}
+
+// How far the browser's bars can reach past the layout viewport, as for zoom:
+// iOS 26 paints the page under its toolbar, and the sheet should be under it too.
+function chromeReach(view: Window): number {
+  if (!view.matchMedia("(pointer: coarse)").matches) return 0;
+  const { width, height } = view.screen;
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  return Math.max(
+    0,
+    Math.ceil((view.innerWidth > view.innerHeight ? short : long) - view.innerHeight),
+  );
+}
+
+type ScrollTimelineConstructor = new (options: {
+  source: Element;
+  axis?: "block" | "inline" | "x" | "y";
+}) => AnimationTimeline;
 
 /**
- * A panel that rises over the photo. Swipe or scroll up to raise it, down to lower
- * it, and the photo fits (or is pushed) into the room left above it.
+ * A sheet that rises over the photo, moved by the browser's own scrolling: the
+ * photo and the sheet share one scroller with a snap point per stop, so swipes,
+ * momentum and rubber-banding are native, and scroll-driven animations fit the
+ * photo into the room above it.
  *
  * ```ts
  * import { sheet } from "@ogdakke/fluidbox/sheet";
  * import "@ogdakke/fluidbox/sheet.css";
  * const details = sheet({ render: ({ item, target }) => (target.textContent = item.id) });
  * createLightbox({ source, sheet: details });
- * details.set("info");
+ * details.set(1);
  * ```
  */
 export function sheet<TItem extends LightboxItem = LightboxItem>(
   options: LightboxSheetOptions<TItem> = {},
 ): LightboxSheet<TItem> {
-  const listeners = new Set<(stop: LightboxSheetStop) => void>();
-  let stop: LightboxSheetStop = "photo";
+  const listeners = new Set<(stop: number) => void>();
+  let stop = 0;
   let instance: SheetRuntime<TItem> | undefined;
-  const announce = (next: LightboxSheetStop) => {
+  const notify = () => {
+    for (const listener of listeners) listener(stop);
+  };
+  const announce = (next: number) => {
     if (next === stop) return;
     stop = next;
     options.onChange?.(next);
-    for (const listener of listeners) listener(next);
+    notify();
   };
   return {
     get stop() {
       return stop;
+    },
+    get slot() {
+      return instance?.slot ?? null;
     },
     set(next, setOptions) {
       instance?.set(next, setOptions?.animate ?? true);
@@ -99,92 +163,204 @@ export function sheet<TItem extends LightboxItem = LightboxItem>(
       return () => listeners.delete(listener);
     },
     mount(context) {
-      instance = new SheetRuntime(context, options, announce);
+      instance = new SheetRuntime(context, options, announce, () => {
+        instance = undefined;
+        notify();
+      });
+      notify();
       return instance;
     },
   };
 }
 
 class SheetRuntime<TItem extends LightboxItem> implements LightboxExtensionInstance<TItem> {
+  readonly slot: HTMLDivElement;
   readonly #dialog: HTMLElement;
+  readonly #overlay: HTMLElement;
+  readonly #scroller: HTMLDivElement;
+  readonly #stage: HTMLDivElement;
   readonly #context: LightboxExtensionContext<TItem>;
   readonly #options: LightboxSheetOptions<TItem>;
-  readonly #announce: (stop: LightboxSheetStop) => void;
+  readonly #dismiss: LightboxSheetDismiss;
+  readonly #announce: (stop: number) => void;
+  readonly #onDestroy: () => void;
   readonly #lifetime = new AbortController();
-  readonly #rests = new WeakMap<HTMLElement, Rest>();
-  readonly #slideObserver: MutationObserver;
+  readonly #room: PhotoRoom;
+  readonly #timeline: AnimationTimeline | undefined;
+  readonly #resize: ResizeObserver;
   readonly #unsubscribe: LightboxDispose;
+  #strip: HTMLElement | null = null;
   #source: LightboxSource<TItem>;
   #owned: HTMLElement | undefined;
   #rendered: { index: number; controller: AbortController; dispose?: LightboxDispose } | undefined;
-  #stop: LightboxSheetStop = "photo";
-  #stops: Stops = { photo: 0, info: 0, full: 0 };
-  #visible = 0;
-  #velocity = 0;
-  #target = 0;
-  #frame = 0;
-  #lastTime = 0;
-  #settled: (() => void)[] = [];
-  #drag: { startY: number; startVisible: number; samples: [number, number][] } | undefined;
+  #stop = 0;
+  /** Scroll offsets of the stops, rest first. */
+  #offsets: number[] = [0];
+  #rest = 0;
+  #range = 0;
+  #layout = "";
   #touch:
-    | { x: number; y: number; axis: "pending" | "vertical" | "horizontal" | "native" }
+    | { x: number; y: number; flight: boolean | undefined; landing: boolean; landed?: boolean }
     | undefined;
-  #wheelLock = 0;
-  #suppressClick = false;
+  #returnFocus: HTMLElement | null = null;
+  #focusOnSettle = false;
+  #dismissed = false;
+  #entered = false;
+  #dismissObserver: IntersectionObserver | undefined;
+  #touching = false;
+  #heading = false;
+  #fade: Animation | undefined;
+  #keyboard = 0;
+  #stripMoving = false;
+  #measurePending = false;
+  #stripTimer: ReturnType<typeof setTimeout> | undefined;
+  #keyboardUntil = 0;
+  #keyboardFrame = 0;
+  #unlockPage: (() => void) | undefined;
+  #fieldTap: { field: HTMLElement; x: number; y: number } | undefined;
+  /** While a field has focus: the highest the sheet has been, to tell a lowering. */
+  #typingTop: number | undefined;
 
   constructor(
     context: LightboxExtensionContext<TItem>,
     options: LightboxSheetOptions<TItem>,
-    announce: (stop: LightboxSheetStop) => void,
+    announce: (stop: number) => void,
+    onDestroy: () => void,
   ) {
     this.#context = context;
     this.#dialog = context.dialog;
+    this.#overlay = this.#dialog.closest<HTMLElement>("[data-lightbox-overlay]") ?? this.#dialog;
     this.#source = context.source;
     this.#options = options;
+    this.#dismiss = options.dismiss ?? "flight";
     this.#announce = announce;
-    this.#dialog.dataset.lightboxSheetHost = "";
-    this.#dialog.dataset.sheet = "photo";
+    this.#onDestroy = onDestroy;
+    const document = this.#dialog.ownerDocument;
     const signal = AbortSignal.any([this.#lifetime.signal, context.signal]);
+
+    // One scroller holds the photos and the sheet: space to scroll the photo
+    // away into, the stage the photos rest in, and the sheet's slot below it.
+    this.#scroller = document.createElement("div");
+    this.#scroller.dataset.lightboxSheetScroller = "";
+    const space = document.createElement("div");
+    space.dataset.lightboxSheetSpace = "";
+    this.#stage = document.createElement("div");
+    this.#stage.dataset.lightboxSheetStage = "";
+    this.slot = document.createElement("div");
+    this.slot.dataset.lightboxSheetSlot = "";
+    this.#scroller.append(space, this.#stage, this.slot);
+    this.#strip = this.#dialog.querySelector<HTMLElement>("[data-lightbox-slides]");
+    (this.#strip ?? this.#dialog.firstElementChild)?.before(this.#scroller);
+    if (this.#strip) this.#stage.append(this.#strip);
+
+    this.#dialog.dataset.lightboxSheetHost = "";
+    this.#overlay.dataset.lightboxSheetOverlay = "";
+    this.#overlay.dataset.sheetDismiss = this.#dismiss;
+    this.#dialog.dataset.sheet = "0";
     if (options.render) {
-      this.#owned = this.#dialog.ownerDocument.createElement("section");
+      this.#owned = document.createElement("section");
       this.#owned.dataset.lightboxSheet = "";
       this.#owned.dataset.lightboxChrome = "";
       this.#owned.setAttribute("aria-label", "Details");
-      this.#dialog.append(this.#owned);
+      this.slot.append(this.#owned);
     }
-    const view = this.#dialog.ownerDocument.defaultView;
-    view?.addEventListener("resize", () => this.#remeasure(), { signal });
+
+    const view = document.defaultView!;
+    const Timeline = (view as unknown as { ScrollTimeline?: ScrollTimelineConstructor })
+      .ScrollTimeline;
+    this.#timeline = Timeline ? new Timeline({ source: this.#scroller, axis: "block" }) : undefined;
+    this.#room = new PhotoRoom(
+      this.#dialog,
+      {
+        photo: "--lightbox-sheet-photo",
+        gap: "--lightbox-sheet-gap",
+        limit: "--lightbox-sheet-fit-limit",
+      },
+      this.#stage,
+    );
+
+    // Nothing here runs while the sheet moves: the browser scrolls it, and
+    // scroll-driven animations move the photo. Only the end of a scroll is read.
+    this.#scroller.addEventListener("scrollend", this.#onScrollEnd, { signal });
+    if (!("onscrollend" in view)) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      this.#scroller.addEventListener(
+        "scroll",
+        () => {
+          clearTimeout(timer);
+          timer = setTimeout(this.#onScrollEnd, 120);
+        },
+        { passive: true, signal },
+      );
+    }
+    view.addEventListener("resize", () => this.#remeasure(true), { signal });
+    view.visualViewport?.addEventListener("resize", this.#onViewport, { signal });
+    view.visualViewport?.addEventListener("scroll", this.#onViewport, { signal });
+    // A field in the sheet: the page must not scroll to reveal it, and the
+    // sheet makes room above the keyboard itself, as React Aria's sheet does.
+    this.slot.addEventListener("touchstart", this.#onFieldTouch, { passive: true, signal });
+    this.slot.addEventListener("touchmove", this.#onFieldMove, { passive: true, signal });
+    this.slot.addEventListener("touchend", this.#onFieldTap, { passive: false, signal });
+    this.slot.addEventListener("focusin", this.#onFieldFocus, { signal });
+    this.slot.addEventListener("focusout", this.#onFieldFocus, { signal });
+    this.#resize = new ResizeObserver(this.#onContentResize);
+    this.#resize.observe(this.slot);
+    // The sheet's content changes with the item as the strip swipes. Measuring
+    // then would rebuild the photos' animations and move the snap points under
+    // a strip still snapping, which WebKit leaves stuck between slides; so the
+    // measure waits for the strip to come to rest.
+    if (this.#strip) {
+      const strip = this.#strip;
+      strip.addEventListener("scroll", this.#onStripScroll, { passive: true, signal });
+      strip.addEventListener("scrollend", this.#onStripRest, { signal });
+    }
     // Triggers anywhere in the viewer, and taps above a raised sheet, before the
     // viewer reads them as a close.
     (this.#dialog.parentElement ?? this.#dialog).addEventListener("click", this.#onClick, {
       capture: true,
       signal,
     });
-    this.#dialog.addEventListener("touchstart", this.#onTouchStart, { passive: true, signal });
-    this.#dialog.addEventListener("touchmove", this.#onTouchMove, { passive: false, signal });
-    this.#dialog.addEventListener("touchend", this.#onTouchEnd, { signal });
-    this.#dialog.addEventListener("touchcancel", this.#onTouchEnd, { signal });
-    this.#dialog.addEventListener("wheel", this.#onSheetWheel, { passive: false, signal });
-    // Slides come and go as the strip scrolls; new ones take the current pose.
-    this.#slideObserver = new MutationObserver(() => this.#paintSlides());
-    this.#slideObserver.observe(this.#dialog, { childList: true, subtree: true });
-    let measured = false;
+    // The one decision made in script: a pull down on the resting photo is the
+    // viewer's flight, so the browser must not scroll it.
+    if (this.#dismiss === "flight") {
+      this.#stage.addEventListener("touchstart", this.#onTouchStart, { passive: true, signal });
+      this.#stage.addEventListener("touchmove", this.#onTouchMove, { passive: false, signal });
+      this.#stage.addEventListener("touchend", this.#onTouchEnd, { passive: true, signal });
+      this.#stage.addEventListener("touchcancel", this.#onTouchEnd, { passive: true, signal });
+    }
+    if (this.#dismiss === "scroll") {
+      this.#dismissObserver = new IntersectionObserver(this.#onStageVisibility, {
+        root: this.#scroller,
+        threshold: [0],
+      });
+      this.#dismissObserver.observe(this.#stage);
+      this.#scroller.addEventListener("touchstart", this.#onDismissTouch, {
+        passive: true,
+        signal,
+      });
+      this.#scroller.addEventListener("touchend", this.#onDismissRelease, {
+        passive: true,
+        signal,
+      });
+      this.#scroller.addEventListener("touchcancel", this.#onDismissRelease, {
+        passive: true,
+        signal,
+      });
+    }
     this.#unsubscribe = context.controller.subscribe((state) => {
       if (state.status === "closed") {
-        measured = false;
         this.#reset();
-      } else if (!measured) {
-        measured = true;
-        this.#measure();
-        this.#paint((this.#target = this.#stops.photo));
+        return;
       }
       const index = state.requestedIndex ?? state.activeIndex;
-      if (index !== null && state.status !== "closed") this.#renderItem(index);
+      if (index !== null) this.#renderItem(index);
+      // Triggers rendered with the viewer's content arrive after the sheet attached.
+      if (state.status === "open") this.#syncTriggers();
     });
   }
 
   get #element() {
-    return this.#dialog.querySelector<HTMLElement>("[data-lightbox-sheet]");
+    return this.slot.querySelector<HTMLElement>("[data-lightbox-sheet]");
   }
 
   get #enabled() {
@@ -196,6 +372,10 @@ class SheetRuntime<TItem extends LightboxItem> implements LightboxExtensionInsta
 
   get #open() {
     return this.#context.controller.state.status === "open";
+  }
+
+  get #raised() {
+    return this.#scroller.scrollTop > this.#rest + 1;
   }
 
   #length(name: string) {
@@ -210,61 +390,97 @@ class SheetRuntime<TItem extends LightboxItem> implements LightboxExtensionInsta
     this.#clearRender();
   }
 
-  claimDrag(deltaY: number) {
-    if (!this.#open || !this.#enabled) return false;
-    return deltaY < 0 || this.#stop !== "photo" || this.#visible > this.#stops.photo + 1;
+  attach() {
+    // A detached scroller forgets where it was; every opening starts at rest.
+    this.#layout = "";
+    this.#measure();
+    this.#scroller.scrollTop = this.#rest;
+    this.#setStop(0);
   }
 
-  drag(phase: "start" | "move" | "end" | "cancel", clientY: number) {
-    if (phase === "start") this.#dragStart(clientY);
-    else if (phase === "move") this.#dragMove(clientY);
-    else this.#dragEnd(phase === "cancel");
+  claimDrag(deltaY: number) {
+    if (!this.#enabled) return false;
+    // A pull down on the resting photo is the viewer's dismiss; the browser
+    // scrolls everything else, so there is nothing for the viewer to do.
+    if (this.#dismiss !== "flight" || deltaY <= 0) return true;
+    if (!this.#raised) return false;
+    if (!this.#touch?.landing) return true;
+    this.#land();
+    return false;
   }
 
   wheel(deltaY: number) {
     if (!this.#open || !this.#enabled) return false;
-    // Wheel up at the photo is the dismiss gesture; everything else steps the sheet.
-    if (this.#stop === "photo" && deltaY < 0) return false;
-    this.#wheelStep(deltaY);
-    return true;
+    if (this.#dismiss === "flight" && deltaY < 0 && !this.#raised) return false;
+    return "native" as const;
   }
 
   keydown(event: KeyboardEvent) {
-    if (event.key !== "Escape" || this.#stop === "photo" || !this.#open) return false;
-    this.set("photo", true);
+    if (event.key !== "Escape" || !this.#raised || !this.#open) return false;
+    this.set(0, true);
     return true;
   }
 
   allowsZoom() {
-    return this.#stop === "photo" && this.#visible <= this.#stops.photo + 1;
+    return !this.#enabled || Math.abs(this.#scroller.scrollTop - this.#rest) <= 1;
   }
 
   beforeClose() {
-    if (this.#visible <= this.#stops.photo + 0.5) return undefined;
-    return new Promise<void>((resolve) => {
-      this.#settled.push(resolve);
-      this.#moveTo("photo", !this.#reducedMotion());
-    });
+    this.#dropKeyboard();
+    if (this.#dismissed) {
+      // The photo is mostly gone already; the rest fades as the scroll goes on.
+      const fade = this.#overlay.animate([{ opacity: 1 }, { opacity: 0 }], {
+        duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : DISMISS_FADE,
+        easing: "ease-out",
+        fill: "forwards",
+      });
+      this.#fade = fade;
+      return fade.finished.then(
+        () => undefined,
+        () => undefined,
+      );
+    }
+    if (!this.#raised) return;
+    // The flight doesn't wait for the sheet: the photo holds the pose it has,
+    // the flight takes it from there, and the sheet goes down as it flies.
+    this.#room.freeze();
+    this.#scrollTo(0, true);
+  }
+
+  closesInPlace() {
+    return this.#dismissed;
   }
 
   destroy() {
     this.#lifetime.abort();
-    this.#slideObserver.disconnect();
+    clearTimeout(this.#stripTimer);
+    cancelAnimationFrame(this.#keyboardFrame);
+    this.#unlockPage?.();
+    this.#resize.disconnect();
+    this.#dismissObserver?.disconnect();
+    this.#room.destroy();
     this.#unsubscribe();
-    cancelAnimationFrame(this.#frame);
     this.#clearRender();
-    this.#owned?.remove();
-    this.#reset();
+    if (this.#strip) this.#scroller.replaceWith(this.#strip);
+    else this.#scroller.remove();
     delete this.#dialog.dataset.lightboxSheetHost;
     delete this.#dialog.dataset.sheet;
+    delete this.#overlay.dataset.lightboxSheetOverlay;
+    delete this.#overlay.dataset.sheetDismiss;
+    this.#overlay.removeAttribute("data-sheet-dismissed");
+    for (const name of Array.from(this.#overlay.style)) {
+      if (name.startsWith("--lightbox-sheet-")) this.#overlay.style.removeProperty(name);
+    }
+    this.#onDestroy();
   }
 
   // Public control.
 
-  set(stop: LightboxSheetStop, animate: boolean) {
+  set(stop: number, animate: boolean) {
     if (!this.#open || !this.#enabled) return;
+    if (stop < this.#stop) this.#dropKeyboard();
     this.#measure();
-    this.#moveTo(stop, animate && !this.#reducedMotion());
+    this.#scrollTo(stop, animate);
   }
 
   // Content.
@@ -288,346 +504,495 @@ class SheetRuntime<TItem extends LightboxItem> implements LightboxExtensionInsta
     this.#owned?.replaceChildren();
   }
 
-  // Geometry.
+  // Geometry: lengths CSS lays the scroller out with, and a snap marker per stop.
 
-  /** Resting heights of the visible part of the sheet, at each stop. */
   #measure() {
     const element = this.#element;
-    if (!element) return;
+    const view = this.#dialog.ownerDocument.defaultView!;
+    const enabled = this.#enabled;
     const height = this.#dialog.clientHeight;
-    const peek = this.#length("--lightbox-sheet-peek");
-    const max = this.#length("--lightbox-sheet-max-height") || height * 0.6;
-    const natural = element.offsetHeight;
-    const info = Math.max(peek, Math.min(natural, max));
-    const full = Math.max(info, natural);
-    this.#stops = { photo: peek, info, full: full - info < 24 ? info : full };
+    const reach = enabled ? chromeReach(view) : 0;
+    const peek = enabled ? this.#length("--lightbox-sheet-peek") : 0;
+    // Far enough that the stage has left the scroller, bars and all, at scroll 0.
+    const dismiss = enabled && this.#dismiss === "scroll" ? height + reach + 1 : 0;
+    // A sheet that doesn't peek rests below the bars, not under them.
+    const lead = enabled && peek <= 0 ? reach : 0;
+    // The sheet pads itself under the toolbar by the reach; that part never shows.
+    const tallest = element
+      ? (Number.parseFloat(getComputedStyle(element).maxHeight) || height + reach) - reach
+      : 0;
+    // The keyboard's padding is not the sheet's own height.
+    const content =
+      enabled && element ? Math.min(tallest, element.offsetHeight - reach - this.#keyboard) : 0;
+    // Every stop is reachable: the sheet grows to the tallest, as other sheets do.
+    const visible = [peek];
+    let required = 0;
+    for (const point of this.#options.snapPoints ?? DEFAULT_SNAP_POINTS) {
+      const pixels =
+        point === "content"
+          ? content
+          : typeof point === "number"
+            ? point
+            : (height * Number.parseFloat(point)) / 100;
+      const next = Math.min(tallest, Math.max(peek, pixels));
+      // "content" follows the sheet; only a set height may stretch it.
+      if (point !== "content") required = Math.max(required, next);
+      if (next - visible.at(-1)! >= MIN_STOP_GAP) visible.push(next);
+    }
+    const offsets = visible.map((shown, index) =>
+      index ? Math.round(dismiss + lead + shown - peek) : dismiss,
+    );
+    const layout = [enabled, height, reach, peek, dismiss, content, ...offsets].join();
+    if (layout === this.#layout) return false;
+    this.#layout = layout;
+    this.#rest = dismiss;
+    this.#offsets = offsets;
+    this.#range = Math.max(offsets.at(-1)!, dismiss + lead + content - peek);
+    this.#dialog.toggleAttribute("data-sheet-off", !enabled);
     this.#dialog.toggleAttribute("data-sheet-peeking", peek > 0);
-  }
-
-  #remeasure() {
-    if (!this.#open) return;
-    this.#forgetRests();
-    this.#measure();
-    cancelAnimationFrame(this.#frame);
-    this.#frame = 0;
-    this.#paint((this.#target = this.#stops[this.#stop]));
-  }
-
-  #forgetRests() {
-    for (const slide of this.#slides()) this.#rests.delete(slide);
-  }
-
-  #slides() {
-    return this.#dialog.querySelectorAll<HTMLElement>("[data-lightbox-slide]");
-  }
-
-  /** Where the photo in a slide sits with the sheet away, in viewport coordinates. */
-  #rest(slide: HTMLElement): Rest | undefined {
-    const cached = this.#rests.get(slide);
-    if (cached) return cached;
-    const media =
-      slide.querySelector<HTMLElement>("[data-lightbox-media]") ??
-      slide.querySelector<HTMLElement>("[data-lightbox-frame]");
-    if (!media) return undefined;
-    const { translate, scale } = slide.style;
-    slide.style.translate = slide.style.scale = "";
-    const box = slide.getBoundingClientRect();
-    const rect = media.getBoundingClientRect();
-    slide.style.translate = translate;
-    slide.style.scale = scale;
-    if (!rect.height) return undefined;
-    const rest = {
-      top: rect.top,
-      bottom: rect.bottom,
-      height: rect.height,
-      originX: rect.left - box.left + rect.width / 2,
-      originY: rect.top - box.top,
-    };
-    this.#rests.set(slide, rest);
-    return rest;
-  }
-
-  /** The photo shrinks (fit) or rises (push) into the room above the sheet. */
-  #pose(rest: Rest, visible: number): Pose {
-    const height = this.#dialog.clientHeight;
-    const rising = Math.max(0, visible - this.#stops.photo);
-    if (!rising) return { ty: 0, scale: 1 };
-    const gap = this.#length("--lightbox-sheet-gap") * Math.min(1, rising / 48);
-    const bottom = height - visible - gap;
-    if (rest.bottom <= bottom) return { ty: 0, scale: 1 };
-    const top = Math.min(rest.top, this.#length("--lightbox-stage-top"));
-    const mode = getComputedStyle(this.#dialog).getPropertyValue("--lightbox-sheet-photo").trim();
-    if (mode === "push") {
-      // Rises with the sheet until its top meets the stage; then the sheet covers it.
-      return { ty: clamp(bottom - rest.bottom, top - rest.top, 0), scale: 1 };
-    }
-    const scale = clamp((bottom - top) / rest.height, 0.25, 1);
-    return { ty: bottom - scale * rest.height - rest.top, scale };
-  }
-
-  // Painting.
-
-  #paint(visible: number) {
-    this.#visible = visible;
-    const { photo, info, full } = this.#stops;
-    const style = this.#dialog.style;
-    style.setProperty("--lightbox-sheet-visible", `${visible}px`);
-    style.setProperty(
-      "--lightbox-sheet-progress",
-      String(info > photo ? clamp((visible - photo) / (info - photo), 0, 1) : 0),
+    const style = this.#overlay.style;
+    const px = (value: number) => `${value}px`;
+    style.setProperty("--lightbox-sheet-reach", px(reach));
+    style.setProperty("--lightbox-sheet-lead", px(lead));
+    style.setProperty("--lightbox-sheet-dismiss-distance", px(dismiss));
+    style.setProperty("--lightbox-sheet-range", px(this.#range));
+    style.setProperty("--lightbox-sheet-height", px(content));
+    style.setProperty("--lightbox-sheet-min-height", px(enabled ? required : 0));
+    style.setProperty("--lightbox-sheet-visible-start", px(peek - dismiss - lead));
+    style.setProperty("--lightbox-sheet-first-offset", px(offsets[1] ?? dismiss + 1));
+    this.#placeMarkers(enabled ? [...(dismiss ? [0] : []), ...offsets] : []);
+    this.#restartAnimations();
+    this.#room.track(
+      enabled && this.#timeline
+        ? { timeline: this.#timeline, range: this.#range, from: dismiss, lead }
+        : undefined,
+      peek,
     );
-    style.setProperty(
-      "--lightbox-sheet-expand",
-      String(full > info ? clamp((visible - info) / (full - info), 0, 1) : 0),
-    );
-    this.#dialog.toggleAttribute("data-sheet-raised", visible > photo + 0.5);
-    this.#paintSlides();
+    return true;
   }
 
-  #paintSlides() {
-    const raised = this.#visible > this.#stops.photo + 0.5;
-    for (const slide of this.#slides()) {
-      const rest = raised ? this.#rest(slide) : undefined;
-      const pose = rest ? this.#pose(rest, this.#visible) : { ty: 0, scale: 1 };
-      if (pose.ty === 0 && pose.scale === 1) {
-        if (slide.style.translate) {
-          slide.style.translate = slide.style.scale = slide.style.transformOrigin = "";
-        }
+  // Chromium keeps a scroll-driven animation's start from its first range, so
+  // one whose range moved with the layout starts over to pick up the new one.
+  #restartAnimations() {
+    void getComputedStyle(this.#overlay).animationRange;
+    for (const animation of this.#overlay.getAnimations({ subtree: true })) {
+      if (!(animation instanceof CSSAnimation) || animation.timeline === document.timeline)
         continue;
-      }
-      slide.style.transformOrigin = `${rest!.originX}px ${rest!.originY}px`;
-      slide.style.translate = `0 ${pose.ty}px`;
-      slide.style.scale = String(pose.scale);
+      animation.cancel();
+      animation.play();
     }
   }
 
-  // Motion.
-
-  #reducedMotion() {
-    return matchMedia("(prefers-reduced-motion: reduce)").matches;
+  #placeMarkers(offsets: number[]) {
+    const markers = [...this.#scroller.querySelectorAll<HTMLElement>("[data-lightbox-sheet-snap]")];
+    for (const [index, offset] of offsets.entries()) {
+      let marker = markers[index];
+      if (!marker) {
+        marker = this.#dialog.ownerDocument.createElement("div");
+        marker.dataset.lightboxSheetSnap = "";
+        this.#scroller.append(marker);
+      }
+      marker.style.top = `${offset}px`;
+      // A flick from the top can't fly past the resting photo into a dismiss.
+      marker.toggleAttribute("data-rest", offset === this.#rest);
+    }
+    for (const marker of markers.slice(offsets.length)) marker.remove();
   }
 
-  #setStop(stop: LightboxSheetStop) {
+  #onContentResize = () => {
+    if (this.#stripMoving) this.#measurePending = true;
+    else this.#remeasure(false);
+  };
+
+  #onStripScroll = () => {
+    this.#stripMoving = true;
+    // Without scrollend, a pause stands in for it.
+    if ("onscrollend" in window) return;
+    clearTimeout(this.#stripTimer);
+    this.#stripTimer = setTimeout(this.#onStripRest, 150);
+  };
+
+  #onStripRest = () => {
+    clearTimeout(this.#stripTimer);
+    this.#stripMoving = false;
+    if (!this.#measurePending) return;
+    this.#measurePending = false;
+    this.#remeasure(false);
+  };
+
+  #remeasure(window: boolean) {
+    if (this.#context.controller.state.status === "closed") return;
+    if (window) this.#room.forget();
+    if (!this.#measure() && !window) return;
+    // The browser re-snaps to the same marker after a layout change; a window
+    // resize moves every marker, so the sheet goes back to its stop itself.
+    if (window) this.#scroller.scrollTop = this.#offsets[this.#stop] ?? this.#rest;
+  }
+
+  // The keyboard. Safari scrolls the page to show a focused field, but the
+  // viewer is pinned to the page's scroll, so the field would move with it. So
+  // while a field in the sheet is focused the page can't scroll, and the sheet
+  // pads itself by the part the keyboard covers, as React Aria's sheet does.
+
+  // Safari pans the screen to a field it focuses itself, and the viewer, pinned
+  // to the page, can't follow. So a tap on a field focuses it from script with
+  // preventScroll instead, as React Aria does, and nothing pans.
+  #onFieldTouch = (event: TouchEvent) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const touch = event.touches[0];
+    this.#fieldTap = undefined;
+    if (!opensKeyboard(target) || !touch || event.touches.length !== 1) return;
+    this.#lockPage();
+    if (target !== this.#dialog.ownerDocument.activeElement) {
+      this.#fieldTap = { field: target, x: touch.clientX, y: touch.clientY };
+    }
+  };
+
+  #onFieldMove = (event: TouchEvent) => {
+    const tap = this.#fieldTap;
+    const touch = event.touches[0];
+    if (tap && touch && Math.hypot(touch.clientX - tap.x, touch.clientY - tap.y) > 10) {
+      this.#fieldTap = undefined;
+    }
+  };
+
+  #onFieldTap = (event: TouchEvent) => {
+    const tap = this.#fieldTap;
+    this.#fieldTap = undefined;
+    if (!tap || !event.cancelable || !tap.field.isConnected) return;
+    event.preventDefault();
+    tap.field.focus({ preventScroll: true });
+  };
+
+  #onFieldFocus = (event: FocusEvent) => {
+    const field = event.type === "focusin" ? event.target : event.relatedTarget;
+    if (
+      opensKeyboard(field instanceof Element ? field : null) &&
+      this.slot.contains(field as Node)
+    ) {
+      this.#lockPage();
+      // Focus moving to a field by other means, as the keyboard's arrows do:
+      // focus it again without the scroll, as React Aria's handleBlur does.
+      if (event.type === "focusout") (field as HTMLElement).focus({ preventScroll: true });
+      this.#startTyping();
+    } else if (event.type === "focusout") {
+      this.#unlockPage?.();
+      this.#unlockPage = undefined;
+      this.#typingTop = undefined;
+      this.#scroller.removeEventListener("scroll", this.#onTypingScroll);
+    }
+    this.#followKeyboard();
+  };
+
+  #startTyping() {
+    if (this.#typingTop !== undefined) return;
+    this.#typingTop = this.#scroller.scrollTop;
+    // Only while a field has focus does script watch the scroll, for the one
+    // thing CSS can't do: put the keyboard away as soon as the sheet goes down.
+    this.#scroller.addEventListener("scroll", this.#onTypingScroll, { passive: true });
+  }
+
+  #onTypingScroll = () => {
+    const top = this.#scroller.scrollTop;
+    if (this.#typingTop === undefined) return;
+    if (top > this.#typingTop) {
+      this.#typingTop = top;
+      return;
+    }
+    if (this.#typingTop - top > LOWERING) this.#dropKeyboard();
+  };
+
+  /** Move focus from a field to the sheet, which puts the keyboard away. */
+  #dropKeyboard() {
+    const document = this.#dialog.ownerDocument;
+    const element = this.#element;
+    if (!opensKeyboard(document.activeElement) || !this.slot.contains(document.activeElement)) {
+      return;
+    }
+    if (element && !element.hasAttribute("tabindex")) element.tabIndex = -1;
+    if (element) element.focus({ preventScroll: true });
+    else (document.activeElement as HTMLElement).blur();
+  }
+
+  #lockPage() {
+    const view = this.#dialog.ownerDocument.defaultView!;
+    if (this.#unlockPage || !view.matchMedia("(pointer: coarse)").matches) return;
+    const root = this.#dialog.ownerDocument.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    this.#unlockPage = () => (root.style.overflow = previous);
+  }
+
+  // WebKit reports the keyboard once as it starts to slide, so it is read each
+  // frame until it has settled, as React Aria's runAfterKeyboard does.
+  #followKeyboard() {
+    this.#keyboardUntil = performance.now() + KEYBOARD_TRANSITION;
+    if (this.#keyboardFrame) return;
+    const frame = () => {
+      this.#onViewport();
+      this.#keyboardFrame =
+        performance.now() < this.#keyboardUntil ? requestAnimationFrame(frame) : 0;
+      if (!this.#keyboardFrame) this.#revealField();
+    };
+    this.#keyboardFrame = requestAnimationFrame(frame);
+  }
+
+  #onViewport = () => {
+    const viewport = this.#dialog.ownerDocument.defaultView?.visualViewport;
+    const focused = this.#dialog.ownerDocument.activeElement;
+    let keyboard = 0;
+    if (viewport && opensKeyboard(focused) && this.slot.contains(focused)) {
+      // What the keyboard takes from the viewer, as React Aria reckons it:
+      // its height less the visible height. Nothing pans, so that is the overlap.
+      keyboard = Math.max(0, Math.round(this.#dialog.clientHeight - viewport.height));
+    }
+    if (keyboard === this.#keyboard) return;
+    this.#keyboard = keyboard;
+    this.#overlay.style.setProperty("--lightbox-sheet-keyboard", `${keyboard}px`);
+  };
+
+  /**
+   * Scroll a focused field to the middle of what the keyboard leaves, in each
+   * scroller it is in up to the sheet's own, as React Aria's usePreventScroll does.
+   */
+  #revealField() {
+    const document = this.#dialog.ownerDocument;
+    const field = document.activeElement;
+    const viewport = document.defaultView?.visualViewport;
+    if (!opensKeyboard(field) || !this.slot.contains(field) || !viewport) return;
+    let target: HTMLElement = field;
+    for (
+      let area = target.parentElement;
+      area && this.#scroller.contains(area);
+      area = area.parentElement
+    ) {
+      const overflow = getComputedStyle(area).overflowY;
+      if (!/auto|scroll/.test(overflow) || area.scrollHeight <= area.clientHeight) continue;
+      const box = area.getBoundingClientRect();
+      const bottom = Math.min(box.bottom, viewport.offsetTop + viewport.height);
+      const rect = target.getBoundingClientRect();
+      if (rect.top < box.top || rect.bottom > bottom) {
+        const adjustment = rect.top - box.top - ((bottom - box.top) / 2 - rect.height / 2);
+        area.scrollTo({
+          top: Math.max(
+            0,
+            Math.min(area.scrollHeight - area.clientHeight, area.scrollTop + adjustment),
+          ),
+          behavior: "smooth",
+        });
+      }
+      target = area;
+    }
+  }
+
+  // Stops.
+
+  #nearestStop() {
+    const top = this.#scroller.scrollTop;
+    let best = 0;
+    for (const [index, offset] of this.#offsets.entries()) {
+      if (Math.abs(offset - top) < Math.abs(this.#offsets[best]! - top)) best = index;
+    }
+    return best;
+  }
+
+  #scrollTo(stop: number, animate: boolean) {
+    const index = Math.max(0, Math.min(stop, this.#offsets.length - 1));
+    const smooth = animate && !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const top = this.#offsets[index]!;
+    if (Math.abs(this.#scroller.scrollTop - top) < 1) {
+      this.#onScrollEnd();
+      return;
+    }
+    this.#scroller.scrollTo({ top, behavior: smooth ? "smooth" : "instant" });
+    if (!smooth) this.#onScrollEnd();
+  }
+
+  #onScrollEnd = () => {
+    if (this.#dismissed || this.#context.controller.state.status === "closed") return;
+    const stop = this.#nearestStop();
+    const resting = Math.abs(this.#scroller.scrollTop - this.#offsets[stop]!) <= 2;
+    if (!resting) return;
+    this.#setStop(stop);
+    if (this.#focusOnSettle && stop > 0) {
+      this.#focusOnSettle = false;
+      const element = this.#element;
+      if (element && !element.hasAttribute("tabindex")) element.tabIndex = -1;
+      element?.focus({ preventScroll: true });
+    }
+  };
+
+  #setStop(stop: number) {
+    const last = this.#offsets.length - 1;
+    const element = this.#element;
+    this.#dialog.toggleAttribute("data-sheet-raised", stop > 0);
+    // At the top stop the sheet's own content scrolls, and scrolls on into the
+    // sheet from its top, as React Aria's sheet does; below it a swipe anywhere
+    // on the sheet moves the sheet.
+    this.#dialog.toggleAttribute("data-sheet-expanded", stop > 0 && stop === last);
+    const away = stop === 0 && !this.#dialog.hasAttribute("data-sheet-peeking");
+    element?.toggleAttribute("inert", away);
+    if (away && element?.contains(this.#dialog.ownerDocument.activeElement)) {
+      (this.#returnFocus?.isConnected ? this.#returnFocus : this.#dialog).focus({
+        preventScroll: true,
+      });
+    }
+    this.#syncTriggers(stop);
+    if (stop === this.#stop && this.#dialog.dataset.sheet === String(stop)) return;
     this.#stop = stop;
-    this.#dialog.dataset.sheet = stop;
+    this.#dialog.dataset.sheet = String(stop);
     this.#announce(stop);
     this.#dialog.dispatchEvent(new CustomEvent("lightbox-sheet-change", { detail: { stop } }));
   }
 
-  #moveTo(stop: LightboxSheetStop, animate: boolean) {
-    const target = this.#stops[stop];
-    if (stop !== this.#stop) this.#setStop(stop);
-    this.#target = target;
-    if (!animate) {
-      cancelAnimationFrame(this.#frame);
-      this.#frame = 0;
-      this.#velocity = 0;
-      this.#paint(target);
-      this.#finishMotion();
-      return;
+  #syncTriggers(stop = this.#stop) {
+    for (const trigger of this.#dialog.querySelectorAll("[data-lightbox-sheet-stop]")) {
+      trigger.setAttribute("aria-expanded", String(stop > 0));
     }
-    this.#dialog.dataset.sheetMoving = target > this.#visible ? "up" : "down";
-    if (!this.#frame) {
-      this.#lastTime = performance.now();
-      this.#frame = requestAnimationFrame(this.#step);
-    }
-  }
-
-  #step = (time: number) => {
-    const dt = Math.min(0.032, Math.max(0.001, (time - this.#lastTime) / 1000));
-    this.#lastTime = time;
-    const force = STIFFNESS * (this.#target - this.#visible) - DAMPING * this.#velocity;
-    this.#velocity += force * dt;
-    let next = this.#visible + this.#velocity * dt;
-    const done = Math.abs(this.#target - next) < 0.5 && Math.abs(this.#velocity) < 12;
-    if (done) next = this.#target;
-    this.#paint(next);
-    if (done) {
-      this.#frame = 0;
-      this.#velocity = 0;
-      this.#finishMotion();
-    } else {
-      this.#frame = requestAnimationFrame(this.#step);
-    }
-  };
-
-  #finishMotion() {
-    delete this.#dialog.dataset.sheetMoving;
-    const element = this.#element;
-    if (element && this.#stop === "photo") element.scrollTop = 0;
-    for (const resolve of this.#settled.splice(0)) resolve();
   }
 
   #reset() {
-    cancelAnimationFrame(this.#frame);
-    this.#frame = 0;
-    this.#drag = undefined;
-    this.#velocity = 0;
-    if (this.#stop !== "photo") this.#setStop("photo");
-    this.#paint((this.#target = this.#stops.photo));
-    this.#forgetRests();
-    delete this.#dialog.dataset.sheetMoving;
-    for (const resolve of this.#settled.splice(0)) resolve();
+    this.#touch = undefined;
+    this.#dismissed = false;
+    this.#entered = false;
+    this.#overlay.removeAttribute("data-sheet-dismissed");
+    this.#touching = this.#heading = false;
+    this.#fade?.cancel();
+    this.#fade = undefined;
+    this.#focusOnSettle = false;
+    this.#returnFocus = null;
+    this.#unlockPage?.();
+    this.#unlockPage = undefined;
+    this.#typingTop = undefined;
+    this.#scroller.removeEventListener("scroll", this.#onTypingScroll);
+    this.#keyboard = 0;
+    this.#overlay.style.removeProperty("--lightbox-sheet-keyboard");
+    this.#room.forget();
+    if (this.#stop !== 0) this.#setStop(0);
   }
 
-  // Dragging, from the photo (through the viewer) or from the sheet itself.
+  // The scroll dismiss: the viewer closes once the stage has scrolled out of
+  // the bottom of the scroller, as React Aria's sheet does.
 
-  #dragStart(clientY: number) {
-    cancelAnimationFrame(this.#frame);
-    this.#frame = 0;
-    this.#measure();
-    this.#drag = {
-      startY: clientY,
-      startVisible: this.#visible,
-      samples: [[performance.now(), clientY]],
-    };
-    this.#dialog.dataset.sheetDragging = "";
-  }
+  #onStageVisibility = (entries: IntersectionObserverEntry[]) => {
+    const entry = entries.at(-1);
+    if (!entry || !this.#enabled || this.#dismissed) return;
+    if (entry.isIntersecting) this.#entered = true;
+    if (!this.#entered || !this.#open || this.#scroller.scrollTop >= this.#rest) return;
+    if (!entry.isIntersecting || this.#committed()) this.#dismissNow();
+  };
 
-  #dragMove(clientY: number) {
-    const drag = this.#drag;
-    if (!drag) return;
-    drag.samples.push([performance.now(), clientY]);
-    if (drag.samples.length > 6) drag.samples.shift();
-    const raw = drag.startVisible + drag.startY - clientY;
-    const { photo, full } = this.#stops;
-    // Past either end the sheet follows at a third of the finger's pace.
-    const visible =
-      raw > full ? full + (raw - full) / 3 : raw < photo ? photo - (photo - raw) / 3 : raw;
-    this.#dialog.dataset.sheetMoving = visible >= this.#visible ? "up" : "down";
-    this.#paint(Math.max(0, visible));
-  }
+  // Waiting for the photo to scroll all the way off, under the bars too, is a
+  // screen's travel at the browser's snap speed, and until then the viewer
+  // catches the next swipe meant for the page. React Aria's sheet only has its
+  // own height to go. Snapping is mandatory, so a scroll still heading down
+  // once the finger is up can only end in the dismiss: the viewer lets go of
+  // touches there and then, and fades as the scroll goes on.
 
-  #dragEnd(cancelled: boolean) {
-    const drag = this.#drag;
-    this.#drag = undefined;
-    delete this.#dialog.dataset.sheetDragging;
-    if (!drag) return;
-    const [first, last] = [drag.samples[0]!, drag.samples.at(-1)!];
-    const elapsed = last[0] - first[0];
-    // Upward speed in px/ms.
-    const speed = cancelled || elapsed < 1 ? 0 : (first[1] - last[1]) / elapsed;
-    const order: LightboxSheetStop[] = ["photo", "info", "full"];
-    const stops = order.filter(
-      (stop, index) => index === 0 || this.#stops[stop] > this.#stops[order[index - 1]!] + 1,
+  #onDismissTouch = () => {
+    this.#touching = true;
+    this.#heading = false;
+  };
+
+  #onDismissRelease = () => {
+    this.#touching = false;
+    const from = this.#scroller.scrollTop;
+    if (from >= this.#rest || this.#dismissed) return;
+    // The first scroll after the finger lifts tells where the momentum goes.
+    this.#scroller.addEventListener(
+      "scroll",
+      () => {
+        this.#heading = this.#scroller.scrollTop < from;
+        if (this.#committed()) this.#dismissNow();
+      },
+      { once: true, passive: true },
     );
-    let stop = stops.reduce((best, candidate) =>
-      Math.abs(this.#stops[candidate] - this.#visible) < Math.abs(this.#stops[best] - this.#visible)
-        ? candidate
-        : best,
-    );
-    if (Math.abs(speed) > FLING) {
-      const direction = Math.sign(speed);
-      const ahead = stops.filter(
-        (candidate) => (this.#stops[candidate] - this.#visible) * direction > 1,
-      );
-      stop = (direction > 0 ? ahead[0] : ahead.at(-1)) ?? stop;
-    }
-    this.#velocity = speed * 1000;
-    this.#suppressClick = true;
-    setTimeout(() => (this.#suppressClick = false), 0);
-    this.#moveTo(stop, !this.#reducedMotion());
+  };
+
+  #committed() {
+    return !this.#touching && this.#heading;
   }
 
-  #wheelStep(deltaY: number) {
-    // One trackpad swipe sends dozens of events; the first one decides.
-    const now = performance.now();
-    const locked = now - this.#wheelLock < 260;
-    this.#wheelLock = now;
-    if (locked || Math.abs(deltaY) < 4) return;
-    this.#measure();
-    const order: LightboxSheetStop[] = ["photo", "info", "full"];
-    const stops = order.filter(
-      (stop, index) => index === 0 || this.#stops[stop] > this.#stops[order[index - 1]!] + 1,
-    );
-    const index = stops.indexOf(this.#stop);
-    const next = stops[clamp(index + Math.sign(deltaY), 0, stops.length - 1)]!;
-    this.#moveTo(next, !this.#reducedMotion());
+  #dismissNow() {
+    if (this.#dismissed || !this.#open) return;
+    this.#dismissed = true;
+    this.#overlay.toggleAttribute("data-sheet-dismissed", true);
+    void this.#context.controller.close({ reason: "pointer" });
   }
 
-  // Events on the sheet element.
-
-  #inSheet(target: EventTarget | null) {
-    const element = this.#element;
-    return !!element && target instanceof Node && element.contains(target);
-  }
+  // The flight's share of the photo: a pull down from rest.
 
   #onTouchStart = (event: TouchEvent) => {
-    if (!this.#inSheet(event.target) || event.touches.length !== 1 || !this.#open) return;
-    const touch = event.touches[0]!;
-    this.#touch = { x: touch.clientX, y: touch.clientY, axis: "pending" };
+    const touch = event.touches[0];
+    const landing = this.#landing();
+    this.#touch =
+      touch && event.touches.length === 1 && this.#enabled && (!this.#raised || landing)
+        ? { x: touch.clientX, y: touch.clientY, flight: undefined, landing }
+        : undefined;
   };
+
+  // A second flick down needn't wait for the first to settle: with the sheet
+  // most of the way down, and not resting at a stop, a pull down is the flight.
+  #landing() {
+    const top = this.#scroller.scrollTop;
+    const first = this.#offsets[1];
+    if (first === undefined || top <= this.#rest + 1) return false;
+    const resting = this.#offsets.some((offset) => Math.abs(offset - top) <= 2);
+    return !resting && top - this.#rest < (first - this.#rest) * LANDING;
+  }
+
+  /** The rest of the way down, under the flight's drag. */
+  #land() {
+    if (!this.#touch || this.#touch.landed) return;
+    this.#touch.landed = true;
+    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this.#scroller.scrollTo({ top: this.#rest, behavior: smooth ? "smooth" : "instant" });
+  }
 
   #onTouchMove = (event: TouchEvent) => {
     const touch = this.#touch;
     const point = event.touches[0];
     if (!touch || !point || event.touches.length !== 1) return;
-    const dx = point.clientX - touch.x;
-    const dy = point.clientY - touch.y;
-    if (touch.axis === "pending") {
+    if (touch.flight === undefined) {
+      const dx = point.clientX - touch.x;
+      const dy = point.clientY - touch.y;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < AXIS_THRESHOLD) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        touch.axis = "horizontal";
-        return;
-      }
-      const element = this.#element!;
-      // At full the sheet scrolls its own content, and only a pull down from the
-      // top of it moves the sheet.
-      const scrolls = this.#stop === "full" && element.scrollHeight > element.clientHeight + 1;
-      if (scrolls && (dy < 0 || element.scrollTop > 0)) {
-        touch.axis = "native";
-        return;
-      }
-      touch.axis = "vertical";
-      this.#dragStart(touch.y);
+      touch.flight = dy > 0 && dy > Math.abs(dx);
     }
-    if (touch.axis !== "vertical") return;
+    if (!touch.flight) return;
     if (event.cancelable) event.preventDefault();
-    this.#dragMove(point.clientY);
+    if (touch.landing) this.#land();
   };
 
   #onTouchEnd = (event: TouchEvent) => {
-    if (!this.#touch || event.touches.length) return;
-    const axis = this.#touch.axis;
-    this.#touch = undefined;
-    if (axis === "vertical") this.#dragEnd(event.type === "touchcancel");
-  };
-
-  #onSheetWheel = (event: WheelEvent) => {
-    if (!this.#inSheet(event.target) || !this.#open || event.ctrlKey) return;
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    const element = this.#element!;
-    const scrolls = this.#stop === "full" && element.scrollHeight > element.clientHeight + 1;
-    if (scrolls && (event.deltaY > 0 || element.scrollTop > 0)) return;
-    event.preventDefault();
-    this.#wheelStep(event.deltaY);
+    if (!event.touches.length) this.#touch = undefined;
   };
 
   #onClick = (event: MouseEvent) => {
-    if (this.#suppressClick) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
     const target = event.target instanceof Element ? event.target : null;
     const trigger = target?.closest<HTMLElement>("[data-lightbox-sheet-stop]");
     if (trigger && this.#dialog.contains(trigger)) {
-      const stop = trigger.dataset.lightboxSheetStop as LightboxSheetStop;
-      if (!["photo", "info", "full"].includes(stop)) return;
+      const stop = Number(trigger.dataset.lightboxSheetStop);
+      if (!Number.isInteger(stop)) return;
       event.preventDefault();
       event.stopPropagation();
-      this.set(stop === this.#stop && stop !== "photo" ? "photo" : stop, true);
+      const next = stop === this.#stop && stop > 0 ? 0 : stop;
+      if (next > 0) {
+        this.#returnFocus = trigger;
+        this.#focusOnSettle = true;
+      }
+      this.set(next, true);
       return;
     }
     // A tap above a raised sheet lowers it rather than closing the viewer.
     if (
-      this.#stop !== "photo" &&
-      !this.#inSheet(target) &&
+      this.#raised &&
+      !this.slot.contains(target) &&
       !target?.closest("button, a[href], input, select, textarea, [data-lightbox-filmstrip]")
     ) {
       event.preventDefault();
       event.stopPropagation();
-      this.set("photo", true);
+      this.set(0, true);
     }
   };
 }

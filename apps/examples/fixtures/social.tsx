@@ -2,10 +2,18 @@ import { mountSite } from "../src/site";
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { LightboxItem } from "@ogdakke/fluidbox";
-import { Lightbox, useLightboxSheet, useLightboxState } from "@ogdakke/fluidbox/react";
+import { Lightbox, useLightboxState } from "@ogdakke/fluidbox/react";
 import { sheet, type LightboxSheet } from "@ogdakke/fluidbox/sheet";
 import { tallScenes } from "@ogdakke/fluidbox-design/art-scenes";
 import { artItem, scenes } from "../src/art";
+import {
+  Button,
+  Sheet as AriaSheet,
+  SheetBackdrop,
+  SheetContent,
+  SheetOverlay,
+  SheetTrigger,
+} from "react-aria-components";
 import { Avatar, Badge, Icon, compact, type IconName, type Person } from "./social-ui";
 import "@ogdakke/fluidbox/sheet.css";
 import "./safari-chrome.css";
@@ -265,9 +273,8 @@ function Composer({ me }: { me: Person }) {
 
 const me: Person = { name: "You", handle: "you", seed: 30 };
 
-function XViewer({ replies }: { replies: LightboxSheet }) {
+function XViewer() {
   const active = useActivePost(tweets);
-  const stop = useLightboxSheet(replies);
   const [aside, setAside] = useState(true);
   return (
     <Lightbox.Portal>
@@ -342,8 +349,7 @@ function XViewer({ replies }: { replies: LightboxSheet }) {
                 icon="reply"
                 value={active.stats.replies}
                 label="Show replies"
-                aria-expanded={stop !== "photo"}
-                data-lightbox-sheet-stop="info"
+                data-lightbox-sheet-stop="1"
               />
               <Count icon="repost" value={active.stats.reposts} label="Reposts" />
               <Count icon="like" value={active.stats.likes} label="Likes" />
@@ -353,19 +359,6 @@ function XViewer({ replies }: { replies: LightboxSheet }) {
           </div>
         </div>
       )}
-      <section className="x-sheet" data-lightbox-sheet data-lightbox-chrome aria-label="Replies">
-        <div data-lightbox-sheet-handle />
-        <header className="x-sheet__head">
-          <strong>Replies</strong>
-          <span className="x-muted">{active && compact(active.stats.replies)}</span>
-        </header>
-        <ul className="x-replies">
-          {active?.replies.map((reply) => (
-            <ReplyRow key={reply.by.handle} reply={reply} />
-          ))}
-        </ul>
-        <Composer me={me} />
-      </section>
       <Lightbox.Previous />
       <Lightbox.Next />
       <Lightbox.Close />
@@ -373,13 +366,36 @@ function XViewer({ replies }: { replies: LightboxSheet }) {
   );
 }
 
+/** In the sheet's slot, which scrolls with the photo: the replies, and the composer at the end. */
+function XReplies({ replies }: { replies: LightboxSheet }) {
+  const active = useActivePost(tweets);
+  return (
+    <Lightbox.Sheet sheet={replies}>
+      <section className="x-sheet" data-lightbox-sheet data-lightbox-chrome aria-label="Replies">
+        <div data-lightbox-sheet-handle />
+        <header className="x-sheet__head">
+          <strong>Replies</strong>
+          <span className="x-muted">{active && compact(active.stats.replies)}</span>
+        </header>
+        <ul className="x-replies" data-lightbox-sheet-scroll>
+          {active?.replies.map((reply) => (
+            <ReplyRow key={reply.by.handle} reply={reply} />
+          ))}
+        </ul>
+        <Composer me={me} />
+      </section>
+    </Lightbox.Sheet>
+  );
+}
+
 function XThread({ post }: { post: Post }) {
   // One sheet per viewer, kept for its lifetime.
-  const replies = useMemo(() => sheet(), []);
+  const replies = useMemo(() => sheet({ snapPoints: ["62%", "100%"] }), []);
   return (
     <Lightbox.Root items={post.items} sheet={replies}>
       <Tweet post={post} />
-      <XViewer replies={replies} />
+      <XViewer />
+      <XReplies replies={replies} />
     </Lightbox.Root>
   );
 }
@@ -419,7 +435,7 @@ function IgActions({ post }: { post: Post }) {
     <>
       <div className="ig-actions">
         <Count icon="like" label="Like" />
-        <Count icon="comment" label="Comment" data-lightbox-sheet-stop="full" />
+        <Count icon="comment" label="Comment" data-lightbox-sheet-stop="2" />
         <Count icon="send" label="Share" />
         <Count icon="bookmark" label="Save" />
       </div>
@@ -463,7 +479,7 @@ function IgAuthor({ post }: { post: Post }) {
   );
 }
 
-function InstagramViewer() {
+function InstagramViewer({ details }: { details: LightboxSheet }) {
   const active = useActivePost(grams);
   return (
     <Lightbox.Portal>
@@ -484,31 +500,34 @@ function InstagramViewer() {
           </footer>
         </aside>
       )}
-      {/* On a phone the caption peeks under the photo and drags up into the comments. */}
-      <section className="ig-sheet" data-lightbox-sheet data-lightbox-chrome aria-label="Post">
-        <div data-lightbox-sheet-handle />
-        {active && (
-          <>
-            <IgActions post={active} />
-            <p className="ig-caption">
-              <strong>{active.by.handle}</strong> {active.text}
-            </p>
-            <button type="button" className="ig-more" data-lightbox-sheet-stop="full">
-              View all {active.stats.replies} comments
-            </button>
-            <IgComments post={active} />
-          </>
-        )}
-      </section>
       <Lightbox.Previous />
       <Lightbox.Next />
       <Lightbox.Close />
+      {/* On a phone the caption peeks under the photo and drags up into the comments. */}
+      <Lightbox.Sheet sheet={details}>
+        <section className="ig-sheet" data-lightbox-sheet data-lightbox-chrome aria-label="Post">
+          <div data-lightbox-sheet-handle />
+          {active && (
+            <>
+              <IgActions post={active} />
+              <p className="ig-caption">
+                <strong>{active.by.handle}</strong> {active.text}
+              </p>
+              <button type="button" className="ig-more" data-lightbox-sheet-stop="2">
+                View all {active.stats.replies} comments
+              </button>
+              <IgComments post={active} />
+            </>
+          )}
+        </section>
+      </Lightbox.Sheet>
     </Lightbox.Portal>
   );
 }
 
 function InstagramProfile() {
-  const details = useMemo(() => sheet(), []);
+  // The caption peeks and can't be put away; a swipe down scrolls the photo off.
+  const details = useMemo(() => sheet({ snapPoints: ["55%", "content"], dismiss: "scroll" }), []);
   const profile = people.fjord;
   return (
     <Lightbox.Root items={grams.flatMap((gram) => gram.items)} sheet={details}>
@@ -546,8 +565,67 @@ function InstagramProfile() {
           ))}
         </div>
       </div>
-      <InstagramViewer />
+      <InstagramViewer details={details} />
     </Lightbox.Root>
+  );
+}
+
+// React Aria's Sheet, for comparison: X's replies with no photo, raised from the
+// reply count to the same stops, so its keyboard and gestures can be tried side
+// by side with ours.
+
+function AriaReplies({ post }: { post: Post }) {
+  return (
+    <article className="x-post">
+      <Avatar person={post.by} />
+      <div className="x-post__body">
+        <header className="x-head">
+          <Name person={post.by} />
+          <span className="x-muted">
+            @{post.by.handle} · {post.ago}
+          </span>
+          <Icon name="more" size={18} />
+        </header>
+        <p>{post.text}</p>
+        <footer className="x-counts">
+          <SheetTrigger>
+            <Button className="count" data-icon="reply" aria-label="Show replies">
+              <Icon name="reply" size={19} />
+              <span>{compact(post.stats.replies)}</span>
+            </Button>
+            {/* Ours takes 62% of the screen, React Aria a share of the sheet; pixels match them. */}
+            <SheetOverlay
+              className="ra-overlay"
+              snapPoints={[Math.round(window.innerHeight * 0.62), "100%"]}
+            >
+              <SheetBackdrop
+                className="ra-backdrop"
+                swipeAnimation="ra-backdrop"
+                swipeAnimationRange={{ start: 1 }}
+              />
+              <AriaSheet className="ra-sheet" overscrollPadding>
+                <div className="ra-handle" />
+                <SheetContent className="ra-content" aria-label="Replies">
+                  <header className="x-sheet__head">
+                    <strong>Replies</strong>
+                    <span className="x-muted">{compact(post.stats.replies)}</span>
+                  </header>
+                  <ul className="x-replies ra-replies">
+                    {post.replies.map((reply) => (
+                      <ReplyRow key={reply.by.handle} reply={reply} />
+                    ))}
+                  </ul>
+                  <Composer me={me} />
+                </SheetContent>
+              </AriaSheet>
+            </SheetOverlay>
+          </SheetTrigger>
+          <Count icon="repost" value={post.stats.reposts} label="Reposts" />
+          <Count icon="like" value={post.stats.likes} label="Likes" />
+          <Count icon="views" value={post.stats.views} label="Views" />
+        </footer>
+      </div>
+    </article>
   );
 }
 
@@ -596,7 +674,16 @@ function App() {
       >
         <InstagramProfile />
       </Section>
-      <Section index={3} title="Findings" note="What broke on the way here, and what fixed it.">
+      <Section
+        index={3}
+        title="React Aria's Sheet"
+        note="For comparison: react-aria-components 1.22.1 with X's replies and no photo. The reply count raises the sheet to the same two stops, 62% of the screen and all of it. React Aria has no pinned footer, so the composer sits at the bottom of the sheet; its keyboard handling is its own."
+      >
+        <div className="x-feed">
+          <AriaReplies post={tweets[0]!} />
+        </div>
+      </Section>
+      <Section index={4} title="Findings" note="What broke on the way here, and what fixed it.">
         <ol className="findings">
           <li>
             <strong>Room around the photo: fixed.</strong> --lightbox-stage-top, -right, -bottom and
