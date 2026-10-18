@@ -111,7 +111,7 @@ test("viewer selectors stay isolated and honor stylesheet order", async ({ page 
   const overlay = page.locator("[data-lightbox-overlay]");
   const close = overlay.locator("[data-lightbox-close]").first();
   await expect(overlay).toHaveCSS("position", "absolute");
-  await expect(overlay.locator("[data-lightbox-container]")).toHaveCSS("position", "sticky");
+  await expect(overlay.locator("[data-lightbox-container]")).toHaveCSS("position", "absolute");
   await expect(overlay.locator("[data-lightbox-backdrop]")).toHaveCSS("position", "absolute");
   await expect(overlay.locator("[data-lightbox-backdrop]")).toHaveCSS(
     "background-color",

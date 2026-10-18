@@ -56,6 +56,8 @@ Read from `:root` or the overlay: `--layer-lightbox`, `--layer-lightbox-flight`,
 
 `--lightbox-backdrop-filter` sets the backdrop's `backdrop-filter`, `none` by default. Pair it with a translucent `--lightbox-backdrop-background`, for example `blur(24px) saturate(1.5)`; iOS 26 Safari then shows the blurred page behind its bars.
 
+`[data-lightbox-container]` is `position: absolute` at the page's scroll position, which the runtime sets as `--lightbox-scroll-top`. Don't make it sticky or fixed: iOS 26 Safari tints its bars from a sticky or fixed layer at the screen's edge, using colours from anywhere inside it.
+
 While zoomed, the image can pan under the browser's own bars. On touch screens the zoom viewport reaches past the window by the difference between the screen and window heights, which covers iOS Safari's status bar and toolbar wherever they sit. Set `--lightbox-zoom-bleed` on `:root` or the overlay to choose the reach yourself, or `0px` to keep the image inside the window.
 
 `--lightbox-slide-gap` adds space between gallery slides, shown only while swiping; images stay full-bleed. It is `0` by default. Set it on the opening element, `:root`, or the overlay; like every `--lightbox-*` property on the opening element, it is copied onto the portal.

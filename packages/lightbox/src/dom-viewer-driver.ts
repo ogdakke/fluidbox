@@ -246,6 +246,10 @@ export class DomViewerDriver<
     });
     const ownerWindow = ownerDocument.defaultView;
     ownerWindow?.addEventListener("resize", this.#onResize, { signal: this.#lifetime.signal });
+    ownerWindow?.addEventListener("scroll", this.#onPageScroll, {
+      passive: true,
+      signal: this.#lifetime.signal,
+    });
     ownerWindow?.visualViewport?.addEventListener("resize", this.#onResize, {
       signal: this.#lifetime.signal,
     });
@@ -341,7 +345,7 @@ export class DomViewerDriver<
     }
     const view = this.#portal.overlay.ownerDocument.defaultView!;
     this.#viewportWidth = view.innerWidth;
-    this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    this.#sizeContainer(view);
     this.#applyTheme(context.origin?.trigger ?? null);
     this.#syncPageHeight();
     void this.#strip?.select(context.index, false);
@@ -404,7 +408,7 @@ export class DomViewerDriver<
     else this.#preparedOpen = undefined;
     const view = this.#portal.overlay.ownerDocument.defaultView!;
     this.#viewportWidth = view.innerWidth;
-    this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    this.#sizeContainer(view);
     const focused = this.#portal.overlay.ownerDocument.activeElement;
     this.#applyTheme(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     this.#syncPageHeight();
@@ -1235,11 +1239,12 @@ export class DomViewerDriver<
     const view = this.#portal.overlay.ownerDocument.defaultView;
     if (!view) return;
     this.#syncPageHeight();
+    this.#pinContainer(view);
     const widthChanged = view.innerWidth !== this.#viewportWidth;
     if (this.#controller?.state.status === "closing") {
       if (widthChanged) {
         this.#viewportWidth = view.innerWidth;
-        this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+        this.#sizeContainer(view);
       }
       this.#updateCloseTarget();
       this.#scheduleCloseTargetUpdate();
@@ -1248,7 +1253,7 @@ export class DomViewerDriver<
     if (!widthChanged) return;
     if (this.#dragGesture.active) this.#endDrag(true);
     this.#viewportWidth = view.innerWidth;
-    this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    this.#sizeContainer(view);
     if (this.#zoom?.zoomed) {
       this.#zoom.reset();
       return;
@@ -1257,6 +1262,26 @@ export class DomViewerDriver<
       this.#cancelAnimations(false);
       this.#clearMotionStyles();
     }
+  };
+
+  // The container is absolute at the page's scroll position, not sticky: iOS 26
+  // Safari takes a sticky layer touching the screen's edge for chrome and tints
+  // its bar with a colour from anywhere inside it. React Aria's Sheet does the
+  // same for the same reason.
+  #sizeContainer(view: Window) {
+    this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    this.#pinContainer(view);
+  }
+
+  #pinContainer(view: Window) {
+    this.#portal.overlay.style.setProperty("--lightbox-scroll-top", `${view.scrollY}px`);
+  }
+
+  // The page can still scroll under an open lightbox; follow it as sticky did.
+  #onPageScroll = () => {
+    const view = this.#portal.overlay.ownerDocument.defaultView;
+    if (!view || this.#controller?.state.status === "closed") return;
+    this.#pinContainer(view);
   };
 
   #syncPageHeight() {

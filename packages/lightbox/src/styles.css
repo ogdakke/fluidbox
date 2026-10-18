@@ -342,8 +342,10 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-container] {
-  position: sticky;
-  top: 0;
+  /* At the page's scroll position, never sticky: iOS 26 tints its bars from sticky layers. */
+  position: absolute;
+  top: var(--lightbox-scroll-top, 0px);
+  left: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   place-items: center;
