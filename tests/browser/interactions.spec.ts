@@ -289,7 +289,7 @@ test("settled gallery frame matches its visual baseline", async ({ page }) => {
   const dialog = page.locator("[data-lightbox-dialog]");
   await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
   await page
-    .locator('[data-lightbox-slide][aria-hidden="false"] img:not([data-lightbox-content-preview])')
+    .locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')
     .evaluate((image: HTMLImageElement) => image.decode());
   await expect(page).toHaveScreenshot("opened-gallery.png", {
     animations: "disabled",
@@ -302,7 +302,7 @@ test("settled gallery frame matches its visual baseline", async ({ page }) => {
     "Item 2 of 3",
   );
   await page
-    .locator('[data-lightbox-slide][aria-hidden="false"] img:not([data-lightbox-content-preview])')
+    .locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')
     .evaluate((image: HTMLImageElement) => image.decode());
   await expect(page).toHaveScreenshot("next-gallery.png", {
     animations: "disabled",

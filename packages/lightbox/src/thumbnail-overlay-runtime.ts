@@ -135,7 +135,6 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
         const target = this.#document.createElement("div");
         target.dataset.lightboxTransitionContent = "";
         target.setAttribute("aria-hidden", "true");
-        this.#publish(target, phase, progress);
         const controller = new AbortController();
         // The target lives in document coordinates. Its host clips it to the
         // page so a growing target never widens the page, which mobile Safari
@@ -144,6 +143,7 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
         host.dataset.lightboxTransitionHost = "";
         host.setAttribute("aria-hidden", "true");
         host.append(target);
+        this.#publish(target, phase, progress);
         this.#position(target, frame);
         this.#document.body.append(host);
         const dispose = registration.renderer.mount({
@@ -198,7 +198,9 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     const targets = [
       ...new Set([active.registration.element, active.frameLayer, active.target]),
     ].filter((element): element is HTMLElement => !!element && element.isConnected);
-    const animations = targets.map((target) => target.animate(progress, options));
+    const animations = targets.map((target) =>
+      this.#progressHolder(target).animate(progress, options),
+    );
     if (active.frameLayer?.isConnected) {
       const layer = active.frameLayer.animate(
         frameMotion.map(({ offset, transform }) => ({
@@ -305,10 +307,10 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     if (!active) return;
     for (const target of new Set([active.registration.element, active.frameLayer, active.target])) {
       if (!target?.isConnected) continue;
-      const style = getComputedStyle(target);
-      target.style.setProperty(
+      const holder = this.#progressHolder(target);
+      holder.style.setProperty(
         "--lightbox-progress",
-        style.getPropertyValue("--lightbox-progress"),
+        getComputedStyle(holder).getPropertyValue("--lightbox-progress"),
       );
     }
     if (active.frameLayer?.dataset.lightboxTravelLayer !== undefined) {
@@ -333,7 +335,20 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
 
   #publish(target: HTMLElement, phase: ThumbnailOverlayPhase, progress: number) {
     target.dataset.lightboxPhase = phase;
-    target.style.setProperty("--lightbox-progress", String(progress));
+    this.#progressHolder(target).style.setProperty("--lightbox-progress", String(progress));
+  }
+
+  /**
+   * The element that carries an overlay's progress. The travelling target
+   * inherits it from its host: WebKit stops applying the target's animated
+   * width and height while the registered progress animates on the target.
+   */
+  #progressHolder(target: HTMLElement) {
+    const host = target.parentElement;
+    return target.dataset.lightboxTransitionContent !== undefined &&
+      host?.dataset.lightboxTransitionHost !== undefined
+      ? host
+      : target;
   }
 
   #position(target: HTMLElement, frame: HTMLElement) {

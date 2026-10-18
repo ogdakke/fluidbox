@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { holdMotion } from "./support/hold-motion";
 
 const sitePages: [path: string, openers: string[]][] = [
   ["/", ["#mosaic app-lightbox [slot=trigger]"]],
@@ -17,6 +18,14 @@ for (const [path, openers] of sitePages) {
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
     });
+    // The map demo embeds OpenStreetMap. Serve a stand-in so the check covers
+    // these pages, not a third-party page that needs the network and WebGL.
+    await page.route("https://www.openstreetmap.org/**", (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<!doctype html><title>Map</title><p>Map</p>",
+      }),
+    );
     await page.goto(path);
     await expect(page.locator("[aria-busy]")).toHaveCount(0, { timeout: 15_000 });
     for (const selector of openers) {
@@ -86,7 +95,9 @@ test("React origin prototypes open image, iframe, and text-only galleries", asyn
   await page.goto("/react.html");
 
   await page.getByRole("button", { name: "View the Coral Runner shoe" }).click();
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"] img')).toBeVisible();
+  await expect(
+    page.locator('[data-lightbox-slide][aria-hidden="false"] img[data-lightbox-media]'),
+  ).toBeVisible();
   await page.locator("[data-lightbox-dialog] [data-lightbox-close]").click();
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 
@@ -131,7 +142,13 @@ test("React shared trigger closes every selected slide to its current preview", 
     "Item 2 of 4",
   );
   await expect(preview).toHaveAttribute("src", "/second.svg");
-  await page.locator("[data-lightbox-dialog] [data-lightbox-close]").click();
+  await holdMotion(page);
+  // Tap the button where it is drawn. Playwright's scroll into view treats the
+  // sticky control as off screen and scrolls the page under the open viewer,
+  // which can carry the preview out of view before the close begins.
+  const close = await page.locator("[data-lightbox-dialog] [data-lightbox-close]").boundingBox();
+  await page.mouse.click(close!.x + close!.width / 2, close!.y + close!.height / 2);
+  await page.evaluate(() => window.__motion.ready());
   await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
   const landing = await page.evaluate(() => {
     const preview = document.querySelector<HTMLElement>(".gallery-card__preview")!;
@@ -156,6 +173,8 @@ test("React shared trigger closes every selected slide to its current preview", 
   expect(landing.flight.height).toBeCloseTo(landing.origin.height, 0);
   expect(landing.origin.height).toBeGreaterThan(0);
   expect(landing.badgeProgress).toBeGreaterThan(0.9);
+  await page.evaluate(() => window.__motion.release());
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 
 for (const framework of ["solid", "vue", "angular"] as const) {

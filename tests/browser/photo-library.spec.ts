@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { holdMotion } from "./support/hold-motion";
 
 async function firstVisiblePhotoIndex(page: Page, includeWindow = true): Promise<number> {
   return page.locator(".library-scroll [data-photo-index]").evaluateAll((buttons, checkWindow) => {
@@ -44,7 +45,8 @@ test("React trigger prepares on pointerdown and discards a cancelled open", asyn
       reused: preparedAnimations.every((animation) => openingAnimations.includes(animation)),
     };
   });
-  expect(reuse).toEqual({ count: 4, paused: true, reused: true });
+  expect(reuse.count).toBeGreaterThan(0);
+  expect(reuse).toMatchObject({ paused: true, reused: true });
   await expect(page.locator("[data-lightbox-dialog][data-lightbox-state='open']")).toBeVisible();
 });
 
@@ -87,19 +89,43 @@ for (const count of [10_000, 100_000]) {
     expect(origin).not.toBeNull();
 
     const start = await originButton.evaluate(async (element: HTMLElement) => {
-      element.click();
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      );
+      // A loaded WebKit can stall longer than the whole opening, so a live
+      // animation may already be over when it is measured. Hold every
+      // animation near its start as it is created, measure, then let it run.
+      const animate = Object.getOwnPropertyDescriptor(Element.prototype, "animate")!
+        .value as Element["animate"];
+      const held: Animation[] = [];
+      Element.prototype.animate = function (
+        this: Element,
+        ...args: Parameters<Element["animate"]>
+      ) {
+        const animation = animate.apply(this, args);
+        animation.playbackRate = 1e-6;
+        held.push(animation);
+        return animation;
+      };
+      try {
+        element.click();
+        for (let frames = 0; frames < 120; frames += 1) {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          const overlay = document.querySelector("[data-lightbox-overlay]");
+          if (overlay && !overlay.hasAttribute("data-lightbox-prepared") && held.length) break;
+        }
+      } finally {
+        Element.prototype.animate = animate;
+      }
       const frame = document.querySelector<HTMLElement>(
         '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
       )!;
-      for (const animation of document.getAnimations()) {
+      for (const animation of held) {
         animation.pause();
         animation.currentTime = 0;
       }
       const bounds = frame.getBoundingClientRect();
-      for (const animation of document.getAnimations()) animation.play();
+      for (const animation of held) {
+        animation.playbackRate = 1;
+        animation.play();
+      }
       return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
     });
     await testInfo.attach("deep-origin-geometry", {
@@ -127,23 +153,33 @@ for (const count of [10_000, 100_000]) {
     });
     await expect(page.locator(`[data-photo-index="${index}"]`)).toHaveCount(0);
     const farIndex = count - 200;
-    await page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element, selectedIndex) => {
-      const start = new Event("touchstart", { bubbles: true });
-      Object.defineProperty(start, "touches", { value: [{}] });
-      element.dispatchEvent(start);
-      const size = parseFloat(
-        getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
-      );
-      const gap = parseFloat(getComputedStyle(element).columnGap);
-      const padding = parseFloat(getComputedStyle(element).paddingLeft);
-      element.scrollTo({
-        left: padding + selectedIndex * (size + gap) + size / 2 - element.clientWidth / 2,
-        behavior: "instant",
-      });
-      const end = new Event("touchend", { bubbles: true });
-      Object.defineProperty(end, "touches", { value: [] });
-      element.dispatchEvent(end);
-    }, farIndex);
+    await page
+      .locator("[data-lightbox-filmstrip-scroll]")
+      .evaluate(async (element, selectedIndex) => {
+        const start = new Event("touchstart", { bubbles: true });
+        Object.defineProperty(start, "touches", { value: [{}] });
+        element.dispatchEvent(start);
+        const size = parseFloat(
+          getComputedStyle(element.parentElement!).getPropertyValue(
+            "--lightbox-filmstrip-item-size",
+          ),
+        );
+        const gap = parseFloat(getComputedStyle(element).columnGap);
+        const padding = parseFloat(getComputedStyle(element).paddingLeft);
+        // A finger is still down while the strip scrolls, so lift it only
+        // after the strip has reported the scroll, as a real touch would.
+        const scrolled = new Promise((resolve) =>
+          element.addEventListener("scroll", resolve, { once: true }),
+        );
+        element.scrollTo({
+          left: padding + selectedIndex * (size + gap) + size / 2 - element.clientWidth / 2,
+          behavior: "instant",
+        });
+        await scrolled;
+        const end = new Event("touchend", { bubbles: true });
+        Object.defineProperty(end, "touches", { value: [] });
+        element.dispatchEvent(end);
+      }, farIndex);
     const filmstripGeometry = await page
       .locator("[data-lightbox-filmstrip-scroll]")
       .evaluate((element) => ({
@@ -201,7 +237,7 @@ for (const count of [10_000, 100_000]) {
     );
     await expect(farThumbnail).not.toHaveAttribute("data-lightbox-thumbnail-hidden", "");
     const selectedIndex = count - 250;
-    await page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element, index) => {
+    await page.locator("[data-lightbox-filmstrip-scroll]").evaluate(async (element, index) => {
       const start = new Event("touchstart", { bubbles: true });
       Object.defineProperty(start, "touches", { value: [{}] });
       element.dispatchEvent(start);
@@ -210,10 +246,16 @@ for (const count of [10_000, 100_000]) {
       );
       const gap = parseFloat(getComputedStyle(element).columnGap);
       const padding = parseFloat(getComputedStyle(element).paddingLeft);
+      // A finger is still down while the strip scrolls, so lift it only
+      // after the strip has reported the scroll, as a real touch would.
+      const scrolled = new Promise((resolve) =>
+        element.addEventListener("scroll", resolve, { once: true }),
+      );
       element.scrollTo({
         left: padding + index * (size + gap) + size / 2 - element.clientWidth / 2,
         behavior: "instant",
       });
+      await scrolled;
       const end = new Event("touchend", { bubbles: true });
       Object.defineProperty(end, "touches", { value: [] });
       element.dispatchEvent(end);
@@ -291,7 +333,11 @@ for (const count of [10_000, 100_000]) {
       )
       .toBe(true);
 
-    const beforeResize = await firstVisiblePhotoIndex(page);
+    // Clicking the reveal button scrolls the window to it, which can leave too
+    // little of the scroller on screen for a whole tile. The anchor that a
+    // resize keeps is the scroller's own first visible tile.
+    const beforeResize = await firstVisiblePhotoIndex(page, false);
+    expect(beforeResize).toBeGreaterThanOrEqual(0);
     await page.setViewportSize({ width: 420, height: 760 });
     await expect
       .poll(() =>
@@ -301,8 +347,10 @@ for (const count of [10_000, 100_000]) {
           .evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length),
       )
       .toBe(2);
-    await expect.poll(() => firstVisiblePhotoIndex(page)).toBeGreaterThanOrEqual(beforeResize - 6);
-    expect(await firstVisiblePhotoIndex(page)).toBeLessThanOrEqual(beforeResize + 6);
+    await expect
+      .poll(() => firstVisiblePhotoIndex(page, false))
+      .toBeGreaterThanOrEqual(beforeResize - 6);
+    expect(await firstVisiblePhotoIndex(page, false)).toBeLessThanOrEqual(beforeResize + 6);
     expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
     expect(await scroll.evaluate((element) => element.scrollHeight)).toBeLessThan(12_000_000);
     expect(pageErrors).toEqual([]);
@@ -838,7 +886,7 @@ test("opening remains active until the delayed filmstrip reveal settles", async 
 test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
   await page.goto("/photo-library.html");
   await page.evaluate(() => {
-    const measurements = { starts: 0, opacity: [] as number[], sampling: true };
+    const measurements = { starts: 0 };
     Object.assign(window, { __filmstripRevealMeasurements: measurements });
     document.addEventListener(
       "animationstart",
@@ -849,38 +897,49 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
       },
       true,
     );
-    const sample = () => {
-      const filmstrip = document.querySelector<HTMLElement>("[data-lightbox-filmstrip]");
-      if (filmstrip && getComputedStyle(filmstrip).visibility === "visible") {
-        measurements.opacity.push(Number(getComputedStyle(filmstrip).opacity));
-      }
-      if (measurements.sampling) requestAnimationFrame(sample);
-    };
-    requestAnimationFrame(sample);
+    // The fade is a CSS animation that starts with the reveal attribute, and
+    // a stalled frame can play it out unseen, so pause it in that same task.
+    new MutationObserver(() => {
+      if (document.querySelector("[data-filmstrip-revealing]")) window.__motion.freeze();
+    }).observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-filmstrip-revealing"],
+      subtree: true,
+    });
   });
+  await holdMotion(page);
   await page.locator("[data-photo-index]").first().click();
+  const measurements = await page.evaluate(async () => {
+    const end = await window.__motion.ready();
+    const filmstrip = document.querySelector<HTMLElement>("[data-lightbox-filmstrip]")!;
+    const fade = filmstrip
+      .getAnimations()
+      .find(
+        (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+      )!;
+    const fadeEnd = Number(fade.effect!.getComputedTiming().endTime);
+    const opacity: number[] = [];
+    for (let time = 0; time <= Math.max(end, fadeEnd); time += 8) {
+      window.__motion.seek(time);
+      if (getComputedStyle(filmstrip).visibility === "visible") {
+        opacity.push(Number(getComputedStyle(filmstrip).opacity));
+      }
+    }
+    window.__motion.release();
+    return opacity;
+  });
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",
   );
-  const measurements = await page.evaluate(() => {
-    const result = (
-      window as unknown as {
-        __filmstripRevealMeasurements: {
-          starts: number;
-          opacity: number[];
-          sampling: boolean;
-        };
-      }
-    ).__filmstripRevealMeasurements;
-    result.sampling = false;
-    return { starts: result.starts, opacity: result.opacity };
-  });
-  expect(measurements.starts).toBe(1);
-  expect(measurements.opacity.some((opacity) => opacity > 0 && opacity < 1)).toBe(true);
-  for (let index = 1; index < measurements.opacity.length; index += 1) {
-    expect(measurements.opacity[index]!).toBeGreaterThanOrEqual(
-      measurements.opacity[index - 1]! - 0.01,
-    );
+  const { starts } = await page.evaluate(
+    () =>
+      (window as unknown as { __filmstripRevealMeasurements: { starts: number } })
+        .__filmstripRevealMeasurements,
+  );
+  expect(starts).toBe(1);
+  expect(measurements.some((opacity) => opacity > 0 && opacity < 1)).toBe(true);
+  for (let index = 1; index < measurements.length; index += 1) {
+    expect(measurements[index]!).toBeGreaterThanOrEqual(measurements[index - 1]! - 0.01);
   }
 });

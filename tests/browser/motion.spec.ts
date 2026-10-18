@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { holdMotion } from "./support/hold-motion";
 
 test.use({ trace: "on", video: "on" });
 
@@ -23,6 +24,7 @@ function expectContinuous({ before, after }: Interruption) {
 }
 
 async function sampleIndexedOpening(page: Page, gallerySelector: string, index: number) {
+  await holdMotion(page);
   return page.evaluate(
     async ({ gallerySelector, index }) => {
       const gallery = document.querySelector<
@@ -31,14 +33,11 @@ async function sampleIndexedOpening(page: Page, gallerySelector: string, index: 
         }
       >(gallerySelector)!;
       void gallery.controller.open({ index });
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      );
+      await window.__motion.ready();
       const media = document.querySelector<HTMLElement>(
         '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
       )!;
       const frame = media.closest<HTMLElement>("[data-lightbox-frame]")!;
-      const animations = document.getAnimations();
       const sample = () => {
         const bounds = frame.getBoundingClientRect();
         return {
@@ -49,14 +48,11 @@ async function sampleIndexedOpening(page: Page, gallerySelector: string, index: 
           frameOpacity: Number(getComputedStyle(frame).opacity),
         };
       };
-      for (const animation of animations) {
-        animation.pause();
-        animation.currentTime = 0;
-      }
+      window.__motion.seek(0);
       const start = sample();
-      for (const animation of animations) animation.currentTime = 120;
+      window.__motion.seek(120);
       const progress = sample();
-      for (const animation of animations) animation.play();
+      window.__motion.release();
       return { start, progress };
     },
     { gallerySelector, index },
@@ -282,11 +278,25 @@ test("wheel dismissal reuses the image decoded during the wheel spring", async (
   await expect(page.locator("[data-lightbox-flight]")).toHaveCount(0);
 
   await page.evaluate(() => {
+    // The flight lives only as long as the close, which a loaded browser can
+    // finish between polls, so note it as it is mounted.
+    const probe = window as unknown as { __preparedFlightMounted: boolean };
+    probe.__preparedFlightMounted = false;
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector("[data-lightbox-flight] [data-prepared-flight]")) return;
+      probe.__preparedFlightMounted = true;
+      observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
     (window as unknown as { __releasePreparedDecode(): void }).__releasePreparedDecode();
   });
   await frame.dispatchEvent("wheel", { deltaY: -400, bubbles: true, cancelable: true });
-  await expect(page.locator("[data-lightbox-flight] [data-prepared-flight]")).toHaveCount(1);
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __preparedFlightMounted: boolean }).__preparedFlightMounted,
+    ),
+  ).toBe(true);
 });
 
 test("failed early decode keeps the source painted until the mounted flight decodes", async ({
@@ -379,6 +389,7 @@ test("direct React gallery carries clipped-origin geometry through opening and c
   });
   const originBounds = await origin.boundingBox();
   expect(originBounds).not.toBeNull();
+  await holdMotion(page);
   const corners = await origin.evaluate(async (element: HTMLElement) => {
     const rect = (target: HTMLElement) => {
       const bounds = target.getBoundingClientRect();
@@ -434,9 +445,7 @@ test("direct React gallery carries clipped-origin geometry through opening and c
       present: Boolean(preparedOverlay),
       visibility: preparedOverlay ? getComputedStyle(preparedOverlay).visibility : null,
     };
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await window.__motion.ready();
     const openingAnimations = document.getAnimations();
     setTime(openingAnimations, 0);
     const openingStart = sample();
@@ -446,7 +455,7 @@ test("direct React gallery carries clipped-origin geometry through opening and c
     const openingHalf = sample();
     setTime(openingAnimations, 195);
     const openingThreeQuarter = sample();
-    for (const animation of openingAnimations) animation.play();
+    window.__motion.release();
     return {
       preparation,
       openingStart,
@@ -493,6 +502,7 @@ test("direct React gallery carries clipped-origin geometry through opening and c
     "open",
   );
 
+  await holdMotion(page);
   const closing = await page.evaluate(async () => {
     const rect = (target: HTMLElement) => {
       const bounds = target.getBoundingClientRect();
@@ -507,10 +517,7 @@ test("direct React gallery carries clipped-origin geometry through opening and c
     const frame = document.querySelector<HTMLElement>(
       "[data-lightbox-flight] [data-lightbox-frame]",
     )!;
-    await new Promise<void>((resolve) => {
-      const wait = () => (frame.getAnimations().length ? resolve() : requestAnimationFrame(wait));
-      wait();
-    });
+    await window.__motion.ready();
     const media = frame.querySelector<HTMLElement>("[data-lightbox-media]")!;
     const backdrop = document.querySelector<HTMLElement>("[data-lightbox-backdrop]")!;
     const animations = document.getAnimations();
@@ -541,7 +548,7 @@ test("direct React gallery carries clipped-origin geometry through opening and c
       };
     };
     const samples = [0, 0.25, 0.5, 0.75, 0.999].map((progress) => sample(duration * progress));
-    for (const animation of animations) animation.play();
+    window.__motion.release();
     return { duration, samples };
   });
   await testInfo.attach("clipped-origin-closing-geometry", {
@@ -587,11 +594,11 @@ test("direct React transition matches its reference frames", async ({ page }, te
   await origin.evaluate((element: HTMLElement) => {
     element.style.borderRadius = "8px 12px 16px 4px";
   });
+  await holdMotion(page);
   await origin.click();
   await page.evaluate(async () => {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await window.__motion.ready();
     for (const animation of document.getAnimations()) {
-      animation.pause();
       const duration = Number(animation.effect?.getComputedTiming().duration);
       animation.currentTime = duration / 2;
     }
@@ -601,31 +608,39 @@ test("direct React transition matches its reference frames", async ({ page }, te
     caret: "hide",
     maxDiffPixelRatio: 0.001,
   });
-  await page.evaluate(() => {
-    for (const animation of document.getAnimations()) animation.play();
-  });
+  await page.evaluate(() => window.__motion.release());
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
     "open",
   );
-  await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-flight]")).toHaveCSS("visibility", "visible");
-  await expect(origin.locator("img")).toHaveCSS("visibility", "hidden");
+  await holdMotion(page);
+  // The controls fade with CSS transitions, which start with the closing state.
+  // Freeze them as it is published, before a stalled frame can finish them.
   await page.evaluate(() => {
+    const dialog = document.querySelector<HTMLElement>("[data-lightbox-dialog]")!;
+    const observer = new MutationObserver(() => {
+      if (dialog.dataset.lightboxState !== "closing") return;
+      observer.disconnect();
+      window.__motion.freeze();
+    });
+    observer.observe(dialog, { attributeFilter: ["data-lightbox-state"] });
+  });
+  await page.keyboard.press("Escape");
+  await page.evaluate(async () => {
+    await window.__motion.ready();
     for (const animation of document.getAnimations()) {
-      animation.pause();
       const duration = Number(animation.effect?.getComputedTiming().duration);
       animation.currentTime = duration / 2;
     }
   });
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCSS("visibility", "visible");
+  await expect(origin.locator("img")).toHaveCSS("visibility", "hidden");
   await expect(page).toHaveScreenshot("direct-photo-closing-half.png", {
     animations: "allow",
     caret: "hide",
     maxDiffPixelRatio: 0.001,
   });
-  await page.evaluate(() => {
-    for (const animation of document.getAnimations()) animation.play();
-  });
+  await page.evaluate(() => window.__motion.release());
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 
@@ -655,6 +670,7 @@ test("direct React transition reverses from its painted crop", async ({ page }, 
           animationDuration: Number(animation?.effect?.getComputedTiming().duration ?? NaN),
         };
       };
+      await window.__motion.ready();
       const oldAnimations = document.getAnimations();
       for (const animation of oldAnimations) {
         animation.pause();
@@ -682,8 +698,8 @@ test("direct React transition reverses from its painted crop", async ({ page }, 
       return { before, after };
     }, phase);
 
+  await holdMotion(page);
   await origin.click();
-  await page.waitForTimeout(30);
   const opening = await reversal("opening");
   await testInfo.attach("direct-opening-reversal", {
     body: JSON.stringify(opening, null, 2),
@@ -699,8 +715,8 @@ test("direct React transition reverses from its painted crop", async ({ page }, 
     "data-lightbox-state",
     "open",
   );
+  await holdMotion(page);
   await page.keyboard.press("Escape");
-  await page.waitForTimeout(20);
   const closing = await reversal("closing");
   await testInfo.attach("direct-closing-reversal", {
     body: JSON.stringify(closing, null, 2),
@@ -760,7 +776,10 @@ test("direct touch dismissal preserves crop, radii, and native strip position", 
       ),
     )
     .toBe(true);
-  const drag = await frame.evaluate((element) => {
+  // The gesture draws the move on its next frame, which a loaded page can
+  // reach after the strip has already frozen.
+  const drag = await frame.evaluate(async (element) => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const style = getComputedStyle(element);
     const media = element.querySelector<HTMLElement>("[data-lightbox-media]")!;
     const slides = element.closest<HTMLElement>("[data-lightbox-slides]")!;
@@ -811,10 +830,9 @@ test("direct close flight retargets after viewport resize", async ({ page }, tes
     "data-lightbox-state",
     "open",
   );
+  await holdMotion(page);
   await page.keyboard.press("Escape");
-  await page.evaluate(() => {
-    for (const animation of document.getAnimations()) animation.pause();
-  });
+  await page.evaluate(() => window.__motion.ready());
   await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
   await expect(
     page.locator(
@@ -822,11 +840,20 @@ test("direct close flight retargets after viewport resize", async ({ page }, tes
     ),
   ).toHaveCount(1);
 
+  // The resize event can reach a loaded page frames after the viewport has
+  // changed, so measure only once the runtime has seen it and run the two
+  // retarget frames that follow it.
+  await page.evaluate(() => {
+    (window as Window & { __resized?: Promise<void> }).__resized = new Promise<void>((resolve) =>
+      window.addEventListener("resize", () => resolve(), { once: true }),
+    );
+  });
   await page.setViewportSize({ width: 740, height: 680 });
   const result = await page.evaluate(async () => {
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await (window as Window & { __resized?: Promise<void> }).__resized;
+    for (let frame = 0; frame < 3; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
     for (const animation of document.getAnimations()) {
       animation.pause();
       const duration = Number(animation.effect?.getComputedTiming().duration);
@@ -846,9 +873,7 @@ test("direct close flight retargets after viewport resize", async ({ page }, tes
   for (const dimension of ["x", "y", "width", "height"] as const) {
     expect(Math.abs(result.flight[dimension] - result.target[dimension])).toBeLessThan(5);
   }
-  await page.evaluate(() => {
-    for (const animation of document.getAnimations()) animation.play();
-  });
+  await page.evaluate(() => window.__motion.release());
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
   await expect(page.locator("[data-lightbox-flight]")).toHaveCount(0);
 });
@@ -1013,6 +1038,7 @@ test("nested visual target takes precedence over its preview box", async ({ page
     image.dataset.lightboxTarget = "";
     image.style.borderRadius = "3px";
   });
+  await holdMotion(page);
   const startRadius = await page.locator("app-gallery").evaluate(
     async (
       gallery: HTMLElement & {
@@ -1020,20 +1046,15 @@ test("nested visual target takes precedence over its preview box", async ({ page
       },
     ) => {
       void gallery.controller.open({ index: 0 });
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      );
-      for (const animation of document.getAnimations()) {
-        animation.pause();
-        animation.currentTime = 0;
-      }
+      await window.__motion.ready();
+      window.__motion.seek(0);
       const frame = document.querySelector<HTMLElement>(
         '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
       )!;
       const style = getComputedStyle(frame);
       const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
       const visibleRadius = Number.parseFloat(style.borderTopLeftRadius) * Math.abs(matrix.a);
-      for (const animation of document.getAnimations()) animation.play();
+      window.__motion.release();
       return visibleRadius;
     },
   );
@@ -1110,6 +1131,15 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
           };
           wait();
         });
+      // Hold each animation as it is created, so a stalled frame cannot play a
+      // whole transition out before the frame loop above finds it.
+      const animate = Object.getOwnPropertyDescriptor(Element.prototype, "animate")!
+        .value as Element["animate"];
+      Element.prototype.animate = function (this: Element, ...args) {
+        const animation = animate.apply(this, args);
+        animation.playbackRate = 1e-6;
+        return animation;
+      };
       if (phase === "opening") void controller.open({ index: 0 });
       else void controller.close();
       const beforeFrame = await waitForAnimation(phase === "opening" ? slideFrame : flightFrame);
@@ -1128,7 +1158,11 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
         animation.currentTime = 0;
       }
       const after = sample(afterFrame);
-      for (const animation of document.getAnimations()) animation.play();
+      Element.prototype.animate = animate;
+      for (const animation of document.getAnimations()) {
+        animation.playbackRate = 1;
+        animation.play();
+      }
       return { before, after };
     }, phase);
 

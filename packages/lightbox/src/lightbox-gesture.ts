@@ -56,6 +56,8 @@ export interface LightboxDragState extends LightboxDragStart {
   inputX: number;
   inputY: number;
   wheelCommit: boolean;
+  /** Wheel input has arrived that no frame has drawn yet. */
+  wheelPending: boolean;
   wheelPhase: WheelGesturePhase;
   wheelSettleDistance: number;
   wheelSnapProgress: number;
@@ -107,6 +109,7 @@ export class LightboxGestureController {
       inputX: 0,
       inputY: 0,
       wheelCommit: false,
+      wheelPending: false,
       wheelPhase: "tracking",
       wheelSettleDistance: 0,
       wheelSnapProgress: 0,
@@ -159,6 +162,7 @@ export class LightboxGestureController {
     }
     state.targetY += step;
     state.wheelPhase = "tracking";
+    state.wheelPending = true;
     const targetDistance = state.wheelOffset + state.targetY * state.wheelDirection;
     state.wheelCommit = targetDistance >= wheelDismissDistance;
     state.time = now;
@@ -237,7 +241,11 @@ export class LightboxGestureController {
     this.#frame = 0;
     const state = this.#state;
     if (!state?.wheelTarget) return;
-    if (!state.wheelCommit && now - state.time >= WHEEL_RELEASE_GAP) {
+    // A gap only reads as a release once the last input has been drawn. A
+    // frame that stalls past the gap would otherwise drop that input unseen.
+    const released = !state.wheelPending && now - state.time >= WHEEL_RELEASE_GAP;
+    state.wheelPending = false;
+    if (!state.wheelCommit && released) {
       if (state.wheelPhase === "tracking") {
         const distance = state.wheelOffset + state.y * state.wheelDirection;
         state.wheelPhase = distance <= 0 ? "past-open" : "settling";
@@ -276,7 +284,7 @@ export class LightboxGestureController {
       state.springVelocityY = 0;
       distance = 0;
     }
-    const waitingForRelease = now - state.time < WHEEL_RELEASE_GAP;
+    const waitingForRelease = !released;
     const settled =
       Math.abs(state.targetY - state.y) <= WHEEL_SETTLE_POSITION &&
       Math.abs(state.springVelocityY) <= WHEEL_SETTLE_VELOCITY;

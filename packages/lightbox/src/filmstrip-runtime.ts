@@ -47,6 +47,7 @@ export class FilmstripRuntime {
   #centerFrame = 0;
   #mountFrame = 0;
   #readyFrame = 0;
+  #settleFrame = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(options: FilmstripRuntimeOptions) {
@@ -154,7 +155,26 @@ export class FilmstripRuntime {
     cancelAnimationFrame(this.#centerFrame);
     cancelAnimationFrame(this.#mountFrame);
     cancelAnimationFrame(this.#readyFrame);
+    this.#clearSettle();
+  }
+
+  #clearSettle() {
+    cancelAnimationFrame(this.#settleFrame);
+    this.#settleFrame = 0;
     clearTimeout(this.#settleTimer);
+  }
+
+  /**
+   * Settle a while after input that scrolls on the next frame. That frame
+   * delivers the scroll events, so a frame that stalls past the settle delay
+   * cannot end the user's control before the browser reports their scroll.
+   */
+  #settleAfterFrame() {
+    this.#clearSettle();
+    this.#settleFrame = requestAnimationFrame(() => {
+      this.#settleFrame = 0;
+      this.#settleTimer = setTimeout(this.#onSettled, 160);
+    });
   }
 
   #readGeometry() {
@@ -266,12 +286,12 @@ export class FilmstripRuntime {
         if (!this.#initializing && this.#mode === "user") this.#select(this.#nearestIndex(), false);
       });
     }
-    clearTimeout(this.#settleTimer);
+    this.#clearSettle();
     if (!this.#touching) this.#settleTimer = setTimeout(this.#onSettled, 160);
   };
 
   #onSettled = () => {
-    clearTimeout(this.#settleTimer);
+    this.#clearSettle();
     if (this.#initializing || this.#touching) return;
     if (this.#mode !== "user") return;
     cancelAnimationFrame(this.#scrollFrame);
@@ -283,26 +303,26 @@ export class FilmstripRuntime {
 
   #onTouchStart = () => {
     this.#touching = true;
-    clearTimeout(this.#settleTimer);
+    this.#clearSettle();
     this.#takeControl();
   };
 
   #onTouchEnd = (event: TouchEvent) => {
     if (event.touches.length) return;
     this.#touching = false;
-    clearTimeout(this.#settleTimer);
+    this.#clearSettle();
     this.#settleTimer = setTimeout(this.#onSettled, 160);
   };
 
   #takeControl = () => {
-    clearTimeout(this.#settleTimer);
+    this.#clearSettle();
     if (this.#mode !== "user") this.#userScrolled = false;
     this.#mode = "user";
   };
 
   #releaseControl = () => {
     if (this.#touching) return;
-    clearTimeout(this.#settleTimer);
+    this.#clearSettle();
     if (!this.#userScrolled) {
       this.#mode = "idle";
       return;
@@ -313,7 +333,7 @@ export class FilmstripRuntime {
   #onKeyDown = (event: KeyboardEvent) => {
     if (!/^(Arrow(Left|Right)|Home|End|Page(Up|Down))$/.test(event.key)) return;
     this.#takeControl();
-    this.#settleTimer = setTimeout(this.#onSettled, 160);
+    this.#settleAfterFrame();
   };
 
   #onWheel = (event: WheelEvent) => {
@@ -323,6 +343,6 @@ export class FilmstripRuntime {
       event.preventDefault();
       this.#scroller.scrollLeft += event.deltaY;
     }
-    this.#settleTimer = setTimeout(this.#onSettled, 160);
+    this.#settleAfterFrame();
   };
 }

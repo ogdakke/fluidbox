@@ -140,6 +140,8 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 
 [data-lightbox-transition-host] {
+  --lightbox-progress: 1;
+
   position: absolute;
   top: 0;
   left: 0;
@@ -150,8 +152,6 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 
 [data-lightbox-transition-content] {
-  --lightbox-progress: 1;
-
   position: absolute;
   top: var(--lightbox-transition-top, 0);
   left: var(--lightbox-transition-left, 0);

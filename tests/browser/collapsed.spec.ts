@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
+import { holdMotion } from "./support/hold-motion";
 
 test.use({ video: "on", trace: "on" });
 
@@ -31,11 +32,43 @@ async function openVisible(gallery: Locator, index: number, page: Page) {
   await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
 }
 
+/**
+ * Send wheel steps from inside the page, one per frame. The gesture reads a
+ * gap of a few frames as a release, and a round trip per step can be longer
+ * than that in a loaded browser. The next step is requested before the step
+ * is sent, so it runs ahead of the gesture's own frame.
+ */
+async function wheelSteps(page: Page, x: number, y: number, deltas: readonly number[]) {
+  await page.evaluate(
+    ([x, y, deltas]) =>
+      new Promise<void>((resolve) => {
+        let index = 0;
+        const step = () => {
+          if (index >= deltas.length) return resolve();
+          const deltaY = deltas[index++]!;
+          requestAnimationFrame(step);
+          document.elementFromPoint(x, y)!.dispatchEvent(
+            new WheelEvent("wheel", {
+              bubbles: true,
+              cancelable: true,
+              composed: true,
+              clientX: x,
+              clientY: y,
+              deltaY,
+            }),
+          );
+        };
+        step();
+      }),
+    [x, y, deltas] as const,
+  );
+}
+
 async function startFrameProbe(page: Page) {
   await page.evaluate((selector) => {
     const frames: Frame[] = [];
     let running = true;
-    const sample = () => {
+    const record = () => {
       const teaser = document.querySelector<HTMLElement>(selector + " > [data-preview-more]");
       const dialog = document.querySelector<HTMLElement>("[data-lightbox-dialog]");
       const source = dialog?.querySelector<HTMLElement>(
@@ -62,12 +95,26 @@ async function startFrameProbe(page: Page) {
         layerOpacity: layer ? Number(getComputedStyle(layer).opacity) : 0,
         labelOpacity: label ? Number(getComputedStyle(label).opacity) : 0,
       });
+    };
+    const sample = () => {
+      record();
       if (running) requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
+    // A stalled frame can hold a whole close, so each state change is also
+    // recorded as it happens.
+    const states = new MutationObserver(record);
+    states.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-lightbox-state"],
+      subtree: true,
+    });
     Object.assign(window, {
       __collapsedFrames: frames,
-      __stopCollapsedFrames: () => (running = false),
+      __stopCollapsedFrames: () => {
+        running = false;
+        states.disconnect();
+      },
     });
   }, gallerySelector);
 }
@@ -274,15 +321,32 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
         label: label ? Number(getComputedStyle(label).opacity) : 0,
         target: target ? Number(getComputedStyle(target).opacity) : 0,
       });
-      if (running) requestAnimationFrame(sample);
     };
-    requestAnimationFrame(sample);
+    const loop = () => {
+      sample();
+      if (running) requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
     Object.assign(window, {
+      __overlaySample: sample,
       __overlaySamples: samples,
       __stopOverlaySamples: () => (running = false),
     });
   });
+  await holdMotion(page);
   await teaser.locator('[slot="trigger"]').click();
+  // Step through the whole opening, whatever the browser manages to draw.
+  await page.evaluate(async () => {
+    const sample = (window as unknown as Window & { __overlaySample: () => void }).__overlaySample;
+    const end = await window.__motion.ready();
+    for (let time = 0; time < end; time += 8) {
+      window.__motion.seek(time);
+      sample();
+    }
+    window.__motion.seek(end - 1);
+    sample();
+    window.__motion.release();
+  });
   await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
   await page.waitForTimeout(100);
   const samples = await page.evaluate(() => {
@@ -297,17 +361,20 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
     body: JSON.stringify(samples, null, 2),
     contentType: "application/json",
   });
-  expect(samples.length).toBeGreaterThan(10);
-  const settled = samples.findIndex(
-    (sample) => sample.phase === "opening" && Number(sample.layer) < 0.1,
-  );
-  expect(settled).toBeGreaterThan(0);
-  expect(samples.slice(settled).every((sample) => Number(sample.layer) < 0.2)).toBe(true);
-  expect(samples.slice(settled).every((sample) => Number(sample.label) < 0.2)).toBe(true);
+  // Once the opening has begun, the overlay only fades.
+  const fading = samples.slice(samples.findIndex((sample) => sample.phase === "opening"));
+  expect(fading.some((sample) => sample.phase === "opening")).toBe(true);
+  expect(fading.some((sample) => sample.state === "open")).toBe(true);
+  for (const key of ["layer", "label"] as const) {
+    const brightenings = fading.filter(
+      (sample, index) => index > 0 && Number(sample[key]) > Number(fading[index - 1]![key]) + 0.02,
+    );
+    expect(brightenings, key).toEqual([]);
+  }
   expect(
     samples
       .filter((sample) => sample.state === "open")
-      .every((sample) => Number(sample.layer) < 0.1),
+      .every((sample) => Number(sample.layer) < 0.1 && Number(sample.label) < 0.1),
   ).toBe(true);
 });
 
@@ -323,7 +390,7 @@ test("the teaser content is already opaque when close settles", async ({ page },
   await page.evaluate(() => {
     const samples: Array<{ state: string; label: number; layer: number }> = [];
     let running = true;
-    const sample = () => {
+    const read = () => {
       const teaser = document.querySelector<HTMLElement>(
         "#collapsed-gallery > [data-preview-more]",
       )!;
@@ -333,7 +400,7 @@ test("the teaser content is already opaque when close settles", async ({ page },
       );
       const staticLabel = teaser.querySelector<HTMLElement>("[data-collapsed-label]");
       const visible = getComputedStyle(teaser).visibility !== "hidden";
-      samples.push({
+      return {
         state:
           document.querySelector("[data-lightbox-dialog]")?.getAttribute("data-lightbox-state") ??
           "closed",
@@ -343,16 +410,35 @@ test("the teaser content is already opaque when close settles", async ({ page },
             ? Number(getComputedStyle(staticLabel).opacity)
             : 0,
         layer: layer ? Number(getComputedStyle(layer).opacity) : 0,
-      });
+      };
+    };
+    const sample = () => {
+      samples.push(read());
       if (running) requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
     Object.assign(window, {
       __closeOverlaySamples: samples,
       __stopCloseOverlaySamples: () => (running = false),
+      __readCloseOverlay: read,
     });
   });
+  await holdMotion(page);
   await page.keyboard.press("Escape");
+  // Read the close a millisecond before it settles, however few frames of it
+  // the browser draws.
+  const settling = await page.evaluate(async () => {
+    const read = (
+      window as unknown as Window & {
+        __readCloseOverlay: () => { state: string; label: number; layer: number };
+      }
+    ).__readCloseOverlay;
+    window.__motion.seek((await window.__motion.ready()) - 1);
+    const last = read();
+    window.__motion.release();
+    return last;
+  });
+  expect(settling.state).toBe("closing");
   await expect(page.locator(dialogSelector)).toHaveCount(0);
   await page.waitForTimeout(50);
   const samples = await page.evaluate(() => {
@@ -367,13 +453,11 @@ test("the teaser content is already opaque when close settles", async ({ page },
     body: JSON.stringify(samples, null, 2),
     contentType: "application/json",
   });
-  const lastClosing = samples.findLast((sample) => sample.state === "closing");
   const firstClosed = samples.find((sample) => sample.state === "closed");
-  expect(lastClosing).toBeDefined();
   expect(firstClosed).toBeDefined();
-  expect(lastClosing!.label).toBeGreaterThan(0.98);
-  expect(lastClosing!.layer).toBeGreaterThan(0.98);
-  expect(Math.abs(firstClosed!.label - lastClosing!.label)).toBeLessThan(0.02);
+  expect(settling.label).toBeGreaterThan(0.98);
+  expect(settling.layer).toBeGreaterThan(0.98);
+  expect(Math.abs(firstClosed!.label - settling.label)).toBeLessThan(0.02);
   expect(
     samples.filter((sample) => sample.state === "closed").every((sample) => sample.label > 0.95),
   ).toBe(true);
@@ -403,11 +487,7 @@ test("slow and fast wheel dismissal each finish at the source", async ({ page },
     await startFrameProbe(page);
     const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
     const bounds = (await frame.boundingBox())!;
-    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
-    for (const delta of deltas) {
-      await page.mouse.wheel(0, delta);
-      await page.waitForTimeout(30);
-    }
+    await wheelSteps(page, bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, deltas);
     await expect(page.locator(dialogSelector)).toHaveCount(0);
     const frames = await finishFrameProbe(page, testInfo);
     expect(frames.every((sample) => sample.preview === initial)).toBe(true);

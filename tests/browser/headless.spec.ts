@@ -456,7 +456,8 @@ test("adjacent slides paint their placeholder while responsive images are pendin
   }, placeholder);
   const neighbor = page.locator("[data-lightbox-slide] [data-lightbox-media]").nth(1);
   await expect(neighbor).toHaveAttribute("loading", "eager");
-  if (testInfo.project.name === "iphone-15-pro") {
+  // Mobile WebKit has no wheel input.
+  if (testInfo.project.name === "iphone-15-pro" || testInfo.project.name === "ipad-pro-11") {
     await page.evaluate(() => window.headlessViewer.goTo({ index: 1 }));
   } else {
     const strip = page.locator("[data-lightbox-slides]");
@@ -583,6 +584,59 @@ test("plain runtime keeps the preview available while a failed full image is ret
   await expect(media).toHaveAttribute("src", "/retry-full.svg");
 });
 
+test("plain runtime keeps focus that moved into the dialog during the opening", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.route("**/focus-full.svg", (route) => route.abort("failed"));
+  await page.goto("/headless.html");
+  const during = await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 1,
+      getItem: () => ({
+        id: "focus-test",
+        preview: { src: "/photo-portrait.svg", width: 240, height: 360 },
+        media: { type: "image", src: "/focus-full.svg", alt: "Focus", width: 800, height: 800 },
+      }),
+      getIndex: (id) => (id === "focus-test" ? 0 : null),
+    });
+    // Hold the opening so the failed slide's Retry can be focused before it settles.
+    const animate = Object.getOwnPropertyDescriptor(Element.prototype, "animate")!
+      .value as Element["animate"];
+    const held: Animation[] = [];
+    Element.prototype.animate = function (this: Element, ...args) {
+      const animation = animate.apply(this, args);
+      animation.playbackRate = 1e-6;
+      held.push(animation);
+      return animation;
+    };
+    void window.headlessViewer.open({ id: "focus-test" });
+    const retry = () =>
+      document.querySelector<HTMLElement>(
+        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-error]:not([hidden]) button',
+      );
+    const painting = () =>
+      document.querySelector("[data-lightbox-overlay]:not([data-lightbox-prepared])") && retry();
+    for (let frames = 0; frames < 240 && !painting(); frames += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+    Element.prototype.animate = animate;
+    retry()!.focus();
+    const state = {
+      state: document.querySelector<HTMLElement>("[data-lightbox-dialog]")?.dataset.lightboxState,
+      focused: document.activeElement === retry(),
+    };
+    for (const animation of held) animation.playbackRate = 1;
+    return state;
+  });
+  expect(during).toEqual({ state: "opening", focused: true });
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await expect(page.locator("[data-lightbox-error] button").first()).toBeFocused();
+});
+
 test("plain runtime settles immediately when reduced motion is requested", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/headless.html");
@@ -654,8 +708,23 @@ test("plain runtime preserves the painted frame when open and close reverse", as
       }
     };
 
+    // The opening starts a frame or more after the call. Hold every animation
+    // as it is created so a loaded browser cannot play past the times below.
+    const animate = Object.getOwnPropertyDescriptor(Element.prototype, "animate")!
+      .value as Element["animate"];
+    const held: Animation[] = [];
+    Element.prototype.animate = function (this: Element, ...args) {
+      const animation = animate.apply(this, args);
+      animation.playbackRate = 1e-6;
+      held.push(animation);
+      return animation;
+    };
+
     void window.headlessViewer.open({ id: "one" });
-    await nextFrame();
+    for (let frames = 0; frames < 240; frames += 1) {
+      await nextFrame();
+      if (held.length && !document.querySelector("[data-lightbox-prepared]")) break;
+    }
     setMotionTime(120);
     const openingBefore = bounds();
     void window.headlessViewer.close();
@@ -669,6 +738,8 @@ test("plain runtime preserves the painted frame when open and close reverse", as
     await Promise.resolve();
     await Promise.resolve();
     const closingAfter = bounds();
+    Element.prototype.animate = animate;
+    for (const animation of held) animation.playbackRate = 1;
     return { openingBefore, openingAfter, closingBefore, closingAfter };
   });
 
@@ -755,19 +826,28 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
     return maximum;
   });
   expect(progress).toBeGreaterThan(0);
-  await frame.dispatchEvent("wheel", {
-    deltaX: 0,
-    deltaY: 160,
-    deltaMode: 0,
-  });
-  await expect(overlay).toHaveAttribute("data-lightbox-state", "closing");
-  const tailPrevented = await page.evaluate(() => {
-    document.getAnimations().forEach((animation) => animation.pause());
-    const event = new WheelEvent("wheel", { cancelable: true, deltaY: 20 });
-    window.dispatchEvent(event);
-    return event.defaultPrevented;
-  });
-  expect(tailPrevented).toBe(true);
+  // A loaded browser can play the whole close before a poll sees it, and the
+  // momentum tail only counts within a short quiet gap. Catch the closing as
+  // it is published, hold it, and send the tail in the same turn.
+  const closing = await frame.evaluate(
+    (element) =>
+      new Promise<{ state: string | undefined; tailPrevented: boolean }>((resolve) => {
+        const overlay = document.querySelector<HTMLElement>("[data-lightbox-overlay]")!;
+        const observer = new MutationObserver(() => {
+          if (overlay.dataset.lightboxState !== "closing") return;
+          observer.disconnect();
+          document.getAnimations().forEach((animation) => animation.pause());
+          const tail = new WheelEvent("wheel", { cancelable: true, deltaY: 20 });
+          window.dispatchEvent(tail);
+          resolve({ state: overlay.dataset.lightboxState, tailPrevented: tail.defaultPrevented });
+        });
+        observer.observe(overlay, { attributeFilter: ["data-lightbox-state"] });
+        element.dispatchEvent(
+          new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 160 }),
+        );
+      }),
+  );
+  expect(closing).toEqual({ state: "closing", tailPrevented: true });
   await page.waitForTimeout(130);
   const freshInputPrevented = await page.evaluate(() => {
     const event = new WheelEvent("wheel", { cancelable: true, deltaY: 20 });
@@ -917,14 +997,29 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
   });
 
   const opening = await page.evaluate(async () => {
+    // The opening starts a frame or two after the call, and a loaded WebKit
+    // can stall longer than the whole motion. Hold every animation as it is
+    // created so none finishes before it is measured.
+    const animate = Object.getOwnPropertyDescriptor(Element.prototype, "animate")!
+      .value as Element["animate"];
+    const held: Animation[] = [];
+    Element.prototype.animate = function (this: Element, ...args) {
+      const animation = animate.apply(this, args);
+      animation.playbackRate = 1e-6;
+      held.push(animation);
+      return animation;
+    };
     void window.headlessViewer.open({ id: "one" });
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    for (let frames = 0; frames < 240; frames += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (document.querySelector("[data-lightbox-frame]")?.getAnimations().length) break;
+    }
+    Element.prototype.animate = animate;
     for (const animation of document.getAnimations()) {
       animation.pause();
       animation.currentTime = 120;
     }
+    for (const animation of held) animation.playbackRate = 1;
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const host = document.querySelector<HTMLElement>("[data-test-thumbnail-overlay]")!;
     const travel = document.querySelector<HTMLElement>("[data-lightbox-transition-content]")!;

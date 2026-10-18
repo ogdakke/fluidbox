@@ -176,12 +176,12 @@ for (const id of cases) {
     const trigger = await prepareCase(page, id);
     const box = await visibleOrigin(page, id);
     expect(box.width).toBeGreaterThan(20);
-    const before = await page.screenshot({ clip: box, animations: "allow" });
+    const before = await page.screenshot({ clip: box, animations: "allow", scale: "css" });
 
     await armHold(page, "start");
     await trigger.click();
     await held(page);
-    const opening = await page.screenshot({ clip: box, animations: "allow" });
+    const opening = await page.screenshot({ clip: box, animations: "allow", scale: "css" });
     const openDifference = await difference(page, before, opening);
 
     await page.evaluate(() => {
@@ -194,7 +194,7 @@ for (const id of cases) {
     await armHold(page, "end");
     await page.keyboard.press("Escape");
     await held(page);
-    const closing = await page.screenshot({ clip: box, animations: "allow" });
+    const closing = await page.screenshot({ clip: box, animations: "allow", scale: "css" });
     const closeDifference = await difference(page, before, closing);
 
     expect.soft(openDifference, "first opening frame differs from the card").toBeLessThan(0.03);
@@ -278,12 +278,47 @@ test("a close after an idle moment still animates", async ({ page }) => {
   await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
   // Long enough for a browser to stop advancing its idle timeline.
   await page.waitForTimeout(1200);
+  // Watch the close as it happens: a loaded browser can finish it before a
+  // later poll looks. A skipped close runs no motion on any of its frames.
+  type CloseMotion = { closing: boolean; running: number; frames: number };
+  await page.evaluate(() => {
+    (window as unknown as { __closeMotion: Promise<CloseMotion> }).__closeMotion =
+      new Promise<CloseMotion>((resolve) => {
+        const result = { closing: false, running: 0, frames: 0 };
+        const count = () => {
+          if (!document.querySelector("[data-lightbox-dialog]")) return resolve(result);
+          if (result.closing) {
+            result.frames += 1;
+            result.running = Math.max(
+              result.running,
+              document.getAnimations().filter((animation) => animation.playState === "running")
+                .length,
+            );
+          }
+          requestAnimationFrame(count);
+        };
+        new MutationObserver((_, observer) => {
+          const state = document
+            .querySelector("[data-lightbox-dialog]")
+            ?.getAttribute("data-lightbox-state");
+          if (state !== "closing") return;
+          observer.disconnect();
+          result.closing = true;
+        }).observe(document.body, {
+          attributes: true,
+          attributeFilter: ["data-lightbox-state"],
+          subtree: true,
+        });
+        requestAnimationFrame(count);
+      });
+  });
   await page.keyboard.press("Escape");
-  await page.waitForTimeout(120);
-  await expect(dialog, "the close skipped its motion").toHaveAttribute(
-    "data-lightbox-state",
-    "closing",
+  const motion = await page.evaluate(
+    () => (window as unknown as { __closeMotion: Promise<CloseMotion> }).__closeMotion,
   );
+  expect(motion.closing, "the close skipped its motion").toBe(true);
+  expect(motion.running, "the close skipped its motion").toBeGreaterThan(0);
+  expect(motion.frames, "the close skipped its motion").toBeGreaterThan(0);
   await expect(dialog).toHaveCount(0);
 });
 

@@ -438,7 +438,7 @@ export class DomViewerDriver<
       this.#strip?.completeOpening(context.index);
       delete this.#portal.overlay.dataset.lightboxPrepared;
       this.#setState("open");
-      this.#focus();
+      this.#focusUnlessInside();
       return;
     }
 
@@ -528,7 +528,7 @@ export class DomViewerDriver<
     this.#portal.dialog.style.removeProperty("--lightbox-gallery-controls-reveal-delay");
     delete this.#portal.dialog.dataset.filmstripRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
-    this.#focus();
+    this.#focusUnlessInside();
   }
 
   async select(context: ViewerSessionMotionContext<TItem>) {
@@ -1675,6 +1675,12 @@ export class DomViewerDriver<
       return;
     this.#focus();
   };
+
+  /** Move focus into a settled dialog, unless someone already put it there. */
+  #focusUnlessInside() {
+    const focused = this.#portal.dialog.ownerDocument.activeElement;
+    if (!focused || !this.#portal.dialog.contains(focused)) this.#focus();
+  }
 
   #focus() {
     const close = this.#portal.dialog.querySelector<HTMLElement>("[data-lightbox-close]");
