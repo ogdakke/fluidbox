@@ -117,6 +117,8 @@ export class ViewerSession<
   #state: LightboxState;
   #pending: PendingCommand | undefined;
   #revealController: AbortController | undefined;
+  /** The item whose origin the user last saw: the one opened or last revealed. */
+  #revealedId: string | undefined;
   #sourceRefreshPending = false;
   #destroyed = false;
 
@@ -172,6 +174,11 @@ export class ViewerSession<
     this.#emit({ type: "status-change", status: "closing" });
     const activeIndex = this.#state.activeIndex;
     const activeItem = activeIndex === null ? null : this.#source.getItem(activeIndex);
+    // A swipe reveals its slide's origin only once the strip settles. A close
+    // that starts sooner still has to land on that origin, not the last one.
+    if (activeItem && this.#revealedId !== activeItem.id) {
+      this.#requestReveal(activeItem.id, activeIndex!, "selection");
+    }
     const origin = activeItem ? this.#origins.get(activeItem.id) : null;
     if (activeItem && origin?.prepareClose) {
       try {
@@ -380,6 +387,7 @@ export class ViewerSession<
       reason,
     };
     this.#origins.hideThumbnail(item.id);
+    if (opening) this.#revealedId = item.id;
     void this.#run(operation, () =>
       opening ? this.#driver.open(context) : this.#driver.select(context),
     ).then((settled) => {
@@ -557,6 +565,7 @@ export class ViewerSession<
     this.#abortReveal();
     const adapter = this.#originAdapter;
     if (!adapter) return;
+    this.#revealedId = id;
     const controller = new AbortController();
     this.#revealController = controller;
     try {

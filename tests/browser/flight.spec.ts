@@ -332,6 +332,40 @@ test("every photo in the scroller opens its own slide of one gallery", async ({ 
   await expect(dialog).toHaveCount(0);
 });
 
+test("a close right after a swipe flies to the swiped photo", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "pixel-7", "CDP touch input requires mobile Chromium.");
+  await prepareCase(page, "scroll");
+  const items = page.locator('[data-flight-case="scroll"] [data-flight-item]');
+  await items.nth(1).scrollIntoViewIfNeeded();
+  await items.nth(1).tap();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const session = await page.context().newCDPSession(page);
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", x: number) =>
+    session.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: type === "touchEnd" ? [] : [{ x, y: 400 }],
+    });
+  await touch("touchStart", 330);
+  for (let x = 300; x >= 60; x -= 30) {
+    await touch("touchMove", x);
+    await page.waitForTimeout(16);
+  }
+  await touch("touchEnd", 60);
+  // Close before the strip settles and reveals the swiped photo on its own.
+  await expect(items.nth(2).locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
+  const visible = await items.nth(2).evaluate((item) => {
+    const scroller = item.closest<HTMLElement>("[data-flight-scroller]")!.getBoundingClientRect();
+    const rect = item.getBoundingClientRect();
+    return rect.left >= scroller.left - 1 && rect.right <= scroller.right + 1;
+  });
+  expect(visible, "the scroller shows the swiped photo").toBe(true);
+  await expect(dialog).toHaveCount(0);
+  await session.detach();
+});
+
 test("a travelling badge never widens the page", async ({ page }) => {
   // On a phone the card is nearly as wide as the screen, so the growing badge
   // layer passes the right edge. A wider page makes mobile Safari zoom it out.
