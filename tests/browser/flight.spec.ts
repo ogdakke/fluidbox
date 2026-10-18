@@ -325,3 +325,37 @@ test("zooming leaves no unzoomed image behind", async ({ page }, testInfo) => {
   );
   expect(leftovers.every((visibility) => visibility === "hidden")).toBe(true);
 });
+
+test("slides stay aligned and images fit their slide on a fractional width", async ({ page }) => {
+  await page.goto("/react/");
+  // A fractional dialog width: rounded slide positions would drift per slide.
+  await page.addStyleTag({
+    content: "[data-lightbox-dialog] { width: calc(100% - 0.4px) !important; }",
+  });
+  const cover = page.locator(".cover");
+  await cover.scrollIntoViewIfNeeded();
+  await cover.click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  for (let step = 1; step <= 4; step++) {
+    await page.locator("[data-lightbox-next]").click();
+    const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+    await expect(active).toHaveAttribute("aria-label", `Item ${step + 1} of 5`);
+    await page.waitForTimeout(700);
+    const geometry = await active.evaluate((slide) => {
+      const box = (element: Element) => element.getBoundingClientRect();
+      const strip = box(slide.parentElement!);
+      return {
+        offset: box(slide).left - strip.left,
+        slide: [box(slide).left, box(slide).right],
+        frame: [
+          box(slide.querySelector("[data-lightbox-frame]")!).left,
+          box(slide.querySelector("[data-lightbox-frame]")!).right,
+        ],
+      };
+    });
+    expect(Math.abs(geometry.offset), `slide ${step + 1} drifted`).toBeLessThan(0.5);
+    expect(geometry.frame[0]!).toBeGreaterThanOrEqual(geometry.slide[0]! - 0.5);
+    expect(geometry.frame[1]!).toBeLessThanOrEqual(geometry.slide[1]! + 0.5);
+  }
+});

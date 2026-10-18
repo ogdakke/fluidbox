@@ -19,19 +19,24 @@ function findPages(directory: string, prefix = ""): [string, string][] {
 const pages = Object.fromEntries(findPages(import.meta.dirname));
 
 /**
- * The package build replaces dist/styles.css by renaming a new file over it,
- * and the dev server's watcher loses the file after the first replacement, so
- * edits stop reaching the page. While serving, read the stylesheet from source.
+ * While serving, load @ogdakke/fluidbox from source. The package build writes
+ * new hashed chunk names on every change, so a browser holding the dev page
+ * imports chunks that no longer exist (on iOS the tab keeps running old code),
+ * and the watcher loses dist/styles.css after its first rebuild. Builds use the
+ * built package as consumers do.
  */
-function sourceStyles(command: "build" | "serve"): Record<string, string> {
-  return command === "serve"
-    ? {
-        "@ogdakke/fluidbox/styles.css": resolve(
-          import.meta.dirname,
-          "../../packages/lightbox/src/styles.css",
-        ),
-      }
-    : {};
+function packageSource(command: "build" | "serve") {
+  if (command !== "serve") return [];
+  const source = (file: string) =>
+    resolve(import.meta.dirname, "../../packages/lightbox/src", file);
+  return [
+    { find: "@ogdakke/fluidbox/styles.css", replacement: source("styles.css") },
+    ...["elements", "react", "solid", "vue", "angular"].map((entry) => ({
+      find: `@ogdakke/fluidbox/${entry}`,
+      replacement: source(`${entry}.ts`),
+    })),
+    { find: /^@ogdakke\/fluidbox$/, replacement: source("index.ts") },
+  ];
 }
 
 export default defineConfig(({ command }) => ({
@@ -41,7 +46,11 @@ export default defineConfig(({ command }) => ({
     __VUE_PROD_DEVTOOLS__: false,
     __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
   },
-  resolve: { alias: sourceStyles(command) },
+  resolve: {
+    alias: packageSource(command),
+    // Package source resolves frameworks from its own node_modules; keep one copy.
+    dedupe: ["react", "react-dom", "solid-js", "vue", "@angular/core", "@angular/common"],
+  },
   server: {
     allowedHosts: true,
     port: Number(process.env.PORT) || 5173,

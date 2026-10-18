@@ -149,7 +149,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       this.#mounted = true;
       this.#observer.observe(this.element);
     }
-    this.#width = this.element.clientWidth;
+    // The exact width, as the resize observer reports it. clientWidth rounds,
+    // and index × rounded width drifts off the slides on a fractional viewport.
+    this.#width = this.element.getBoundingClientRect().width;
     this.#align(this.#index);
     this.#loadWindow();
   }
@@ -230,13 +232,16 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     element.setAttribute("aria-hidden", String(index !== this.#index));
     const frame = this.#ownerDocument.createElement("div");
     frame.dataset.lightboxFrame = "";
+    // Size against the slide (a size container), never the viewport: 100vw
+    // includes a desktop scrollbar and can differ by a fraction on iOS, which
+    // left the image a sliver wider or narrower than its slide.
     frame.style.setProperty(
       "--lightbox-item-width",
-      `min(100vw, calc(var(--lightbox-content-height, var(--lightbox-height, 100svh)) * ${item.media.width / item.media.height}))`,
+      `min(100cqw, calc(var(--lightbox-content-height, var(--lightbox-height, 100svh)) * ${item.media.width / item.media.height}))`,
     );
     frame.style.setProperty(
       "--lightbox-item-height",
-      `min(${(item.media.height / item.media.width) * 100}vw, var(--lightbox-content-height, var(--lightbox-height, 100svh)))`,
+      `min(${(item.media.height / item.media.width) * 100}cqw, var(--lightbox-content-height, var(--lightbox-height, 100svh)))`,
     );
     const error = this.#ownerDocument.createElement("div");
     error.dataset.lightboxError = "";
