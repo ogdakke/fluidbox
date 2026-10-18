@@ -565,7 +565,10 @@ export class DomViewerDriver<
     const duration = Math.min(480, 220 + Math.sqrt(Math.max(0, travel - 240)) * 4);
     let frame = this.#frame;
     let media = this.#media;
-    if (from) {
+    // Moving an iframe or video into the body-level flight would reload it or
+    // reset playback, so embedded media close inside their own frame instead.
+    const embedded = media instanceof HTMLIFrameElement || media instanceof HTMLMediaElement;
+    if (from && !embedded) {
       const source = media;
       const prepared =
         source instanceof HTMLImageElement &&
@@ -623,11 +626,24 @@ export class DomViewerDriver<
       );
     }
     this.#applyMediaPose(frame, media, start);
+    // Embedded media lands on a static snapshot, so fade the snapshot back in.
+    const cover = from
+      ? frame.querySelector<HTMLImageElement>(":scope > [data-lightbox-media-cover][src]")
+      : null;
     const animations = [
       frame.animate(motion.frame, this.#motionOptions(motion.duration)),
       media.animate(motion.image, this.#motionOptions(motion.duration)),
       frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+      ...(cover
+        ? [
+            cover.animate([{ opacity: getComputedStyle(cover).opacity }, { opacity: 1 }], {
+              duration: motion.duration * 0.6,
+              easing: "ease-out",
+              fill: "both",
+            }),
+          ]
+        : []),
       ...this.#thumbnailOverlays.animations(
         motion.frame,
         motion.progress,

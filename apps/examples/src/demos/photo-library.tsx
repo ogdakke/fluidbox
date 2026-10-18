@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Lightbox, useLightbox } from "@ogdakke/fluidbox/react";
 import type {
@@ -8,17 +7,24 @@ import type {
   LightboxOriginAdapter,
   LightboxSource,
 } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/styles.css";
 import "./photo-library.css";
 
 const sectionSize = 96;
 const startingDay = Date.UTC(2026, 8, 23);
-const fixtures = [
+export type LibraryImage = {
+  readonly src: string;
+  readonly width: number;
+  readonly height: number;
+  readonly shape: string;
+};
+
+/** Plain test illustrations. The React page passes the generated landscapes instead. */
+export const fixtureImages: readonly LibraryImage[] = [
   { src: "/first.svg", width: 1200, height: 800, shape: "landscape" },
   { src: "/photo-portrait.svg", width: 800, height: 1200, shape: "portrait" },
   { src: "/second.svg", width: 1200, height: 800, shape: "landscape" },
   { src: "/photo-square.svg", width: 900, height: 900, shape: "square" },
-] as const;
+];
 
 type LibraryRow =
   | { kind: "date"; key: string; day: number; firstPhoto: number }
@@ -29,8 +35,8 @@ function photoId(index: number): string {
   return `synthetic-photo-${index}`;
 }
 
-function photoAt(index: number) {
-  const fixture = fixtures[(index * 17 + Math.floor(index / sectionSize)) % fixtures.length];
+function photoAt(index: number, images: readonly LibraryImage[] = fixtureImages) {
+  const fixture = images[(index * 17 + Math.floor(index / sectionSize)) % images.length]!;
   return {
     id: photoId(index),
     media: {
@@ -90,7 +96,14 @@ function columnsFor(width: number): number {
   return 5;
 }
 
-function Library() {
+export function PhotoLibrary({
+  images = fixtureImages,
+  embedded = false,
+}: {
+  images?: readonly LibraryImage[];
+  /** Embedded libraries drop the page header and size to their container. */
+  embedded?: boolean;
+}) {
   const count = new URLSearchParams(location.search).get("count") === "100000" ? 100_000 : 10_000;
   const gallery = useRef<LightboxController<PhotoItem> | null>(null);
   const scrollElement = useRef<HTMLDivElement | null>(null);
@@ -108,7 +121,7 @@ function Library() {
     () => ({
       count,
       getItem(index) {
-        return photoAt(index);
+        return photoAt(index, images);
       },
       getIndex(id) {
         const index = Number(id.slice("synthetic-photo-".length));
@@ -117,7 +130,7 @@ function Library() {
           : null;
       },
     }),
-    [count],
+    [count, images],
   );
   const originAdapter = useMemo<LightboxOriginAdapter>(
     () => ({
@@ -247,19 +260,21 @@ function Library() {
   return (
     <Lightbox.Root source={source} origins={originAdapter} onEvent={onLightboxEvent}>
       <ControllerBridge controllerRef={gallery} />
-      <main className="library-page" data-library-count={count}>
-        <header className="library-header">
-          <div>
-            <p className="eyebrow">Fluidbox × TanStack Virtual</p>
+      <main
+        className={embedded ? "library-page library-page--embedded" : "library-page"}
+        data-library-count={count}
+      >
+        {!embedded && (
+          <header className="library-header">
+            <p className="fb-label">Fluidbox × TanStack Virtual</p>
             <h1>A long photo library</h1>
             <p>
               Scroll the host grid, open a thumbnail, then navigate in the viewer. These are
               repeated local SVG illustrations with mixed dimensions, useful for geometry and DOM
               checks. They are not a photo decoding or transfer benchmark.
             </p>
-          </div>
-          <a href="/">Back to playground</a>
-        </header>
+          </header>
+        )}
 
         <div className="library-controls">
           <form
@@ -271,16 +286,22 @@ function Library() {
             <label htmlFor="photo-number">Photo number</label>
             <input
               id="photo-number"
+              className="fb-input"
               type="number"
               min="1"
               max={count}
               value={requestedNumber}
               onChange={(event) => setRequestedNumber(event.target.value)}
             />
-            <button type="submit" disabled={!validRequested}>
+            <button type="submit" className="fb-button" disabled={!validRequested}>
               Jump in library
             </button>
-            <button type="button" disabled={!validRequested} onClick={() => openPhoto(requested)}>
+            <button
+              type="button"
+              className="fb-button fb-button--primary"
+              disabled={!validRequested}
+              onClick={() => openPhoto(requested)}
+            >
               Open number
             </button>
           </form>
@@ -293,11 +314,15 @@ function Library() {
               />
               Show filmstrip on next open
             </label>
-            <a href={count === 10_000 ? "?count=100000" : "?count=10000"}>
+            <a
+              className="fb-button fb-button--small"
+              href={count === 10_000 ? "?count=100000" : "?count=10000"}
+            >
               {count === 10_000 ? "Try 100,000 items" : "Back to 10,000 items"}
             </a>
             <button
               type="button"
+              className="fb-button fb-button--small"
               disabled={lastViewed === null}
               onClick={() => lastViewed !== null && scrollToPhoto(lastViewed)}
             >
@@ -315,9 +340,9 @@ function Library() {
         </p>
         <Lightbox.Portal>
           {showFilmstrip && <Lightbox.Filmstrip />}
-          <Lightbox.Previous aria-label="Previous photo">←</Lightbox.Previous>
-          <Lightbox.Next aria-label="Next photo">→</Lightbox.Next>
-          <Lightbox.Close aria-label="Close">×</Lightbox.Close>
+          <Lightbox.Previous aria-label="Previous photo" />
+          <Lightbox.Next aria-label="Next photo" />
+          <Lightbox.Close aria-label="Close" />
         </Lightbox.Portal>
         <div className="library-scroll" ref={scrollElement} tabIndex={0} aria-label="Photo library">
           <div className="library-track" style={{ height: virtualizer.getTotalSize() }}>
@@ -335,7 +360,7 @@ function Library() {
                   }}
                 >
                   {row.kind === "date" ? (
-                    <h2>
+                    <h2 className="fb-rule-title">
                       {new Date(startingDay - row.day * 86_400_000).toLocaleDateString("en-US", {
                         month: "long",
                         day: "numeric",
@@ -350,7 +375,7 @@ function Library() {
                     >
                       {Array.from({ length: row.count }, (_, offset) => {
                         const index = row.firstPhoto + offset;
-                        const photo = photoAt(index);
+                        const photo = photoAt(index, images);
                         return (
                           <Lightbox.Item key={photo.id} id={photo.id}>
                             <Lightbox.Trigger asChild>
@@ -400,9 +425,3 @@ function Library() {
     </Lightbox.Root>
   );
 }
-
-createRoot(document.querySelector("#root")!).render(
-  <React.StrictMode>
-    <Library />
-  </React.StrictMode>,
-);

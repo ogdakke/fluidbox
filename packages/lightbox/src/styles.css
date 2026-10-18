@@ -556,7 +556,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   height: var(--lightbox-filmstrip-space);
   min-width: 0;
   overflow: hidden;
-  background: var(--lightbox-filmstrip-dock-background, transparent);
+  background: transparent;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-filmstrip] {
   --lightbox-filmstrip-item-size: 52px;
@@ -751,6 +751,22 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   position: relative;
   z-index: 2;
 }
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-media-cover] {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  transition: opacity 0.25s ease-out;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-media-cover]:not([src]),
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-media-ready]
+  > [data-lightbox-media-cover] {
+  opacity: 0;
+}
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-media][data-lightbox-image-pending] {
   visibility: hidden;
@@ -780,10 +796,21 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   z-index: 1;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
-  [data-lightbox-dialog][data-lightbox-gallery]
+  [data-lightbox-dialog]:is([data-lightbox-gallery], [data-lightbox-headless])
   [data-lightbox-close] {
   top: 16px;
   right: 16px;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-headless]:not([data-lightbox-gallery])
+  [data-lightbox-close] {
+  transition: opacity 180ms linear;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  :is([data-lightbox-close], [data-lightbox-previous], [data-lightbox-next])
+  > [data-lightbox-icon] {
+  display: block;
+  flex: none;
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight])
@@ -834,7 +861,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
     var(--lightbox-gallery-controls-reveal-delay, 210ms) both;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
-  [data-lightbox-dialog][data-lightbox-gallery][data-dismissing]
+  [data-lightbox-dialog][data-dismissing]
   :is([data-lightbox-previous], [data-lightbox-next], [data-lightbox-close]) {
   opacity: 0;
   pointer-events: none;

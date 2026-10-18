@@ -1,3 +1,4 @@
+import { controlIcon } from "./control-icons";
 import { arraySource } from "./array-source";
 import { createLightbox } from "./create-lightbox";
 import { FilmstripSession } from "./filmstrip";
@@ -34,7 +35,7 @@ function button(ownerDocument: Document, part: "close" | "previous" | "next", la
   element.type = "button";
   element.dataset[`lightbox${part[0]!.toUpperCase()}${part.slice(1)}`] = "";
   element.setAttribute("aria-label", label);
-  element.textContent = part === "close" ? "×" : part === "previous" ? "←" : "→";
+  element.append(controlIcon(ownerDocument, part));
   return element;
 }
 

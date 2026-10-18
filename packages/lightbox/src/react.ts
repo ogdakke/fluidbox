@@ -1,3 +1,4 @@
+import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS, type ControlIconPart } from "./control-icons";
 import {
   Children,
   cloneElement,
@@ -507,14 +508,37 @@ function action(
         type: attributes.type ?? "button",
         disabled: attributes.disabled ?? isDisabled,
         [`data-lightbox-${name}`]: "",
+        "aria-label": attributes["aria-label"] ?? (children == null ? label : undefined),
         onClick(event: ReactMouseEvent<HTMLButtonElement>) {
           onClick?.(event);
           if (!event.defaultPrevented) void controller[name]({ reason: "api" });
         },
       },
-      children ?? label,
+      children ?? defaultIcon(name),
     );
   });
+}
+
+function defaultIcon(part: ControlIconPart) {
+  const {
+    "stroke-width": strokeWidth,
+    "stroke-linecap": strokeLinecap,
+    "stroke-linejoin": strokeLinejoin,
+    "aria-hidden": ariaHidden,
+    ...attributes
+  } = CONTROL_ICON_ATTRIBUTES;
+  return createElement(
+    "svg",
+    {
+      ...attributes,
+      strokeWidth,
+      strokeLinecap,
+      strokeLinejoin,
+      "aria-hidden": ariaHidden,
+      "data-lightbox-icon": "",
+    },
+    createElement("path", { d: CONTROL_ICON_PATHS[part] }),
+  );
 }
 
 const Close = action("close", "Close", (state) => state.status === "closed");

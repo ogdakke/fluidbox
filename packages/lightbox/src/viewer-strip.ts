@@ -16,6 +16,8 @@ interface ViewerSlide {
   readonly picture?: HTMLPictureElement;
   readonly placeholder?: HTMLImageElement;
   readonly preview?: HTMLImageElement;
+  /** Snapshot shown over embedded media until it has loaded, and while closing. */
+  readonly cover?: HTMLImageElement;
   readonly image: HTMLElement;
   readonly error: HTMLDivElement;
   loaded: boolean;
@@ -248,6 +250,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     let picture: HTMLPictureElement | undefined;
     let placeholder: HTMLImageElement | undefined;
     let preview: HTMLImageElement | undefined;
+    let cover: HTMLImageElement | undefined;
     let media: HTMLElement;
     if (item.media.type === "image") {
       frame.dataset.lightboxImageFrame = "";
@@ -311,6 +314,14 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       iframe.setAttribute("allowfullscreen", "");
       frame.append(iframe);
       media = iframe;
+      cover = this.#ownerDocument.createElement("img");
+      cover.dataset.lightboxMediaCover = "";
+      cover.alt = "";
+      cover.setAttribute("aria-hidden", "true");
+      cover.decoding = "sync";
+      const coverSrc = item.preview?.src ?? item.thumbnail?.src;
+      if (coverSrc) cover.src = coverSrc;
+      frame.append(cover);
     } else {
       const content = this.#ownerDocument.createElement("div");
       content.dataset.lightboxItemContent = "";
@@ -331,6 +342,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       picture,
       placeholder,
       preview,
+      cover,
       image: media,
       error,
       loaded: false,
@@ -346,6 +358,13 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   prepareOpening(index: number, origin?: HTMLImageElement) {
     const slide = this.#slides.get(index);
     const item = this.#source.getItem(index);
+    if (slide?.cover) {
+      // Embedded pages paint long after the opening motion starts. The origin's
+      // snapshot covers the frame until the embed reports that it has loaded.
+      const src = item.preview?.src ?? item.thumbnail?.src ?? origin?.currentSrc ?? origin?.src;
+      if (src) slide.cover.src = src;
+      return;
+    }
     if (!slide || item.media.type !== "image" || !(slide.image instanceof HTMLImageElement)) return;
     slide.opening = true;
     const decodedPreview = origin ? observeDecodedPreview(origin) : null;
@@ -520,6 +539,20 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       slide.image.src = item.media.src;
       if (item.media.poster) slide.image.poster = item.media.poster.src;
     } else if (item.media.type === "iframe" && slide.image instanceof HTMLIFrameElement) {
+      const frame = slide.frame;
+      const controller = new AbortController();
+      slide.controller = controller;
+      delete frame.dataset.lightboxMediaReady;
+      slide.image.addEventListener(
+        "load",
+        () => {
+          // The load event fires before the embedded page's first paint.
+          const view = this.#ownerDocument.defaultView;
+          const timer = view?.setTimeout(() => (frame.dataset.lightboxMediaReady = ""), 200);
+          controller.signal.addEventListener("abort", () => view?.clearTimeout(timer));
+        },
+        { once: true, signal: controller.signal },
+      );
       slide.image.src = item.media.src;
       if (item.media.allow) slide.image.allow = item.media.allow;
       if (item.media.referrerPolicy) slide.image.referrerPolicy = item.media.referrerPolicy;
@@ -555,6 +588,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       slide.image.removeAttribute("src");
       slide.image.load();
     } else if (slide.image instanceof HTMLIFrameElement) {
+      delete slide.frame.dataset.lightboxMediaReady;
       slide.image.removeAttribute("src");
     } else if (slide.image instanceof HTMLImageElement) {
       slide.imageVersion += 1;
