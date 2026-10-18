@@ -408,20 +408,11 @@ document.addEventListener("keydown", (event) => {
 });
 
 // Readout.
-function lvhMinusSvh() {
-  const probe = document.createElement("div");
-  probe.style.cssText = "position:absolute;visibility:hidden;height:calc(100lvh - 100svh)";
-  document.body.append(probe);
-  const value = probe.offsetHeight;
-  probe.remove();
-  return value;
-}
 const readout = document.querySelector<HTMLElement>("[data-lab-readout]")!;
 function updateReadout() {
   const sheet = sheets[active]?.sheet;
   readout.textContent = [
     `url        ${location.pathname}${location.search}`,
-    `gap        ${sheet ? Math.round(parseFloat(getComputedStyle(sheet.querySelector(".sl-panel-wrap")!).paddingBottom) - reach) : "-"}px  lvh-svh ${Math.round(lvhMinusSvh())}px`,
     `settings   ${Object.entries(current)
       .map(([key, value]) => `${key}=${value}`)
       .join(" ")}`,

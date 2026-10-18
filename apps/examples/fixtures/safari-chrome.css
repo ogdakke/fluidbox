@@ -247,12 +247,6 @@ html.lab-scroll-locked {
 
 /* Lightbox variants. These override the runtime's zero-specificity rules. */
 
-html[data-lab-container="absolute"] [data-lightbox-overlay] [data-lightbox-container] {
-  position: absolute;
-  top: var(--lab-scroll-y, 0px);
-  left: 0;
-}
-
 html[data-lab-backdrop="translucent"] [data-lightbox-overlay] [data-lightbox-backdrop] {
   background: color-mix(in srgb, var(--background, #111) 55%, transparent);
 }

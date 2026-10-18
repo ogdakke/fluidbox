@@ -17,15 +17,11 @@ mountSite("fixtures", {
 
 /** Every setting lives in the URL so a result can be reported as a link. */
 const settings = {
-  container: {
-    label: "Stage container",
-    options: { sticky: "Sticky (current)", absolute: "Absolute at scrollY + scroll lock" },
-  },
   backdrop: {
     label: "Backdrop colour",
-    options: { opaque: "Opaque (current)", translucent: "Translucent" },
+    options: { opaque: "Opaque (default)", translucent: "Translucent" },
   },
-  blur: { label: "Backdrop blur", options: { off: "Off (current)", on: "On" } },
+  blur: { label: "Backdrop blur", options: { off: "Off (default)", on: "On" } },
   header: {
     label: "Page header",
     options: { none: "None", sticky: "Sticky", fixed: "Fixed" },
@@ -82,15 +78,12 @@ if (current.header !== "none") {
 const pageHeight = () =>
   Math.max(root.scrollHeight, document.body.scrollHeight, window.innerHeight);
 
-// Scroll lock shared by the "absolute at scrollY" probe and container setting.
+// Scroll lock for the "absolute at scrollY" probe.
 let locks = 0;
 function lockScroll(lock: boolean) {
   locks = Math.max(0, locks + (lock ? 1 : -1));
   root.classList.toggle("lab-scroll-locked", locks > 0);
 }
-const syncScroll = () => root.style.setProperty("--lab-scroll-y", `${window.scrollY}px`);
-syncScroll();
-window.addEventListener("scroll", syncScroll, { passive: true });
 
 // Probes: the same magenta layer built four ways.
 type Probe = { id: string; title: string; note: string; build: () => HTMLElement; lock?: boolean };
@@ -199,14 +192,7 @@ const origin = (id: string): LightboxOrigin | null => {
 };
 function onStatus(next: LightboxStatus) {
   if (next === status) return;
-  const wasClosed = status === "closed";
   status = next;
-  if (current.container === "absolute") {
-    if (wasClosed && status !== "closed") {
-      syncScroll();
-      lockScroll(true);
-    } else if (!wasClosed && status === "closed") lockScroll(false);
-  }
   updateReadout();
 }
 function connect(controller: LightboxController, open: (target: LightboxTarget) => unknown) {
