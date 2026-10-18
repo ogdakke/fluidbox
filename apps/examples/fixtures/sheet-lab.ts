@@ -185,6 +185,17 @@ function pin() {
   container.style.top = `${scrollY}px`;
 }
 
+// The photo rests a gap clear of the panel when it has room to. Only the
+// anchored panel overlaps, and only a photo that would otherwise rise past the
+// top of the screen: its top stops there and the panel's rounded top comes
+// over its bottom edge, by up to 24px.
+function photoGap(photoHeight: number, panelTop: number, slide: HTMLElement) {
+  const clear = 12;
+  if (current.overscroll !== "on") return clear;
+  const top = parseFloat(getComputedStyle(slide.querySelector(".sl-figure")!).paddingTop);
+  return Math.max(-24, Math.min(clear, panelTop - top - photoHeight));
+}
+
 function measure() {
   const height = innerHeight;
   reach = chromeReach();
@@ -204,14 +215,12 @@ function measure() {
     // The panel rises through the empty space under the photo first, then
     // pushes the photo up with it, a gap ahead of it. The stage holds still for
     // that first stretch. A photo with less room below than the gap moves a
-    // little faster than the scroll instead, over the whole push. The anchored
-    // panel overlaps a tall enough photo instead, its rounded top over the
-    // photo's bottom edge; the floating pane keeps clear of it.
-    const gap = current.overscroll === "on" ? -24 : 12;
+    // little faster than the scroll instead, over the whole push.
     // A photo narrower than the screen, like a tall screenshot, widens to the
     // full width as iOS Photos does, from its top edge, while the stage carries
     // its bottom to the same gap from the panel. Both run over the whole push.
-    const zoom = slide.clientWidth / photo.offsetWidth;
+    const zoom = Math.max(1, slide.clientWidth / photo.offsetWidth);
+    const gap = photoGap(zoom * photo.offsetHeight, height - panelHeight, slide);
     if (zoom > 1.01) {
       const bottom = height - gap - photo.offsetTop - zoom * photo.offsetHeight;
       slide.style.setProperty("--sl-zoom", String(zoom));
