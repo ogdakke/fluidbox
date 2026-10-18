@@ -431,3 +431,21 @@ test("a playing clip keeps playing from the same moment in the player and back",
   expect(back.paused).toBe(false);
   expect(back.time).toBeGreaterThan(closedAt - 0.1);
 });
+
+for (const id of ["cover", "video-inline"]) {
+  test(`the "${id}" flight starts with the card's rounded corners`, async ({ page }) => {
+    const trigger = await prepareCase(page, id);
+    await armHold(page, "start");
+    await trigger.click();
+    await held(page);
+    // The frame is scaled, so compare its painted radius with the card's.
+    const radius = await page.evaluate(() => {
+      const frame = document.querySelector<HTMLElement>(
+        "[data-lightbox-dialog] [data-lightbox-frame]",
+      )!;
+      const style = getComputedStyle(frame);
+      return Number.parseFloat(style.borderTopLeftRadius) * new DOMMatrix(style.transform).a;
+    });
+    expect(radius).toBeCloseTo(14, 0);
+  });
+}

@@ -158,7 +158,10 @@ function parentOf(element: Element): Element | null {
   return root instanceof ShadowRoot ? root.host : null;
 }
 
-/** The radius of each visible corner, taken from the box whose corner it is. */
+/**
+ * The radius of each visible corner. Every box that shares the corner clips
+ * it, so the roundest of them is the one on screen.
+ */
 function visibleRadii(visible: Box, boxes: readonly Corners[]): CornerRadii {
   const corners: [keyof Box, keyof Box][] = [
     ["left", "top"],
@@ -167,12 +170,13 @@ function visibleRadii(visible: Box, boxes: readonly Corners[]): CornerRadii {
     ["left", "bottom"],
   ];
   return corners.map(([x, y], index) => {
+    let radius = 0;
     for (const { box, radii } of boxes) {
       if (Math.abs(box[x] - visible[x]) < EDGE && Math.abs(box[y] - visible[y]) < EDGE) {
-        return radii[index]!;
+        radius = Math.max(radius, radii[index]!);
       }
     }
-    return 0;
+    return radius;
   }) as CornerRadii;
 }
 
