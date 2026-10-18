@@ -361,6 +361,8 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   max-width: 100vw;
   max-height: var(--lightbox-height, 100svh);
   outline: none;
+  /* The slide strip overhangs by one gap; keep it off the page. */
+  overflow-x: clip;
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-dialog]:focus-visible {
@@ -496,9 +498,14 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   --lightbox-content-height: calc(var(--lightbox-height, 100svh) - var(--lightbox-filmstrip-space));
   position: relative;
 }
+/* Full-bleed slides would touch, and a fractional scroll offset after a swipe
+   shows a pixel of the neighbour. Each slide carries half a gap on both sides
+   instead; the strip is one gap wider than the dialog, which clips it.
+   Consumers set --lightbox-slide-gap like any other --lightbox-* input. */
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-slides] {
   display: flex;
-  width: 100%;
+  width: calc(100% + var(--lightbox-slide-gap, 16px));
+  margin-inline: calc(var(--lightbox-slide-gap, 16px) / -2);
   height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
@@ -518,6 +525,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-slide] {
   flex: 0 0 100%;
   min-width: 0;
+  padding-inline: calc(var(--lightbox-slide-gap, 16px) / 2);
   display: grid;
   place-items: center;
   grid-template-rows: var(--lightbox-content-height);
@@ -851,11 +859,14 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   --lightbox-gallery-control-opacity: 0.35;
   cursor: default;
 }
+/* Controls start hidden without a transition. A fade-out here would show the
+   controls leaving and then arriving again with the reveal below. */
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery][data-opening]
   :is([data-lightbox-previous], [data-lightbox-next], [data-lightbox-close]) {
   opacity: 0;
   pointer-events: none;
+  transition: none;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery][data-opening][data-gallery-controls-revealing]

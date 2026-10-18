@@ -54,6 +54,8 @@ Read from the opening element and copied onto the portal: `--background`, `--col
 
 Read from `:root` or the overlay: `--layer-lightbox`, `--layer-lightbox-flight`, `--lightbox-backdrop-background`, `--lightbox-filmstrip-dock-background`, `--lightbox-filmstrip-zoom-duration`, `--lightbox-filmstrip-zoom-travel`.
 
+`--lightbox-slide-gap` sets the space between gallery slides, `16px` by default. Images stay full-bleed; the gap shows only while swiping, and it keeps a fractional scroll offset from revealing a sliver of the neighbouring slide. Set it on the opening element, `:root`, or the overlay; like every `--lightbox-*` property on the opening element, it is copied onto the portal.
+
 Closed previews read `--lightbox-preview-width`, `--lightbox-preview-height`, and `--lightbox-preview-aspect`.
 
 ## Runtime-owned variables
