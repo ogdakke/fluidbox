@@ -158,12 +158,6 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   will-change: transform, opacity;
 }
 
-[data-lightbox-transition-content] > *,
-[data-lightbox-transition-content] [data-lightbox-counter-scale] {
-  transform: var(--lightbox-transition-counter-transform, none);
-  transform-origin: center;
-}
-
 [data-lightbox-transition-content]:has([data-lightbox-transition-controls]) {
   opacity: var(--lightbox-transition-content-opacity, 1);
 }
@@ -910,6 +904,18 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-dialog][data-zoomed] {
   touch-action: none;
+}
+/* Zoom moves the media into its own viewport. The unzoomed preview, placeholder,
+   and frame surface left behind would otherwise show around the zoomed image. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-zoomed]
+  :is([data-lightbox-slide-placeholder], [data-lightbox-slide-preview]) {
+  visibility: hidden;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-zoomed]
+  [data-lightbox-image-frame] {
+  background: transparent;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-zoom-viewport] {
   position: fixed;

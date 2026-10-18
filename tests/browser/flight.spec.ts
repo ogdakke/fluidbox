@@ -267,3 +267,61 @@ test("a wheel during the opening takes over and dismisses", async ({ page }, tes
   await expect(dialog).toHaveAttribute("data-lightbox-state", "closing");
   await expect(dialog).toHaveCount(0, { timeout: 15_000 });
 });
+
+test("a close after an idle moment still animates", async ({ page }) => {
+  const trigger = await prepareCase(page, "cover");
+  await trigger.click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  // Long enough for a browser to stop advancing its idle timeline.
+  await page.waitForTimeout(1200);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(120);
+  await expect(dialog, "the close skipped its motion").toHaveAttribute(
+    "data-lightbox-state",
+    "closing",
+  );
+  await expect(dialog).toHaveCount(0);
+});
+
+test("a travelling badge lands exactly on the card's badge", async ({ page }) => {
+  const trigger = await prepareCase(page, "badge");
+  const card = (await page.locator('[data-flight-case="badge"] .flight-badge').boundingBox())!;
+  await trigger.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await armHold(page, "end");
+  await page.keyboard.press("Escape");
+  await held(page);
+  const landing = (await page
+    .locator("[data-lightbox-transition-content] .flight-badge")
+    .boundingBox())!;
+  expect(Math.abs(landing.x - card.x)).toBeLessThan(1.5);
+  expect(Math.abs(landing.y - card.y)).toBeLessThan(1.5);
+  expect(Math.abs(landing.width - card.width)).toBeLessThan(1.5);
+});
+
+test("zooming leaves no unzoomed image behind", async ({ page }, testInfo) => {
+  test.skip(!!testInfo.project.use.isMobile, "Double-click zoom is a desktop scenario.");
+  const trigger = await prepareCase(page, "cover");
+  await trigger.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  const media = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]');
+  const box = (await media.boundingBox())!;
+  await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 3);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute("data-zoomed", "");
+  const leftovers = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[data-lightbox-slide][aria-hidden="false"] :is([data-lightbox-slide-preview], [data-lightbox-slide-placeholder])',
+      ),
+      (layer) => getComputedStyle(layer).visibility,
+    ),
+  );
+  expect(leftovers.every((visibility) => visibility === "hidden")).toBe(true);
+});

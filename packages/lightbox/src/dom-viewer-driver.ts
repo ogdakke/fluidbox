@@ -374,6 +374,9 @@ export class DomViewerDriver<
   }
 
   async open(context: ViewerSessionMotionContext<TItem>) {
+    // The session has just hidden the card's image. Keep it painted until the
+    // opening's first frame is ready to cover it, or the card blinks empty.
+    this.#keepThumbnailVisible(context.origin?.thumbnail);
     this.#preparedFlight = undefined;
     const previous = activeViewer.claim(this.#viewerOwner);
     if (previous && !previous.closeImmediately()) {
@@ -418,6 +421,7 @@ export class DomViewerDriver<
     if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (context.signal.aborted) return;
     if (this.#prefersReducedMotion()) {
+      this.#keepThumbnailVisible(undefined);
       for (const animation of prepared?.animations ?? []) animation.cancel();
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
@@ -914,7 +918,15 @@ export class DomViewerDriver<
   }
 
   #synchronizeStart(animations: Animation[]) {
-    const timelineTime = Number(this.#portal.overlay.ownerDocument.timeline.currentTime ?? 0);
+    // Start every animation now, on the real clock. The timeline's own time is
+    // the last frame's timestamp, and Firefox stops advancing it while nothing
+    // animates, so after an idle moment it would start the motion in the past
+    // and finish it on its first frame. Assigning the start right away (rather
+    // than waiting for `ready`) keeps Safari from repainting time zero.
+    const view = this.#portal.overlay.ownerDocument.defaultView;
+    const timelineTime = view
+      ? view.performance.now()
+      : Number(this.#portal.overlay.ownerDocument.timeline.currentTime ?? 0);
     for (const animation of animations) {
       animation.play();
       animation.currentTime = 0;

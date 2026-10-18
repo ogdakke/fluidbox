@@ -21,22 +21,31 @@ interface ActiveOverlay<TItem extends LightboxItem> {
   readonly layerAnimations: Animation[];
 }
 
-function counterScale(matrix: DOMMatrix) {
-  return `scale(${1 / Math.max(0.0001, Math.abs(matrix.a))}, ${1 / Math.max(0.0001, Math.abs(matrix.d))})`;
+interface FrameBox {
+  readonly width: number;
+  readonly height: number;
 }
 
-/** The travelling copy follows the frame; its children undo the frame's scale. */
-function targetMotion(frameMotion: Keyframe[]): Keyframe[] {
-  return frameMotion.map(({ offset, transform }) => {
-    const value = String(transform ?? "none");
-    return {
-      offset,
-      transform: value,
-      "--lightbox-transition-counter-transform": counterScale(
-        new DOMMatrix(value === "none" ? undefined : value),
-      ),
-    };
-  });
+/**
+ * The travelling copy follows the frame's painted box without scaling: it is
+ * moved and resized, so its content keeps its own size and offsets throughout
+ * the flight and lands exactly where the thumbnail's copy sits.
+ */
+function targetStyle(transform: string | DOMMatrix | null | undefined, box: FrameBox) {
+  const value = String(transform ?? "none");
+  const matrix = new DOMMatrix(value === "none" ? undefined : value);
+  return {
+    transform: `translate(${matrix.e}px, ${matrix.f}px)`,
+    width: `${box.width * Math.abs(matrix.a)}px`,
+    height: `${box.height * Math.abs(matrix.d)}px`,
+  };
+}
+
+function targetMotion(frameMotion: Keyframe[], box: FrameBox): Keyframe[] {
+  return frameMotion.map(({ offset, transform }) => ({
+    offset,
+    ...targetStyle(transform as string | undefined, box),
+  }));
 }
 
 /**
@@ -60,6 +69,7 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
   readonly #document: Document;
   readonly #registrations = new Map<LightboxItemId, LightboxThumbnailOverlayRegistration<TItem>>();
   #active: ActiveOverlay<TItem> | undefined;
+  readonly #boxes = new WeakMap<HTMLElement, FrameBox>();
 
   constructor(ownerDocument: Document) {
     this.#document = ownerDocument;
@@ -67,14 +77,6 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     if (!progressRegistered && css && "registerProperty" in css) {
       const properties: PropertyDefinition[] = [
         { name: "--lightbox-progress", syntax: "<number>", inherits: true, initialValue: "1" },
-        // Renderers may mount content after the motion starts. An inherited,
-        // interpolable counter transform reaches children that arrive late.
-        {
-          name: "--lightbox-transition-counter-transform",
-          syntax: "<transform-list>",
-          inherits: true,
-          initialValue: "scale(1)",
-        },
       ];
       for (const property of properties) {
         try {
@@ -201,18 +203,8 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
       animations.push(layer);
     }
     if (!active.target) return animations;
-    animations.push(active.target.animate(targetMotion(frameMotion), options));
-    const counterMotion = frameMotion.map(({ offset, transform }) => {
-      const value = String(transform ?? "none");
-      const matrix = new DOMMatrix(value === "none" ? undefined : value);
-      return {
-        offset,
-        transform: `scale(${1 / Math.max(0.0001, Math.abs(matrix.a))}, ${1 / Math.max(0.0001, Math.abs(matrix.d))})`,
-      };
-    });
-    for (const target of this.#counterScaleTargets(active.target)) {
-      animations.push(target.animate(counterMotion, options));
-    }
+    const box = this.#boxes.get(active.target);
+    if (box) animations.push(active.target.animate(targetMotion(frameMotion, box), options));
     return animations;
   }
 
@@ -229,14 +221,14 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     }
     if (!active.target) return;
     this.#publish(active.target, phase, progress);
-    if (transform) {
-      active.target.style.setProperty("--lightbox-transition-transform", transform.toString());
-      const counter = counterScale(transform);
-      active.target.style.setProperty("--lightbox-transition-counter-transform", counter);
-      for (const target of this.#counterScaleTargets(active.target)) {
-        target.style.setProperty("--lightbox-transition-counter-transform", counter);
-      }
-    }
+    const box = this.#boxes.get(active.target);
+    if (transform && box) this.#placeTarget(active.target, targetStyle(transform, box));
+  }
+
+  #placeTarget(target: HTMLElement, style: { transform: string; width: string; height: string }) {
+    target.style.setProperty("--lightbox-transition-transform", style.transform);
+    target.style.setProperty("--lightbox-transition-width", style.width);
+    target.style.setProperty("--lightbox-transition-height", style.height);
   }
 
   currentProgress(fallback: number) {
@@ -287,26 +279,15 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
         );
       }
     }
-    if (!target) return;
-    const counterTargets = new Set(this.#counterScaleTargets(target));
-    const counterMotion = frameMotion.map(({ offset, transform }) => {
-      const value = String(transform ?? "none");
-      const matrix = new DOMMatrix(value === "none" ? undefined : value);
-      return {
-        offset,
-        transform: `scale(${1 / Math.max(0.0001, Math.abs(matrix.a))}, ${1 / Math.max(0.0001, Math.abs(matrix.d))})`,
-      };
-    });
+    const box = target && this.#boxes.get(target);
+    if (!target || !box) return;
     for (const animation of animations) {
-      if (!(animation.effect instanceof KeyframeEffect)) continue;
-      const effectTarget = animation.effect.target;
       if (
-        effectTarget === target &&
+        animation.effect instanceof KeyframeEffect &&
+        animation.effect.target === target &&
         animation.effect.getKeyframes().some((frame) => frame.transform)
       ) {
-        animation.effect.setKeyframes(targetMotion(frameMotion));
-      } else if (effectTarget instanceof HTMLElement && counterTargets.has(effectTarget)) {
-        animation.effect.setKeyframes(counterMotion);
+        animation.effect.setKeyframes(targetMotion(frameMotion, box));
       }
     }
   }
@@ -327,13 +308,8 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
       Object.assign(active.frameLayer.style, { transform, width, height });
     }
     if (active.target) {
-      const matrix = new DOMMatrix(getComputedStyle(active.target).transform);
-      active.target.style.setProperty("--lightbox-transition-transform", matrix.toString());
-      const counter = counterScale(matrix);
-      active.target.style.setProperty("--lightbox-transition-counter-transform", counter);
-      for (const target of this.#counterScaleTargets(active.target)) {
-        target.style.setProperty("--lightbox-transition-counter-transform", counter);
-      }
+      const { transform, width, height } = getComputedStyle(active.target);
+      this.#placeTarget(active.target, { transform, width, height });
     }
   }
 
@@ -355,12 +331,13 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
   #position(target: HTMLElement, frame: HTMLElement) {
     const view = this.#document.defaultView!;
     const rect = frame.getBoundingClientRect();
-    // The target receives the frame's transform animation. Position it at the
-    // frame's layout box so the current transform is not applied twice.
+    // The target is placed at the frame's layout box and follows the frame's
+    // transform as a translation and a resize, never as a scale.
     const transformValue = getComputedStyle(frame).transform;
     const transform = new DOMMatrix(transformValue === "none" ? undefined : transformValue);
-    target.style.setProperty("--lightbox-transition-width", `${frame.offsetWidth}px`);
-    target.style.setProperty("--lightbox-transition-height", `${frame.offsetHeight}px`);
+    const box = { width: frame.offsetWidth, height: frame.offsetHeight };
+    this.#boxes.set(target, box);
+    this.#placeTarget(target, targetStyle(transform, box));
     target.style.setProperty(
       "--lightbox-transition-left",
       `${rect.left - transform.e + view.scrollX}px`,
@@ -369,16 +346,6 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
       "--lightbox-transition-top",
       `${rect.top - transform.f + view.scrollY}px`,
     );
-  }
-
-  #counterScaleTargets(target: HTMLElement) {
-    return Array.from(target.children).flatMap((child) => {
-      if (!(child instanceof HTMLElement)) return [];
-      const marked = Array.from(
-        child.querySelectorAll<HTMLElement>("[data-lightbox-counter-scale]"),
-      );
-      return marked.length ? marked : [child];
-    });
   }
 
   #disposeActive() {

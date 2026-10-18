@@ -268,7 +268,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
         preview.dataset.lightboxSlidePreview = "";
         preview.alt = "";
         preview.setAttribute("aria-hidden", "true");
-        preview.decoding = "async";
+        // A preview is small and usually already decoded for the page; paint it
+        // on the first frame it appears in.
+        preview.decoding = "sync";
         frame.append(preview);
       }
       picture = this.#ownerDocument.createElement("picture");
@@ -376,6 +378,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       origin?.src;
     if (preview) {
       slide.imageVersion += 1;
+      // The card's image is already decoded. Asynchronous decoding lets Safari
+      // skip painting it on the opening's first frame, which reads as a blink.
+      if (decodedPreview) slide.image.decoding = "sync";
       if (decodedPreview) delete slide.image.dataset.lightboxImagePending;
       else slide.image.dataset.lightboxImagePending = "";
       for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
@@ -609,7 +614,14 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.imageVersion += 1;
     const version = slide.imageVersion;
     slide.fullApplied = true;
-    slide.image.dataset.lightboxImagePending = "";
+    // The full image decodes off the main thread. An image that already paints
+    // a preview keeps it until the new source is ready; only an empty one hides.
+    const painted =
+      slide.image.dataset.lightboxImagePending === undefined &&
+      slide.image.complete &&
+      slide.image.naturalWidth > 0;
+    slide.image.decoding = "async";
+    if (!painted) slide.image.dataset.lightboxImagePending = "";
     for (const source of slide.picture.querySelectorAll("source")) source.remove();
     for (const resource of item.media.sources ?? []) {
       const source = this.#ownerDocument.createElement("source");

@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import react from "@vitejs/plugin-react";
 import solid from "vite-plugin-solid";
 import { defineConfig } from "vite";
@@ -18,13 +18,30 @@ function findPages(directory: string, prefix = ""): [string, string][] {
 }
 const pages = Object.fromEntries(findPages(import.meta.dirname));
 
-export default defineConfig({
+/**
+ * The package build replaces dist/styles.css by renaming a new file over it,
+ * and the dev server's watcher loses the file after the first replacement, so
+ * edits stop reaching the page. While serving, read the stylesheet from source.
+ */
+function sourceStyles(command: "build" | "serve"): Record<string, string> {
+  return command === "serve"
+    ? {
+        "@ogdakke/fluidbox/styles.css": resolve(
+          import.meta.dirname,
+          "../../packages/lightbox/src/styles.css",
+        ),
+      }
+    : {};
+}
+
+export default defineConfig(({ command }) => ({
   plugins: [react({ include: /(react|photo-library)\.tsx$/ }), solid({ include: /solid\.tsx$/ })],
   define: {
     __VUE_OPTIONS_API__: false,
     __VUE_PROD_DEVTOOLS__: false,
     __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
   },
+  resolve: { alias: sourceStyles(command) },
   server: {
     allowedHosts: true,
     port: Number(process.env.PORT) || 5173,
@@ -38,4 +55,4 @@ export default defineConfig({
   build: {
     rollupOptions: { input: pages },
   },
-});
+}));
