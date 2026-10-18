@@ -54,6 +54,10 @@ Read from the opening element and copied onto the portal: `--background`, `--col
 
 Read from `:root` or the overlay: `--layer-lightbox`, `--layer-lightbox-flight`, `--lightbox-backdrop-background`, `--lightbox-filmstrip-dock-background`, `--lightbox-filmstrip-zoom-duration`, `--lightbox-filmstrip-zoom-travel`.
 
+`--lightbox-backdrop-filter` sets the backdrop's `backdrop-filter`, `none` by default. Pair it with a translucent `--lightbox-backdrop-background`, for example `blur(24px) saturate(1.5)`; iOS 26 Safari then shows the blurred page behind its bars.
+
+While zoomed, the image can pan under the browser's own bars. On touch screens the zoom viewport reaches past the window by the difference between the screen and window heights, which covers iOS Safari's status bar and toolbar wherever they sit. Set `--lightbox-zoom-bleed` on `:root` or the overlay to choose the reach yourself, or `0px` to keep the image inside the window.
+
 `--lightbox-slide-gap` adds space between gallery slides, shown only while swiping; images stay full-bleed. It is `0` by default. Set it on the opening element, `:root`, or the overlay; like every `--lightbox-*` property on the opening element, it is copied onto the portal.
 
 Closed previews read `--lightbox-preview-width`, `--lightbox-preview-height`, and `--lightbox-preview-aspect`.

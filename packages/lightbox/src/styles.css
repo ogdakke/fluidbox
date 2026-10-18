@@ -360,6 +360,8 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   inset: 0;
   background: var(--lightbox-backdrop-background, var(--background, #111));
   opacity: var(--lightbox-backdrop-opacity, 1);
+  -webkit-backdrop-filter: var(--lightbox-backdrop-filter, none);
+  backdrop-filter: var(--lightbox-backdrop-filter, none);
   transform: translateZ(0);
   will-change: opacity;
   cursor: zoom-out;
@@ -941,9 +943,13 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   [data-lightbox-image-frame] {
   background: transparent;
 }
+/* Reaches under the bars and pads by the same, so pan maths ignore the bleed. */
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-zoom-viewport] {
-  position: fixed;
-  inset: 0;
+  --lightbox-zoom-reach: var(--lightbox-zoom-bleed, var(--lightbox-zoom-chrome, 0px));
+
+  position: absolute;
+  inset: calc(-1 * var(--lightbox-zoom-reach)) 0;
+  padding-block: var(--lightbox-zoom-reach);
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
