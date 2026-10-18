@@ -8,15 +8,15 @@ source, origin, renderer, and controller contracts used by framework bindings.
 
 | Old responsibility                                                          | Headless owner                                       | Status                                                                                                                                                                              |
 | --------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Discover DOM-authored children and adapt their media/content                | Custom-element adapter                               | `AppLightbox.compile()` reads an explicit trigger and inert content template                                                                                                        |
-| Read an indexed source without mounting every thumbnail                     | `LightboxSource`, `arraySource()`, and `ViewerStrip` | Migrated                                                                                                                                                                            |
+| Discover DOM-authored children and adapt their media/content                | Custom-element adapter                               | `FluidboxItemElement.compile()` reads an explicit trigger and inert content template                                                                                                |
+| Read an indexed source without mounting every thumbnail                     | `FluidboxSource`, `arraySource()`, and `ViewerStrip` | Migrated                                                                                                                                                                            |
 | Validate an indexed open and select an item in an existing session          | `ViewerSession.open()` and `goTo()`                  | Migrated                                                                                                                                                                            |
 | Keep stable item identity across source changes                             | `ViewerSession.setSource()`                          | Migrated and covered by command tests                                                                                                                                               |
-| Reveal the settled thumbnail in its scroll container                        | `LightboxOriginAdapter.revealOrigin()`               | Migrated. Filmstrip previews defer reveal until final touch/scroll settlement; reveal is abortable and never delays close.                                                          |
+| Reveal the settled thumbnail in its scroll container                        | `FluidboxOriginAdapter.revealOrigin()`               | Migrated. Filmstrip previews defer reveal until final touch/scroll settlement; reveal is abortable and never delays close.                                                          |
 | Focus the gallery when a virtualizer has removed the selected trigger       | `DomViewerDriver` focus-host fallback                | Migrated when the original trigger had a connected focusable ancestor. Originless opens have no caller-selected fallback.                                                           |
-| Redirect and warm a hidden teaser tile through `data-lightbox-preview-more` | Host origin/overlay adapter                          | Partial. The engine does not encode a gallery layout convention, and no direct example yet recreates the old proxy source, picture hiding, alt update, warming, and reset behavior. |
+| Redirect and warm a hidden teaser tile through `data-fluidbox-preview-more` | Host origin/overlay adapter                          | Partial. The engine does not encode a gallery layout convention, and no direct example yet recreates the old proxy source, picture hiding, alt update, warming, and reset behavior. |
 
-`AppGallery` is a declarative adapter over one `createLightbox()` controller. It does not implement
+`FluidboxGalleryElement` is a declarative adapter over one `createFluidbox()` controller. It does not implement
 a second gallery engine.
 
 ## Full-image strip
@@ -61,9 +61,9 @@ painting.
 | Enforce one active viewer and hand ownership to a new viewer                                     | `viewer-ownership.ts`                                                               | Migrated; close veto is honored                                                                                     |
 | Track closed, opening, open, and closing state                                                   | `ViewerSession` and `DomViewerDriver`                                               | Migrated                                                                                                            |
 | Prepare opening geometry before the portal becomes visible                                       | `DomViewerDriver.open()`                                                            | Migrated                                                                                                            |
-| Prebuild and measure opening on primary pointerdown, then cancel on pointer cancellation         | `LightboxController.prepare()` and trigger bindings                                 | Migrated. Preparation keeps state/background ownership unchanged, pauses the opening animations, and is disposable. |
+| Prebuild and measure opening on primary pointerdown, then cancel on pointer cancellation         | `FluidboxController.prepare()` and trigger bindings                                 | Migrated. Preparation keeps state/background ownership unchanged, pauses the opening animations, and is disposable. |
 | Reverse an unfinished open or close from the painted pose                                        | `DomViewerDriver` plus `image-transition-motion.ts`                                 | Migrated with timestamped geometry coverage                                                                         |
-| Copy theme variables from the scoped trigger into the body portal                                | `DomViewerDriver.#applyTheme()`                                                     | Migrated for all `--lightbox-*` inputs and legacy aliases                                                           |
+| Copy theme variables from the scoped trigger into the body portal                                | `DomViewerDriver.#applyTheme()`                                                     | Migrated for all `--fluidbox-*` inputs and legacy aliases                                                           |
 | Keep filmstrip controls hidden until the opening backdrop is ready                               | `DomViewerDriver.#waitForFilmstripReveal()`                                         | Migrated                                                                                                            |
 | Keep video action controls hidden until their delayed reveal animation finishes                  | `ThumbnailOverlayRuntime`                                                           | Migrated for traveling overlay renderers; opening settlement waits for the application control reveal.              |
 | Publish trigger state and `aria-expanded`                                                        | `DomViewerDriver.#setActiveTrigger()`                                               | Migrated                                                                                                            |
@@ -73,7 +73,7 @@ painting.
 
 | Old responsibility                                                                | Headless owner                                            | Status                                                                    |
 | --------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Measure the marked visual rather than assuming the trigger box                    | `origin-geometry.ts` and `LightboxOrigin.visual`          | Migrated                                                                  |
+| Measure the marked visual rather than assuming the trigger box                    | `origin-geometry.ts` and `FluidboxOrigin.visual`          | Migrated                                                                  |
 | Preserve cover-crop continuity through open, close, and reversal                  | `transition-geometry.ts` and `image-transition-motion.ts` | Migrated                                                                  |
 | Interpolate asymmetric corner radii in screen space                               | `mapRadii()` and the radius animation channel             | Migrated; iPhone emulation coverage exists, physical iOS remains required |
 | Fall back to scale/fade when no visible origin exists                             | `DomViewerDriver` fallback poses                          | Migrated                                                                  |
@@ -82,8 +82,8 @@ painting.
 | Hide the active background thumbnail throughout the viewer session                | `OriginRegistry`                                          | Migrated, including after host reveal and recycled registration           |
 | Drive host and traveling thumbnail decorations from the same progress             | `ThumbnailOverlayRuntime`                                 | Migrated                                                                  |
 
-The old `data-lightbox-preview-more` transition layer mixed a particular teaser layout with viewer
-motion. `LightboxOrigin.visual` plus a host or traveling thumbnail overlay supplies the necessary
+The old `data-fluidbox-preview-more` transition layer mixed a particular teaser layout with viewer
+motion. `FluidboxOrigin.visual` plus a host or traveling thumbnail overlay supplies the necessary
 composition points, but the gallery demo still needs a migration example proving the same teaser
 crop, radius, and decoration behavior.
 
@@ -91,9 +91,9 @@ crop, radius, and decoration behavior.
 
 | Old responsibility                                                                   | Headless owner                                               | Status   |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------- |
-| Touch drag dismissal and cancellation                                                | Shared `LightboxGestureController` used by `DomViewerDriver` | Migrated |
+| Touch drag dismissal and cancellation                                                | Shared `FluidboxGestureController` used by `DomViewerDriver` | Migrated |
 | Trackpad wheel ownership, acceleration handoff, momentum suppression, and settlement | `DomViewerDriver`                                            | Migrated |
-| Pinch, pan, double-click/tap, and zoom suspension during navigation                  | Shared `lightbox-zoom.ts` used by `DomViewerDriver`          | Migrated |
+| Pinch, pan, double-click/tap, and zoom suspension during navigation                  | Shared `fluidbox-zoom.ts` used by `DomViewerDriver`          | Migrated |
 | Release and restore overlay edges during mobile browser-chrome gestures              | `DomViewerDriver`                                            | Migrated |
 | Route keyboard navigation while excluding native form/media interaction              | `DomViewerDriver`                                            | Migrated |
 | Trap focus, restore focus, label slides, and announce item position                  | Portal, strip, and driver accessibility code                 | Migrated |
@@ -117,6 +117,6 @@ Custom-element files contain declarative adaptation, element registration, porta
 filmstrip DOM. Gesture, zoom, transition, source selection, origin reveal, and portal behavior stay
 in the runtime. New interaction behavior belongs in the runtime first.
 
-The dedicated `headless.html`, photo-library, and React examples use `createLightbox()` directly.
+The dedicated `headless.html`, photo-library, and React examples use `createFluidbox()` directly.
 The vanilla playground demonstrates declarative elements. Solid, Vue, and Angular accept the
-canonical `LightboxSource` and currently compose the same `AppGallery` adapter.
+canonical `FluidboxSource` and currently compose the same `FluidboxGalleryElement` adapter.

@@ -10,12 +10,12 @@ Fluidbox separates **what** a gallery contains from **where** its thumbnails are
 
 ## Sources
 
-A `LightboxSource` is synchronous metadata. It never holds DOM nodes or framework children.
+A `FluidboxSource` is synchronous metadata. It never holds DOM nodes or framework children.
 
 ```ts
-import type { LightboxSource } from "@ogdakke/fluidbox";
+import type { FluidboxSource } from "@ogdakke/fluidbox";
 
-const source: LightboxSource = {
+const source: FluidboxSource = {
   count: photos.length,
   getItem(index) {
     const photo = photos[index]!;
@@ -49,13 +49,13 @@ For in-memory lists, `arraySource(items)` builds the same shape. It copies the a
 The origin adapter answers "which element is item `id` right now?"
 
 ```ts
-const origins: LightboxOriginAdapter = {
+const origins: FluidboxOriginAdapter = {
   getOrigin(id) {
     const trigger = mounted.get(id);
     if (!trigger?.isConnected) return null;
     return {
       trigger, // activation and focus return
-      visual: trigger.querySelector("[data-lightbox-origin]") ?? trigger, // geometry and corner radius
+      visual: trigger.querySelector("[data-fluidbox-origin]") ?? trigger, // geometry and corner radius
       thumbnail: trigger.querySelector("img") ?? undefined, // decoded preview while the full image loads
     };
   },
@@ -78,7 +78,7 @@ With an indexed source, a page can hold a million items and mount twelve thumbna
 On a custom-element gallery, assign the source and adapter as properties:
 
 ```ts
-const gallery = document.querySelector<AppGallery>("app-gallery")!;
+const gallery = document.querySelector<FluidboxGalleryElement>("fluidbox-gallery")!;
 gallery.source = source;
 gallery.origins = origins;
 gallery.open({ index: 49_999 });
@@ -89,7 +89,7 @@ gallery.open({ index: 49_999 });
 When the host grid is virtualized, the selected item's thumbnail may not be mounted. Implement `revealOrigin` to scroll the grid so it is:
 
 ```ts
-const origins: LightboxOriginAdapter = {
+const origins: FluidboxOriginAdapter = {
   getOrigin,
   revealOrigin(id, index, { signal }) {
     virtualizer.scrollToIndex(rowFor(index), { align: "center" });
@@ -132,4 +132,4 @@ const dispose = controller.registerOrigin(
 );
 ```
 
-A matching single-item origin wins over a grouped one. In React, `Lightbox.Trigger` with `items` does this for you; see [React](./react.md).
+A matching single-item origin wins over a grouped one. In React, `Fluidbox.Trigger` with `items` does this for you; see [React](./react.md).

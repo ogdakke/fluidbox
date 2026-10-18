@@ -11,7 +11,7 @@ import {
 } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/angular";
-import type { AppGallery, LightboxItem } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement, FluidboxItem } from "@ogdakke/fluidbox";
 import {
   artSrc,
   formatCount,
@@ -33,8 +33,8 @@ abstract class GalleryHost implements AfterViewInit {
     if (gallery) gallery.origins = originsWithin(() => this.gallery());
   }
 
-  gallery(): AppGallery | null {
-    return this.host.nativeElement.querySelector<AppGallery>("app-gallery");
+  gallery(): FluidboxGalleryElement | null {
+    return this.host.nativeElement.querySelector<FluidboxGalleryElement>("fluidbox-gallery");
   }
 }
 
@@ -49,7 +49,7 @@ abstract class GalleryHost implements AfterViewInit {
         Switch source <span aria-hidden="true">→ {{ nextLabel() }}</span>
       </button>
     </header>
-    <app-gallery class="thumb-row" aria-label="Angular gallery">
+    <fluidbox-gallery class="thumb-row" aria-label="Angular gallery">
       @for (item of collection().items; track item.id; let index = $index) {
         <button
           type="button"
@@ -61,8 +61,8 @@ abstract class GalleryHost implements AfterViewInit {
           <img [src]="item.thumbnail?.src" alt="" />
         </button>
       }
-      <app-filmstrip></app-filmstrip>
-    </app-gallery>
+      <fluidbox-filmstrip></fluidbox-filmstrip>
+    </fluidbox-gallery>
     <code class="framework-panel__api">useFluidboxGallery(() =&gt; gallery, source)</code>
   </article>`,
 })
@@ -77,7 +77,7 @@ class AngularGallery extends GalleryHost {
     useFluidboxGallery(() => this.gallery(), this.source);
   }
 
-  label(item: LightboxItem): string {
+  label(item: FluidboxItem): string {
     return item.media.type === "image" ? item.media.alt : item.id;
   }
 
@@ -111,7 +111,7 @@ const indexed = indexedArt(100_000);
       <button type="submit" class="fb-button fb-button--primary">Open</button>
       <output class="jump__window">{{ windowLabel() }}</output>
     </form>
-    <app-gallery class="virtual-grid" aria-label="Angular indexed gallery">
+    <fluidbox-gallery class="virtual-grid" aria-label="Angular indexed gallery">
       @for (index of indices(); track index) {
         <button
           type="button"
@@ -120,12 +120,12 @@ const indexed = indexedArt(100_000);
           [attr.aria-label]="'Open gallery item ' + (index + 1)"
           (click)="open(index)"
         >
-          <img [src]="src(index)" alt="" data-lightbox-origin />
+          <img [src]="src(index)" alt="" data-fluidbox-origin />
           <span>#{{ format(index + 1) }}</span>
         </button>
       }
-      <app-filmstrip></app-filmstrip>
-    </app-gallery>
+      <fluidbox-filmstrip></fluidbox-filmstrip>
+    </fluidbox-gallery>
   </div>`,
 })
 class AngularIndexed extends GalleryHost {

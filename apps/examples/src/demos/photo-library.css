@@ -92,7 +92,7 @@
   padding-inline: 0;
 }
 
-[data-lightbox-overlay] {
+[data-fluidbox-overlay] {
   display: block;
 }
 

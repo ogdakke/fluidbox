@@ -1,5 +1,5 @@
 {
-  "name": "lightbox-workspace",
+  "name": "fluidbox-workspace",
   "private": true,
   "workspaces": [
     "packages/*",
@@ -10,9 +10,9 @@
     "prepare": "git config core.hooksPath .githooks",
     "test": "bun run --bun vitest run --pool=threads --maxWorkers=1",
     "test:contract": "tsc --noEmit",
-    "dev": "bun run build && concurrently --kill-others --names package,examples \"bun run --cwd packages/lightbox build --watch --no-clean\" \"bun run --cwd apps/examples dev\"",
+    "dev": "bun run build && concurrently --kill-others --names package,examples \"bun run --cwd packages/fluidbox build --watch --no-clean\" \"bun run --cwd apps/examples dev\"",
     "build:examples": "bun run build && bun run --cwd apps/examples build",
-    "build": "bun run --cwd packages/lightbox build",
+    "build": "bun run --cwd packages/fluidbox build",
     "lint:all": "bun run lint && bun run lint:typecheck",
     "lint": "oxlint . --type-aware",
     "lint:fix": "oxlint . --type-aware --fix",

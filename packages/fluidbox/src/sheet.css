@@ -1,0 +1,314 @@
+/* Sheet extension. Import with @ogdakke/fluidbox/sheet. The photos and the sheet
+   share one native scroller with a snap point per stop, so the browser moves
+   both; scroll-driven animations on its timeline, --fluidbox-sheet, do the rest.
+   Every length here is a custom property on the dialog; override any of them in
+   your own CSS. The runtime reads the ones marked "read". */
+@property --fluidbox-sheet-peek {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --fluidbox-sheet-gap {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+/* State, animated by the scroll: pixels of the sheet showing; 0 at rest to 1 at
+   the first stop; 0 at the first stop to 1 at the last; 1 with the photo
+   scrolled away to 0 at rest. */
+@property --fluidbox-sheet-visible {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --fluidbox-sheet-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --fluidbox-sheet-expand {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --fluidbox-sheet-dismiss {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@keyframes fluidbox-sheet-visible {
+  from {
+    --fluidbox-sheet-visible: var(--fluidbox-sheet-visible-start);
+  }
+  to {
+    --fluidbox-sheet-visible: calc(
+      var(--fluidbox-sheet-visible-start) + var(--fluidbox-sheet-range)
+    );
+  }
+}
+@keyframes fluidbox-sheet-progress {
+  to {
+    --fluidbox-sheet-progress: 1;
+  }
+}
+@keyframes fluidbox-sheet-expand {
+  to {
+    --fluidbox-sheet-expand: 1;
+  }
+}
+@keyframes fluidbox-sheet-dismiss {
+  from {
+    --fluidbox-sheet-dismiss: 1;
+  }
+}
+/* The stage holds still while the scroll raises the sheet: a translate that
+   cancels the scroll, not sticky, since Safari tints its bars from sticky layers. */
+@keyframes fluidbox-sheet-hold {
+  to {
+    translate: 0 calc(var(--fluidbox-sheet-range) - var(--fluidbox-sheet-dismiss-distance));
+  }
+}
+@keyframes fluidbox-sheet-backdrop {
+  from {
+    opacity: 0;
+  }
+}
+
+:where([data-fluidbox-overlay][data-fluidbox-sheet-overlay]) {
+  /* The scroller names the timeline; this lets the backdrop, outside it, read it. */
+  timeline-scope: --fluidbox-sheet;
+  animation:
+    fluidbox-sheet-visible linear both,
+    fluidbox-sheet-progress linear both,
+    fluidbox-sheet-expand linear both,
+    fluidbox-sheet-dismiss linear both;
+  animation-timeline: --fluidbox-sheet;
+  animation-range:
+    0px var(--fluidbox-sheet-range),
+    var(--fluidbox-sheet-dismiss-distance) var(--fluidbox-sheet-first-offset),
+    var(--fluidbox-sheet-first-offset) var(--fluidbox-sheet-range),
+    0px var(--fluidbox-sheet-dismiss-distance);
+}
+/* With the scroll dismiss the photo leaves by scrolling, not by flying home,
+   so its thumbnail on the page stays in view while the viewer is open; only a
+   flight, opening or closing, hides it. */
+:root:has([data-fluidbox-overlay][data-sheet-dismiss="scroll"][data-fluidbox-state="open"])
+  [data-fluidbox-thumbnail-hidden] {
+  visibility: visible !important;
+}
+/* A committed scroll dismiss hands touches straight back to the page. */
+:where([data-fluidbox-overlay][data-sheet-dismissed]),
+:where([data-fluidbox-overlay][data-sheet-dismissed]) * {
+  pointer-events: none !important;
+}
+/* The scroll dismiss fades the backdrop as the photo goes. */
+:where([data-fluidbox-overlay][data-fluidbox-sheet-overlay][data-sheet-dismiss="scroll"])
+  > [data-fluidbox-backdrop] {
+  animation: fluidbox-sheet-backdrop linear both;
+  animation-timeline: --fluidbox-sheet;
+  animation-range: 0px var(--fluidbox-sheet-dismiss-distance);
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-sheet-host] {
+  /* Read: 0 turns the sheet off, as for wide screens with a sidebar instead. */
+  --fluidbox-sheet-enabled: 1;
+  /* Read: fit shrinks the photo into the room above the sheet; push slides it up. */
+  --fluidbox-sheet-photo: fit;
+  /* Read: the sheet showing at rest. */
+  --fluidbox-sheet-peek: 0px;
+  /* Read: space between the photo and the sheet. */
+  --fluidbox-sheet-gap: 12px;
+  /* Space above the sheet when it shows all of itself. */
+  --fluidbox-sheet-top: calc(env(safe-area-inset-top, 0px) + 56px);
+  --fluidbox-sheet-radius: 18px;
+  --fluidbox-sheet-max-width: 640px;
+  --fluidbox-sheet-background: var(--fb-bg, Canvas);
+  --fluidbox-sheet-color: var(--fb-fg, CanvasText);
+  /* The photo keeps clear of the peeking sheet. */
+  --fluidbox-stage-bottom: var(--fluidbox-sheet-peek);
+}
+
+/* Reaches under the browser's bars at both ends, as the zoom viewport does: a
+   scroller clips to its box, and the sheet should paint under the toolbar. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-scroller] {
+  position: absolute;
+  inset: calc(-1 * var(--fluidbox-sheet-reach, 0px)) 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scroll-timeline: --fluidbox-sheet block;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-sheet-scroller]::-webkit-scrollbar {
+  display: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-sheet-off]
+  [data-fluidbox-sheet-scroller] {
+  overflow: hidden;
+  scroll-snap-type: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-space] {
+  height: calc(var(--fluidbox-sheet-reach, 0px) + var(--fluidbox-sheet-dismiss-distance, 0px));
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
+  position: relative;
+  /* Holds the strip's bleed under the bars in, instead of collapsing it through. */
+  display: flow-root;
+  height: calc(100% - 2 * var(--fluidbox-sheet-reach, 0px));
+  animation: fluidbox-sheet-hold linear both;
+  animation-timeline: --fluidbox-sheet;
+  animation-range: var(--fluidbox-sheet-dismiss-distance) var(--fluidbox-sheet-range);
+}
+/* The dialog's and the strip's own touch-action would keep vertical swipes
+   from the scroller. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is(
+    [data-fluidbox-dialog][data-fluidbox-sheet-host],
+    [data-fluidbox-sheet-stage] [data-fluidbox-slides]
+  ) {
+  touch-action: pan-x pan-y;
+}
+/* The strip only scrolls sideways; a vertical swipe on it chains on to the scroller. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-sheet-stage]
+  [data-fluidbox-slides] {
+  overscroll-behavior-y: auto;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-snap] {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  scroll-snap-align: start;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-snap][data-rest] {
+  scroll-snap-stop: always;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-slot] {
+  position: relative;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: calc(var(--fluidbox-sheet-lead, 0px) - var(--fluidbox-sheet-peek));
+  pointer-events: none;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet] {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--fluidbox-sheet-max-width);
+  /* Tall enough for the top stop, whatever the content. */
+  min-height: calc(var(--fluidbox-sheet-min-height, 0px) + var(--fluidbox-sheet-reach, 0px));
+  max-height: calc(
+    var(--fluidbox-height, 100svh) - var(--fluidbox-sheet-top) + var(--fluidbox-sheet-reach, 0px)
+  );
+  /* Under the toolbar too, so the toolbar shows the sheet and not the photo; and,
+     as React Aria's sheet does, clear of the keyboard, so the end of the sheet
+     can be brought above it. */
+  padding-bottom: calc(
+    env(safe-area-inset-bottom, 0px) + var(--fluidbox-sheet-reach, 0px) +
+      var(--fluidbox-sheet-keyboard, 0px)
+  );
+  overflow: hidden;
+  border-radius: var(--fluidbox-sheet-radius) var(--fluidbox-sheet-radius) 0 0;
+  background: var(--fluidbox-sheet-background);
+  color: var(--fluidbox-sheet-color);
+  box-shadow:
+    0 -1px 0 rgb(0 0 0 / 0.06),
+    0 -12px 40px rgb(0 0 0 / 0.18);
+  outline: none;
+  pointer-events: auto;
+}
+/* Below the top stop a swipe anywhere on the sheet moves the sheet; at the top
+   its content scrolls, and at the top of the content a pull down carries on
+   into the sheet. Mark the part that scrolls with data-fluidbox-sheet-scroll,
+   or the whole sheet scrolls. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-scroll] {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior-y: auto;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-sheet-expanded]
+  :is([data-fluidbox-sheet-scroll], [data-fluidbox-sheet]:not(:has([data-fluidbox-sheet-scroll]))) {
+  overflow-y: auto;
+}
+
+/* A grab handle; add one as the sheet's first child. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-handle] {
+  flex: none;
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 4px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0;
+  background: currentColor;
+  opacity: 0.25;
+}
+
+/* Choreography: the arrows centre on the photo and go once the sheet is up,
+   the filmstrip gives way, and the photo fades rather than shrink to a stamp
+   past the first stop. Set --fluidbox-sheet-fade: 0 to keep it. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-sheet-host]
+  :is([data-fluidbox-previous], [data-fluidbox-next]) {
+  translate: 0 calc(max(0px, var(--fluidbox-sheet-visible)) / -2 + var(--fluidbox-sheet-peek) / 2);
+  opacity: calc(1 - var(--fluidbox-sheet-progress) * 2 - var(--fluidbox-sheet-dismiss) * 3);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-sheet-raised]
+  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-filmstrip-dock]) {
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-sheet-host]
+  [data-fluidbox-slide] {
+  opacity: calc(1 - var(--fluidbox-sheet-expand) * var(--fluidbox-sheet-fade, 1));
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-sheet-host]
+  [data-fluidbox-filmstrip-dock] {
+  opacity: calc(1 - var(--fluidbox-sheet-progress) * 3 - var(--fluidbox-sheet-dismiss) * 3);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-sheet-host]
+  [data-fluidbox-close] {
+  opacity: calc(1 - var(--fluidbox-sheet-dismiss) * 3);
+}
+/* A dismiss fades the controls at once, as without a sheet. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-sheet-host][data-dismissing]
+  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Without scroll-driven animations the sheet still scrolls and snaps; the
+   stage holds with sticky instead, and the photo stays the size it is. */
+@supports not (animation-timeline: scroll()) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
+    position: sticky;
+    top: var(--fluidbox-sheet-reach, 0px);
+  }
+  /* Without a timeline these would run once and stop at their end: the stage
+     a whole range down, and every state at 1. */
+  :where([data-fluidbox-overlay][data-fluidbox-sheet-overlay]),
+  :where([data-fluidbox-overlay][data-fluidbox-sheet-overlay]) > [data-fluidbox-backdrop],
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
+    animation: none;
+  }
+}

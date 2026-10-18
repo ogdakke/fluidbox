@@ -14,7 +14,7 @@
         <h1>Solid</h1>
         <p>
           <code>useFluidboxGallery(source)</code> returns a ref callback that keeps an
-          <code>&lt;app-gallery&gt;</code> in sync with a signal.
+          <code>&lt;fluidbox-gallery&gt;</code> in sync with a signal.
         </p>
       </header>
       <section class="section" aria-labelledby="source-switching-title">
@@ -36,11 +36,11 @@
           <pre><code>const [source, setSource] = createSignal(photos);
 const bind = useFluidboxGallery(source);
 
-&lt;app-gallery ref={(node) =&gt; { gallery = node; bind(node); }}&gt;
+&lt;fluidbox-gallery ref={(node) =&gt; { gallery = node; bind(node); }}&gt;
   &lt;For each={items()}&gt;
     {(item, index) =&gt; &lt;button onClick={() =&gt; gallery.open({ index: index() })}&gt;…&lt;/button&gt;}
   &lt;/For&gt;
-&lt;/app-gallery&gt;</code></pre>
+&lt;/fluidbox-gallery&gt;</code></pre>
         </details>
       </section>
       <section class="section" aria-labelledby="indexed-window-title">

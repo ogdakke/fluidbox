@@ -14,8 +14,8 @@ import "@ogdakke/fluidbox/styles.css";
 Add a gallery to the page:
 
 ```html
-<app-gallery aria-label="Photos">
-  <app-lightbox item-id="mountain">
+<fluidbox-gallery aria-label="Photos">
+  <fluidbox-item item-id="mountain">
     <button slot="trigger" type="button">
       <img src="/photos/mountain-thumb.jpg" alt="A mountain at dusk" width="300" height="200" />
     </button>
@@ -28,19 +28,19 @@ Add a gallery to the page:
         <img src="/photos/mountain.jpg" width="2400" height="1600" alt="A mountain at dusk" />
       </picture>
     </template>
-  </app-lightbox>
-  <app-filmstrip></app-filmstrip>
-</app-gallery>
+  </fluidbox-item>
+  <fluidbox-filmstrip></fluidbox-filmstrip>
+</fluidbox-gallery>
 ```
 
-The `elements` import registers the custom elements. Import the CSS separately to style the viewer. See the [markup and styling guide](docs/LIGHTBOX.md) for slots, state attributes, and CSS hooks.
+The `elements` import registers the custom elements. Import the CSS separately to style the viewer. See the [markup and styling guide](docs/FLUIDBOX.md) for slots, state attributes, and CSS hooks.
 
 For server rendering, import the package root and register the elements after hydration:
 
 ```ts
-import { registerLightboxElements } from "@ogdakke/fluidbox";
+import { registerFluidboxElements } from "@ogdakke/fluidbox";
 
-await registerLightboxElements();
+await registerFluidboxElements();
 ```
 
 The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue`, and `/angular`. Install only `@ogdakke/fluidbox` alongside the framework your app already uses. The framework packages are optional peers, and each binding has its own export. See [framework bindings](docs/BINDINGS.md) for working examples.
@@ -50,10 +50,14 @@ The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `
 An indexed source lets a gallery open items whose thumbnails are not currently in the DOM. This is useful with virtual lists. The viewer and filmstrip keep a bounded number of elements mounted.
 
 ```ts
-import type { AppGallery, LightboxOriginAdapter, LightboxSource } from "@ogdakke/fluidbox";
+import type {
+  FluidboxGalleryElement,
+  FluidboxOriginAdapter,
+  FluidboxSource,
+} from "@ogdakke/fluidbox";
 
-const gallery = document.querySelector<AppGallery>("app-gallery")!;
-const source: LightboxSource = {
+const gallery = document.querySelector<FluidboxGalleryElement>("fluidbox-gallery")!;
+const source: FluidboxSource = {
   count: photos.length,
   getItem(index) {
     const photo = photos[index]!;
@@ -74,7 +78,7 @@ const source: LightboxSource = {
     return index < 0 ? null : index;
   },
 };
-const origins: LightboxOriginAdapter = {
+const origins: FluidboxOriginAdapter = {
   getOrigin(id) {
     const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${CSS.escape(id)}"]`);
     return trigger
@@ -92,7 +96,7 @@ void gallery.open({ index: 0 });
 
 ## Development
 
-This repository uses Bun. The package lives in `packages/lightbox`. The showcase and test fixtures in `apps/examples` use its built exports.
+This repository uses Bun. The package lives in `packages/fluidbox`. The showcase and test fixtures in `apps/examples` use its built exports.
 
 ```sh
 bun install
@@ -117,4 +121,4 @@ The [public API contract](docs/PUBLIC_API.md) defines the headless source, contr
 origin, and thumbnail-overlay target. The [roadmap to 1.0](docs/ROADMAP.md) tracks its runtime and
 framework implementation, CDN adapters, styling work, and release gates.
 
-Portfolio declares `"@ogdakke/fluidbox": "file:../lightbox/packages/lightbox"`, so a fresh checkout works after building this package and running `bun install` in `portfolio-v4`. For a live directory link during development, run `bun link` in `packages/lightbox`, then `bun link @ogdakke/fluidbox` in `portfolio-v4`. Reapply the consumer link after reinstalling dependencies.
+Portfolio declares `"@ogdakke/fluidbox": "file:../fluidbox/packages/fluidbox"`, so a fresh checkout works after building this package and running `bun install` in `portfolio-v4`. For a live directory link during development, run `bun link` in `packages/fluidbox`, then `bun link @ogdakke/fluidbox` in `portfolio-v4`. Reapply the consumer link after reinstalling dependencies.

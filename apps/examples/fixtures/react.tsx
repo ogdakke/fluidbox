@@ -1,8 +1,8 @@
 import { mountSite } from "../src/site";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { LightboxItem } from "@ogdakke/fluidbox";
-import { Lightbox } from "@ogdakke/fluidbox/react";
+import type { FluidboxItem } from "@ogdakke/fluidbox";
+import { Fluidbox } from "@ogdakke/fluidbox/react";
 import { alternateRuntimeSource, runtimeSource } from "./source";
 import "./react-examples.css";
 
@@ -10,7 +10,7 @@ mountSite("fixtures", {
   fixture: "React binding · composed parts, shared origins, and source replacement",
 });
 
-const productItems: LightboxItem[] = [
+const productItems: FluidboxItem[] = [
   {
     id: "runner",
     media: {
@@ -24,7 +24,7 @@ const productItems: LightboxItem[] = [
   },
 ];
 
-const mapItems: LightboxItem[] = [
+const mapItems: FluidboxItem[] = [
   {
     id: "store-map",
     media: {
@@ -37,7 +37,7 @@ const mapItems: LightboxItem[] = [
   },
 ];
 
-const albumItems: LightboxItem[] = ["/first.svg", "/second.svg", "/first.svg", "/second.svg"].map(
+const albumItems: FluidboxItem[] = ["/first.svg", "/second.svg", "/first.svg", "/second.svg"].map(
   (src, index) => ({
     id: `album-${index + 1}`,
     media: {
@@ -53,19 +53,19 @@ const albumItems: LightboxItem[] = ["/first.svg", "/second.svg", "/first.svg", "
 
 function ViewerControls({ filmstrip = false }: { filmstrip?: boolean }) {
   return (
-    <Lightbox.Portal>
-      <Lightbox.Previous />
-      <Lightbox.Next />
-      <Lightbox.Close />
-      {filmstrip && <Lightbox.Filmstrip />}
-    </Lightbox.Portal>
+    <Fluidbox.Portal>
+      <Fluidbox.Previous />
+      <Fluidbox.Next />
+      <Fluidbox.Close />
+      {filmstrip && <Fluidbox.Filmstrip />}
+    </Fluidbox.Portal>
   );
 }
 
 function IndexedSource() {
   const [currentSource, setCurrentSource] = useState(runtimeSource);
   return (
-    <Lightbox.Root source={currentSource}>
+    <Fluidbox.Root source={currentSource}>
       <section className="example" aria-labelledby="indexed-title">
         <div className="example__heading">
           <div>
@@ -80,20 +80,20 @@ function IndexedSource() {
             Switch source
           </button>
         </div>
-        <Lightbox.Item id="0">
-          <Lightbox.Trigger>
+        <Fluidbox.Item id="0">
+          <Fluidbox.Trigger>
             <span>Open gallery</span>
-          </Lightbox.Trigger>
-        </Lightbox.Item>
+          </Fluidbox.Trigger>
+        </Fluidbox.Item>
         <ViewerControls />
       </section>
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
 function ProductCard() {
   return (
-    <Lightbox.Root items={productItems}>
+    <Fluidbox.Root items={productItems}>
       <section className="example" aria-labelledby="product-title">
         <div className="example__heading">
           <div>
@@ -102,9 +102,9 @@ function ProductCard() {
           </div>
           <p>The product image opens the viewer. The details stay on the card.</p>
         </div>
-        <Lightbox.Trigger item={productItems[0]} asChild>
+        <Fluidbox.Trigger item={productItems[0]} asChild>
           <button type="button" className="product-card" aria-label="View the Coral Runner shoe">
-            <span className="product-card__image" data-lightbox-origin>
+            <span className="product-card__image" data-fluidbox-origin>
               <img src="/runner.svg" alt="" width="1000" height="700" />
             </span>
             <span className="product-card__details">
@@ -116,16 +116,16 @@ function ProductCard() {
             </span>
             <span className="product-card__badge">New color</span>
           </button>
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
         <ViewerControls />
       </section>
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
 function MapCard() {
   return (
-    <Lightbox.Root items={mapItems}>
+    <Fluidbox.Root items={mapItems}>
       <section className="example" aria-labelledby="map-title">
         <div className="example__heading">
           <div>
@@ -134,9 +134,9 @@ function MapCard() {
           </div>
           <p>The preview and the interactive map are different elements.</p>
         </div>
-        <Lightbox.Trigger item={mapItems[0]} asChild>
+        <Fluidbox.Trigger item={mapItems[0]} asChild>
           <button type="button" className="map-card" aria-label="Open the store map">
-            <span className="map-card__preview" data-lightbox-origin>
+            <span className="map-card__preview" data-fluidbox-origin>
               <img src="/map-preview.svg" alt="" width="1000" height="700" />
             </span>
             <span className="map-card__caption">
@@ -144,16 +144,16 @@ function MapCard() {
               <small>Open the interactive map</small>
             </span>
           </button>
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
         <ViewerControls />
       </section>
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
 function AlbumCard() {
   return (
-    <Lightbox.Root items={albumItems}>
+    <Fluidbox.Root items={albumItems}>
       <section className="example" aria-labelledby="album-title">
         <div className="example__heading">
           <div>
@@ -162,22 +162,22 @@ function AlbumCard() {
           </div>
           <p>The text card is the close target even after you move to another slide.</p>
         </div>
-        <Lightbox.Trigger items={albumItems} item={albumItems[0]} asChild>
+        <Fluidbox.Trigger items={albumItems} item={albumItems[0]} asChild>
           <button type="button" className="album-card">
             <span className="album-card__count">04</span>
             <span className="album-card__title">Open the collection</span>
             <span className="album-card__hint">Browse all images ↗</span>
           </button>
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
         <ViewerControls filmstrip />
       </section>
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
 function GalleryCard() {
   return (
-    <Lightbox.Root items={albumItems}>
+    <Fluidbox.Root items={albumItems}>
       <section className="example" aria-labelledby="gallery-card-title">
         <div className="example__heading">
           <div>
@@ -186,22 +186,22 @@ function GalleryCard() {
           </div>
           <p>The card follows the selected slide and is the close target for all four.</p>
         </div>
-        <Lightbox.Trigger items={albumItems} item={albumItems[0]} asChild>
+        <Fluidbox.Trigger items={albumItems} item={albumItems[0]} asChild>
           {({ item }) => (
             <button type="button" className="gallery-card" aria-label="Open the preview gallery">
-              <span className="gallery-card__preview" data-lightbox-origin>
+              <span className="gallery-card__preview" data-fluidbox-origin>
                 <img src={item?.media.type === "image" ? item.media.src : ""} alt="" />
-                <Lightbox.ThumbnailOverlay className="gallery-card__count">
+                <Fluidbox.ThumbnailOverlay className="gallery-card__count">
                   +3
-                </Lightbox.ThumbnailOverlay>
+                </Fluidbox.ThumbnailOverlay>
               </span>
               <span className="gallery-card__caption">Browse the collection</span>
             </button>
           )}
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
         <ViewerControls filmstrip />
       </section>
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 

@@ -28,7 +28,7 @@ const pages = Object.fromEntries(findPages(import.meta.dirname));
 function packageSource(command: "build" | "serve") {
   if (command !== "serve") return [];
   const source = (file: string) =>
-    resolve(import.meta.dirname, "../../packages/lightbox/src", file);
+    resolve(import.meta.dirname, "../../packages/fluidbox/src", file);
   return [
     { find: "@ogdakke/fluidbox/styles.css", replacement: source("styles.css") },
     { find: "@ogdakke/fluidbox/sheet.css", replacement: source("sheet.css") },
@@ -53,7 +53,7 @@ function watchPackageSource(): Plugin {
     name: "watch-package-source",
     apply: "serve",
     configureServer(server) {
-      server.watcher.add(resolve(import.meta.dirname, "../../packages/lightbox/src"));
+      server.watcher.add(resolve(import.meta.dirname, "../../packages/fluidbox/src"));
     },
   };
 }

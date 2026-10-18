@@ -1,6 +1,6 @@
 # Codex instructions
 
-This is a Bun workspace. The only installable package is `packages/lightbox`.
+This is a Bun workspace. The only installable package is `packages/fluidbox`.
 
 - Use `bun install` for dependencies and `bun run <script>` for scripts.
 - Use `bun run build` for tsdown, `bun run test` for Vitest, `bun run test:ssr` and `bun run test:bundle` for package checks, `bun run lint:all` for oxlint and TypeScript 7, and `bun run format:check` for oxfmt.

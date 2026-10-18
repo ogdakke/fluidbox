@@ -1,10 +1,10 @@
 import { artSrc, scenes } from "../art";
 
-/** Fills an `<app-gallery>` with one `<app-lightbox>` per scene, laid out as justified rows. */
+/** Fills an `<fluidbox-gallery>` with one `<fluidbox-item>` per scene, laid out as justified rows. */
 export function mountElements(gallery: HTMLElement): void {
-  const filmstrip = gallery.querySelector("app-filmstrip");
+  const filmstrip = gallery.querySelector("fluidbox-filmstrip");
   for (const scene of scenes) {
-    const item = document.createElement("app-lightbox");
+    const item = document.createElement("fluidbox-item");
     item.setAttribute("item-id", scene.id);
     item.style.setProperty("--ratio", String(scene.width / scene.height));
 
@@ -21,7 +21,7 @@ export function mountElements(gallery: HTMLElement): void {
     trigger.type = "button";
     trigger.slot = "trigger";
     // The rounded button clips the image, so it is the handoff box rather than the bare <img>.
-    trigger.dataset.lightboxPreview = "";
+    trigger.dataset.fluidboxPreview = "";
     trigger.append(image());
 
     const content = document.createElement("template");

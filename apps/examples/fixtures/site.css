@@ -12,20 +12,20 @@ main h1 {
   font-size: 1.6rem;
 }
 
-app-gallery {
+fluidbox-gallery {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 
-app-lightbox img {
+fluidbox-item img {
   display: block;
   width: 100%;
   height: auto;
   border-radius: var(--fb-image-radius);
 }
 
-app-gallery > button[data-virtual-index] {
+fluidbox-gallery > button[data-virtual-index] {
   height: var(--fb-control-height);
   margin: 0 8px 8px 0;
   padding: 0 14px;
@@ -36,7 +36,7 @@ app-gallery > button[data-virtual-index] {
   cursor: pointer;
 }
 
-app-gallery > button[data-virtual-index]:hover {
+fluidbox-gallery > button[data-virtual-index]:hover {
   border-color: var(--fb-fg);
   background: var(--fb-surface-2);
 }

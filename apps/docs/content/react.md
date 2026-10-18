@@ -11,64 +11,64 @@ order: 1
 ## A gallery
 
 ```tsx
-import { Lightbox } from "@ogdakke/fluidbox/react";
+import { Fluidbox } from "@ogdakke/fluidbox/react";
 import "@ogdakke/fluidbox/styles.css";
 
-export function Photos({ photos }: { photos: LightboxItem[] }) {
+export function Photos({ photos }: { photos: FluidboxItem[] }) {
   return (
-    <Lightbox.Root items={photos}>
+    <Fluidbox.Root items={photos}>
       {photos.map((photo) => (
-        <Lightbox.Item key={photo.id} id={photo.id}>
-          <Lightbox.Trigger asChild>
+        <Fluidbox.Item key={photo.id} id={photo.id}>
+          <Fluidbox.Trigger asChild>
             <button type="button">
               <img src={photo.thumbnail?.src} alt="" />
             </button>
-          </Lightbox.Trigger>
-        </Lightbox.Item>
+          </Fluidbox.Trigger>
+        </Fluidbox.Item>
       ))}
-      <Lightbox.Portal>
-        <Lightbox.Previous />
-        <Lightbox.Next />
-        <Lightbox.Close />
-        <Lightbox.Filmstrip />
-      </Lightbox.Portal>
-    </Lightbox.Root>
+      <Fluidbox.Portal>
+        <Fluidbox.Previous />
+        <Fluidbox.Next />
+        <Fluidbox.Close />
+        <Fluidbox.Filmstrip />
+      </Fluidbox.Portal>
+    </Fluidbox.Root>
   );
 }
 ```
 
-`Root` takes either `items` (an array) or `source` (a [`LightboxSource`](./sources-and-origins.md)), plus optional `origins`, `renderers`, `onBeforeCommand`, and `onEvent`.
+`Root` takes either `items` (an array) or `source` (a [`FluidboxSource`](./sources-and-origins.md)), plus optional `origins`, `renderers`, `onBeforeCommand`, and `onEvent`.
 
 ## Parts
 
 | Part                                 | Role                                                                                  |
 | ------------------------------------ | ------------------------------------------------------------------------------------- |
-| `Lightbox.Root`                      | Creates the controller for its items or source.                                       |
-| `Lightbox.Item`                      | Scopes an item ID for the parts inside it.                                            |
-| `Lightbox.Trigger`                   | Opens an item. `asChild` composes onto your element and its ref.                      |
-| `Lightbox.ThumbnailOverlay`          | Content over the thumbnail that fades (`host`) or travels (`travel`) with the flight. |
-| `Lightbox.Portal`                    | Renders children into the viewer's portal.                                            |
-| `Lightbox.Previous`, `Next`, `Close` | Buttons wired to the controller, disabled at the ends of finite galleries.            |
-| `Lightbox.Filmstrip`                 | The thumbnail strip.                                                                  |
+| `Fluidbox.Root`                      | Creates the controller for its items or source.                                       |
+| `Fluidbox.Item`                      | Scopes an item ID for the parts inside it.                                            |
+| `Fluidbox.Trigger`                   | Opens an item. `asChild` composes onto your element and its ref.                      |
+| `Fluidbox.ThumbnailOverlay`          | Content over the thumbnail that fades (`host`) or travels (`travel`) with the flight. |
+| `Fluidbox.Portal`                    | Renders children into the viewer's portal.                                            |
+| `Fluidbox.Previous`, `Next`, `Close` | Buttons wired to the controller, disabled at the ends of finite galleries.            |
+| `Fluidbox.Filmstrip`                 | The thumbnail strip.                                                                  |
 
-Hooks: `useLightbox()` returns the controller; `useLightboxState(selector)` subscribes to a slice of state.
+Hooks: `useFluidbox()` returns the controller; `useFluidboxState(selector)` subscribes to a slice of state.
 
 ## Rich origins
 
-Any element can be the origin. Mark the visible box with `data-lightbox-origin` when the trigger contains more than the image:
+Any element can be the origin. Mark the visible box with `data-fluidbox-origin` when the trigger contains more than the image:
 
 ```tsx
-<Lightbox.Trigger item={product} asChild>
+<Fluidbox.Trigger item={product} asChild>
   <button type="button" className="product">
-    <span className="product__image" data-lightbox-origin>
+    <span className="product__image" data-fluidbox-origin>
       <img src="/runner.svg" alt="" />
-      <Lightbox.ThumbnailOverlay behavior="travel">
+      <Fluidbox.ThumbnailOverlay behavior="travel">
         <span className="badge">New color</span>
-      </Lightbox.ThumbnailOverlay>
+      </Fluidbox.ThumbnailOverlay>
     </span>
     <span className="product__details">Coral Runner · $124</span>
   </button>
-</Lightbox.Trigger>
+</Fluidbox.Trigger>
 ```
 
 Only the image flies; the price stays on the card, and the badge rides along on the transition layer.
@@ -78,21 +78,21 @@ Only the image flies; the price stays on the card, and the badge rides along on 
 A trigger with `items` stands in for all of them. Its render callback receives the selected item, so the cover can follow navigation and every slide closes back to it:
 
 ```tsx
-<Lightbox.Root items={photos}>
-  <Lightbox.Trigger item={photos[0]} items={photos} asChild>
+<Fluidbox.Root items={photos}>
+  <Fluidbox.Trigger item={photos[0]} items={photos} asChild>
     {({ item }) => (
       <button type="button" aria-label="Open the album">
-        <span data-lightbox-origin>
+        <span data-fluidbox-origin>
           <img src={item?.thumbnail?.src} alt="" />
-          <Lightbox.ThumbnailOverlay>+{photos.length - 1}</Lightbox.ThumbnailOverlay>
+          <Fluidbox.ThumbnailOverlay>+{photos.length - 1}</Fluidbox.ThumbnailOverlay>
         </span>
       </button>
     )}
-  </Lightbox.Trigger>
-  <Lightbox.Portal>
-    <Lightbox.Close />
-  </Lightbox.Portal>
-</Lightbox.Root>
+  </Fluidbox.Trigger>
+  <Fluidbox.Portal>
+    <Fluidbox.Close />
+  </Fluidbox.Portal>
+</Fluidbox.Root>
 ```
 
 Keep the visual node mounted while its contents change so the handoff geometry stays stable.

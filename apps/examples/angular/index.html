@@ -33,11 +33,11 @@
         </div>
         <details class="fb-code">
           <summary>Binding</summary>
-          <pre><code>@Component({ schemas: [CUSTOM_ELEMENTS_SCHEMA], template: `&lt;app-gallery&gt;…&lt;/app-gallery&gt;` })
+          <pre><code>@Component({ schemas: [CUSTOM_ELEMENTS_SCHEMA], template: `&lt;fluidbox-gallery&gt;…&lt;/fluidbox-gallery&gt;` })
 class Photos {
   readonly source = signal(photos);
   constructor() {
-    useFluidboxGallery(() =&gt; this.host.nativeElement.querySelector("app-gallery"), this.source);
+    useFluidboxGallery(() =&gt; this.host.nativeElement.querySelector("fluidbox-gallery"), this.source);
   }
 }</code></pre>
         </details>

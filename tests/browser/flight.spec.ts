@@ -47,7 +47,7 @@ type Box = { x: number; y: number; width: number; height: number };
 async function visibleOrigin(page: Page, id: string): Promise<Box> {
   return page.evaluate((id) => {
     const trigger = document.querySelector(`[data-flight-case="${id}"] [data-flight-trigger]`)!;
-    const visual = trigger.querySelector<HTMLElement>("[data-lightbox-origin]") ?? trigger;
+    const visual = trigger.querySelector<HTMLElement>("[data-fluidbox-origin]") ?? trigger;
     const rect = visual.getBoundingClientRect();
     const left = Math.max(0, rect.left);
     const top = Math.max(0, rect.top);
@@ -102,7 +102,7 @@ async function armHold(page: Page, at: "start" | "middle" | "end") {
     const timer = setInterval(() => {
       const moving = Array.from(
         document.querySelectorAll(
-          "[data-lightbox-overlay] [data-lightbox-frame], [data-lightbox-flight] [data-lightbox-frame]",
+          "[data-fluidbox-overlay] [data-fluidbox-frame], [data-fluidbox-flight] [data-fluidbox-frame]",
         ),
       ).some((frame) =>
         frame
@@ -187,8 +187,8 @@ for (const id of cases) {
     await page.evaluate(() => {
       for (const animation of document.getAnimations()) animation.playbackRate = 1;
     });
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-      "data-lightbox-state",
+    await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+      "data-fluidbox-state",
       "open",
     );
     await armHold(page, "end");
@@ -207,18 +207,18 @@ test("a travelling badge keeps its size through the flight", async ({ page }) =>
   const badge = page.locator('[data-flight-case="badge"] .flight-badge');
   const size = (await badge.boundingBox())!;
   await trigger.click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await armHold(page, "middle");
   await page.keyboard.press("Escape");
   await held(page);
   const travelling = (await page
-    .locator("[data-lightbox-transition-content] .flight-badge")
+    .locator("[data-fluidbox-transition-content] .flight-badge")
     .boundingBox())!;
   const opacity = await page
-    .locator("[data-lightbox-transition-content]")
+    .locator("[data-fluidbox-transition-content]")
     .evaluate((target) => Number(getComputedStyle(target).opacity));
   expect(opacity, "the badge is visible mid-flight").toBeGreaterThan(0.9);
   // The badge is near-black with white text. If the flying image covered it,
@@ -257,25 +257,25 @@ test("a wheel during the opening takes over and dismisses", async ({ page }, tes
   const trigger = page.locator('[data-flight-case="cover"] [data-flight-trigger]');
   await trigger.scrollIntoViewIfNeeded();
   await trigger.click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "opening");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "opening");
   await page.waitForTimeout(400);
   const box = (await trigger.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await expect(dialog, "the wheel lands while the opening still plays").toHaveAttribute(
-    "data-lightbox-state",
+    "data-fluidbox-state",
     "opening",
   );
   await page.mouse.wheel(0, -500);
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "closing");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "closing");
   await expect(dialog).toHaveCount(0, { timeout: 15_000 });
 });
 
 test("a close after an idle moment still animates", async ({ page }) => {
   const trigger = await prepareCase(page, "cover");
   await trigger.click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
   // Long enough for a browser to stop advancing its idle timeline.
   await page.waitForTimeout(1200);
   // Watch the close as it happens: a loaded browser can finish it before a
@@ -286,7 +286,7 @@ test("a close after an idle moment still animates", async ({ page }) => {
       new Promise<CloseMotion>((resolve) => {
         const result = { closing: false, running: 0, frames: 0 };
         const count = () => {
-          if (!document.querySelector("[data-lightbox-dialog]")) return resolve(result);
+          if (!document.querySelector("[data-fluidbox-dialog]")) return resolve(result);
           if (result.closing) {
             result.frames += 1;
             result.running = Math.max(
@@ -299,14 +299,14 @@ test("a close after an idle moment still animates", async ({ page }) => {
         };
         new MutationObserver((_, observer) => {
           const state = document
-            .querySelector("[data-lightbox-dialog]")
-            ?.getAttribute("data-lightbox-state");
+            .querySelector("[data-fluidbox-dialog]")
+            ?.getAttribute("data-fluidbox-state");
           if (state !== "closing") return;
           observer.disconnect();
           result.closing = true;
         }).observe(document.body, {
           attributes: true,
-          attributeFilter: ["data-lightbox-state"],
+          attributeFilter: ["data-fluidbox-state"],
           subtree: true,
         });
         requestAnimationFrame(count);
@@ -334,8 +334,8 @@ test("the card stays painted until the opening has been on screen for a frame", 
         const image = document.querySelector<HTMLElement>('[data-flight-case="cover"] img')!;
         const seen: string[] = [];
         const tick = () => {
-          const overlay = document.querySelector("[data-lightbox-overlay]");
-          const shown = !!overlay && !overlay.hasAttribute("data-lightbox-prepared");
+          const overlay = document.querySelector("[data-fluidbox-overlay]");
+          const shown = !!overlay && !overlay.hasAttribute("data-fluidbox-prepared");
           if (shown) seen.push(getComputedStyle(image).visibility);
           if (seen.length < 4) requestAnimationFrame(tick);
           else resolve(seen);
@@ -356,13 +356,13 @@ test("every photo in the scroller opens its own slide of one gallery", async ({ 
   const second = items.nth(1);
   await second.scrollIntoViewIfNeeded();
   await second.click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
-  await expect(second.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(second.locator("img")).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
   // The viewer browses the whole gallery, and the card it hides follows.
   await page.keyboard.press("ArrowRight");
-  await expect(items.nth(2).locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
-  await expect(second.locator("img")).not.toHaveAttribute("data-lightbox-thumbnail-hidden");
+  await expect(items.nth(2).locator("img")).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
+  await expect(second.locator("img")).not.toHaveAttribute("data-fluidbox-thumbnail-hidden");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 });
@@ -373,8 +373,8 @@ test("a close right after a swipe flies to the swiped photo", async ({ page }, t
   const items = page.locator('[data-flight-case="scroll"] [data-flight-item]');
   await items.nth(1).scrollIntoViewIfNeeded();
   await items.nth(1).tap();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
   const session = await page.context().newCDPSession(page);
   const touch = (type: "touchStart" | "touchMove" | "touchEnd", x: number) =>
     session.send("Input.dispatchTouchEvent", {
@@ -388,9 +388,9 @@ test("a close right after a swipe flies to the swiped photo", async ({ page }, t
   }
   await touch("touchEnd", 60);
   // Close before the strip settles and reveals the swiped photo on its own.
-  await expect(items.nth(2).locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+  await expect(items.nth(2).locator("img")).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-flight]")).toHaveCount(1);
   const visible = await items.nth(2).evaluate((item) => {
     const scroller = item.closest<HTMLElement>("[data-flight-scroller]")!.getBoundingClientRect();
     const rect = item.getBoundingClientRect();
@@ -424,12 +424,12 @@ test("a travelling badge never widens the page", async ({ page }) => {
     requestAnimationFrame(tick);
   });
   await trigger.click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   const { widest, rest } = await page.evaluate(() => {
     const { widest, rest } = window as unknown as { widest: number; rest: number };
     return { widest, rest };
@@ -441,15 +441,15 @@ test("a travelling badge lands exactly on the card's badge", async ({ page }) =>
   const trigger = await prepareCase(page, "badge");
   const card = (await page.locator('[data-flight-case="badge"] .flight-badge').boundingBox())!;
   await trigger.click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await armHold(page, "end");
   await page.keyboard.press("Escape");
   await held(page);
   const landing = (await page
-    .locator("[data-lightbox-transition-content] .flight-badge")
+    .locator("[data-fluidbox-transition-content] .flight-badge")
     .boundingBox())!;
   expect(Math.abs(landing.x - card.x)).toBeLessThan(1.5);
   expect(Math.abs(landing.y - card.y)).toBeLessThan(1.5);
@@ -460,18 +460,18 @@ test("zooming leaves no unzoomed image behind", async ({ page }, testInfo) => {
   test.skip(!!testInfo.project.use.isMobile, "Double-click zoom is a desktop scenario.");
   const trigger = await prepareCase(page, "cover");
   await trigger.click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
-  const media = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]');
+  const media = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]');
   const box = (await media.boundingBox())!;
   await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 3);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute("data-zoomed", "");
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute("data-zoomed", "");
   const leftovers = await page.evaluate(() =>
     Array.from(
       document.querySelectorAll<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] :is([data-lightbox-slide-preview], [data-lightbox-slide-placeholder])',
+        '[data-fluidbox-slide][aria-hidden="false"] :is([data-fluidbox-slide-preview], [data-fluidbox-slide-placeholder])',
       ),
       (layer) => getComputedStyle(layer).visibility,
     ),
@@ -483,16 +483,16 @@ test("slides stay aligned and images fit their slide on a fractional width", asy
   await page.goto("/react/");
   // A fractional dialog width: rounded slide positions would drift per slide.
   await page.addStyleTag({
-    content: "[data-lightbox-dialog] { width: calc(100% - 0.4px) !important; }",
+    content: "[data-fluidbox-dialog] { width: calc(100% - 0.4px) !important; }",
   });
   const cover = page.locator(".cover");
   await cover.scrollIntoViewIfNeeded();
   await cover.click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
   for (let step = 1; step <= 4; step++) {
-    await page.locator("[data-lightbox-next]").click();
-    const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+    await page.locator("[data-fluidbox-next]").click();
+    const active = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
     await expect(active).toHaveAttribute("aria-label", `Item ${step + 1} of 5`);
     await page.waitForTimeout(700);
     const geometry = await active.evaluate((slide) => {
@@ -502,8 +502,8 @@ test("slides stay aligned and images fit their slide on a fractional width", asy
         offset: box(slide).left - strip.left,
         slide: [box(slide).left, box(slide).right],
         frame: [
-          box(slide.querySelector("[data-lightbox-frame]")!).left,
-          box(slide.querySelector("[data-lightbox-frame]")!).right,
+          box(slide.querySelector("[data-fluidbox-frame]")!).left,
+          box(slide.querySelector("[data-fluidbox-frame]")!).right,
         ],
       };
     });
@@ -523,7 +523,7 @@ test("an opening never reloads a picture that is already on screen", async ({ pa
     new MutationObserver((records) => {
       for (const record of records) {
         const target = record.target as Element;
-        if (target.matches("[data-lightbox-media]") && record.attributeName)
+        if (target.matches("[data-fluidbox-media]") && record.attributeName)
           log.push(`${record.attributeName}=${target.getAttribute(record.attributeName)}`);
       }
     }).observe(document.body, {
@@ -533,8 +533,8 @@ test("an opening never reloads a picture that is already on screen", async ({ pa
     });
   });
   await trigger.click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await page.waitForTimeout(400);
@@ -559,10 +559,10 @@ test("a playing clip keeps playing from the same moment in the player and back",
   });
   const clicked = await card.evaluate((video: HTMLVideoElement) => video.currentTime);
   await page.locator('[data-flight-case="video-inline"] [data-flight-trigger]').click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
   const player = dialog.locator("video");
-  await expect(page.locator("[data-lightbox-video-stand-in]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-video-stand-in]")).toHaveCount(0);
   const playing = await player.evaluate((video: HTMLVideoElement) => ({
     paused: video.paused,
     time: video.currentTime,
@@ -591,7 +591,7 @@ for (const id of ["cover", "video-inline"]) {
     // The frame is scaled, so compare its painted radius with the card's.
     const radius = await page.evaluate(() => {
       const frame = document.querySelector<HTMLElement>(
-        "[data-lightbox-dialog] [data-lightbox-frame]",
+        "[data-fluidbox-dialog] [data-fluidbox-frame]",
       )!;
       const style = getComputedStyle(frame);
       return Number.parseFloat(style.borderTopLeftRadius) * new DOMMatrix(style.transform).a;

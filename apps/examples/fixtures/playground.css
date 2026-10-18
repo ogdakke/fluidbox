@@ -62,7 +62,7 @@ main > section {
   gap: 8px;
 }
 
-.photo-grid app-lightbox {
+.photo-grid fluidbox-item {
   display: block;
   cursor: zoom-in;
 }

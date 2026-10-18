@@ -1,12 +1,12 @@
 /* Viewer chrome in the shared language: square hairline controls on a near-opaque backdrop. */
 
-[data-lightbox-overlay] {
-  --lightbox-filmstrip-dock-background: color-mix(in srgb, var(--fb-bg) 88%, transparent);
+[data-fluidbox-overlay] {
+  --fluidbox-filmstrip-dock-background: color-mix(in srgb, var(--fb-bg) 88%, transparent);
   font-family: var(--fb-font-sans);
 }
 
-:where([data-lightbox-overlay])
-  :is([data-lightbox-close], [data-lightbox-previous], [data-lightbox-next]) {
+:where([data-fluidbox-overlay])
+  :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]) {
   border: 1px solid var(--fb-line-strong);
   border-radius: 0;
   background: var(--fb-bg);
@@ -14,35 +14,35 @@
   box-shadow: none;
 }
 
-:where([data-lightbox-overlay]) [data-lightbox-close] {
+:where([data-fluidbox-overlay]) [data-fluidbox-close] {
   width: 40px;
   height: 40px;
 }
 
-:where([data-lightbox-overlay]) [data-lightbox-close]:hover {
+:where([data-fluidbox-overlay]) [data-fluidbox-close]:hover {
   transform: none;
   background: var(--fb-surface-2);
 }
 
-:where([data-lightbox-overlay]) :is([data-lightbox-previous], [data-lightbox-next]) {
+:where([data-fluidbox-overlay]) :is([data-fluidbox-previous], [data-fluidbox-next]) {
   width: 44px;
   height: 44px;
 }
 
-:where([data-lightbox-overlay])
-  :is([data-lightbox-close], [data-lightbox-previous], [data-lightbox-next]):hover:not(:disabled) {
+:where([data-fluidbox-overlay])
+  :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]):hover:not(:disabled) {
   border-color: var(--fb-fg);
   background: var(--fb-surface-2);
 }
 
-:where([data-lightbox-overlay]) [data-lightbox-filmstrip-item] {
+:where([data-fluidbox-overlay]) [data-fluidbox-filmstrip-item] {
   border-radius: 2px;
 }
 
 /* Gallery arrows are styled by a dialog-qualified package rule, so match its weight. */
-:where([data-lightbox-overlay])
-  [data-lightbox-dialog][data-lightbox-gallery]
-  :is([data-lightbox-previous], [data-lightbox-next]) {
+:where([data-fluidbox-overlay])
+  [data-fluidbox-dialog][data-fluidbox-gallery]
+  :is([data-fluidbox-previous], [data-fluidbox-next]) {
   width: 44px;
   height: 44px;
   border: 1px solid var(--fb-line-strong);

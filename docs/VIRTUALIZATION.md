@@ -14,8 +14,8 @@ Assets are repeated local SVG illustrations with landscape, portrait, and square
 
 ## Current public contract
 
-Use a `LightboxSource` with `createLightbox()` or the composed React binding. The photo-library
-example uses `arraySource()`, `Lightbox.Root`, `Lightbox.Item`, and `Lightbox.Trigger`; it does not
+Use a `FluidboxSource` with `createFluidbox()` or the composed React binding. The photo-library
+example uses `arraySource()`, `Fluidbox.Root`, `Fluidbox.Item`, and `Fluidbox.Trigger`; it does not
 register custom elements.
 
 - `count` is the full source count, not the number of mounted thumbnails.
@@ -53,7 +53,7 @@ function getOrigin(id: string) {
 }
 ```
 
-For a card whose visible crop and corners come from a wrapper, mark that wrapper with `data-lightbox-preview`. Use `data-lightbox-target` for a more precise nested visual target. The origin is still the interactive trigger for focus; the marked visual box supplies handoff geometry and radii while the child image supplies media. This avoids guessing which ancestor provides clipping.
+For a card whose visible crop and corners come from a wrapper, mark that wrapper with `data-fluidbox-preview`. Use `data-fluidbox-target` for a more precise nested visual target. The origin is still the interactive trigger for focus; the marked visual box supplies handoff geometry and radii while the child image supplies media. This avoids guessing which ancestor provides clipping.
 
 Use the virtualizer's stable item-key API and the framework's own mounting/ref lifecycle to call registration and cleanup. A button containing an image can be the origin; without an explicit visual marker, its descendant image supplies transition geometry. Retaining a thumbnail registration must not retain every unmounted DOM node.
 

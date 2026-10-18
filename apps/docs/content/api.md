@@ -8,29 +8,29 @@ order: 1
 
 Everything below is exported from `@ogdakke/fluidbox` unless noted. Types live in the same entry.
 
-## createLightbox(options)
+## createFluidbox(options)
 
 ```ts
-function createLightbox<TItem extends LightboxItem>(
-  options: LightboxOptions<TItem>,
-): LightboxController<TItem>;
+function createFluidbox<TItem extends FluidboxItem>(
+  options: FluidboxOptions<TItem>,
+): FluidboxController<TItem>;
 ```
 
 | Option            | Type                                       | Notes                                                          |
 | ----------------- | ------------------------------------------ | -------------------------------------------------------------- |
-| `source`          | `LightboxSource<TItem>`                    | Required. See [Sources and origins](./sources-and-origins.md). |
-| `origins`         | `LightboxOriginAdapter`                    | Resolves and reveals thumbnail elements.                       |
-| `renderers`       | `Record<string, LightboxRenderer>`         | Mounts `custom` media by renderer key.                         |
-| `portal`          | `LightboxPortalRenderer`                   | Mounts your controls into the viewer once.                     |
+| `source`          | `FluidboxSource<TItem>`                    | Required. See [Sources and origins](./sources-and-origins.md). |
+| `origins`         | `FluidboxOriginAdapter`                    | Resolves and reveals thumbnail elements.                       |
+| `renderers`       | `Record<string, FluidboxRenderer>`         | Mounts `custom` media by renderer key.                         |
+| `portal`          | `FluidboxPortalRenderer`                   | Mounts your controls into the viewer once.                     |
 | `zoom`            | `false \| { step?: number; max?: number }` | `step` defaults to `2`, `max` to `4`. `false` disables zoom.   |
 | `onBeforeCommand` | `(event) => void`                          | Runs synchronously; call `event.preventDefault()` to veto.     |
-| `onEvent`         | `(event: LightboxEvent) => void`           | Request, selection, and status events.                         |
+| `onEvent`         | `(event: FluidboxEvent) => void`           | Request, selection, and status events.                         |
 
 ## Controller
 
 | Member                                                           | Description                                                                        |
 | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| `state`                                                          | Immutable `LightboxState` snapshot.                                                |
+| `state`                                                          | Immutable `FluidboxState` snapshot.                                                |
 | `prepare(target)`                                                | Mount and measure for a likely open. Returns a disposer.                           |
 | `open(target, options?)`                                         | Open at `{ id }` or `{ index }`.                                                   |
 | `close(options?)`                                                | Close to the current origin or the fallback.                                       |
@@ -41,7 +41,7 @@ function createLightbox<TItem extends LightboxItem>(
 | `subscribe(listener)`                                            | Called after each new state snapshot. Returns a disposer.                          |
 | `destroy()`                                                      | Synchronous and idempotent.                                                        |
 
-`options` is `{ signal?: AbortSignal; reason?: LightboxCommandReason }`. The default reason is `"api"`.
+`options` is `{ signal?: AbortSignal; reason?: FluidboxCommandReason }`. The default reason is `"api"`.
 
 ### Command results
 
@@ -57,7 +57,7 @@ Commands validate their target synchronously and throw `RangeError` for a missin
 ### State
 
 ```ts
-interface LightboxState {
+interface FluidboxState {
   status: "closed" | "opening" | "open" | "closing";
   count: number;
   activeId: string | null;
@@ -84,17 +84,17 @@ For an accepted open or navigation, events arrive in this order:
 
 ## arraySource(items)
 
-Builds an immutable `LightboxSource` from an array. Throws for empty or duplicate IDs; an empty array is a valid empty source.
+Builds an immutable `FluidboxSource` from an array. Throws for empty or duplicate IDs; an empty array is a valid empty source.
 
 ## Items
 
 ```ts
-interface LightboxItem {
+interface FluidboxItem {
   id: string;
-  media: LightboxImageMedia | LightboxVideoMedia | LightboxIframeMedia | LightboxCustomMedia;
-  thumbnail?: LightboxImageResource;
-  preview?: LightboxImageResource;
-  placeholder?: LightboxImageResource;
+  media: FluidboxImageMedia | FluidboxVideoMedia | FluidboxIframeMedia | FluidboxCustomMedia;
+  thumbnail?: FluidboxImageResource;
+  preview?: FluidboxImageResource;
+  placeholder?: FluidboxImageResource;
   caption?: string;
   description?: string;
 }
@@ -105,7 +105,7 @@ See [Media types](./media.md) for each media shape.
 ## Renderers
 
 ```ts
-interface LightboxRenderer<TItem> {
+interface FluidboxRenderer<TItem> {
   mount(context: {
     item: TItem;
     index: number;
@@ -114,10 +114,10 @@ interface LightboxRenderer<TItem> {
   }): void | (() => void);
 }
 
-interface LightboxPortalRenderer<TItem> {
+interface FluidboxPortalRenderer<TItem> {
   mount(context: {
     target: HTMLElement;
-    controller: LightboxController<TItem>;
+    controller: FluidboxController<TItem>;
     signal: AbortSignal;
   }): void | (() => void);
 }
@@ -129,7 +129,7 @@ The runtime calls the returned disposer before it removes the target, and never 
 
 | Export                       | Description                                                          |
 | ---------------------------- | -------------------------------------------------------------------- |
-| `registerLightboxElements()` | Registers the elements. Use after hydration in server-rendered apps. |
-| `AppGallery`                 | `source`, `origins`, `controller`, `whenReady()`, `open(target)`.    |
-| `AppLightbox`                | `itemId`, `trigger`, `openItemId`.                                   |
+| `registerFluidboxElements()` | Registers the elements. Use after hydration in server-rendered apps. |
+| `FluidboxGalleryElement`     | `source`, `origins`, `controller`, `whenReady()`, `open(target)`.    |
+| `FluidboxItemElement`        | `itemId`, `trigger`, `openItemId`.                                   |
 | `@ogdakke/fluidbox/elements` | Side-effect import that registers on load.                           |

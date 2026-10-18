@@ -1,0 +1,1106 @@
+/* Stage insets; registered so zoom reads them as pixels. */
+@property --fluidbox-stage-top {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --fluidbox-stage-right {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --fluidbox-stage-bottom {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --fluidbox-stage-left {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+:root {
+  --layer-fluidbox: 7;
+  --layer-fluidbox-flight: 8;
+}
+
+fluidbox-item {
+  display: flow-root;
+}
+
+fluidbox-item[data-fluidbox-preview-hidden] {
+  display: none;
+}
+
+fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
+  display: none;
+}
+
+fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]) {
+  appearance: none;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  display: block;
+  width: var(--fluidbox-preview-width, 100%);
+  height: var(--fluidbox-preview-height, auto);
+  cursor: zoom-in;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible {
+  outline: 1px solid var(--border, currentColor);
+  outline-offset: 2px;
+}
+
+[data-fluidbox-video-trigger] {
+  position: relative;
+  width: var(--fluidbox-preview-width, 100%);
+  height: var(--fluidbox-preview-height, auto);
+  aspect-ratio: var(--fluidbox-preview-aspect, var(--fluidbox-content-aspect));
+  overflow: hidden;
+}
+
+[data-fluidbox-video-trigger] > video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+[data-fluidbox-video-trigger] > [data-fluidbox-transition-layer] {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+[data-fluidbox-video-actions] {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 180ms linear;
+}
+
+[data-fluidbox-video-actions]::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--background, oklch(0% 0 0 / 0.7));
+  box-shadow: 0 2px 8px oklch(0% 0 0 / 0.25);
+}
+
+[data-fluidbox-video-actions] > button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color, white);
+  cursor: zoom-in;
+  pointer-events: auto;
+}
+
+[data-fluidbox-video-actions] > [data-fluidbox-close] {
+  opacity: 0;
+  cursor: zoom-out;
+  pointer-events: none;
+}
+
+@keyframes fluidbox-video-actions-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fluidbox-filmstrip-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fluidbox-gallery-controls-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--fluidbox-gallery-control-opacity, 1);
+  }
+}
+
+@keyframes fluidbox-video-actions-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
+  animation: fluidbox-video-actions-appear 120ms ease-out both;
+}
+
+[data-fluidbox-transition-host] {
+  --fluidbox-progress: 1;
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--fluidbox-transition-host-height, 100%);
+  overflow: clip;
+  pointer-events: none;
+}
+
+[data-fluidbox-transition-content] {
+  position: absolute;
+  top: var(--fluidbox-transition-top, 0);
+  left: var(--fluidbox-transition-left, 0);
+  z-index: var(--layer-fluidbox-flight, 8);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  pointer-events: none;
+  width: var(--fluidbox-transition-width, auto);
+  height: var(--fluidbox-transition-height, auto);
+  transform: var(--fluidbox-transition-transform, none);
+  transform-origin: top left;
+  will-change: transform, opacity;
+}
+
+[data-fluidbox-transition-content]:has([data-fluidbox-transition-controls]) {
+  opacity: var(--fluidbox-transition-content-opacity, 1);
+}
+
+[data-fluidbox-transition-content]:has(
+  [data-fluidbox-transition-controls]
+)[data-fluidbox-phase="open"] {
+  opacity: 1;
+}
+
+[data-fluidbox-transition-content]:not(:has([data-fluidbox-transition-controls])) {
+  opacity: var(--fluidbox-transition-content-opacity, 0);
+}
+
+[data-fluidbox-transition-content][data-fluidbox-phase="opening"]:not(
+  :has([data-fluidbox-transition-controls])
+) {
+  opacity: var(
+    --fluidbox-transition-content-opacity,
+    clamp(0, calc((var(--fluidbox-progress) - 0.78) * 4.5455), 1)
+  );
+}
+
+[data-fluidbox-transition-content]:is(
+  [data-fluidbox-phase="dragging"],
+  [data-fluidbox-phase="closing"]
+):not(:has([data-fluidbox-transition-controls])) {
+  opacity: var(
+    --fluidbox-transition-content-opacity,
+    clamp(0, calc((var(--fluidbox-progress) - 0.56) * 2.9412), 1)
+  );
+}
+
+[data-fluidbox-transition-content]:has([data-fluidbox-transition-controls]) [data-fluidbox-open] {
+  opacity: var(--fluidbox-progress);
+  pointer-events: none;
+}
+
+[data-fluidbox-transition-content]:has([data-fluidbox-transition-controls]) [data-fluidbox-close] {
+  opacity: calc(1 - var(--fluidbox-progress));
+  pointer-events: none;
+}
+
+[data-fluidbox-transition-content]:is(
+    [data-fluidbox-phase="opening"],
+    [data-fluidbox-phase="dragging"],
+    [data-fluidbox-phase="closing"]
+  )
+  [data-fluidbox-video-actions] {
+  opacity: 0;
+}
+
+[data-fluidbox-transition-content][data-fluidbox-phase="opening"][data-fluidbox-controls-revealing]
+  [data-fluidbox-video-actions] {
+  animation: fluidbox-video-actions-reveal 180ms linear var(--fluidbox-controls-reveal-delay, 210ms)
+    both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fluidbox-video-actions] {
+    transition-duration: 0ms;
+    animation-duration: 0ms;
+    animation-delay: 0ms;
+  }
+}
+
+@starting-style {
+  [data-fluidbox-transition-content][data-fluidbox-phase="opening"] [data-fluidbox-video-actions] {
+    opacity: 1;
+  }
+}
+
+[data-fluidbox-transition-content]:is(
+    [data-fluidbox-phase="opening"],
+    [data-fluidbox-phase="dragging"],
+    [data-fluidbox-phase="closing"]
+  )
+  [data-fluidbox-video-actions]
+  > button {
+  pointer-events: none;
+}
+
+[data-fluidbox-transition-content]:has(
+    [data-fluidbox-transition-controls]
+  )[data-fluidbox-phase="open"]
+  [data-fluidbox-close] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+[data-fluidbox-thumbnail] {
+  display: none;
+}
+
+[data-fluidbox-preview-proxy] {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+[data-fluidbox-preview-source-hidden] {
+  visibility: hidden;
+}
+
+[data-fluidbox-thumbnail-hidden] {
+  visibility: hidden !important;
+}
+
+/* A crossfading flight fades over the card, so the card keeps its image. */
+[data-fluidbox-thumbnail-hidden][data-fluidbox-thumbnail-crossfade] {
+  visibility: visible !important;
+}
+
+/* Keep root rule specificity; :where keeps descendant defaults easy to override. */
+:is([data-fluidbox-overlay], [data-fluidbox-flight]) {
+  display: block;
+}
+
+:is([data-fluidbox-overlay], [data-fluidbox-flight])[data-fluidbox-overlay] {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: var(--fluidbox-page-height, 100vh);
+  z-index: var(--layer-fluidbox, 7);
+}
+
+:is(
+  [data-fluidbox-overlay],
+  [data-fluidbox-flight]
+)[data-fluidbox-overlay][data-fluidbox-prepared] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+:is([data-fluidbox-overlay], [data-fluidbox-flight])[data-fluidbox-flight] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--layer-fluidbox-flight, 8);
+  width: 100%;
+  height: var(--fluidbox-flight-height, 100%);
+  overflow: clip;
+  pointer-events: none;
+  display: block;
+}
+
+:is([data-fluidbox-overlay], [data-fluidbox-flight])[data-fluidbox-flight] > [data-fluidbox-frame] {
+  position: absolute;
+  top: var(--fluidbox-flight-top, 0);
+  left: var(--fluidbox-flight-left, 0);
+  width: var(--fluidbox-flight-width, auto);
+  height: var(--fluidbox-flight-item-height, auto);
+}
+
+:is([data-fluidbox-overlay], [data-fluidbox-flight])[data-fluidbox-flight]
+  > [data-fluidbox-frame]
+  > :is([data-fluidbox-media], [data-fluidbox-item-content]) {
+  width: var(--fluidbox-flight-width, auto);
+  height: var(--fluidbox-flight-item-height, auto);
+  max-width: none;
+  max-height: none;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-flight-source-hidden] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-container] {
+  /* At the page's scroll position, never sticky: iOS 26 tints its bars from sticky layers. */
+  position: absolute;
+  top: var(--fluidbox-scroll-top, 0px);
+  left: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  width: 100%;
+  height: var(--fluidbox-height, 100svh);
+  isolation: isolate;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  color: var(--color, white);
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-backdrop] {
+  position: absolute;
+  inset: 0;
+  background: var(--fluidbox-backdrop-background, var(--background, #111));
+  opacity: var(--fluidbox-backdrop-opacity, 1);
+  -webkit-backdrop-filter: var(--fluidbox-backdrop-filter, none);
+  backdrop-filter: var(--fluidbox-backdrop-filter, none);
+  transform: translateZ(0);
+  will-change: opacity;
+  cursor: zoom-out;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog] {
+  touch-action: pan-x;
+  position: relative;
+  max-width: 100vw;
+  max-height: var(--fluidbox-height, 100svh);
+  outline: none;
+  /* A slide gap makes the strip overhang; keep it off the page. */
+  overflow-x: clip;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]:focus-visible {
+  outline: 1px solid var(--border, currentColor);
+  outline-offset: 2px;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-media] {
+  display: block;
+  max-width: 100cqw;
+  max-height: var(--fluidbox-height, 100svh);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  aspect-ratio: var(--fluidbox-media-aspect, auto);
+  border-radius: 0;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-more-label] {
+  color: var(--fluidbox-label-color, inherit);
+  font: var(--fluidbox-label-font, inherit);
+  letter-spacing: var(--fluidbox-label-letter-spacing, normal);
+  text-shadow: var(--fluidbox-label-text-shadow, none);
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is([data-fluidbox-media], [data-fluidbox-content], [data-fluidbox-item-content]) {
+  transform: var(--fluidbox-media-transform, none);
+  transform-origin: top left;
+  will-change: transform;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-content] {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100cqw, calc(var(--fluidbox-height, 100svh) * var(--fluidbox-content-ratio, 1)));
+  height: min(
+    var(--fluidbox-height, 100svh),
+    calc(100cqw * var(--fluidbox-content-inverse-ratio, 1))
+  );
+  max-width: 100cqw;
+  max-height: var(--fluidbox-height, 100svh);
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-content] > * {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-content]
+  > [data-fluidbox-content-preview] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-content][data-content-revealed]
+  > [data-fluidbox-content-preview] {
+  display: none;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-content] picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-content]:not([data-sized]) {
+  width: auto;
+  height: auto;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-content]:not([data-sized])
+  > * {
+  width: auto;
+  height: auto;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close] {
+  z-index: 6;
+  display: flex;
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--background, #111);
+  color: var(--color, white);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px oklch(0% 0 0 / 0.2);
+  transition:
+    transform 150ms ease-out,
+    background 150ms ease-out,
+    opacity 180ms linear;
+  opacity: var(--fluidbox-gallery-control-opacity, var(--fluidbox-close-opacity, 1));
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close][hidden],
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-error][hidden] {
+  display: none;
+}
+
+/* Every dialog fills the viewport. A dialog that shrinks to its media would
+   clip the opening and closing flights to the media's column. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog] {
+  --fluidbox-content-height: calc(
+    var(--fluidbox-height, 100svh) - var(--fluidbox-stage-top) - var(--fluidbox-stage-bottom)
+  );
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-filmstrip] {
+  --fluidbox-filmstrip-space: calc(84px + env(safe-area-inset-bottom, 0px));
+  --fluidbox-content-height: calc(
+    var(--fluidbox-height, 100svh) - var(--fluidbox-filmstrip-space) - var(--fluidbox-stage-top) -
+      var(--fluidbox-stage-bottom)
+  );
+  position: relative;
+}
+/* Optional space between slides (--fluidbox-slide-gap, 0 by default). Each
+   slide carries half the gap on both sides; the strip is one gap wider than
+   the dialog, which clips it. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slides] {
+  display: flex;
+  width: calc(
+    100% - var(--fluidbox-stage-left) - var(--fluidbox-stage-right) + var(--fluidbox-slide-gap, 0px)
+  );
+  margin-inline: calc(var(--fluidbox-stage-left) - var(--fluidbox-slide-gap, 0px) / 2)
+    calc(var(--fluidbox-stage-right) - var(--fluidbox-slide-gap, 0px) / 2);
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slides]::-webkit-scrollbar {
+  display: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-slides][data-fluidbox-frozen] {
+  overflow-x: hidden;
+  scroll-snap-type: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide] {
+  flex: 0 0 100%;
+  min-width: 0;
+  /* Media inside sizes against the slide with cqw units. */
+  container-type: inline-size;
+  padding-inline: calc(var(--fluidbox-slide-gap, 0px) / 2);
+  padding-block-start: var(--fluidbox-stage-top);
+  display: grid;
+  place-items: center;
+  grid-template-rows: var(--fluidbox-content-height);
+  align-content: start;
+  scroll-snap-align: center;
+  transform: translateX(var(--fluidbox-scroll-compensation, 0px));
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-slide]
+  :is([data-fluidbox-media], [data-fluidbox-item-content]) {
+  width: var(--fluidbox-item-width, auto);
+  height: var(--fluidbox-item-height, auto);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-dismissing]
+  [data-fluidbox-slide][aria-hidden="true"] {
+  opacity: 0;
+  visibility: hidden;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-filmstrip]
+  [data-fluidbox-slides] {
+  height: var(--fluidbox-content-height);
+  min-height: 0;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-filmstrip][data-dismissing]
+  [data-fluidbox-slides] {
+  height: 100%;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-dock] {
+  position: absolute;
+  z-index: 5;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--fluidbox-filmstrip-space);
+  min-width: 0;
+  overflow: hidden;
+  background: transparent;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+  --fluidbox-filmstrip-item-size: 52px;
+  --fluidbox-filmstrip-gap: 5px;
+  position: relative;
+  inset-inline: 0;
+  align-self: start;
+  margin-block-start: 10px;
+  height: 64px;
+  overflow: hidden;
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  will-change: transform, opacity;
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--fluidbox-filmstrip-zoom-duration, 180ms) linear,
+    transform var(--fluidbox-filmstrip-zoom-duration, 180ms) ease-out;
+}
+:where([data-fluidbox-overlay][data-fluidbox-prepared]) [data-fluidbox-filmstrip] {
+  visibility: hidden;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-opening]
+  [data-fluidbox-filmstrip] {
+  opacity: 0;
+  transition-property: transform;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-opening][data-filmstrip-revealing]
+  [data-fluidbox-filmstrip] {
+  visibility: visible;
+  animation: fluidbox-filmstrip-appear 180ms linear var(--fluidbox-filmstrip-reveal-delay, 210ms)
+    both;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery]:is(
+    [data-dismissing],
+    [data-fluidbox-state="closing"]
+  )
+  [data-fluidbox-filmstrip] {
+  opacity: 0;
+  transform: translateY(var(--fluidbox-filmstrip-zoom-travel, 18px));
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+    transition-duration: 0ms;
+    animation-duration: 0ms;
+    animation-delay: 0ms;
+  }
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-zoomed]
+  [data-fluidbox-filmstrip] {
+  /* these override the inline styles. todo: find better way */
+  opacity: 0 !important;
+  transform: translateY(var(--fluidbox-filmstrip-zoom-travel, 18px)) !important;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-zoomed]
+  [data-fluidbox-filmstrip-dock] {
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-scroll] {
+  display: flex;
+  gap: var(--fluidbox-filmstrip-gap);
+  height: 100%;
+  padding-inline: calc(50vw - 26px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: calc(50vw - 26px);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  overflow-anchor: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-scroll]::-webkit-scrollbar {
+  display: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-track] {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] {
+  all: unset;
+  position: absolute;
+  box-sizing: border-box;
+  width: var(--fluidbox-filmstrip-item-size);
+  height: var(--fluidbox-filmstrip-item-size);
+  margin-block: 6px;
+  overflow: hidden;
+  border-radius: max(2px, calc(var(--radius, 6px) / 2));
+  opacity: 0.58;
+  scroll-snap-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: opacity 120ms linear;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-item][aria-selected="true"] {
+  opacity: 1;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-item]:focus-visible {
+  outline: 2px solid var(--primary, currentColor);
+  outline-offset: -2px;
+}
+@media (hover: none) and (pointer: coarse) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-fluidbox-gallery][data-filmstrip] {
+    --fluidbox-filmstrip-space: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+    height: 50px;
+    margin-block-start: 8px;
+  }
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+    --fluidbox-filmstrip-item-size: 38px;
+    --fluidbox-filmstrip-gap: 3px;
+  }
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-scroll] {
+    padding-inline: calc(50vw - 19px);
+    scroll-padding-inline: calc(50vw - 19px);
+  }
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] {
+    margin-block: 6px;
+  }
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-frame] {
+  position: relative;
+  isolation: isolate;
+  width: max-content;
+  max-width: 100cqw;
+  max-height: var(--fluidbox-height, 100svh);
+  border-radius: var(--fluidbox-frame-radius, 0);
+  transform: var(--fluidbox-frame-transform, none);
+  transform-origin: top left;
+  overflow: hidden;
+  will-change: transform, border-radius;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-travel-layer] {
+  z-index: 3;
+  transform-origin: top left;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-image-frame] {
+  background: var(--fluidbox-image-placeholder-background, rgb(127 127 127 / 0.12));
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-frame]
+  :is([data-fluidbox-slide-placeholder], [data-fluidbox-slide-preview]) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: top left;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide-placeholder] {
+  z-index: 0;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide-preview] {
+  z-index: 1;
+  visibility: hidden;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-slide-preview][data-fluidbox-image-ready] {
+  visibility: visible;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-frame]
+  > [data-fluidbox-picture]
+  > [data-fluidbox-media] {
+  position: relative;
+  z-index: 2;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is([data-fluidbox-media-cover], [data-fluidbox-video-stand-in]) {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: top left;
+  pointer-events: none;
+  transition: opacity 0.25s ease-out;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-media-cover]:not([src]),
+/* The snapshot stays through the opening flight, so a fast embed never swaps framing mid-flight. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog]:not([data-opening])
+  [data-fluidbox-media-ready]
+  > [data-fluidbox-media-cover] {
+  opacity: 0;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-media][data-fluidbox-image-pending] {
+  visibility: hidden;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-transition-layer] {
+  --fluidbox-progress: 1;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: var(--fluidbox-transition-layer-opacity, var(--fluidbox-progress));
+  overflow: hidden;
+  isolation: isolate;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-transition-layer]::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  z-index: 0;
+  background: var(--fluidbox-layer-color, transparent);
+  opacity: var(--fluidbox-layer-mask-opacity, 1);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-transition-layer] > * {
+  position: relative;
+  z-index: 1;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog]:is([data-fluidbox-gallery], [data-fluidbox-headless])
+  [data-fluidbox-close] {
+  top: calc(var(--fluidbox-stage-top) + 16px);
+  right: calc(var(--fluidbox-stage-right) + 16px);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-headless]:not([data-fluidbox-gallery])
+  [data-fluidbox-close] {
+  transition: opacity 180ms linear;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next])
+  > [data-fluidbox-icon] {
+  display: block;
+  flex: none;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery]
+  :is([data-fluidbox-previous], [data-fluidbox-next]) {
+  position: absolute;
+  z-index: 6;
+  top: calc(
+    var(--fluidbox-stage-top) + (100% - var(--fluidbox-stage-top) - var(--fluidbox-stage-bottom)) /
+      2
+  );
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent, rgb(20 20 20 / 0.72));
+  color: var(--color, white);
+  font: inherit;
+  cursor: pointer;
+  transform: translateY(-50%);
+  opacity: var(--fluidbox-gallery-control-opacity, 1);
+  transition: opacity 180ms linear;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-previous] {
+  left: calc(var(--fluidbox-stage-left) + 16px);
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-next] {
+  right: calc(var(--fluidbox-stage-right) + 16px);
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
+  --fluidbox-gallery-control-opacity: 0.35;
+  cursor: default;
+}
+/* Controls start hidden without a transition. A fade-out here would show the
+   controls leaving and then arriving again with the reveal below. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-opening]
+  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-opening][data-gallery-controls-revealing]
+  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+  animation: fluidbox-gallery-controls-appear 180ms linear
+    var(--fluidbox-gallery-controls-reveal-delay, 210ms) both;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-dismissing]
+  :is(
+    [data-fluidbox-previous],
+    [data-fluidbox-next],
+    [data-fluidbox-close],
+    [data-fluidbox-chrome]
+  ) {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Consumer layers marked data-fluidbox-chrome reveal and dismiss with the controls. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-chrome] {
+  transition: opacity 180ms linear;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-opening]
+  [data-fluidbox-chrome] {
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-opening][data-chrome-revealing]
+  [data-fluidbox-chrome] {
+  animation: fluidbox-gallery-controls-appear 180ms linear
+    var(--fluidbox-chrome-reveal-delay, 210ms) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+    :is(
+      [data-fluidbox-dialog][data-fluidbox-gallery]
+        :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
+      [data-fluidbox-chrome]
+    ) {
+    transition-duration: 0ms;
+    animation-duration: 0ms;
+    animation-delay: 0ms;
+  }
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-opening]
+  [data-fluidbox-slides],
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-dismissing]
+  [data-fluidbox-slides] {
+  overflow: hidden;
+}
+/* A photo dragged or closing in place moves toward the browser's bars; the
+   strip reaches under them and pads by the same, as the zoom viewport does, so
+   it isn't cut at the layout viewport. Nothing inside moves. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-dismissing]
+  [data-fluidbox-slides] {
+  box-sizing: content-box;
+  margin-block: calc(-1 * var(--fluidbox-chrome-reach, 0px));
+  padding-block: var(--fluidbox-chrome-reach, 0px);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-zoomed]
+  [data-fluidbox-slides] {
+  overflow: visible;
+  transform: translateX(calc(-1 * var(--fluidbox-zoom-scroll-offset, 0px)));
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-zoomed]
+  [data-fluidbox-frame] {
+  overflow: visible;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-gallery][data-zoomed]
+  [data-fluidbox-slide][aria-hidden="true"] {
+  visibility: hidden;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog][data-zoomed] {
+  touch-action: none;
+}
+/* Zoom moves the media into its own viewport. The unzoomed preview, placeholder,
+   and frame surface left behind would otherwise show around the zoomed image. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-zoomed]
+  :is([data-fluidbox-slide-placeholder], [data-fluidbox-slide-preview]) {
+  visibility: hidden;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-zoomed]
+  [data-fluidbox-image-frame] {
+  background: transparent;
+}
+/* Reaches under the stage insets and the browser's bars, and pads by the same,
+   so pan maths ignore the reach. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport] {
+  --fluidbox-zoom-reach: var(--fluidbox-zoom-bleed, var(--fluidbox-zoom-chrome, 0px));
+
+  --fluidbox-zoom-reach-start: var(--fluidbox-zoom-reach-top, var(--fluidbox-zoom-reach));
+  --fluidbox-zoom-reach-end: var(--fluidbox-zoom-reach-bottom, var(--fluidbox-zoom-reach));
+  --fluidbox-zoom-reach-inline-start: var(--fluidbox-zoom-reach-left, 0px);
+  --fluidbox-zoom-reach-inline-end: var(--fluidbox-zoom-reach-right, 0px);
+
+  position: absolute;
+  inset: calc(var(--fluidbox-zoom-stage-top, 0px) - var(--fluidbox-zoom-reach-start))
+    calc(var(--fluidbox-zoom-stage-right, 0px) - var(--fluidbox-zoom-reach-inline-end))
+    calc(var(--fluidbox-zoom-stage-bottom, 0px) - var(--fluidbox-zoom-reach-end))
+    calc(var(--fluidbox-zoom-stage-left, 0px) - var(--fluidbox-zoom-reach-inline-start));
+  padding: var(--fluidbox-zoom-reach-start) var(--fluidbox-zoom-reach-inline-end)
+    var(--fluidbox-zoom-reach-end) var(--fluidbox-zoom-reach-inline-start);
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-zoom-viewport]::-webkit-scrollbar {
+  display: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-canvas] {
+  position: relative;
+  width: var(--fluidbox-zoom-canvas-width);
+  height: var(--fluidbox-zoom-canvas-height);
+  overflow: hidden;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-anchor] {
+  position: absolute;
+  top: var(--fluidbox-zoom-anchor-top);
+  left: var(--fluidbox-zoom-anchor-left);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-zoom-anchor]
+  > :is([data-fluidbox-media], [data-fluidbox-content]) {
+  width: var(--fluidbox-zoom-item-width);
+  height: var(--fluidbox-zoom-item-height);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-placeholder] {
+  width: var(--fluidbox-zoom-placeholder-width);
+  height: var(--fluidbox-zoom-placeholder-height);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport],
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-zoom-viewport]
+  :is([data-fluidbox-media], [data-fluidbox-content]) {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-zoom-viewport][data-grabbing],
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-zoom-viewport][data-grabbing]
+  :is([data-fluidbox-media], [data-fluidbox-content]) {
+  cursor: grabbing;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-error] {
+  position: absolute;
+  z-index: 4;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  padding: 8px;
+  background: var(--background, white);
+  color: var(--color, black);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-status] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close]:hover {
+  transform: scale(1.1);
+  background: var(--accent);
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close]:focus-visible {
+  outline: 2px solid var(--primary, currentColor);
+  outline-offset: 2px;
+}

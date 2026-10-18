@@ -31,22 +31,22 @@
         </div>
         <details class="fb-code">
           <summary>Composition</summary>
-          <pre><code>import { Lightbox } from "@ogdakke/fluidbox/react";
+          <pre><code>import { Fluidbox } from "@ogdakke/fluidbox/react";
 
-&lt;Lightbox.Root items={photos}&gt;
-  &lt;Lightbox.Trigger item={photos[0]} items={photos} asChild&gt;
+&lt;Fluidbox.Root items={photos}&gt;
+  &lt;Fluidbox.Trigger item={photos[0]} items={photos} asChild&gt;
     {({ item }) =&gt; (
       &lt;button type="button"&gt;
-        &lt;img src={item?.thumbnail?.src} alt="" data-lightbox-origin /&gt;
-        &lt;Lightbox.ThumbnailOverlay&gt;+{photos.length - 1}&lt;/Lightbox.ThumbnailOverlay&gt;
+        &lt;img src={item?.thumbnail?.src} alt="" data-fluidbox-origin /&gt;
+        &lt;Fluidbox.ThumbnailOverlay&gt;+{photos.length - 1}&lt;/Fluidbox.ThumbnailOverlay&gt;
       &lt;/button&gt;
     )}
-  &lt;/Lightbox.Trigger&gt;
-  &lt;Lightbox.Portal&gt;
-    &lt;Lightbox.Previous /&gt; &lt;Lightbox.Next /&gt; &lt;Lightbox.Close /&gt;
-    &lt;Lightbox.Filmstrip /&gt;
-  &lt;/Lightbox.Portal&gt;
-&lt;/Lightbox.Root&gt;</code></pre>
+  &lt;/Fluidbox.Trigger&gt;
+  &lt;Fluidbox.Portal&gt;
+    &lt;Fluidbox.Previous /&gt; &lt;Fluidbox.Next /&gt; &lt;Fluidbox.Close /&gt;
+    &lt;Fluidbox.Filmstrip /&gt;
+  &lt;/Fluidbox.Portal&gt;
+&lt;/Fluidbox.Root&gt;</code></pre>
         </details>
       </section>
       <section class="section" aria-labelledby="virtualized-library-title">
@@ -69,9 +69,9 @@ const origins = {
   revealOrigin: (id, index, { signal }) =&gt; scrollToPhoto(index, signal),
 };
 
-&lt;Lightbox.Root source={source} origins={origins}&gt;
-  {virtualRows.map((row) =&gt; /* Lightbox.Item + Lightbox.Trigger per tile */)}
-&lt;/Lightbox.Root&gt;</code></pre>
+&lt;Fluidbox.Root source={source} origins={origins}&gt;
+  {virtualRows.map((row) =&gt; /* Fluidbox.Item + Fluidbox.Trigger per tile */)}
+&lt;/Fluidbox.Root&gt;</code></pre>
         </details>
       </section>
     </main>

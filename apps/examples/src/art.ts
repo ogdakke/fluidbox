@@ -1,5 +1,5 @@
 import { arraySource } from "@ogdakke/fluidbox";
-import type { LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
+import type { FluidboxItem, FluidboxSource } from "@ogdakke/fluidbox";
 import { scenes, type Scene } from "@ogdakke/fluidbox-design/art-scenes";
 
 export { scenes };
@@ -7,7 +7,7 @@ export type { Scene };
 
 export const artSrc = (scene: Scene) => `/art/${scene.id}.svg`;
 
-export function artItem(scene: Scene, id = scene.id): LightboxItem {
+export function artItem(scene: Scene, id = scene.id): FluidboxItem {
   const src = artSrc(scene);
   return {
     id,
@@ -21,8 +21,8 @@ export const sceneById = (id: string) => scenes.find((scene) => scene.id === id)
 /** Small in-memory galleries used by the Solid, Vue, and Angular panels. */
 export type ArtCollection = {
   readonly label: string;
-  readonly items: readonly LightboxItem[];
-  readonly source: LightboxSource<LightboxItem>;
+  readonly items: readonly FluidboxItem[];
+  readonly source: FluidboxSource<FluidboxItem>;
 };
 
 function collection(label: string, prefix: string, ids: string[]): ArtCollection {
@@ -41,7 +41,7 @@ export function frameworkCollections(prefix: string): [ArtCollection, ArtCollect
 /** A large indexed collection that cycles through the scenes. Hosts mount a small window of it. */
 export function indexedArt(count: number) {
   const sceneAt = (index: number) => scenes[(index * 7) % scenes.length]!;
-  const source: LightboxSource<LightboxItem> = {
+  const source: FluidboxSource<FluidboxItem> = {
     count,
     getItem(index) {
       const scene = sceneAt(index);

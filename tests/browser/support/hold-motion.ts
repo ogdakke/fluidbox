@@ -49,7 +49,7 @@ export async function holdMotion(page: Page) {
       },
       async ready() {
         for (let frames = 0; frames < 240; frames += 1) {
-          if (held.length && !document.querySelector("[data-lightbox-prepared]")) break;
+          if (held.length && !document.querySelector("[data-fluidbox-prepared]")) break;
           await frame();
         }
         // Parts of a transition can start a frame after its first animation.

@@ -81,9 +81,9 @@ if (
   throw new Error("--json requires an output path");
 }
 const jsonPath = jsonIndex === -1 ? null : process.argv[jsonIndex + 1];
-const css = sizeOf(await readFile("packages/lightbox/dist/styles.css"));
+const css = sizeOf(await readFile("packages/fluidbox/dist/styles.css"));
 // The sheet ships its own stylesheet on top of the base one.
-const sheetCss = sizeOf(await readFile("packages/lightbox/dist/sheet.css"));
+const sheetCss = sizeOf(await readFile("packages/fluidbox/dist/sheet.css"));
 const tsdownInfo = JSON.parse(await readFile("node_modules/tsdown/package.json", "utf8")) as {
   version: string;
 };
@@ -192,11 +192,11 @@ for (const name of entrypoints) {
     return !peer || !expectedFramework[name].includes(peer);
   });
   const initialCode = initialChunks.map((chunk) => chunk.code).join("\n");
-  const registersLightbox = /customElements\.define\([`"']app-lightbox[`"']/.test(initialCode);
+  const registersFluidbox = /customElements\.define\([`"']fluidbox-item[`"']/.test(initialCode);
   // Extensions cost nothing until imported: no core entry may carry their code.
   const activationCode = activationChunks.map((chunk) => chunk.code).join("\n");
   const carriesExtension =
-    name !== "filmstrip" && name !== "sheet" && /lightboxSheetHost/.test(activationCode);
+    name !== "filmstrip" && name !== "sheet" && /fluidboxSheetHost/.test(activationCode);
   const errors = [
     unresolved.size && `unresolved runtime externals: ${[...unresolved].join(", ")}`,
     forbidden.length && `unexpected framework imports: ${forbidden.join(", ")}`,
@@ -206,8 +206,8 @@ for (const name of entrypoints) {
       `activation JS gzip budget exceeded (${activationJsGzipLimits[name]} B)`,
     activationWithCss.gzipBytes > activationWithCssGzipLimits[name] &&
       `activation with CSS gzip budget exceeded (${activationWithCssGzipLimits[name]} B)`,
-    name !== "elements" && registersLightbox && "custom elements loaded eagerly",
-    name === "elements" && !registersLightbox && "custom element registration missing",
+    name !== "elements" && registersFluidbox && "custom elements loaded eagerly",
+    name === "elements" && !registersFluidbox && "custom element registration missing",
     carriesExtension && "sheet extension bundled into a core entry",
   ].filter((error): error is string => typeof error === "string");
 

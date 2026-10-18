@@ -10,7 +10,7 @@ import {
 } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/angular";
-import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement, FluidboxItem, FluidboxSource } from "@ogdakke/fluidbox";
 import { alternateSource, source } from "./source";
 import "./frameworks.css";
 
@@ -23,24 +23,26 @@ mountSite("fixtures", { fixture: "Angular binding · indexed gallery with source
   template: `<main>
     <h1>Angular gallery</h1>
     <button type="button" (click)="switchSource()">Switch source</button>
-    <app-gallery>
+    <fluidbox-gallery>
       <button type="button" (click)="open()">Open gallery</button>
-    </app-gallery>
+    </fluidbox-gallery>
   </main>`,
 })
 class App {
-  readonly source = signal<LightboxSource<LightboxItem> | null>(source);
+  readonly source = signal<FluidboxSource<FluidboxItem> | null>(source);
   readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   constructor() {
     useFluidboxGallery(
-      () => this.host.nativeElement.querySelector<AppGallery>("app-gallery"),
+      () => this.host.nativeElement.querySelector<FluidboxGalleryElement>("fluidbox-gallery"),
       this.source,
     );
   }
 
   open(): void {
-    void this.host.nativeElement.querySelector<AppGallery>("app-gallery")?.open({ index: 0 });
+    void this.host.nativeElement
+      .querySelector<FluidboxGalleryElement>("fluidbox-gallery")
+      ?.open({ index: 0 });
   }
 
   switchSource(): void {

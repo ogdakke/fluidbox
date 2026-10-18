@@ -1,9 +1,9 @@
 import { mountSite } from "../src/site";
 import React, { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { LightboxItem } from "@ogdakke/fluidbox";
-import { Lightbox, useLightboxState } from "@ogdakke/fluidbox/react";
-import { sheet, type LightboxSheet } from "@ogdakke/fluidbox/sheet";
+import type { FluidboxItem } from "@ogdakke/fluidbox";
+import { Fluidbox, useFluidboxState } from "@ogdakke/fluidbox/react";
+import { sheet, type FluidboxSheet } from "@ogdakke/fluidbox/sheet";
 import { tallScenes } from "@ogdakke/fluidbox-design/art-scenes";
 import { artItem, scenes } from "../src/art";
 import {
@@ -51,7 +51,7 @@ type Post = {
   readonly date: string;
   readonly stats: { replies: number; reposts: number; likes: number; views: number };
   readonly replies: readonly Reply[];
-  readonly items: readonly LightboxItem[];
+  readonly items: readonly FluidboxItem[];
 };
 
 const allScenes = [...scenes, ...tallScenes];
@@ -150,7 +150,7 @@ const postOf = (posts: readonly Post[], id: string | null) =>
 function useActivePost(posts: readonly Post[]) {
   return postOf(
     posts,
-    useLightboxState((state) => state.activeId),
+    useFluidboxState((state) => state.activeId),
   );
 }
 
@@ -188,20 +188,20 @@ function Grid({ post }: { post: Post }) {
   return (
     <div className="x-grid" data-count={post.items.length}>
       {post.items.map((item) => (
-        <Lightbox.Trigger key={item.id} item={item} asChild>
+        <Fluidbox.Trigger key={item.id} item={item} asChild>
           <button
             type="button"
             aria-label={`Open ${item.media.type === "image" && item.media.alt}`}
           >
             <img
-              data-lightbox-origin
+              data-fluidbox-origin
               src={item.thumbnail?.src}
               alt=""
               width={item.thumbnail?.width}
               height={item.thumbnail?.height}
             />
           </button>
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
       ))}
     </div>
   );
@@ -277,8 +277,8 @@ function XViewer() {
   const active = useActivePost(tweets);
   const [aside, setAside] = useState(true);
   return (
-    <Lightbox.Portal>
-      <div className="x-layer" data-aside={aside ? "open" : "closed"} data-lightbox-chrome>
+    <Fluidbox.Portal>
+      <div className="x-layer" data-aside={aside ? "open" : "closed"} data-fluidbox-chrome>
         <button
           type="button"
           className="x-toggle"
@@ -299,7 +299,7 @@ function XViewer() {
         )}
       </div>
       {aside && active && (
-        <aside className="x-aside" data-lightbox-chrome aria-label="Post and replies">
+        <aside className="x-aside" data-fluidbox-chrome aria-label="Post and replies">
           <header className="x-author">
             <Avatar person={active.by} />
             <span>
@@ -331,7 +331,7 @@ function XViewer() {
       )}
       {/* X on a phone: the post along the bottom, over the photo; replies rise in a sheet. */}
       {active && (
-        <div className="x-phone" data-lightbox-chrome>
+        <div className="x-phone" data-fluidbox-chrome>
           <div className="x-phone__fade">
             <header className="x-author">
               <Avatar person={active.by} size={36} />
@@ -349,7 +349,7 @@ function XViewer() {
                 icon="reply"
                 value={active.stats.replies}
                 label="Show replies"
-                data-lightbox-sheet-stop="1"
+                data-fluidbox-sheet-stop="1"
               />
               <Count icon="repost" value={active.stats.reposts} label="Reposts" />
               <Count icon="like" value={active.stats.likes} label="Likes" />
@@ -359,32 +359,32 @@ function XViewer() {
           </div>
         </div>
       )}
-      <Lightbox.Previous />
-      <Lightbox.Next />
-      <Lightbox.Close />
-    </Lightbox.Portal>
+      <Fluidbox.Previous />
+      <Fluidbox.Next />
+      <Fluidbox.Close />
+    </Fluidbox.Portal>
   );
 }
 
 /** In the sheet's slot, which scrolls with the photo: the replies, and the composer at the end. */
-function XReplies({ replies }: { replies: LightboxSheet }) {
+function XReplies({ replies }: { replies: FluidboxSheet }) {
   const active = useActivePost(tweets);
   return (
-    <Lightbox.Sheet sheet={replies}>
-      <section className="x-sheet" data-lightbox-sheet data-lightbox-chrome aria-label="Replies">
-        <div data-lightbox-sheet-handle />
+    <Fluidbox.Sheet sheet={replies}>
+      <section className="x-sheet" data-fluidbox-sheet data-fluidbox-chrome aria-label="Replies">
+        <div data-fluidbox-sheet-handle />
         <header className="x-sheet__head">
           <strong>Replies</strong>
           <span className="x-muted">{active && compact(active.stats.replies)}</span>
         </header>
-        <ul className="x-replies" data-lightbox-sheet-scroll>
+        <ul className="x-replies" data-fluidbox-sheet-scroll>
           {active?.replies.map((reply) => (
             <ReplyRow key={reply.by.handle} reply={reply} />
           ))}
         </ul>
         <Composer me={me} />
       </section>
-    </Lightbox.Sheet>
+    </Fluidbox.Sheet>
   );
 }
 
@@ -392,11 +392,11 @@ function XThread({ post }: { post: Post }) {
   // One sheet per viewer, kept for its lifetime.
   const replies = useMemo(() => sheet({ snapPoints: ["62%", "100%"] }), []);
   return (
-    <Lightbox.Root items={post.items} sheet={replies}>
+    <Fluidbox.Root items={post.items} sheet={replies}>
       <Tweet post={post} />
       <XViewer />
       <XReplies replies={replies} />
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
@@ -435,7 +435,7 @@ function IgActions({ post }: { post: Post }) {
     <>
       <div className="ig-actions">
         <Count icon="like" label="Like" />
-        <Count icon="comment" label="Comment" data-lightbox-sheet-stop="2" />
+        <Count icon="comment" label="Comment" data-fluidbox-sheet-stop="2" />
         <Count icon="send" label="Share" />
         <Count icon="bookmark" label="Save" />
       </div>
@@ -479,15 +479,15 @@ function IgAuthor({ post }: { post: Post }) {
   );
 }
 
-function InstagramViewer({ details }: { details: LightboxSheet }) {
+function InstagramViewer({ details }: { details: FluidboxSheet }) {
   const active = useActivePost(grams);
   return (
-    <Lightbox.Portal>
+    <Fluidbox.Portal>
       {/* Always rendered: the stage insets hang off it, and the opening flight
           measures its landing before the active post is known. */}
-      <div className="ig-layer" data-lightbox-chrome />
+      <div className="ig-layer" data-fluidbox-chrome />
       {active && (
-        <aside className="ig-panel" data-lightbox-chrome aria-label="Post">
+        <aside className="ig-panel" data-fluidbox-chrome aria-label="Post">
           <IgAuthor post={active} />
           <IgComments post={active} />
           <footer>
@@ -500,28 +500,28 @@ function InstagramViewer({ details }: { details: LightboxSheet }) {
           </footer>
         </aside>
       )}
-      <Lightbox.Previous />
-      <Lightbox.Next />
-      <Lightbox.Close />
+      <Fluidbox.Previous />
+      <Fluidbox.Next />
+      <Fluidbox.Close />
       {/* On a phone the caption peeks under the photo and drags up into the comments. */}
-      <Lightbox.Sheet sheet={details}>
-        <section className="ig-sheet" data-lightbox-sheet data-lightbox-chrome aria-label="Post">
-          <div data-lightbox-sheet-handle />
+      <Fluidbox.Sheet sheet={details}>
+        <section className="ig-sheet" data-fluidbox-sheet data-fluidbox-chrome aria-label="Post">
+          <div data-fluidbox-sheet-handle />
           {active && (
             <>
               <IgActions post={active} />
               <p className="ig-caption">
                 <strong>{active.by.handle}</strong> {active.text}
               </p>
-              <button type="button" className="ig-more" data-lightbox-sheet-stop="2">
+              <button type="button" className="ig-more" data-fluidbox-sheet-stop="2">
                 View all {active.stats.replies} comments
               </button>
               <IgComments post={active} />
             </>
           )}
         </section>
-      </Lightbox.Sheet>
-    </Lightbox.Portal>
+      </Fluidbox.Sheet>
+    </Fluidbox.Portal>
   );
 }
 
@@ -530,7 +530,7 @@ function InstagramProfile() {
   const details = useMemo(() => sheet({ snapPoints: ["55%", "content"], dismiss: "scroll" }), []);
   const profile = people.fjord;
   return (
-    <Lightbox.Root items={grams.flatMap((gram) => gram.items)} sheet={details}>
+    <Fluidbox.Root items={grams.flatMap((gram) => gram.items)} sheet={details}>
       <div className="ig-profile">
         <header className="ig-profile__head">
           <Avatar person={profile} size={86} />
@@ -557,16 +557,16 @@ function InstagramProfile() {
         </header>
         <div className="ig-grid">
           {grams.map((gram) => (
-            <Lightbox.Trigger key={gram.id} item={gram.items[0]} asChild>
+            <Fluidbox.Trigger key={gram.id} item={gram.items[0]} asChild>
               <button type="button" aria-label={`Open ${gram.text}`}>
-                <img data-lightbox-origin src={gram.items[0].thumbnail?.src} alt="" />
+                <img data-fluidbox-origin src={gram.items[0].thumbnail?.src} alt="" />
               </button>
-            </Lightbox.Trigger>
+            </Fluidbox.Trigger>
           ))}
         </div>
       </div>
       <InstagramViewer details={details} />
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
@@ -686,19 +686,19 @@ function App() {
       <Section index={4} title="Findings" note="What broke on the way here, and what fixed it.">
         <ol className="findings">
           <li>
-            <strong>Room around the photo: fixed.</strong> --lightbox-stage-top, -right, -bottom and
+            <strong>Room around the photo: fixed.</strong> --fluidbox-stage-top, -right, -bottom and
             -left inset the stage. The photo fits and centres inside it, the opening and closing
             flights land in it, and the arrows and close button sit against it.
           </li>
           <li>
-            <strong>Layers and the flights: fixed.</strong> Anything marked data-lightbox-chrome
+            <strong>Layers and the flights: fixed.</strong> Anything marked data-fluidbox-chrome
             stays hidden through the opening flight, fades in with the built-in controls, and fades
             out as soon as a dismiss starts, by drag or by close. A cancelled drag brings it back.
           </li>
           <li>
             <strong>Zoom and the stage: fixed.</strong> Zoom centres inside the stage and pans under
             its insets, so a zoomed photo runs under the action row but still stops at the stage
-            edge. --lightbox-zoom-clip keeps it inside instead.
+            edge. --fluidbox-zoom-clip keeps it inside instead.
           </li>
           <li>
             <strong>Instagram's card: fixed.</strong> The stage insets alone make the box, and the
@@ -706,9 +706,9 @@ function App() {
           </li>
           <li>
             <strong>X's phone viewer: fixed.</strong> The sheet entry (@ogdakke/fluidbox/sheet)
-            raises any data-lightbox-sheet element over the photo and fits the photo into the room
+            raises any data-fluidbox-sheet element over the photo and fits the photo into the room
             above it. Swiping up on the photo raises it instead of dismissing; a reply count marked
-            data-lightbox-sheet-stop opens it; Escape, a tap above it or the close button lower it.
+            data-fluidbox-sheet-stop opens it; Escape, a tap above it or the close button lower it.
           </li>
           <li>
             <strong>Insets must exist before the opening: open.</strong> The opening flight measures

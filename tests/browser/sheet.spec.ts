@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const dialog = (page: Page) => page.locator("[data-lightbox-dialog]");
+const dialog = (page: Page) => page.locator("[data-fluidbox-dialog]");
 
 test.describe("sheet on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
@@ -10,13 +10,13 @@ test.describe("sheet on a phone", () => {
   }) => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
-    await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
-      "data-lightbox-state",
+    await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+      "data-fluidbox-state",
       "open",
     );
     await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
 
-    const trigger = page.locator(".x-phone [data-lightbox-sheet-stop]");
+    const trigger = page.locator(".x-phone [data-fluidbox-sheet-stop]");
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
     await trigger.click();
     await expect(dialog(page)).toHaveAttribute("data-sheet", "1");
@@ -29,11 +29,11 @@ test.describe("sheet on a phone", () => {
         .poll(() =>
           page.evaluate(() => {
             const media = document
-              .querySelector('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')!
+              .querySelector('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')!
               .getBoundingClientRect();
             return Math.round(
               media.bottom -
-                document.querySelector("[data-lightbox-overlay] .x-sheet")!.getBoundingClientRect()
+                document.querySelector("[data-fluidbox-overlay] .x-sheet")!.getBoundingClientRect()
                   .top,
             );
           }),
@@ -42,23 +42,23 @@ test.describe("sheet on a phone", () => {
 
     await page.keyboard.press("Escape");
     await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
-    await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
-      "data-lightbox-state",
+    await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+      "data-fluidbox-state",
       "open",
     );
 
     await trigger.click();
     await expect(dialog(page)).toHaveAttribute("data-sheet", "1");
-    await page.locator("[data-lightbox-close]").click();
-    await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+    await page.locator("[data-fluidbox-close]").click();
+    await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
   });
 
   test("the top stop is reachable however few the replies", async ({ page }) => {
     await page.goto("/social.html");
     await page.locator(".x-post").nth(2).locator(".x-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-lightbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
     await page.evaluate(() => {
-      const scroller = document.querySelector("[data-lightbox-sheet-scroller]")!;
+      const scroller = document.querySelector("[data-fluidbox-sheet-scroller]")!;
       scroller.scrollTo({ top: scroller.scrollHeight, behavior: "instant" });
     });
     await expect(dialog(page)).toHaveAttribute("data-sheet", "2");
@@ -67,7 +67,7 @@ test.describe("sheet on a phone", () => {
       .poll(() =>
         page.evaluate(() =>
           Math.round(
-            document.querySelector("[data-lightbox-overlay] .x-sheet")!.getBoundingClientRect().top,
+            document.querySelector("[data-fluidbox-overlay] .x-sheet")!.getBoundingClientRect().top,
           ),
         ),
       )
@@ -94,12 +94,12 @@ test.describe("sheet on a wide screen", () => {
   test("the X viewer keeps its sidebar and hides the sheet", async ({ page }) => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
-    await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
-      "data-lightbox-state",
+    await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+      "data-fluidbox-state",
       "open",
     );
     await expect(page.locator(".x-aside")).toBeVisible();
-    await expect(page.locator("[data-lightbox-overlay] .x-sheet")).toBeHidden();
+    await expect(page.locator("[data-fluidbox-overlay] .x-sheet")).toBeHidden();
   });
 });
 
@@ -109,7 +109,7 @@ test.describe("zoom under stage insets", () => {
   const zoomedEdges = (page: Page) =>
     page.evaluate(() => {
       const viewport = document
-        .querySelector("[data-lightbox-zoom-viewport]")!
+        .querySelector("[data-fluidbox-zoom-viewport]")!
         .getBoundingClientRect();
       return { viewportBottom: Math.round(viewport.bottom), height: innerHeight };
     });
@@ -117,12 +117,12 @@ test.describe("zoom under stage insets", () => {
   async function zoomIn(page: Page) {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-lightbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
     await page
-      .locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')
+      .locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')
       .dblclick();
     await expect(dialog(page)).toHaveAttribute("data-zoomed", "");
-    await expect(page.locator("[data-lightbox-zoom-viewport]")).toHaveCount(1);
+    await expect(page.locator("[data-fluidbox-zoom-viewport]")).toHaveCount(1);
   }
 
   test("the zoomed photo pans under X's action row and stops at the stage edge", async ({
@@ -134,28 +134,28 @@ test.describe("zoom under stage insets", () => {
 
     // Panned to the end, the photo stops inside the stage, by the pan padding.
     const bottom = await page.evaluate(async () => {
-      const viewport = document.querySelector("[data-lightbox-zoom-viewport]")!;
+      const viewport = document.querySelector("[data-fluidbox-zoom-viewport]")!;
       viewport.scrollTo({ top: viewport.scrollHeight, behavior: "instant" });
       await new Promise((resolve) => requestAnimationFrame(resolve));
-      const media = viewport.querySelector("[data-lightbox-media]")!.getBoundingClientRect();
+      const media = viewport.querySelector("[data-fluidbox-media]")!.getBoundingClientRect();
       return Math.round(media.bottom);
     });
     expect(bottom).toBeLessThanOrEqual(900 - 52);
     expect(bottom).toBeGreaterThanOrEqual(900 - 52 - 100);
   });
 
-  test("--lightbox-zoom-clip keeps the zoomed photo inside the stage", async ({ page }) => {
+  test("--fluidbox-zoom-clip keeps the zoomed photo inside the stage", async ({ page }) => {
     await page.goto("/social.html");
     await page.addStyleTag({
-      content: "[data-lightbox-dialog] { --lightbox-zoom-clip: bottom; }",
+      content: "[data-fluidbox-dialog] { --fluidbox-zoom-clip: bottom; }",
     });
     await page.locator(".x-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-lightbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
     await page
-      .locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]')
+      .locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')
       .dblclick();
     await expect(dialog(page)).toHaveAttribute("data-zoomed", "");
-    await expect(page.locator("[data-lightbox-zoom-viewport]")).toHaveCount(1);
+    await expect(page.locator("[data-fluidbox-zoom-viewport]")).toHaveCount(1);
     const { viewportBottom } = await zoomedEdges(page);
     expect(viewportBottom).toBe(900 - 52);
   });

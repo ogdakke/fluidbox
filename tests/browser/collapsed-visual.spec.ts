@@ -17,11 +17,11 @@ test("collapsed gallery visual checkpoints", async ({ page }, testInfo) => {
     await page.evaluate(async (withTravelLayer) => {
       for (let attempt = 0; attempt < 30; attempt++) {
         const frame = document.querySelector<HTMLElement>(
-          '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+          '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
         );
-        const layer = document.querySelector<HTMLElement>("[data-lightbox-travel-layer]");
+        const layer = document.querySelector<HTMLElement>("[data-fluidbox-travel-layer]");
         if (
-          document.querySelector('[data-lightbox-dialog][data-lightbox-state="opening"]') &&
+          document.querySelector('[data-fluidbox-dialog][data-fluidbox-state="opening"]') &&
           frame?.getAnimations().some((animation) => animation.playState === "running") &&
           (!withTravelLayer ||
             layer?.getAnimations().some((animation) => animation.playState === "running"))
@@ -44,7 +44,11 @@ test("collapsed gallery visual checkpoints", async ({ page }, testInfo) => {
   await load();
   await expect(page.locator("#collapsed-gallery")).toHaveScreenshot("collapsed-closed-gallery.png");
 
-  await page.locator("#collapsed-gallery app-lightbox").first().locator('[slot="trigger"]').click();
+  await page
+    .locator("#collapsed-gallery fluidbox-item")
+    .first()
+    .locator('[slot="trigger"]')
+    .click();
   await freezeOpening(false);
   expect(await page.screenshot({ animations: "allow" })).toMatchSnapshot(
     "collapsed-first-opening-100ms.png",
@@ -61,17 +65,17 @@ test("collapsed gallery visual checkpoints", async ({ page }, testInfo) => {
 
   await load();
   await page.locator("#collapsed-gallery [data-preview-more] [slot=trigger]").click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 4 of 10",
   );
   await page.evaluate(async () => {
-    const strip = document.querySelector<HTMLElement>("[data-lightbox-slides]")!;
+    const strip = document.querySelector<HTMLElement>("[data-fluidbox-slides]")!;
     let previous = strip.scrollLeft;
     let stableFrames = 0;
     for (let frame = 0; frame < 90; frame++) {
@@ -86,8 +90,8 @@ test("collapsed gallery visual checkpoints", async ({ page }, testInfo) => {
   await page.keyboard.press("Escape");
   await page.evaluate(async () => {
     for (let attempt = 0; attempt < 60; attempt++) {
-      const flight = document.querySelector<HTMLElement>("[data-lightbox-flight]");
-      const layer = flight?.querySelector<HTMLElement>("[data-lightbox-travel-layer]");
+      const flight = document.querySelector<HTMLElement>("[data-fluidbox-flight]");
+      const layer = flight?.querySelector<HTMLElement>("[data-fluidbox-travel-layer]");
       if (flight && layer?.getAnimations().some((animation) => animation.playState === "running")) {
         for (const animation of document.getAnimations()) {
           animation.pause();

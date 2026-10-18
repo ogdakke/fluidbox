@@ -194,7 +194,7 @@ main.fb-shell {
   flex: 999 1 0;
 }
 
-.mosaic app-lightbox {
+.mosaic fluidbox-item {
   position: relative;
   flex: var(--ratio) 1 calc(var(--ratio) * clamp(120px, 18vw, 210px));
 }
@@ -229,12 +229,12 @@ main.fb-shell {
   pointer-events: none;
 }
 
-.mosaic app-lightbox:hover .mosaic__label,
-.mosaic app-lightbox:focus-within .mosaic__label {
+.mosaic fluidbox-item:hover .mosaic__label,
+.mosaic fluidbox-item:focus-within .mosaic__label {
   opacity: 1;
 }
 
-.mosaic app-lightbox:not([data-lightbox-state="closed"]) .mosaic__label {
+.mosaic fluidbox-item:not([data-fluidbox-state="closed"]) .mosaic__label {
   opacity: 0;
 }
 
@@ -601,7 +601,7 @@ main.fb-shell {
   color: #fff;
   font-family: var(--fb-font-mono);
   font-size: 12px;
-  opacity: var(--lightbox-progress, 1);
+  opacity: var(--fluidbox-progress, 1);
 }
 
 /* Solid, Vue, Angular panels */

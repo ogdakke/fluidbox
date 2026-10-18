@@ -11,32 +11,32 @@ order: 4
 ```ts
 import { Component, CUSTOM_ELEMENTS_SCHEMA, ElementRef, inject, signal } from "@angular/core";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/angular";
-import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement, FluidboxItem, FluidboxSource } from "@ogdakke/fluidbox";
 
 @Component({
   selector: "photo-page",
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
-    <app-gallery>
+    <fluidbox-gallery>
       @for (photo of photos; track photo.id; let index = $index) {
         <button type="button" [attr.data-origin-id]="photo.id" (click)="open(index)">
           <img [src]="photo.thumbnail?.src" alt="" />
         </button>
       }
-    </app-gallery>
+    </fluidbox-gallery>
   `,
 })
 export class PhotoPage {
   readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  readonly source = signal<LightboxSource<LightboxItem> | null>(photosSource);
+  readonly source = signal<FluidboxSource<FluidboxItem> | null>(photosSource);
 
   constructor() {
     useFluidboxGallery(() => this.gallery(), this.source);
   }
 
-  gallery(): AppGallery | null {
-    return this.host.nativeElement.querySelector<AppGallery>("app-gallery");
+  gallery(): FluidboxGalleryElement | null {
+    return this.host.nativeElement.querySelector<FluidboxGalleryElement>("fluidbox-gallery");
   }
 
   open(index: number): void {

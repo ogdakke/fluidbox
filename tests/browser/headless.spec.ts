@@ -6,23 +6,23 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   await page.goto("/headless.html");
 
   await expect
-    .poll(() => page.evaluate(() => customElements.get("app-lightbox") === undefined))
+    .poll(() => page.evaluate(() => customElements.get("fluidbox-item") === undefined))
     .toBe(true);
   const first = page.locator('[data-photo-id="one"]');
   await first.evaluate((trigger) => {
-    trigger.style.setProperty("--lightbox-backdrop-background", "rgb(12 34 56)");
+    trigger.style.setProperty("--fluidbox-backdrop-background", "rgb(12 34 56)");
     trigger.style.setProperty("--accent", "rgb(78 90 123)");
   });
   await first.click();
 
-  const overlay = page.locator("[data-lightbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-overlay]");
   const activeMedia = page.locator(
-    '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+    '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
   );
-  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+  await expect(overlay).toHaveAttribute("data-fluidbox-state", "open");
   await expect(activeMedia).toHaveAttribute("alt", "Blue square study");
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-picture] source'),
+    page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-picture] source'),
   ).toHaveCount(1);
   await expect(activeMedia).toHaveAttribute(
     "srcset",
@@ -30,20 +30,20 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   );
   await expect(activeMedia).toHaveAttribute("sizes", "min(100vw, 800px)");
   await expect(page.locator("[data-demo-caption]")).toHaveText("one");
-  await expect(page.locator("[data-lightbox-backdrop]")).toHaveCSS(
+  await expect(page.locator("[data-fluidbox-backdrop]")).toHaveCSS(
     "background-color",
     "rgb(12, 34, 56)",
   );
   await expect(overlay).toHaveCSS("--accent", "rgb(78 90 123)");
   await expect(first).toHaveAttribute("aria-haspopup", "dialog");
   await expect(first).toHaveAttribute("aria-expanded", "true");
-  await expect(first).toHaveAttribute("data-lightbox-state", "open");
+  await expect(first).toHaveAttribute("data-fluidbox-state", "open");
 
   await page.locator("[data-demo-next]").click();
   await expect(page.locator("[data-demo-caption]")).toHaveText("two");
   await expect(activeMedia).toHaveAttribute("alt", "Orange portrait study");
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-picture] source'),
+    page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-picture] source'),
   ).toHaveCount(0);
   await expect(activeMedia).not.toHaveAttribute("srcset", /.+/);
   await expect(activeMedia).not.toHaveAttribute("sizes", /.+/);
@@ -59,13 +59,13 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
 test("clicking the empty gallery slide closes the lightbox", async ({ page }, testInfo) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
-  const slide = page.locator('[data-lightbox-slide][aria-hidden="false"]');
-  const frame = slide.locator("[data-lightbox-frame]");
+  const slide = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
+  const frame = slide.locator("[data-fluidbox-frame]");
   const slideBounds = await slide.boundingBox();
   const frameBounds = await frame.boundingBox();
   expect(slideBounds).not.toBeNull();
@@ -80,7 +80,7 @@ test("clicking the empty gallery slide closes the lightbox", async ({ page }, te
   ).toBe(true);
   if (testInfo.project.use.isMobile) await page.touchscreen.tap(x, y);
   else await page.mouse.click(x, y);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
 });
 
 test("plain runtime contains focus and applies the established gallery keyboard policy", async ({
@@ -88,9 +88,9 @@ test("plain runtime contains focus and applies the established gallery keyboard 
 }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-lightbox-overlay]");
-  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
-  await expect(page.locator("[data-lightbox-dialog]")).toBeFocused();
+  const overlay = page.locator("[data-fluidbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator("[data-fluidbox-dialog]")).toBeFocused();
 
   await page.keyboard.press("Tab");
   await expect(page.locator("[data-demo-next]")).toBeFocused();
@@ -102,7 +102,7 @@ test("plain runtime contains focus and applies the established gallery keyboard 
     heading.setAttribute("tabindex", "-1");
     (heading as HTMLElement).focus();
   });
-  await expect(page.locator("[data-lightbox-dialog]")).toBeFocused();
+  await expect(page.locator("[data-fluidbox-dialog]")).toBeFocused();
 
   await page.keyboard.press("PageDown");
   await expect(overlay).toHaveCount(0);
@@ -114,34 +114,34 @@ test("plain runtime returns focus to a virtualized origin host", async ({ page }
   const gallery = page.locator(".headless-grid");
   await gallery.evaluate((element) => element.setAttribute("tabindex", "0"));
   await page.locator('[data-photo-id="one"]').click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
   await page.locator('[data-photo-id="one"]').evaluate((element) => element.remove());
   await page.evaluate(() => void window.headlessViewer.close());
 
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
   await expect(gallery).toBeFocused();
 });
 
 test("plain controllers hand body-level ownership to the newest viewer", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
   await page.evaluate(() => void window.headlessSecondaryViewer.open({ id: "two" }));
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(1);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]'),
+    page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]'),
   ).toHaveAttribute("alt", "Orange portrait study");
   const states = await page.evaluate(() => ({
     first: window.headlessViewer.state.status,
@@ -149,27 +149,27 @@ test("plain controllers hand body-level ownership to the newest viewer", async (
   }));
   expect(states).toEqual({ first: "closed", second: "open" });
   await page.evaluate(() => void window.headlessSecondaryViewer.close());
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
 });
 
 test("active viewer ownership honors a prevented close", async ({ page }) => {
   await page.goto("/headless.html");
   await page.evaluate(() => void window.headlessProtectedViewer.open({ id: "one" }));
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
   const result = await page.evaluate(() => window.headlessSecondaryViewer.open({ id: "two" }));
 
   expect(result).toEqual({ status: "prevented" });
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(1);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]'),
+    page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]'),
   ).toHaveAttribute("alt", "Blue square study");
   const states = await page.evaluate(() => ({
     protected: window.headlessProtectedViewer.state.status,
@@ -177,7 +177,7 @@ test("active viewer ownership honors a prevented close", async ({ page }) => {
   }));
   expect(states).toEqual({ protected: "open", secondary: "closed" });
   await page.evaluate(() => window.headlessProtectedViewer.destroy());
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
 });
 
 test("plain runtime owns video and iframe media while custom renderers own descendants", async ({
@@ -232,24 +232,24 @@ test("plain runtime owns video and iframe media while custom renderers own desce
     });
     void window.headlessViewer.open({ id: "custom" });
   });
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
   await expect(page.locator("[data-test-custom-media]")).toHaveText("Custom custom");
 
   await page.keyboard.press("ArrowRight");
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] video[data-lightbox-media]'),
+    page.locator('[data-fluidbox-slide][aria-hidden="false"] video[data-fluidbox-media]'),
   ).toHaveAttribute("aria-label", "Video study");
   await page.keyboard.press("ArrowRight");
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] iframe[data-lightbox-media]'),
+    page.locator('[data-fluidbox-slide][aria-hidden="false"] iframe[data-fluidbox-media]'),
   ).toHaveAttribute("title", "Iframe study");
   await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-aborts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-disposals", "1");
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
 });
 
 test("destroy unloads mounted custom media before removing the viewer", async ({ page }) => {
@@ -277,7 +277,7 @@ test("destroy unloads mounted custom media before removing the viewer", async ({
     window.headlessViewer.destroy();
   });
 
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
   await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-aborts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-disposals", "1");
@@ -310,15 +310,15 @@ test("custom media uses the document close flight and returns to its retained sl
     void window.headlessViewer.close();
   });
 
-  await expect(page.locator("[data-lightbox-flight] [data-test-custom-media]")).toHaveText(
+  await expect(page.locator("[data-fluidbox-flight] [data-test-custom-media]")).toHaveText(
     "Custom one",
   );
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
 
   await page.evaluate(() => void window.headlessViewer.open({ id: "one" }));
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-test-custom-media]'),
+    page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-test-custom-media]'),
   ).toHaveText("Custom one");
   await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
   await page.evaluate(() => window.headlessViewer.destroy());
@@ -327,12 +327,12 @@ test("custom media uses the document close flight and returns to its retained sl
 test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
-  const sample = await page.locator("[data-lightbox-slides]").evaluate(async (scroller) => {
+  const sample = await page.locator("[data-fluidbox-slides]").evaluate(async (scroller) => {
     const element = scroller as HTMLElement;
     const width = element.clientWidth;
     element.style.scrollSnapType = "none";
@@ -348,7 +348,7 @@ test("plain runtime does not take native horizontal swipe ownership", async ({ p
     return {
       position: element.scrollLeft / width,
       selected: element
-        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
         ?.getAttribute("aria-label"),
       snapOverride: element.style.scrollSnapType,
     };
@@ -371,14 +371,14 @@ test("plain runtime reveals the selected mounted origin without a host callback"
     };
   });
   await page.locator('[data-photo-id="one"]').click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await page.locator("[data-demo-next]").click();
   const second = page.locator('[data-photo-id="two"]');
   await expect(second).toHaveAttribute("data-test-revealed", "");
-  await expect(second.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+  await expect(second.locator("img")).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
 });
 
 test("plain runtime keeps the preview painted until the full image can replace it", async ({
@@ -408,12 +408,12 @@ test("plain runtime keeps the preview painted until the full image can replace i
     });
     void window.headlessViewer.open({ id: "preview-test" });
   });
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "opening");
-  const media = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]');
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "opening");
+  const media = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]');
   await expect(media).toHaveAttribute("src", "/photo-portrait.svg");
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
   await expect(media).toHaveAttribute("src", "/photo-square.svg");
 });
 
@@ -454,25 +454,25 @@ test("adjacent slides paint their placeholder while responsive images are pendin
     });
     await window.headlessViewer.open({ index: 0 });
   }, placeholder);
-  const neighbor = page.locator("[data-lightbox-slide] [data-lightbox-media]").nth(1);
+  const neighbor = page.locator("[data-fluidbox-slide] [data-fluidbox-media]").nth(1);
   await expect(neighbor).toHaveAttribute("loading", "eager");
   // Mobile WebKit has no wheel input.
   if (testInfo.project.name === "iphone-15-pro" || testInfo.project.name === "ipad-pro-11") {
     await page.evaluate(() => window.headlessViewer.goTo({ index: 1 }));
   } else {
-    const strip = page.locator("[data-lightbox-slides]");
+    const strip = page.locator("[data-fluidbox-slides]");
     const bounds = (await strip.boundingBox())!;
     await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
     await page.mouse.wheel(bounds.width, 0);
   }
-  const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
-  await expect(active.locator("[data-lightbox-media]")).toHaveAttribute("alt", "Pending image 1");
-  const fallback = active.locator("[data-lightbox-slide-placeholder]");
+  const active = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
+  await expect(active.locator("[data-fluidbox-media]")).toHaveAttribute("alt", "Pending image 1");
+  const fallback = active.locator("[data-fluidbox-slide-placeholder]");
   await expect(fallback).toHaveAttribute("src", placeholder);
   await expect
     .poll(() => fallback.evaluate((image: HTMLImageElement) => image.naturalWidth))
     .toBe(8);
-  await expect(active.locator("[data-lightbox-media]")).toHaveCSS("visibility", "hidden");
+  await expect(active.locator("[data-fluidbox-media]")).toHaveCSS("visibility", "hidden");
 });
 
 test("plain runtime retains the last decoded origin when its next source is pending", async ({
@@ -519,17 +519,17 @@ test("plain runtime retains the last decoded origin when its next source is pend
   });
 
   const activeMedia = page.locator(
-    '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+    '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
   );
   await expect(activeMedia).toHaveAttribute("src", /photo-square\.svg/);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "opening",
   );
   expect(fullRequests).toBe(0);
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await expect.poll(() => fullRequests).toBe(1);
@@ -570,9 +570,9 @@ test("plain runtime keeps the preview available while a failed full image is ret
     void window.headlessViewer.open({ id: "retry-test" });
   });
 
-  const slide = page.locator('[data-lightbox-slide][aria-hidden="false"]');
-  const media = slide.locator("[data-lightbox-media]");
-  const error = slide.locator("[data-lightbox-error]");
+  const slide = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
+  const media = slide.locator("[data-fluidbox-media]");
+  const error = slide.locator("[data-fluidbox-error]");
   await expect(error).toBeVisible();
   await expect(media).toHaveAttribute("src", "/photo-portrait.svg");
 
@@ -613,40 +613,40 @@ test("plain runtime keeps focus that moved into the dialog during the opening", 
     void window.headlessViewer.open({ id: "focus-test" });
     const retry = () =>
       document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-error]:not([hidden]) button',
+        '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-error]:not([hidden]) button',
       );
     const painting = () =>
-      document.querySelector("[data-lightbox-overlay]:not([data-lightbox-prepared])") && retry();
+      document.querySelector("[data-fluidbox-overlay]:not([data-fluidbox-prepared])") && retry();
     for (let frames = 0; frames < 240 && !painting(); frames += 1) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     }
     Element.prototype.animate = animate;
     retry()!.focus();
     const state = {
-      state: document.querySelector<HTMLElement>("[data-lightbox-dialog]")?.dataset.lightboxState,
+      state: document.querySelector<HTMLElement>("[data-fluidbox-dialog]")?.dataset.fluidboxState,
       focused: document.activeElement === retry(),
     };
     for (const animation of held) animation.playbackRate = 1;
     return state;
   });
   expect(during).toEqual({ state: "opening", focused: true });
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
-  await expect(page.locator("[data-lightbox-error] button").first()).toBeFocused();
+  await expect(page.locator("[data-fluidbox-error] button").first()).toBeFocused();
 });
 
 test("plain runtime settles immediately when reduced motion is requested", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
-  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
   expect(await frame.evaluate((element) => element.getAnimations().length)).toBe(0);
 
-  const behavior = await page.locator("[data-lightbox-slides]").evaluate((slides) => {
+  const behavior = await page.locator("[data-fluidbox-slides]").evaluate((slides) => {
     const element = slides as HTMLElement;
     let selected: ScrollBehavior | undefined;
     const original = element.scrollTo.bind(element);
@@ -664,7 +664,7 @@ test("plain runtime settles immediately when reduced motion is requested", async
   await expect(page.locator("[data-demo-caption]")).toHaveText("two");
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
 });
 
@@ -674,16 +674,16 @@ test("plain runtime keeps session height stable through mobile browser chrome ch
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-lightbox-overlay]");
-  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
-  await expect(overlay).toHaveCSS("--lightbox-height", "700px");
+  const overlay = page.locator("[data-fluidbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(overlay).toHaveCSS("--fluidbox-height", "700px");
 
   await page.setViewportSize({ width: 1000, height: 620 });
-  await expect(overlay).toHaveCSS("--lightbox-height", "700px");
+  await expect(overlay).toHaveCSS("--fluidbox-height", "700px");
 
   await page.setViewportSize({ width: 820, height: 620 });
-  await expect(overlay).toHaveCSS("--lightbox-height", "620px");
-  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+  await expect(overlay).toHaveCSS("--fluidbox-height", "620px");
+  await expect(overlay).toHaveAttribute("data-fluidbox-state", "open");
 });
 
 test("plain runtime preserves the painted frame when open and close reverse", async ({ page }) => {
@@ -694,9 +694,9 @@ test("plain runtime preserves the painted frame when open and close reverse", as
     const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const bounds = () => {
       const frame =
-        document.querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-frame]") ??
+        document.querySelector<HTMLElement>("[data-fluidbox-flight] [data-fluidbox-frame]") ??
         document.querySelector<HTMLElement>(
-          '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+          '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
         )!;
       const rect = frame.getBoundingClientRect();
       return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
@@ -723,7 +723,7 @@ test("plain runtime preserves the painted frame when open and close reverse", as
     void window.headlessViewer.open({ id: "one" });
     for (let frames = 0; frames < 240; frames += 1) {
       await nextFrame();
-      if (held.length && !document.querySelector("[data-lightbox-prepared]")) break;
+      if (held.length && !document.querySelector("[data-fluidbox-prepared]")) break;
     }
     setMotionTime(120);
     const openingBefore = bounds();
@@ -751,8 +751,8 @@ test("plain runtime preserves the painted frame when open and close reverse", as
       expect(Math.abs(before[property] - after[property])).toBeLessThan(4);
     }
   }
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 });
@@ -760,10 +760,10 @@ test("plain runtime preserves the painted frame when open and close reverse", as
 test("plain runtime publishes drag state and dismisses from a touch pointer", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-lightbox-overlay]");
-  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+  const overlay = page.locator("[data-fluidbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-fluidbox-state", "open");
 
-  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
   const center = await frame.boundingBox();
   expect(center).not.toBeNull();
   const x = center!.x + center!.width / 2;
@@ -787,7 +787,7 @@ test("plain runtime publishes drag state and dismisses from a touch pointer", as
   await expect
     .poll(() =>
       overlay.evaluate((element) =>
-        Number(element.style.getPropertyValue("--lightbox-dismiss-progress")),
+        Number(element.style.getPropertyValue("--fluidbox-dismiss-progress")),
       ),
     )
     .toBeGreaterThan(0);
@@ -806,10 +806,10 @@ test("plain runtime publishes drag state and dismisses from a touch pointer", as
 test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-lightbox-overlay]");
-  await expect(overlay).toHaveAttribute("data-lightbox-state", "open");
+  const overlay = page.locator("[data-fluidbox-overlay]");
+  await expect(overlay).toHaveAttribute("data-fluidbox-state", "open");
 
-  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
   const progress = await frame.evaluate(async (element) => {
     let maximum = 0;
     for (let index = 0; index < 3; index++) {
@@ -817,10 +817,10 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
         new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }),
       );
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      const overlay = document.querySelector<HTMLElement>("[data-lightbox-overlay]")!;
+      const overlay = document.querySelector<HTMLElement>("[data-fluidbox-overlay]")!;
       maximum = Math.max(
         maximum,
-        Number(overlay.style.getPropertyValue("--lightbox-dismiss-progress")),
+        Number(overlay.style.getPropertyValue("--fluidbox-dismiss-progress")),
       );
     }
     return maximum;
@@ -832,16 +832,16 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
   const closing = await frame.evaluate(
     (element) =>
       new Promise<{ state: string | undefined; tailPrevented: boolean }>((resolve) => {
-        const overlay = document.querySelector<HTMLElement>("[data-lightbox-overlay]")!;
+        const overlay = document.querySelector<HTMLElement>("[data-fluidbox-overlay]")!;
         const observer = new MutationObserver(() => {
-          if (overlay.dataset.lightboxState !== "closing") return;
+          if (overlay.dataset.fluidboxState !== "closing") return;
           observer.disconnect();
           document.getAnimations().forEach((animation) => animation.pause());
           const tail = new WheelEvent("wheel", { cancelable: true, deltaY: 20 });
           window.dispatchEvent(tail);
-          resolve({ state: overlay.dataset.lightboxState, tailPrevented: tail.defaultPrevented });
+          resolve({ state: overlay.dataset.fluidboxState, tailPrevented: tail.defaultPrevented });
         });
-        observer.observe(overlay, { attributeFilter: ["data-lightbox-state"] });
+        observer.observe(overlay, { attributeFilter: ["data-fluidbox-state"] });
         element.dispatchEvent(
           new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 160 }),
         );
@@ -864,9 +864,9 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  const media = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]');
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  const media = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]');
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
 
   await media.dblclick({ position: { x: 260, y: 260 } });
   const handoff = await media.evaluate(async (element) => {
@@ -890,7 +890,7 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
     await Promise.resolve();
     await nextFrame();
     const moved = document.querySelector<HTMLElement>(
-      "[data-lightbox-zoom-viewport] [data-lightbox-media]",
+      "[data-fluidbox-zoom-viewport] [data-fluidbox-media]",
     );
     const after = moved?.getBoundingClientRect();
     return {
@@ -904,15 +904,15 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
     expect(Math.abs(handoff!.before[property] - handoff!.after![property])).toBeLessThan(3);
   }
   await expect(dialog).toHaveAttribute("data-zoomed", "");
-  const zoomViewport = page.locator("[data-lightbox-zoom-viewport]");
+  const zoomViewport = page.locator("[data-fluidbox-zoom-viewport]");
   await expect(zoomViewport).toHaveCount(1);
-  const scale = await zoomViewport.locator("[data-lightbox-media]").evaluate((element) => {
+  const scale = await zoomViewport.locator("[data-fluidbox-media]").evaluate((element) => {
     const transform = getComputedStyle(element).transform;
     return new DOMMatrix(transform === "none" ? undefined : transform).a;
   });
   expect(scale).toBeGreaterThan(1.5);
 
-  const zoomedMedia = zoomViewport.locator("[data-lightbox-media]");
+  const zoomedMedia = zoomViewport.locator("[data-fluidbox-media]");
   const bounds = await zoomedMedia.boundingBox();
   expect(bounds).not.toBeNull();
   const x = bounds!.x + bounds!.width / 2;
@@ -939,14 +939,14 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
   expect(wheelPrevented).toBe(false);
   await expect(dialog).not.toHaveAttribute("data-dragging", "");
   await expect(dialog).not.toHaveAttribute("data-dismissing", "");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
 
   await page.keyboard.press("0");
   await expect(dialog).not.toHaveAttribute("data-zoomed", "");
-  await expect(page.locator("[data-lightbox-zoom-viewport]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-zoom-viewport]")).toHaveCount(0);
   await expect(media).toBeVisible();
 
-  await page.locator("[data-lightbox-container]").evaluate((container) => {
+  await page.locator("[data-fluidbox-container]").evaluate((container) => {
     const gesture = (type: string, scale: number) => {
       const event = new Event(type, { bubbles: true, cancelable: true });
       Object.defineProperties(event, {
@@ -961,7 +961,7 @@ test("plain runtime reuses pinch and double-click zoom interaction", async ({ pa
     gesture("gestureend", 2);
   });
   await expect(dialog).toHaveAttribute("data-zoomed", "");
-  await expect(page.locator("[data-lightbox-zoom-viewport]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-zoom-viewport]")).toHaveCount(1);
   await page.keyboard.press("0");
   await expect(dialog).not.toHaveAttribute("data-zoomed", "");
 });
@@ -985,7 +985,7 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
           badge.dataset.testTravelingOverlay = "";
           badge.textContent = `Traveling ${item.id}`;
           const actions = document.createElement("span");
-          actions.dataset.lightboxVideoActions = "";
+          actions.dataset.fluidboxVideoActions = "";
           target.append(badge, actions);
           signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
             once: true,
@@ -1012,7 +1012,7 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     void window.headlessViewer.open({ id: "one" });
     for (let frames = 0; frames < 240; frames += 1) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      if (document.querySelector("[data-lightbox-frame]")?.getAnimations().length) break;
+      if (document.querySelector("[data-fluidbox-frame]")?.getAnimations().length) break;
     }
     Element.prototype.animate = animate;
     for (const animation of document.getAnimations()) {
@@ -1022,26 +1022,26 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     for (const animation of held) animation.playbackRate = 1;
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const host = document.querySelector<HTMLElement>("[data-test-thumbnail-overlay]")!;
-    const travel = document.querySelector<HTMLElement>("[data-lightbox-transition-content]")!;
+    const travel = document.querySelector<HTMLElement>("[data-fluidbox-transition-content]")!;
     return {
-      hostPhase: host.dataset.lightboxPhase,
-      hostProgress: Number(getComputedStyle(host).getPropertyValue("--lightbox-progress")),
-      travelPhase: travel.dataset.lightboxPhase,
-      travelProgress: Number(getComputedStyle(travel).getPropertyValue("--lightbox-progress")),
+      hostPhase: host.dataset.fluidboxPhase,
+      hostProgress: Number(getComputedStyle(host).getPropertyValue("--fluidbox-progress")),
+      travelPhase: travel.dataset.fluidboxPhase,
+      travelProgress: Number(getComputedStyle(travel).getPropertyValue("--fluidbox-progress")),
       travelTransform: getComputedStyle(travel).transform,
       frameRect: document
-        .querySelector<HTMLElement>("[data-lightbox-frame]")!
+        .querySelector<HTMLElement>("[data-fluidbox-frame]")!
         .getBoundingClientRect()
         .toJSON(),
       travelRect: travel.getBoundingClientRect().toJSON(),
       text: travel.textContent,
-      layerInFrame: host.parentElement?.hasAttribute("data-lightbox-frame"),
-      controlsDelay: getComputedStyle(travel).getPropertyValue("--lightbox-controls-reveal-delay"),
+      layerInFrame: host.parentElement?.hasAttribute("data-fluidbox-frame"),
+      controlsDelay: getComputedStyle(travel).getPropertyValue("--fluidbox-controls-reveal-delay"),
       hasControlsReveal: document
         .getAnimations()
         .some(
           (animation) =>
-            (animation as CSSAnimation).animationName === "lightbox-video-actions-reveal",
+            (animation as CSSAnimation).animationName === "fluidbox-video-actions-reveal",
         ),
     };
   });
@@ -1065,12 +1065,12 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
       .getAnimations()
       .filter(
         (animation) =>
-          (animation as CSSAnimation).animationName !== "lightbox-video-actions-reveal",
+          (animation as CSSAnimation).animationName !== "fluidbox-video-actions-reveal",
       )
       .forEach((animation) => animation.finish()),
   );
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "opening",
   );
   await page.evaluate(() =>
@@ -1078,25 +1078,25 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
       .getAnimations()
       .find(
         (animation) =>
-          (animation as CSSAnimation).animationName === "lightbox-video-actions-reveal",
+          (animation as CSSAnimation).animationName === "fluidbox-video-actions-reveal",
       )
       ?.finish(),
   );
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await expect(page.locator("[data-test-thumbnail-overlay]")).toHaveAttribute(
-    "data-lightbox-phase",
+    "data-fluidbox-phase",
     "open",
   );
-  await expect(page.locator("[data-lightbox-transition-content]")).toHaveCSS(
-    "--lightbox-progress",
+  await expect(page.locator("[data-fluidbox-transition-content]")).toHaveCSS(
+    "--fluidbox-progress",
     "0",
   );
 
   await page.evaluate(() => void window.headlessViewer.close());
-  await page.locator("[data-lightbox-flight]").waitFor();
+  await page.locator("[data-fluidbox-flight]").waitFor();
   const closing = await page.evaluate(async () => {
     for (const animation of document.getAnimations()) {
       animation.pause();
@@ -1104,9 +1104,9 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     }
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const frame = document.querySelector<HTMLElement>(
-      "[data-lightbox-flight] [data-lightbox-frame]",
+      "[data-fluidbox-flight] [data-fluidbox-frame]",
     )!;
-    const travel = document.querySelector<HTMLElement>("[data-lightbox-transition-content]")!;
+    const travel = document.querySelector<HTMLElement>("[data-fluidbox-transition-content]")!;
     return {
       frameRect: frame.getBoundingClientRect().toJSON(),
       travelRect: travel.getBoundingClientRect().toJSON(),
@@ -1119,11 +1119,11 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
   expect(closing.travelRect.width).toBeCloseTo(closing.frameRect.width, 0);
   expect(closing.travelRect.height).toBeCloseTo(closing.frameRect.height, 0);
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
-  await expect(page.locator("[data-lightbox-transition-content]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-transition-content]")).toHaveCount(0);
   const host = page.locator("[data-test-thumbnail-overlay]");
-  await expect(host).toHaveAttribute("data-lightbox-phase", "preview");
-  await expect(host).toHaveCSS("--lightbox-progress", "1");
+  await expect(host).toHaveAttribute("data-fluidbox-phase", "preview");
+  await expect(host).toHaveCSS("--fluidbox-progress", "1");
   await expect(host).toHaveAttribute("data-renderer-aborted", "");
   await expect(host).toHaveAttribute("data-renderer-disposed", "");
   await expect(page.locator('[data-photo-id="one"] [data-test-thumbnail-overlay]')).toHaveCount(1);
@@ -1154,8 +1154,8 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
   const parked = await page.evaluate(() => {
     const layer = document.querySelector<HTMLElement>("[data-test-parked-layer]")!;
     return {
-      slide: [...document.querySelectorAll("[data-lightbox-slide]")].indexOf(
-        layer.closest("[data-lightbox-slide]")!,
+      slide: [...document.querySelectorAll("[data-fluidbox-slide]")].indexOf(
+        layer.closest("[data-fluidbox-slide]")!,
       ),
       mounts: layer.dataset.mounts,
       selected: window.headlessViewer.state.activeId,
@@ -1191,7 +1191,7 @@ test("native gallery scrolling is never corrected by the runtime", async ({ page
     await window.headlessViewer.open({ index: 0 });
   });
   const offsets = await page
-    .locator("[data-lightbox-slides]")
+    .locator("[data-fluidbox-slides]")
     .evaluate(async (strip: HTMLElement) => {
       // Disable CSS snapping only to reveal any competing JS scroll correction.
       strip.style.scrollSnapType = "none";
@@ -1235,42 +1235,42 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
     void window.headlessViewer.open({ index: 90_000 });
   });
 
-  const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+  const active = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
   await expect(active).toHaveAttribute("aria-label", "Item 90001 of 100000");
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
-  expect(await page.locator("[data-lightbox-slide]").count()).toBeLessThanOrEqual(31);
-  expect(await page.locator("[data-lightbox-media][src]").count()).toBeLessThanOrEqual(3);
+  expect(await page.locator("[data-fluidbox-slide]").count()).toBeLessThanOrEqual(31);
+  expect(await page.locator("[data-fluidbox-media][src]").count()).toBeLessThanOrEqual(3);
 
   await page.keyboard.press("ArrowRight");
   await expect(active).toHaveAttribute("aria-label", "Item 90002 of 100000");
-  expect(await page.locator("[data-lightbox-slide]").count()).toBeLessThanOrEqual(31);
-  expect(await page.locator("[data-lightbox-media][src]").count()).toBeLessThanOrEqual(3);
+  expect(await page.locator("[data-fluidbox-slide]").count()).toBeLessThanOrEqual(31);
+  expect(await page.locator("[data-fluidbox-media][src]").count()).toBeLessThanOrEqual(3);
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
 });
 
 test("the filmstrip option docks thumbnails that navigate the viewer", async ({ page }) => {
   await page.goto("/headless.html");
   await page.evaluate(() => void window.headlessFilmstripViewer.open({ id: "one" }));
 
-  const dialog = page.locator("[data-lightbox-dialog]");
+  const dialog = page.locator("[data-fluidbox-dialog]");
   await expect(dialog).toHaveAttribute("data-filmstrip", /.*/);
-  const items = page.locator("[data-lightbox-filmstrip-item]");
+  const items = page.locator("[data-fluidbox-filmstrip-item]");
   await expect(items.first()).toBeVisible();
-  await expect(page.locator("[data-lightbox-filmstrip]")).toHaveAttribute(
+  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveAttribute(
     "aria-label",
     "Gallery filmstrip",
   );
 
-  await page.locator('[data-lightbox-filmstrip-item][data-index="1"]').click();
+  await page.locator('[data-fluidbox-filmstrip-item][data-index="1"]').click();
   await expect
     .poll(() => page.evaluate(() => window.headlessFilmstripViewer.state.activeIndex))
     .toBe(1);
 
   await page.evaluate(() => void window.headlessFilmstripViewer.close());
-  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
 });

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#11151c" />
-    <title>Lightbox playground</title>
+    <title>Fluidbox playground</title>
     <script type="module" src="/fixtures/playground.ts"></script>
   </head>
   <body>
@@ -25,8 +25,8 @@
           </div>
           <p>Tap either image to open the viewer.</p>
         </div>
-        <app-gallery class="photo-grid" aria-label="Example gallery">
-          <app-lightbox item-id="first">
+        <fluidbox-gallery class="photo-grid" aria-label="Example gallery">
+          <fluidbox-item item-id="first">
             <button slot="trigger" type="button">
               <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
             </button>
@@ -35,8 +35,8 @@
                 <img src="/first.svg" alt="Blue and green circles" width="600" height="400" />
               </picture>
             </template>
-          </app-lightbox>
-          <app-lightbox item-id="second">
+          </fluidbox-item>
+          <fluidbox-item item-id="second">
             <button slot="trigger" type="button">
               <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
             </button>
@@ -45,9 +45,9 @@
                 <img src="/second.svg" alt="Pink and orange squares" width="600" height="400" />
               </picture>
             </template>
-          </app-lightbox>
-          <app-filmstrip></app-filmstrip>
-        </app-gallery>
+          </fluidbox-item>
+          <fluidbox-filmstrip></fluidbox-filmstrip>
+        </fluidbox-gallery>
       </section>
       <section aria-labelledby="virtual-title">
         <div class="section-heading">
@@ -70,9 +70,13 @@
           />
           <button type="submit">Open</button>
         </form>
-        <app-gallery id="virtual-gallery" class="virtual-grid" aria-label="Virtual source gallery">
-          <app-filmstrip></app-filmstrip>
-        </app-gallery>
+        <fluidbox-gallery
+          id="virtual-gallery"
+          class="virtual-grid"
+          aria-label="Virtual source gallery"
+        >
+          <fluidbox-filmstrip></fluidbox-filmstrip>
+        </fluidbox-gallery>
         <p class="hint">
           Only the twelve cards shown here are in the host DOM. The viewer and filmstrip keep their
           own small windows.

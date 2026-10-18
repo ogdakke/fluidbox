@@ -29,10 +29,10 @@ test("current gallery motion and appearance", async ({ page, browserName }, test
     let active = true;
     function sample(now: number) {
       const slide = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"]',
+        '[data-fluidbox-slide][aria-hidden="false"]',
       );
       const media = slide?.querySelector<HTMLElement>(
-        "[data-lightbox-media], [data-lightbox-item-content]",
+        "[data-fluidbox-media], [data-fluidbox-item-content]",
       );
       const rect = media?.getBoundingClientRect();
       samples.push({
@@ -44,14 +44,14 @@ test("current gallery motion and appearance", async ({ page, browserName }, test
         width: rect ? Math.round(rect.width * 100) / 100 : null,
         height: rect ? Math.round(rect.height * 100) / 100 : null,
         scrollLeft:
-          document.querySelector<HTMLElement>("[data-lightbox-slides]")?.scrollLeft ?? null,
+          document.querySelector<HTMLElement>("[data-fluidbox-slides]")?.scrollLeft ?? null,
       });
       previous = now;
       if (active) requestAnimationFrame(sample);
     }
     requestAnimationFrame(sample);
     Object.assign(window, {
-      __lightboxProbe: { samples, longTasks, stop: () => (active = false) },
+      __fluidboxProbe: { samples, longTasks, stop: () => (active = false) },
     });
   });
   let cdp: CDPSession | undefined;
@@ -65,26 +65,26 @@ test("current gallery motion and appearance", async ({ page, browserName }, test
     );
   }
   const openStart = await page.evaluate(() => performance.now());
-  await page.locator("app-lightbox").first().click();
-  await expect(page.locator("[data-lightbox-dialog]")).toBeVisible();
+  await page.locator("fluidbox-item").first().click();
+  await expect(page.locator("[data-fluidbox-dialog]")).toBeVisible();
   await page.waitForTimeout(500);
   const openMs = (await page.evaluate(() => performance.now())) - openStart;
   await page.screenshot({ path: resolve(folder, "open.png"), animations: "disabled" });
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 2 of 30",
   );
   await page.waitForTimeout(350);
   await page.screenshot({ path: resolve(folder, "next.png"), animations: "disabled" });
-  await page.locator('[data-lightbox-filmstrip-item][data-index="20"]').click();
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await page.locator('[data-fluidbox-filmstrip-item][data-index="20"]').click();
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 21 of 30",
   );
   await page.waitForTimeout(250);
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   const cpuAfter = cdp
     ? Object.fromEntries(
         (await cdp.send("Performance.getMetrics")).metrics.map(
@@ -95,9 +95,9 @@ test("current gallery motion and appearance", async ({ page, browserName }, test
   const probe = await page.evaluate(() => {
     const value = (
       window as Window & {
-        __lightboxProbe?: { samples: unknown[]; longTasks: number[]; stop: () => void };
+        __fluidboxProbe?: { samples: unknown[]; longTasks: number[]; stop: () => void };
       }
-    ).__lightboxProbe!;
+    ).__fluidboxProbe!;
     value.stop();
     return { samples: value.samples, longTasks: value.longTasks };
   });
@@ -159,16 +159,16 @@ test("current large gallery allocation", async ({ page }, testInfo) => {
   const fixtureMs = Date.now() - start;
   const openStart = Date.now();
   await page
-    .locator("app-lightbox")
+    .locator("fluidbox-item")
     .first()
     .locator("img")
     .evaluate((element: HTMLElement) => element.click());
-  await expect(page.locator("[data-lightbox-dialog]")).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator("[data-fluidbox-dialog]")).toBeVisible({ timeout: 120_000 });
   const openMs = Date.now() - openStart;
   const allocation = await page.evaluate(() => ({
-    sourceElements: document.querySelectorAll("app-lightbox").length,
-    slides: document.querySelectorAll("[data-lightbox-slide]").length,
-    filmstripButtons: document.querySelectorAll("[data-lightbox-filmstrip-item]").length,
+    sourceElements: document.querySelectorAll("fluidbox-item").length,
+    slides: document.querySelectorAll("[data-fluidbox-slide]").length,
+    filmstripButtons: document.querySelectorAll("[data-fluidbox-filmstrip-item]").length,
     domNodes: document.querySelectorAll("*").length,
   }));
   await writeFile(
@@ -188,8 +188,8 @@ test("current shadow DOM appearance", async ({ page }, testInfo) => {
   const folder = resolve(baselineRoot, testInfo.project.name);
   await mkdir(folder, { recursive: true });
   await page.goto("/harness.html?shadow");
-  await page.locator("#fixture app-lightbox").first().click();
-  await expect(page.locator("[data-lightbox-dialog]")).toBeVisible();
+  await page.locator("#fixture fluidbox-item").first().click();
+  await expect(page.locator("[data-fluidbox-dialog]")).toBeVisible();
   await page.waitForTimeout(350);
   await page.screenshot({ path: resolve(folder, "shadow-open.png"), animations: "disabled" });
   const video = page.video();
@@ -207,7 +207,7 @@ test("timecoded transition diagnostic", async ({ page }, testInfo) => {
   await page.goto("/harness.html?count=30");
   await page.evaluate(() => {
     const clock = document.createElement("output");
-    clock.id = "lightbox-frame-clock";
+    clock.id = "fluidbox-frame-clock";
     clock.style.cssText =
       "position:fixed;z-index:2147483647;left:8px;top:8px;padding:4px 6px;background:#000;color:#fff;font:12px monospace;pointer-events:none";
     document.body.append(clock);
@@ -222,10 +222,10 @@ test("timecoded transition diagnostic", async ({ page }, testInfo) => {
     let active = true;
     function frame(now: number) {
       const slide = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"]',
+        '[data-fluidbox-slide][aria-hidden="false"]',
       );
       const media = slide?.querySelector<HTMLElement>(
-        "[data-lightbox-media], [data-lightbox-item-content]",
+        "[data-fluidbox-media], [data-fluidbox-item-content]",
       );
       const rect = media?.getBoundingClientRect();
       const time = Math.round(now);
@@ -255,13 +255,13 @@ test("timecoded transition diagnostic", async ({ page }, testInfo) => {
       ).__diagnostic.setPhase(next);
     }, phase);
   await setPhase("opening");
-  await page.locator("app-lightbox").first().click();
+  await page.locator("fluidbox-item").first().click();
   await page.waitForTimeout(550);
   await setPhase("next");
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(450);
   await setPhase("filmstrip-21");
-  await page.locator('[data-lightbox-filmstrip-item][data-index="20"]').click();
+  await page.locator('[data-fluidbox-filmstrip-item][data-index="20"]').click();
   await page.waitForTimeout(350);
   await setPhase("closing");
   await page.keyboard.press("Escape");
@@ -298,7 +298,7 @@ test("direct React transition diagnostic", async ({ page }, testInfo) => {
     let active = true;
     function frame(now: number) {
       const media = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media]',
+        '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
       );
       const bounds = media?.getBoundingClientRect();
       clock.textContent = `${Math.round(now)}ms ${phase}`;
@@ -364,7 +364,7 @@ test("indexed source timing and frame capture", async ({ page, browserName }, te
         gapMs: Math.round((now - previous) * 100) / 100,
         active:
           document
-            .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+            .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
             ?.getAttribute("aria-label") ?? null,
       });
       previous = now;
@@ -385,27 +385,27 @@ test("indexed source timing and frame capture", async ({ page, browserName }, te
     );
   }
   const openMs = await page
-    .locator("app-gallery")
+    .locator("fluidbox-gallery")
     .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) => {
       const start = performance.now();
       gallery.open({ index: 99_990 });
       return performance.now() - start;
     });
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 99991 of 100000",
   );
   await page.waitForTimeout(400);
   const openedNodes = await page.locator("*").count();
-  const slides = await page.locator("[data-lightbox-slide]").count();
-  const thumbnails = await page.locator("[data-lightbox-filmstrip-item]").count();
+  const slides = await page.locator("[data-fluidbox-slide]").count();
+  const thumbnails = await page.locator("[data-fluidbox-filmstrip-item]").count();
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 99992 of 100000",
   );
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   const closedNodes = await page.locator("*").count();
   const after = cdp
     ? Object.fromEntries(

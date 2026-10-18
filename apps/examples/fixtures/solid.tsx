@@ -3,7 +3,7 @@ import { mountSite } from "../src/site";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/solid";
-import type { AppGallery } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox";
 import { alternateSource, source } from "./source";
 import "./frameworks.css";
 
@@ -12,13 +12,13 @@ mountSite("fixtures", { fixture: "Solid binding · indexed gallery with source r
 declare module "solid-js" {
   namespace JSX {
     interface IntrinsicElements {
-      "app-gallery": JSX.HTMLAttributes<AppGallery>;
+      "fluidbox-gallery": JSX.HTMLAttributes<FluidboxGalleryElement>;
     }
   }
 }
 
 function App() {
-  let gallery: AppGallery | undefined;
+  let gallery: FluidboxGalleryElement | undefined;
   const [currentSource, setCurrentSource] = createSignal(source);
   const bind = useFluidboxGallery(currentSource);
   return (
@@ -27,16 +27,16 @@ function App() {
       <button type="button" onClick={() => setCurrentSource(alternateSource)}>
         Switch source
       </button>
-      <app-gallery
+      <fluidbox-gallery
         ref={(node) => {
-          gallery = node as AppGallery;
+          gallery = node as FluidboxGalleryElement;
           bind(gallery);
         }}
       >
         <button type="button" onClick={() => gallery?.open({ index: 0 })}>
           Open gallery
         </button>
-      </app-gallery>
+      </fluidbox-gallery>
     </main>
   );
 }

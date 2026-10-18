@@ -13,7 +13,7 @@
         <p class="fb-label">Headless runtime</p>
         <h1>Headless</h1>
         <p>
-          <code>createLightbox()</code> needs no custom elements and no framework. You own the
+          <code>createFluidbox()</code> needs no custom elements and no framework. You own the
           thumbnails; the runtime owns motion, gestures, and focus.
         </p>
       </header>
@@ -29,9 +29,9 @@
         <div class="stage"><div id="headless-grid" class="headless-grid"></div></div>
         <details class="fb-code">
           <summary>Controller</summary>
-          <pre><code>import { arraySource, createLightbox } from "@ogdakke/fluidbox";
+          <pre><code>import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
 
-const viewer = createLightbox({
+const viewer = createFluidbox({
   source: arraySource(photos),
   origins: { getOrigin: (id) =&gt; ({ trigger, visual: trigger }) },
   portal: {

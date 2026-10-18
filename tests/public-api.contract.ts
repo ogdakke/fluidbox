@@ -1,11 +1,11 @@
-import { arraySource, createLightbox } from "../packages/lightbox/src/index";
+import { arraySource, createFluidbox } from "../packages/fluidbox/src/index";
 import type {
-  LightboxController,
-  LightboxImageMedia,
-  LightboxItem,
-  LightboxOriginAdapter,
-  LightboxSource,
-} from "../packages/lightbox/src/index";
+  FluidboxController,
+  FluidboxImageMedia,
+  FluidboxItem,
+  FluidboxOriginAdapter,
+  FluidboxSource,
+} from "../packages/fluidbox/src/index";
 
 const image = {
   type: "image",
@@ -13,14 +13,14 @@ const image = {
   alt: "Description",
   width: 2400,
   height: 1600,
-} satisfies LightboxImageMedia;
+} satisfies FluidboxImageMedia;
 
 const items = [
   { id: "one", media: image, thumbnail: { src: "/thumb.jpg", width: 480, height: 320 } },
-] as const satisfies readonly LightboxItem[];
+] as const satisfies readonly FluidboxItem[];
 
-const source: LightboxSource<(typeof items)[number]> = arraySource(items);
-const origins: LightboxOriginAdapter = {
+const source: FluidboxSource<(typeof items)[number]> = arraySource(items);
+const origins: FluidboxOriginAdapter = {
   getOrigin() {
     const trigger = document.createElement("button");
     const visual = document.createElement("img");
@@ -31,8 +31,8 @@ const origins: LightboxOriginAdapter = {
   },
 };
 
-const controller: LightboxController<(typeof items)[number]> = createLightbox({ source, origins });
-const composedController = createLightbox({
+const controller: FluidboxController<(typeof items)[number]> = createFluidbox({ source, origins });
+const composedController = createFluidbox({
   source,
   portal: {
     mount({ target, controller, signal }) {
@@ -61,7 +61,7 @@ controller.registerThumbnailOverlay("one", {
 });
 
 // @ts-expect-error image media requires intrinsic dimensions
-const missingDimensions: LightboxImageMedia = { type: "image", src: "/bad.jpg", alt: "Bad" };
+const missingDimensions: FluidboxImageMedia = { type: "image", src: "/bad.jpg", alt: "Bad" };
 void missingDimensions;
 
 // @ts-expect-error targets use exactly an id or an index
@@ -77,5 +77,5 @@ controller.registerThumbnailOverlay("one", {
 });
 
 // @ts-expect-error the source snapshot does not own DOM origins
-const invalidSource: LightboxSource = { count: 0, getItem() {}, getIndex() {}, getOrigin() {} };
+const invalidSource: FluidboxSource = { count: 0, getItem() {}, getIndex() {}, getOrigin() {} };
 void invalidSource;

@@ -295,7 +295,7 @@
   flex: 999 1 0;
 }
 
-.doc-demo-gallery app-lightbox {
+.doc-demo-gallery fluidbox-item {
   flex: var(--ratio) 1 calc(var(--ratio) * 120px);
 }
 

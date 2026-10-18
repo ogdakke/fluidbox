@@ -14,13 +14,13 @@ Import the package CSS first, then your overrides:
 
 ```ts
 import "@ogdakke/fluidbox/styles.css";
-import "./lightbox-theme.css";
+import "./fluidbox-theme.css";
 ```
 
-Viewer rules are rooted at a zero-specificity `:where([data-lightbox-overlay])`, so a later rule with the same part selector overrides a default:
+Viewer rules are rooted at a zero-specificity `:where([data-fluidbox-overlay])`, so a later rule with the same part selector overrides a default:
 
 ```css
-[data-lightbox-close] {
+[data-fluidbox-close] {
   width: 40px;
   height: 40px;
   border-radius: 0;
@@ -42,51 +42,51 @@ The open viewer lives in a body-level portal, outside your component tree. When 
 }
 ```
 
-Set them on `:root`, a section, or an individual `app-lightbox`; whatever the opening element inherits is what the viewer uses. Any other variable must be set on `:root` or on `[data-lightbox-overlay]` itself, because the portal does not inherit from your component.
+Set them on `:root`, a section, or an individual `fluidbox-item`; whatever the opening element inherits is what the viewer uses. Any other variable must be set on `:root` or on `[data-fluidbox-overlay]` itself, because the portal does not inherit from your component.
 
 ## Parts
 
-Style open-viewer parts from `[data-lightbox-overlay]` or `[data-lightbox-flight]`, never from the host element. The full list is in the [CSS reference](./css-reference.md); the ones you will reach for most:
+Style open-viewer parts from `[data-fluidbox-overlay]` or `[data-fluidbox-flight]`, never from the host element. The full list is in the [CSS reference](./css-reference.md); the ones you will reach for most:
 
 | Selector                                                                    | Part                              |
 | --------------------------------------------------------------------------- | --------------------------------- |
-| `[data-lightbox-backdrop]`                                                  | Modal backdrop                    |
-| `[data-lightbox-frame]`                                                     | Cropping and radius frame         |
-| `[data-lightbox-close]`, `[data-lightbox-previous]`, `[data-lightbox-next]` | Default controls                  |
-| `[data-lightbox-portal]`                                                    | Mount point for your own controls |
-| `[data-lightbox-filmstrip-item]`                                            | Filmstrip thumbnail               |
+| `[data-fluidbox-backdrop]`                                                  | Modal backdrop                    |
+| `[data-fluidbox-frame]`                                                     | Cropping and radius frame         |
+| `[data-fluidbox-close]`, `[data-fluidbox-previous]`, `[data-fluidbox-next]` | Default controls                  |
+| `[data-fluidbox-portal]`                                                    | Mount point for your own controls |
+| `[data-fluidbox-filmstrip-item]`                                            | Filmstrip thumbnail               |
 
 ## State
 
-The overlay and dialog expose `data-lightbox-state="closed|opening|open|closing"`, plus presence hooks such as `[data-open]`, `[data-starting-style]`, `[data-ending-style]`, `[data-dragging]`, `[data-dismissing]`, and `[data-zoomed]`.
+The overlay and dialog expose `data-fluidbox-state="closed|opening|open|closing"`, plus presence hooks such as `[data-open]`, `[data-starting-style]`, `[data-ending-style]`, `[data-dragging]`, `[data-dismissing]`, and `[data-zoomed]`.
 
 ```css
-[data-lightbox-dialog][data-zoomed] [data-lightbox-portal] {
+[data-fluidbox-dialog][data-zoomed] [data-fluidbox-portal] {
   opacity: 0;
 }
 ```
 
 ## Overlays that move with the image
 
-A badge, play icon, or count on a thumbnail can follow the transition. The runtime publishes `--lightbox-progress` on overlay elements: `1` at the thumbnail, `0` fully open.
+A badge, play icon, or count on a thumbnail can follow the transition. The runtime publishes `--fluidbox-progress` on overlay elements: `1` at the thumbnail, `0` fully open.
 
 ```css
 .photo-count {
-  opacity: var(--lightbox-progress, 1);
+  opacity: var(--fluidbox-progress, 1);
 }
 ```
 
 - **Host** overlays stay on the card and fade or transform with progress.
 - **Travel** overlays render a copy into the transition plane so they ride along with the image.
 
-In React these are `Lightbox.ThumbnailOverlay behavior="host" | "travel"`. Plain JavaScript uses `controller.registerThumbnailOverlay(id, registration)`.
+In React these are `Fluidbox.ThumbnailOverlay behavior="host" | "travel"`. Plain JavaScript uses `controller.registerThumbnailOverlay(id, registration)`.
 
 ## Reading motion
 
 Gesture and transition values are published as runtime-owned variables. Read them; never set them.
 
 ```css
-[data-lightbox-overlay] [data-lightbox-close] {
-  rotate: calc(var(--lightbox-dismiss-progress, 0) * 30deg);
+[data-fluidbox-overlay] [data-fluidbox-close] {
+  rotate: calc(var(--fluidbox-dismiss-progress, 0) * 30deg);
 }
 ```

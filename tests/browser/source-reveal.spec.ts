@@ -2,26 +2,26 @@ import { expect, test } from "@playwright/test";
 
 test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=1000");
-  const gallery = page.locator("app-gallery");
+  const gallery = page.locator("fluidbox-gallery");
   await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
     element.open({ index: 10 }),
   );
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   const handoff = await gallery.evaluate(
     (element: HTMLElement & { open(target: { index: number }): void }) => {
-      const scroller = document.querySelector<HTMLElement>("[data-lightbox-filmstrip-scroll]")!;
+      const scroller = document.querySelector<HTMLElement>("[data-fluidbox-filmstrip-scroll]")!;
       const style = getComputedStyle(scroller);
-      const filmstrip = scroller.closest<HTMLElement>("[data-lightbox-filmstrip]")!;
+      const filmstrip = scroller.closest<HTMLElement>("[data-fluidbox-filmstrip]")!;
       const size = Number.parseFloat(
-        getComputedStyle(filmstrip).getPropertyValue("--lightbox-filmstrip-item-size"),
+        getComputedStyle(filmstrip).getPropertyValue("--fluidbox-filmstrip-item-size"),
       );
       const step = size + Number.parseFloat(style.columnGap);
       const selectedLabel = () =>
         document
-          .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+          .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
           ?.getAttribute("aria-label");
       const beginUnsettledScroll = () => {
         scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: -80 }));
@@ -39,13 +39,13 @@ test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ 
   );
   expect(handoff.sameIndex).toBe("Item 11 of 1000");
   expect(handoff.afterKeyboard).toBe("Item 11 of 1000");
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 12 of 1000",
   );
   // Filmstrip's native settle timer is 160ms; the new selection must survive it.
   await page.waitForTimeout(220);
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 12 of 1000",
   );
@@ -54,7 +54,7 @@ test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ 
 test("a mounted indexed origin follows selection inside its scroll container", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=1000&no-filmstrip");
   await page.evaluate(() => {
-    const gallery = document.querySelector("app-gallery")!;
+    const gallery = document.querySelector("fluidbox-gallery")!;
     const scroller = document.createElement("div");
     scroller.id = "host-scroll";
     Object.assign(scroller.style, { height: "120px", width: "180px", overflow: "auto" });
@@ -64,18 +64,18 @@ test("a mounted indexed origin follows selection inside its scroll container", a
     }
     gallery.prepend(scroller);
   });
-  const gallery = page.locator("app-gallery");
+  const gallery = page.locator("fluidbox-gallery");
   await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
     element.open({ index: 0 }),
   );
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
     element.open({ index: 10 }),
   );
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 11 of 1000",
   );
@@ -91,13 +91,13 @@ test("a mounted indexed origin follows selection inside its scroll container", a
       await element.close();
       return {
         elapsed: performance.now() - started,
-        flightMounted: !!document.querySelector("[data-lightbox-flight]"),
+        flightMounted: !!document.querySelector("[data-fluidbox-flight]"),
       };
     },
   );
   expect(close.elapsed).toBeLessThan(1000);
   expect(close.flightMounted).toBe(false);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   await expect(gallery.locator('[data-virtual-index="10"]')).toBeFocused();
 });
 
@@ -115,7 +115,7 @@ test("stale async reveals abort on rapid selection and close never waits", async
           ) => Promise<void>;
         };
       }
-    >("app-gallery")!;
+    >("fluidbox-gallery")!;
     const events: {
       id: string;
       reason: string;
@@ -151,12 +151,12 @@ test("stale async reveals abort on rapid selection and close never waits", async
       },
     };
   });
-  const gallery = page.locator("app-gallery");
+  const gallery = page.locator("fluidbox-gallery");
   await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
     element.open({ index: 0 }),
   );
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) => {
@@ -189,7 +189,7 @@ test("stale async reveals abort on rapid selection and close never waits", async
   expect(afterClose.elapsed).toBeLessThan(1000);
   expect(afterClose.events[0]).toBe(true);
   expect(afterClose.events.at(-1)).toBe(true);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   const events = await page.evaluate(() => {
     const events = (
       window as unknown as {
@@ -229,7 +229,7 @@ test("source replacement and disconnect abort pending origin reveals", async ({ 
         open(target: { index: number }): Promise<unknown>;
         close(): Promise<unknown>;
       }
-    >("app-gallery")!;
+    >("fluidbox-gallery")!;
     const original = gallery.source!;
     const events: { source: string; aborted: boolean }[] = [];
     Object.assign(window, { __swapEvents: events });
@@ -268,12 +268,12 @@ test("source replacement and disconnect abort pending origin reveals", async ({ 
     return { oldAbortedOnReplace, events: events.map((event) => ({ ...event })) };
   });
   expect(events.oldAbortedOnReplace).toBe(true);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   expect(events.events).toEqual([
     { source: "old", aborted: true },
     { source: "new", aborted: true },
   ]);
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
 });
 
 test("one-item indexed source handles reveal failures without leaking its session", async ({
@@ -282,7 +282,7 @@ test("one-item indexed source handles reveal failures without leaking its sessio
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
   await page.goto("/harness.html?virtual&count=1&no-filmstrip");
-  const gallery = page.locator("app-gallery");
+  const gallery = page.locator("fluidbox-gallery");
   await gallery.evaluate((element: HTMLElement & { origins: unknown }) => {
     element.origins = {
       getOrigin: () => null,
@@ -294,12 +294,12 @@ test("one-item indexed source handles reveal failures without leaking its sessio
   await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
     element.open({ index: 0 }),
   );
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 1 of 1",
   );
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   await gallery.evaluate((element: HTMLElement & { origins: unknown }) => {
     element.origins = {
       getOrigin: () => null,
@@ -311,11 +311,11 @@ test("one-item indexed source handles reveal failures without leaking its sessio
   await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
     element.open({ index: 0 }),
   );
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   expect(pageErrors).toEqual([]);
 });

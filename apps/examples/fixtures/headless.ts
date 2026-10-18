@@ -1,14 +1,14 @@
 import { mountSite } from "../src/site";
-import { arraySource, createLightbox } from "@ogdakke/fluidbox";
+import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
 import { filmstrip } from "@ogdakke/fluidbox/filmstrip";
-import type { LightboxController, LightboxItem, LightboxRenderer } from "@ogdakke/fluidbox";
+import type { FluidboxController, FluidboxItem, FluidboxRenderer } from "@ogdakke/fluidbox";
 import "./headless.css";
 
 mountSite("fixtures", {
   fixture: "Headless runtime · custom renderers, a protected viewer, and a secondary viewer",
 });
 
-const source = arraySource<LightboxItem>([
+const source = arraySource<FluidboxItem>([
   {
     id: "one",
     media: {
@@ -70,9 +70,9 @@ const renderers = {
       return () => increment("customDisposals");
     },
   },
-} satisfies Record<string, LightboxRenderer<DemoItem>>;
+} satisfies Record<string, FluidboxRenderer<DemoItem>>;
 
-const viewer: LightboxController<DemoItem> = createLightbox({
+const viewer: FluidboxController<DemoItem> = createFluidbox({
   source,
   origins,
   renderers,
@@ -113,19 +113,19 @@ const viewer: LightboxController<DemoItem> = createLightbox({
     },
   },
 });
-const secondaryViewer: LightboxController<DemoItem> = createLightbox({
+const secondaryViewer: FluidboxController<DemoItem> = createFluidbox({
   source,
   origins,
   renderers,
 });
 // The filmstrip is an option: its code loads only with this import.
-const filmstripViewer: LightboxController<DemoItem> = createLightbox({
+const filmstripViewer: FluidboxController<DemoItem> = createFluidbox({
   source,
   origins,
   renderers,
   filmstrip: filmstrip(),
 });
-const protectedViewer: LightboxController<DemoItem> = createLightbox({
+const protectedViewer: FluidboxController<DemoItem> = createFluidbox({
   source,
   origins,
   renderers,

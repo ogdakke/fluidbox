@@ -245,14 +245,14 @@ html.lab-scroll-locked {
   overflow: hidden;
 }
 
-/* Lightbox variants. These override the runtime's zero-specificity rules. */
+/* Fluidbox variants. These override the runtime's zero-specificity rules. */
 
-html[data-lab-backdrop="translucent"] [data-lightbox-overlay] [data-lightbox-backdrop] {
+html[data-lab-backdrop="translucent"] [data-fluidbox-overlay] [data-fluidbox-backdrop] {
   background: color-mix(in srgb, var(--background, #111) 55%, transparent);
 }
 
 html[data-lab-blur="on"] {
-  --lightbox-backdrop-filter: blur(24px) saturate(1.5);
+  --fluidbox-backdrop-filter: blur(24px) saturate(1.5);
 }
 
 /* Hidden meters for the readout. Absolute, never fixed, so they cannot tint anything. */

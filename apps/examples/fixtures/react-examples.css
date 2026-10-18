@@ -223,7 +223,7 @@ main {
   color: #fff;
   font-family: var(--fb-font-mono);
   font-size: 12px;
-  opacity: var(--lightbox-progress, 1);
+  opacity: var(--fluidbox-progress, 1);
 }
 
 @media (max-width: 760px) {

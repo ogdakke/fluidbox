@@ -1,6 +1,6 @@
 import { computed, createApp, h, nextTick, onMounted, ref, shallowRef } from "vue";
 import { FluidboxGallery } from "@ogdakke/fluidbox/vue";
-import type { AppGallery } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox";
 import {
   artSrc,
   formatCount,
@@ -13,10 +13,11 @@ import { originsWithin } from "./origins";
 
 const collections = frameworkCollections("vue");
 
-/** Wire the rendered `<app-gallery>` inside `panel` to resolve origins from its cards. */
+/** Wire the rendered `<fluidbox-gallery>` inside `panel` to resolve origins from its cards. */
 function useGalleryElement() {
   const panel = shallowRef<HTMLElement | null>(null);
-  const gallery = () => panel.value?.querySelector<AppGallery>("app-gallery") ?? null;
+  const gallery = () =>
+    panel.value?.querySelector<FluidboxGalleryElement>("fluidbox-gallery") ?? null;
   onMounted(() => {
     const node = gallery();
     if (node) node.origins = originsWithin(gallery);
@@ -65,7 +66,7 @@ export function mount(root: HTMLElement): void {
                   [h("img", { src: item.thumbnail?.src, alt: "" })],
                 ),
               ),
-              h("app-filmstrip"),
+              h("fluidbox-filmstrip"),
             ],
           ),
           h("code", { class: "framework-panel__api" }, "<FluidboxGallery :source>"),
@@ -133,12 +134,12 @@ export function mountIndexed(root: HTMLElement): void {
                     onClick: () => void gallery()?.open({ index }),
                   },
                   [
-                    h("img", { src: artSrc(sceneAt(index)), alt: "", "data-lightbox-origin": "" }),
+                    h("img", { src: artSrc(sceneAt(index)), alt: "", "data-fluidbox-origin": "" }),
                     h("span", `#${formatCount(index + 1)}`),
                   ],
                 ),
               ),
-              h("app-filmstrip"),
+              h("fluidbox-filmstrip"),
             ],
           ),
         ]);

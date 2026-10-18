@@ -1,5 +1,5 @@
-import { arraySource, createLightbox } from "@ogdakke/fluidbox";
-import type { LightboxController, LightboxItem } from "@ogdakke/fluidbox";
+import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
+import type { FluidboxController, FluidboxItem } from "@ogdakke/fluidbox";
 import { artItem, artSrc, sceneById } from "../art";
 
 const icon = (path: string) =>
@@ -7,7 +7,7 @@ const icon = (path: string) =>
 
 const picks = ["canyon", "coast", "ridge", "dune"].map(sceneById);
 
-export function mountHeadless(grid: HTMLElement): LightboxController<LightboxItem> {
+export function mountHeadless(grid: HTMLElement): FluidboxController<FluidboxItem> {
   const source = arraySource(picks.map((scene) => artItem(scene, `headless-${scene.id}`)));
 
   for (const scene of picks) {
@@ -25,7 +25,7 @@ export function mountHeadless(grid: HTMLElement): LightboxController<LightboxIte
     grid.append(button);
   }
 
-  const viewer = createLightbox({
+  const viewer = createFluidbox({
     source,
     origins: {
       getOrigin(id) {

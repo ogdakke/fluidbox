@@ -8,7 +8,7 @@ The first public beta targets plain JavaScript, custom elements, and composed Re
 
 ## Where the project stands
 
-The package is private at `0.0.0`. The root now exports an SSR-safe `createLightbox()` runtime with
+The package is private at `0.0.0`. The root now exports an SSR-safe `createFluidbox()` runtime with
 finite indexed sources, origin registration, host reveal, source replacement, command settlement,
 thumbnail overlays, responsive images, video, iframe, custom renderers, gestures, zoom, a body
 portal, and a bounded native slide strip. The composed React parts use that runtime and do not
@@ -38,7 +38,7 @@ The plain runtime and React contract spike are working. Stage 0 measurement and 
 binding migration are incomplete.
 
 - Locked and implemented the first headless API contract in [PUBLIC_API.md](PUBLIC_API.md), including
-  `arraySource()`, `createLightbox()`, the controller, renderers, origins, overlays, and composed
+  `arraySource()`, `createFluidbox()`, the controller, renderers, origins, overlays, and composed
   React parts.
 - Began the runtime extraction behind the compatibility elements. Origin marker resolution,
   clipping visibility, abortable host reveal ownership, and crop/radius transition geometry now
@@ -49,17 +49,17 @@ binding migration are incomplete.
   supersession, external abort, source reconciliation, host-reveal cancellation, overlay ownership,
   runtime failure, and teardown.
 - Extracted body-portal construction, modal isolation, active-viewer ownership, origin resolution,
-  source reconciliation, and direct DOM motion into runtime modules. `createLightbox()` constructs
+  source reconciliation, and direct DOM motion into runtime modules. `createFluidbox()` constructs
   those modules without loading or registering custom elements.
 - Added the first plain DOM image driver and a plain-JavaScript composition example using the proposed
-  `createLightbox`, source, origin, controller, portal-renderer, data-attribute, and CSS-variable
+  `createFluidbox`, source, origin, controller, portal-renderer, data-attribute, and CSS-variable
   contracts. It opens, navigates, closes, restores current-origin focus, and passes all six browser
   profiles without registering custom elements.
 - The plain runtime now preserves interrupted motion, handles touch and vertical trackpad dismissal
   through the shared spring controller, publishes drag state through data attributes and CSS variables,
-  and builds native responsive image candidates and picture sources. `createLightbox` is exported from
+  and builds native responsive image candidates and picture sources. `createFluidbox` is exported from
   the SSR-safe root; custom elements remain available as a compatibility binding.
-- `createLightbox({ source })` now owns a native horizontal gallery strip without custom elements.
+- `createFluidbox({ source })` now owns a native horizontal gallery strip without custom elements.
   It keeps at most 31 slide shells, loads the active image and its immediate neighbors, rebases around
   distant selections, and has browser coverage against a 100,000-item source. This is the gallery
   JavaScript API; a separate `createGallery` factory is unnecessary.
@@ -68,7 +68,7 @@ binding migration are incomplete.
 - Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.
 - Added the React/TanStack Virtual photo-library pilot with 10k and 100k datasets, responsive rows, and a filmstrip toggle. Its source can reveal the selected item in the background. Closing uses an available target immediately or falls back without waiting. See [virtualized host integration](VIRTUALIZATION.md).
 - Added total activation bundle accounting, including lazy chunks and `unlazy`, with separate CSS and combined budgets. See [bundle baseline](../baseline/bundle-budget.md).
-- Removed stylesheet dependence on `@scope`. Viewer selectors use data-attribute roots, with tests for outside-element isolation, stylesheet override order, and host theme copying. [Styling documentation](LIGHTBOX.md) distinguishes author inputs from runtime-published motion values.
+- Removed stylesheet dependence on `@scope`. Viewer selectors use data-attribute roots, with tests for outside-element isolation, stylesheet override order, and host theme copying. [Styling documentation](FLUIDBOX.md) distinguishes author inputs from runtime-published motion values.
 - Recorded the recent-browser target and available physical devices in [browser support policy](BROWSER_SUPPORT.md). Exact supported versions and physical-device results remain pending.
 
 The immediate milestone is to finish behavior ownership after the public API lock. Migrate the
@@ -85,7 +85,7 @@ The initial plain JavaScript and React contract is locked in [PUBLIC_API.md](PUB
 these concrete artifacts:
 
 1. An export list for the root, custom-element adapter, each framework binding, and styles. Do not treat internal DOM nodes or undocumented CSS variables as extension points.
-2. Type signatures and examples for `createLightbox`, source creation/replacement, origin registration, host reveal, subscriptions, commands, and destruction. Specify synchronous validation, command results, cancellation, event order, and accepted versus settled selection. Closing must never wait for host reveal.
+2. Type signatures and examples for `createFluidbox`, source creation/replacement, origin registration, host reveal, subscriptions, commands, and destruction. Specify synchronous validation, command results, cancellation, event order, and accepted versus settled selection. Closing must never wait for host reveal.
 3. A source contract covering image, video, iframe, and custom-content identity, responsive media metadata, stable IDs, synchronous lookup, missing origins, and source replacement. Keep remote fetching and CDN-specific URL generation outside metadata lookup. Separate the supported initial source model from later asynchronous pagination.
 4. A renderer ownership table and working plain-JavaScript and composed-React examples. Identify runtime-owned measurement/portal nodes, framework-owned descendants, ref attachment and disposal, and the lifecycle of virtualized content. Application code in either example must use only the proposed public interfaces, without custom-element registration or private runtime fields. The contract spike may adapt the existing runtime internally; complete internal decoupling is the subsequent extraction milestone.
 5. Exact names, types, defaults, and event semantics for the composed React parts and hooks.
@@ -203,12 +203,12 @@ Controlled framework state must use request callbacks and committed props withou
 
 ### Proposed plain JavaScript API
 
-Names and exact types remain drafts. Importing `createLightbox` is SSR-safe; calling it creates browser behavior. The final API must not require custom-element registration.
+Names and exact types remain drafts. Importing `createFluidbox` is SSR-safe; calling it creates browser behavior. The final API must not require custom-element registration.
 
 ```ts
-import { createLightbox, arraySource } from "@ogdakke/fluidbox";
+import { createFluidbox, arraySource } from "@ogdakke/fluidbox";
 
-const viewer = createLightbox({
+const viewer = createFluidbox({
   source: arraySource(photos),
   getOrigin: (id) => document.querySelector(`[data-photo-id="${CSS.escape(id)}"]`),
   onChange: ({ id, index, reason }) => console.log(id, index, reason),
@@ -222,7 +222,7 @@ viewer.destroy();
 
 The spike must also demonstrate attaching application-authored controls and custom content to the body portal using public APIs alone. Specify attachment/disposal handles for plain JS parts alongside framework parts; the command-only example above is not the whole headless contract.
 
-Keep `registerLightboxElements()` and `./elements` as the declarative adapter. Decide final tag names and attribute/event mapping before beta. Existing `app-*` names are provisional. Preserve live-content movement and template-based content options for DOM-owned content.
+Keep `registerFluidboxElements()` and `./elements` as the declarative adapter. Decide final tag names and attribute/event mapping before beta. Existing `app-*` names are provisional. Preserve live-content movement and template-based content options for DOM-owned content.
 
 ## Framework composition
 
@@ -231,32 +231,32 @@ Keep `registerLightboxElements()` and `./elements` as the declarative adapter. D
 Composed parts and hooks are the primary React API. Do not replace them with a mandatory preset viewer. The following illustrates the target composition, not working code. `photos` contains normalized media descriptors; `Content` resolves its item from that source rather than declaring a conflicting second `src`.
 
 ```tsx
-import { Lightbox, useLightbox, useLightboxState } from "@ogdakke/fluidbox/react";
+import { Fluidbox, useFluidbox, useFluidboxState } from "@ogdakke/fluidbox/react";
 
 function PhotoGallery({ photos }) {
   return (
-    <Lightbox.Root items={photos}>
+    <Fluidbox.Root items={photos}>
       {photos.map((photo) => (
-        <Lightbox.Item key={photo.id} id={photo.id}>
-          <Lightbox.Trigger asChild>
+        <Fluidbox.Item key={photo.id} id={photo.id}>
+          <Fluidbox.Trigger asChild>
             <button>
               <img src={photo.thumbnailSrc} alt={photo.alt} />
             </button>
-          </Lightbox.Trigger>
-        </Lightbox.Item>
+          </Fluidbox.Trigger>
+        </Fluidbox.Item>
       ))}
-      <Lightbox.Portal>
-        <Lightbox.Content />
+      <Fluidbox.Portal>
+        <Fluidbox.Content />
         <GalleryControls />
-      </Lightbox.Portal>
-    </Lightbox.Root>
+      </Fluidbox.Portal>
+    </Fluidbox.Root>
   );
 }
 
 function GalleryControls() {
-  const { next, previous, close } = useLightbox();
-  const currentIndex = useLightboxState((state) => state.currentIndex);
-  const count = useLightboxState((state) => state.count);
+  const { next, previous, close } = useFluidbox();
+  const currentIndex = useFluidboxState((state) => state.currentIndex);
+  const count = useFluidboxState((state) => state.count);
   return (
     <nav aria-label="Gallery controls">
       <button onClick={() => void previous()}>Previous</button>
@@ -272,7 +272,7 @@ function GalleryControls() {
 
 The composed `Previous`, `Next`, and `Close` parts offer equivalent wiring for consumers who prefer parts over command hooks. Their examples must include finite-gallery disabled states. A `Content` render function receives item metadata and a runtime-provided mounting target for each retained custom-content slide; its exact signature is a stage 1 deliverable.
 
-A virtualized host supplies the full indexed source to `Root` and mounts only visible `Item`/`Trigger` parts. `Content` must render the runtime's bounded slide set without requiring a component for every item. Implement `useLightboxState(selector)` with stable `useSyncExternalStore` snapshots and selector behavior; `useLightbox()` exposes stable commands.
+A virtualized host supplies the full indexed source to `Root` and mounts only visible `Item`/`Trigger` parts. `Content` must render the runtime's bounded slide set without requiring a component for every item. Implement `useFluidboxState(selector)` with stable `useSyncExternalStore` snapshots and selector behavior; `useFluidbox()` exposes stable commands.
 
 The framework owns custom-content descendants. The runtime owns the outer measured frame and transforms. Render React content through React portals into stable targets for its mounted lifetime; do not manually reparent React-owned descendants. Eviction unmounts through React, and revisiting may remount. Persisting state across eviction is an application responsibility unless a bounded retention policy is explicitly added later. Test context, local state while mounted, events, refs, cleanup, Strict Mode, and hydration before freezing this shape.
 
@@ -282,7 +282,7 @@ The framework owns custom-content descendants. The runtime owns the outer measur
 
 Include a `ThumbnailOverlay` part in the contract spike. It inherits the item identity from `Item` and hosts application-authored badges, captions, play icons, counts, or other content over the thumbnail. Provide an equivalent plain-DOM attachment through the same runtime. The typed `host` and `travel` behaviors are the implementation target; they become supported runtime values only after the renderer ownership spike passes.
 
-Publish `data-lightbox-phase` and `--lightbox-progress` on the overlay's animation target. Keep the existing progress convention: `1` at the thumbnail pose and `0` at the fully open pose. Applications can use `opacity: var(--lightbox-progress, 1)` for a continuous fade, phase selectors for immediate hiding, or their own transforms. Reversal and gesture cancellation must continue from the painted progress. These effects must not require per-frame framework state updates or independent CSS animation timers.
+Publish `data-fluidbox-phase` and `--fluidbox-progress` on the overlay's animation target. Keep the existing progress convention: `1` at the thumbnail pose and `0` at the fully open pose. Applications can use `opacity: var(--fluidbox-progress, 1)` for a continuous fade, phase selectors for immediate hiding, or their own transforms. Reversal and gesture cancellation must continue from the painted progress. These effects must not require per-frame framework state updates or independent CSS animation timers.
 
 The spike must distinguish a decoration that stays on the host card from content that travels with the opening/closing image. Define clipping, scaling, pointer-event and accessibility behavior for each. Framework-owned descendants must be rendered and disposed through their framework rather than manually reparented. Demonstrate what happens when the host virtualizer unmounts the originating `Item`, another item becomes selected, or closing falls back without an origin. If traveling overlay content needs a renderer owned by `Root`, make that registration explicit before freezing the component signature.
 

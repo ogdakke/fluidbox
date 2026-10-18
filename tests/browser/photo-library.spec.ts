@@ -20,11 +20,11 @@ test("React trigger prepares on pointerdown and discards a cancelled open", asyn
   await page.goto("/photo-library.html?count=100");
   const trigger = page.locator("[data-photo-index]").first();
   await trigger.dispatchEvent("pointerdown", { button: 0, isPrimary: true, pointerId: 1 });
-  const prepared = page.locator("[data-lightbox-overlay][data-lightbox-prepared]");
+  const prepared = page.locator("[data-fluidbox-overlay][data-fluidbox-prepared]");
   await expect(prepared).toHaveCount(1);
   await expect(prepared).toHaveCSS("visibility", "hidden");
   await expect(trigger).not.toHaveAttribute("data-open", "");
-  await expect(trigger.locator("img")).not.toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+  await expect(trigger.locator("img")).not.toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
 
   await trigger.dispatchEvent("pointercancel", { button: 0, isPrimary: true, pointerId: 1 });
   await expect(prepared).toHaveCount(0);
@@ -47,7 +47,7 @@ test("React trigger prepares on pointerdown and discards a cancelled open", asyn
   });
   expect(reuse.count).toBeGreaterThan(0);
   expect(reuse).toMatchObject({ paused: true, reused: true });
-  await expect(page.locator("[data-lightbox-dialog][data-lightbox-state='open']")).toBeVisible();
+  await expect(page.locator("[data-fluidbox-dialog][data-fluidbox-state='open']")).toBeVisible();
 });
 
 for (const count of [10_000, 100_000]) {
@@ -108,14 +108,14 @@ for (const count of [10_000, 100_000]) {
         element.click();
         for (let frames = 0; frames < 120; frames += 1) {
           await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-          const overlay = document.querySelector("[data-lightbox-overlay]");
-          if (overlay && !overlay.hasAttribute("data-lightbox-prepared") && held.length) break;
+          const overlay = document.querySelector("[data-fluidbox-overlay]");
+          if (overlay && !overlay.hasAttribute("data-fluidbox-prepared") && held.length) break;
         }
       } finally {
         Element.prototype.animate = animate;
       }
       const frame = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+        '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
       )!;
       for (const animation of held) {
         animation.pause();
@@ -135,17 +135,17 @@ for (const count of [10_000, 100_000]) {
     for (const dimension of ["x", "y", "width", "height"] as const) {
       expect(Math.abs(start[dimension] - origin![dimension])).toBeLessThan(5);
     }
-    await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
       `Item ${index + 1} of ${count}`,
     );
-    await expect(page.locator("[data-lightbox-filmstrip]")).toHaveCount(1);
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-      "data-lightbox-state",
+    await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
+    await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+      "data-fluidbox-state",
       "open",
     );
-    await expect(page.locator("[data-lightbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
-    await expect(image).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+    await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
+    await expect(image).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
     await expect(image).toHaveCSS("visibility", "hidden");
 
     await scroll.evaluate((element) => {
@@ -154,14 +154,14 @@ for (const count of [10_000, 100_000]) {
     await expect(page.locator(`[data-photo-index="${index}"]`)).toHaveCount(0);
     const farIndex = count - 200;
     await page
-      .locator("[data-lightbox-filmstrip-scroll]")
+      .locator("[data-fluidbox-filmstrip-scroll]")
       .evaluate(async (element, selectedIndex) => {
         const start = new Event("touchstart", { bubbles: true });
         Object.defineProperty(start, "touches", { value: [{}] });
         element.dispatchEvent(start);
         const size = parseFloat(
           getComputedStyle(element.parentElement!).getPropertyValue(
-            "--lightbox-filmstrip-item-size",
+            "--fluidbox-filmstrip-item-size",
           ),
         );
         const gap = parseFloat(getComputedStyle(element).columnGap);
@@ -181,7 +181,7 @@ for (const count of [10_000, 100_000]) {
         element.dispatchEvent(end);
       }, farIndex);
     const filmstripGeometry = await page
-      .locator("[data-lightbox-filmstrip-scroll]")
+      .locator("[data-fluidbox-filmstrip-scroll]")
       .evaluate((element) => ({
         scrollLeft: element.scrollLeft,
         scrollWidth: element.scrollWidth,
@@ -197,27 +197,27 @@ for (const count of [10_000, 100_000]) {
       contentType: "application/json",
     });
     const filmstripTarget = page.locator(
-      `[data-lightbox-filmstrip-item][data-index="${farIndex}"]`,
+      `[data-fluidbox-filmstrip-item][data-index="${farIndex}"]`,
     );
     await expect(filmstripTarget).toBeVisible();
     await expect
       .poll(() =>
         filmstripTarget.evaluate((element) => {
           const scroller = element
-            .closest("[data-lightbox-filmstrip-scroll]")!
+            .closest("[data-fluidbox-filmstrip-scroll]")!
             .getBoundingClientRect();
           const bounds = element.getBoundingClientRect();
           return bounds.left >= scroller.left && bounds.right <= scroller.right;
         }),
       )
       .toBe(true);
-    await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
       `Item ${farIndex + 1} of ${count}`,
     );
     await expect(scroll.locator(`[data-photo-index="${farIndex}"]`)).toHaveCount(1);
     const farThumbnail = scroll.locator(`[data-photo-index="${farIndex}"] img`);
-    await expect(farThumbnail).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+    await expect(farThumbnail).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
     await expect
       .poll(() =>
         scroll.locator(`[data-photo-index="${farIndex}"]`).evaluate((element) => {
@@ -231,18 +231,18 @@ for (const count of [10_000, 100_000]) {
       )
       .toBe(true);
     await page.keyboard.press("ArrowRight");
-    await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
       `Item ${farIndex + 2} of ${count}`,
     );
-    await expect(farThumbnail).not.toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+    await expect(farThumbnail).not.toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
     const selectedIndex = count - 250;
-    await page.locator("[data-lightbox-filmstrip-scroll]").evaluate(async (element, index) => {
+    await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate(async (element, index) => {
       const start = new Event("touchstart", { bubbles: true });
       Object.defineProperty(start, "touches", { value: [{}] });
       element.dispatchEvent(start);
       const size = parseFloat(
-        getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
+        getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
       );
       const gap = parseFloat(getComputedStyle(element).columnGap);
       const padding = parseFloat(getComputedStyle(element).paddingLeft);
@@ -260,13 +260,13 @@ for (const count of [10_000, 100_000]) {
       Object.defineProperty(end, "touches", { value: [] });
       element.dispatchEvent(end);
     }, selectedIndex);
-    await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
       `Item ${selectedIndex + 1} of ${count}`,
     );
     const selectedTile = scroll.locator(`[data-photo-index="${selectedIndex}"]`);
     await expect(selectedTile).toHaveCount(1);
-    await expect(selectedTile.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+    await expect(selectedTile.locator("img")).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
     await expect
       .poll(() =>
         selectedTile.evaluate((element) => {
@@ -280,7 +280,7 @@ for (const count of [10_000, 100_000]) {
       )
       .toBe(true);
     expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
-    expect(await page.locator("[data-lightbox-slide]").count()).toBeLessThan(40);
+    expect(await page.locator("[data-fluidbox-slide]").count()).toBeLessThan(40);
     expect(await page.locator("*").count()).toBeLessThan(600);
     const selectedBounds = await selectedTile.boundingBox();
     expect(selectedBounds).not.toBeNull();
@@ -288,9 +288,9 @@ for (const count of [10_000, 100_000]) {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const frame =
-        document.querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-frame]") ??
+        document.querySelector<HTMLElement>("[data-fluidbox-flight] [data-fluidbox-frame]") ??
         document.querySelector<HTMLElement>(
-          '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+          '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
         )!;
       const animations = document.getAnimations();
       for (const animation of animations) {
@@ -309,9 +309,9 @@ for (const count of [10_000, 100_000]) {
     for (const dimension of ["x", "y", "width", "height"] as const) {
       expect(Math.abs(closingEnd[dimension] - selectedBounds![dimension])).toBeLessThan(5);
     }
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
     await expect(selectedTile.locator("img")).not.toHaveAttribute(
-      "data-lightbox-thumbnail-hidden",
+      "data-fluidbox-thumbnail-hidden",
       "",
     );
     await expect(selectedTile.locator("img")).toHaveCSS("visibility", "visible");
@@ -366,12 +366,12 @@ test("filmstrip preference applies to the next open", async ({ page }) => {
     .getAttribute("data-photo-index");
   await page.getByRole("checkbox", { name: "Show filmstrip on next open" }).uncheck();
   await page.locator("[data-photo-index]").first().click();
-  await expect(page.locator("[data-lightbox-filmstrip]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   await page.getByRole("checkbox", { name: "Show filmstrip on next open" }).check();
   await page.locator(`[data-photo-index="${initialRange}"]`).click();
-  await expect(page.locator("[data-lightbox-filmstrip]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
   await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
   expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
 });
@@ -380,16 +380,16 @@ test("opening centers the filmstrip once without changing gallery selection", as
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
   await expect(
-    page.locator('[data-lightbox-filmstrip-item][aria-selected="true"]'),
+    page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
   ).toHaveAttribute("data-index", "5000");
   const initial = await filmstrip.evaluate((element) => element.scrollLeft);
   await page.waitForTimeout(400);
   expect(await filmstrip.evaluate((element) => element.scrollLeft)).toBeCloseTo(initial, 0);
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 5001 of 10000",
   );
@@ -411,12 +411,12 @@ test("opening scrolled virtual origins fills and centers the filmstrip", async (
     const trigger = visible.nth(Math.floor(count / 2));
     const expected = Number(await trigger.getAttribute("data-photo-index"));
     await trigger.click();
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-      "data-lightbox-state",
+    await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+      "data-fluidbox-state",
       "open",
     );
 
-    const geometry = await page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element) => {
+    const geometry = await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((element) => {
       const scroller = element.getBoundingClientRect();
       const rendered = [...element.querySelectorAll<HTMLElement>("[data-index]")];
       const selected = element.querySelector<HTMLElement>('[aria-selected="true"]')!;
@@ -441,7 +441,7 @@ test("opening scrolled virtual origins fills and centers the filmstrip", async (
     expect(geometry.rendered).toContain(expected + 1);
     await expect
       .poll(() =>
-        page.locator("[data-lightbox-filmstrip-scroll]").evaluate((element) => {
+        page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((element) => {
           const viewport = element.getBoundingClientRect();
           return [...element.querySelectorAll<HTMLImageElement>("img")]
             .filter((image) => {
@@ -454,7 +454,7 @@ test("opening scrolled virtual origins fills and centers the filmstrip", async (
       .toBe(0);
 
     await page.keyboard.press("Escape");
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   }
 });
 
@@ -462,11 +462,11 @@ test("full-size strip rejects delayed programmatic drift", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
-  const slides = page.locator("[data-lightbox-slides]");
+  const slides = page.locator("[data-fluidbox-slides]");
   await slides.evaluate((element) => {
     element.scrollLeft += element.clientWidth * 0.72;
     element.dispatchEvent(new Event("scroll"));
@@ -474,7 +474,7 @@ test("full-size strip rejects delayed programmatic drift", async ({ page }) => {
   await expect
     .poll(() => slides.evaluate((element) => element.scrollLeft % element.clientWidth))
     .toBe(0);
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 5001 of 10000",
   );
@@ -510,21 +510,21 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
     expect(visible.length).toBeGreaterThan(0);
     let expected = visible[Math.floor(random() * visible.length)]!;
     await page.locator(`[data-photo-index="${expected}"]`).click();
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-      "data-lightbox-state",
+    await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+      "data-fluidbox-state",
       "open",
     );
 
     if (random() > 0.35) {
       expected = Math.max(0, Math.min(9_999, expected + Math.floor(random() * 17) - 8));
-      const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+      const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
       await filmstrip.evaluate(async (element, index) => {
         const touch = new Event("touchstart", { bubbles: true });
         Object.defineProperty(touch, "touches", { value: [{}] });
         element.dispatchEvent(touch);
         const size = parseFloat(
           getComputedStyle(element.parentElement!).getPropertyValue(
-            "--lightbox-filmstrip-item-size",
+            "--fluidbox-filmstrip-item-size",
           ),
         );
         const gap = parseFloat(getComputedStyle(element).columnGap);
@@ -546,13 +546,13 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
       .poll(() =>
         page.evaluate(() => {
           const label = document
-            .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+            .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
             ?.getAttribute("aria-label");
           const selected = document
-            .querySelector('[data-lightbox-filmstrip-item][aria-selected="true"]')
+            .querySelector('[data-fluidbox-filmstrip-item][aria-selected="true"]')
             ?.getAttribute("data-index");
           const hidden = document
-            .querySelector("[data-lightbox-thumbnail-hidden]")
+            .querySelector("[data-fluidbox-thumbnail-hidden]")
             ?.closest("[data-photo-index]")
             ?.getAttribute("data-photo-index");
           return {
@@ -566,13 +566,13 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
     await page.waitForTimeout(250);
     const stable = await page.evaluate(() => {
       const label = document
-        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
         ?.getAttribute("aria-label");
       const selected = document
-        .querySelector('[data-lightbox-filmstrip-item][aria-selected="true"]')
+        .querySelector('[data-fluidbox-filmstrip-item][aria-selected="true"]')
         ?.getAttribute("data-index");
       const hidden = document
-        .querySelector("[data-lightbox-thumbnail-hidden]")
+        .querySelector("[data-fluidbox-thumbnail-hidden]")
         ?.closest("[data-photo-index]")
         ?.getAttribute("data-photo-index");
       return {
@@ -584,30 +584,30 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
     expect(stable).toEqual({ active: expected, selected: expected, hidden: expected });
 
     if (step % 2 === 0) {
-      await page.locator("[data-lightbox-close]").click();
+      await page.locator("[data-fluidbox-close]").click();
     } else {
       await page.keyboard.press("Escape");
     }
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
-    await expect(page.locator("[data-lightbox-thumbnail-hidden]")).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-thumbnail-hidden]")).toHaveCount(0);
   }
 });
 
 test("filmstrip scrubbing reveals the host only after touch settlement", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   const selectedIndex = 5_000;
-  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
   const provisional = await filmstrip.evaluate(async (element, index) => {
     const start = new Event("touchstart", { bubbles: true });
     Object.defineProperty(start, "touches", { value: [] });
     element.dispatchEvent(start);
     const size = parseFloat(
-      getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
+      getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
     );
     const gap = parseFloat(getComputedStyle(element).columnGap);
     const padding = parseFloat(getComputedStyle(element).paddingLeft);
@@ -620,7 +620,7 @@ test("filmstrip scrubbing reveals the host only after touch settlement", async (
     );
     return {
       activeLabel: document
-        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
         ?.getAttribute("aria-label"),
       hostMounted: document.querySelector(`[data-photo-index="${index}"]`) !== null,
     };
@@ -643,13 +643,13 @@ test("delayed programmatic filmstrip scrolling cannot take navigation ownership"
 }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
 
-  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
   await filmstrip.evaluate(async (element) => {
     const size = parseFloat(
-      getComputedStyle(element.parentElement!).getPropertyValue("--lightbox-filmstrip-item-size"),
+      getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
     );
     const gap = parseFloat(getComputedStyle(element).columnGap);
     const padding = parseFloat(getComputedStyle(element).paddingLeft);
@@ -659,23 +659,23 @@ test("delayed programmatic filmstrip scrolling cannot take navigation ownership"
     await new Promise<void>((resolve) => setTimeout(resolve, 220));
   });
 
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 1 of 10000",
   );
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
 });
 
 test("a pointer gesture without scrolling releases filmstrip ownership", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
-  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
   await filmstrip.evaluate(async (element) => {
     element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1 }));
     element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
@@ -686,13 +686,13 @@ test("a pointer gesture without scrolling releases filmstrip ownership", async (
     );
   });
 
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 5001 of 10000",
   );
   await page.waitForTimeout(300);
   await expect(
-    page.locator('[data-lightbox-filmstrip-item][aria-selected="true"]'),
+    page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
   ).toHaveAttribute("data-index", "5000");
 });
 
@@ -700,12 +700,12 @@ test("filmstrip input and programmatic sync settle without an event storm", asyn
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
-  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
   const selectedIndex = await filmstrip.evaluate(async (element) => {
     let scrollEvents = 0;
     element.addEventListener("scroll", () => (scrollEvents += 1));
@@ -724,10 +724,10 @@ test("filmstrip input and programmatic sync settle without an event storm", asyn
     await new Promise<void>((resolve) => setTimeout(resolve, 400));
     return {
       active: document
-        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
         ?.getAttribute("aria-label"),
       selected: document
-        .querySelector('[data-lightbox-filmstrip-item][aria-selected="true"]')
+        .querySelector('[data-fluidbox-filmstrip-item][aria-selected="true"]')
         ?.getAttribute("data-index"),
       extraEvents: scrollEvents - settledEvents,
     };
@@ -740,12 +740,12 @@ test("a vertical wheel burst scrolls and settles the filmstrip once", async ({ p
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
-  const filmstrip = page.locator("[data-lightbox-filmstrip-scroll]");
+  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
   await filmstrip.evaluate((element) => {
     for (const deltaY of [90, 120, 0]) {
       element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY }));
@@ -754,17 +754,17 @@ test("a vertical wheel burst scrolls and settles the filmstrip once", async ({ p
   await expect
     .poll(() =>
       page
-        .locator('[data-lightbox-filmstrip-item][aria-selected="true"]')
+        .locator('[data-fluidbox-filmstrip-item][aria-selected="true"]')
         .getAttribute("data-index"),
     )
     .not.toBe("5000");
   const selected = Number(
     await page
-      .locator('[data-lightbox-filmstrip-item][aria-selected="true"]')
+      .locator('[data-fluidbox-filmstrip-item][aria-selected="true"]')
       .getAttribute("data-index"),
   );
   await expect(page.locator(`[data-photo-index="${selected}"]`)).toHaveCount(1);
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     `Item ${selected + 1} of 10000`,
   );
@@ -775,8 +775,8 @@ test("native gallery swiping reveals the virtualized origin only after settlemen
 }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   await page.locator(".library-scroll").evaluate((element) => {
@@ -784,7 +784,7 @@ test("native gallery swiping reveals the virtualized origin only after settlemen
   });
   await expect(page.locator('[data-photo-index="1"]')).toHaveCount(0);
 
-  const slides = page.locator("[data-lightbox-slides]");
+  const slides = page.locator("[data-fluidbox-slides]");
   const provisional = await slides.evaluate(async (element) => {
     const start = new Event("touchstart", { bubbles: true });
     Object.defineProperty(start, "touches", { value: [{}] });
@@ -795,7 +795,7 @@ test("native gallery swiping reveals the virtualized origin only after settlemen
     );
     return {
       activeLabel: element
-        .querySelector('[data-lightbox-slide][aria-hidden="false"]')
+        .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
         ?.getAttribute("aria-label"),
       hostMounted: document.querySelector('[data-photo-index="1"]') !== null,
     };
@@ -814,12 +814,12 @@ test("native gallery swiping reveals the virtualized origin only after settlemen
 test("native slide swiping survives the browser pointer-cancel handoff", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
 
-  const slides = page.locator("[data-lightbox-slides]");
+  const slides = page.locator("[data-fluidbox-slides]");
   await slides.evaluate(async (element) => {
     element.dispatchEvent(
       new PointerEvent("pointerdown", {
@@ -843,7 +843,7 @@ test("native slide swiping survives the browser pointer-cancel handoff", async (
     );
   });
 
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 2 of 10000",
   );
@@ -852,14 +852,14 @@ test("native slide swiping survives the browser pointer-cancel handoff", async (
 test("opening remains active until the delayed filmstrip reveal settles", async ({ page }) => {
   await page.goto("/photo-library.html");
   await page.locator("[data-photo-index]").first().click();
-  const dialog = page.locator("[data-lightbox-dialog]");
-  const filmstrip = page.locator("[data-lightbox-filmstrip]");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  const filmstrip = page.locator("[data-fluidbox-filmstrip]");
   const paused = await filmstrip.evaluate(async (element) => {
     for (let frame = 0; frame < 60; frame += 1) {
       const animation = element
         .getAnimations()
         .find(
-          (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+          (candidate) => (candidate as CSSAnimation).animationName === "fluidbox-filmstrip-appear",
         );
       if (animation) {
         animation.pause();
@@ -871,16 +871,16 @@ test("opening remains active until the delayed filmstrip reveal settles", async 
   });
   expect(paused).toBe(true);
   await page.waitForTimeout(600);
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "opening");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "opening");
   await filmstrip.evaluate((element) => {
     element
       .getAnimations()
       .find(
-        (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+        (candidate) => (candidate as CSSAnimation).animationName === "fluidbox-filmstrip-appear",
       )
       ?.finish();
   });
-  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
 });
 
 test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
@@ -891,7 +891,7 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
     document.addEventListener(
       "animationstart",
       (event) => {
-        if ((event as AnimationEvent).animationName === "lightbox-filmstrip-appear") {
+        if ((event as AnimationEvent).animationName === "fluidbox-filmstrip-appear") {
           measurements.starts += 1;
         }
       },
@@ -911,11 +911,11 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
   await page.locator("[data-photo-index]").first().click();
   const measurements = await page.evaluate(async () => {
     const end = await window.__motion.ready();
-    const filmstrip = document.querySelector<HTMLElement>("[data-lightbox-filmstrip]")!;
+    const filmstrip = document.querySelector<HTMLElement>("[data-fluidbox-filmstrip]")!;
     const fade = filmstrip
       .getAnimations()
       .find(
-        (candidate) => (candidate as CSSAnimation).animationName === "lightbox-filmstrip-appear",
+        (candidate) => (candidate as CSSAnimation).animationName === "fluidbox-filmstrip-appear",
       )!;
     const fadeEnd = Number(fade.effect!.getComputedTiming().endTime);
     const opacity: number[] = [];
@@ -928,8 +928,8 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
     window.__motion.release();
     return opacity;
   });
-  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-    "data-lightbox-state",
+  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
+    "data-fluidbox-state",
     "open",
   );
   const { starts } = await page.evaluate(

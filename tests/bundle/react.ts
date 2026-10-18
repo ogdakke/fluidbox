@@ -1,1 +1,1 @@
-export { Lightbox, useLightbox, useLightboxState } from "@ogdakke/fluidbox/react";
+export { Fluidbox, useFluidbox, useFluidboxState } from "@ogdakke/fluidbox/react";

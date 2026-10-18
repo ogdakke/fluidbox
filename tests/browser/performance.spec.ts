@@ -24,7 +24,7 @@ test("indexed source open cost stays near constant with gallery size", async ({
     let maxViewerNodes = 0;
     for (let iteration = 0; iteration < 6; iteration++) {
       const elapsed = await page
-        .locator("app-gallery")
+        .locator("fluidbox-gallery")
         .evaluate(
           (gallery: HTMLElement & { open(target: { index: number }): void }, target: number) => {
             const start = performance.now();
@@ -33,14 +33,14 @@ test("indexed source open cost stays near constant with gallery size", async ({
           },
           count - 10,
         );
-      await expect(page.locator("[data-lightbox-dialog]")).toBeVisible();
+      await expect(page.locator("[data-fluidbox-dialog]")).toBeVisible();
       maxViewerNodes = Math.max(
         maxViewerNodes,
-        await page.locator("[data-lightbox-slide], [data-lightbox-filmstrip-item]").count(),
+        await page.locator("[data-fluidbox-slide], [data-fluidbox-filmstrip-item]").count(),
       );
       if (iteration > 0) openMs.push(elapsed);
       await page.keyboard.press("Escape");
-      await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+      await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
       closedNodes.push(await page.locator("*").count());
     }
     measurements[String(count)] = { openMs, maxViewerNodes, initialNodes, closedNodes };

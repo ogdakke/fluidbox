@@ -13,11 +13,11 @@ The stable headless root exports:
 
 - `arraySource()` and the source, media, origin, controller, event, renderer, and overlay types in
   `src/public-api.ts`.
-- `createLightbox()`. Calling it requires a DOM; importing it does not.
+- `createFluidbox()`. Calling it requires a DOM; importing it does not.
 
-`registerLightboxElements`, `AppGallery`, and `AppLightbox` expose the custom-element adapter.
-Declarative items compile directly to `LightboxItem`; indexed galleries accept `LightboxSource` and
-`LightboxOriginAdapter`. `@ogdakke/fluidbox/elements` remains the only eager custom-element
+`registerFluidboxElements`, `FluidboxGalleryElement`, and `FluidboxItemElement` expose the custom-element adapter.
+Declarative items compile directly to `FluidboxItem`; indexed galleries accept `FluidboxSource` and
+`FluidboxOriginAdapter`. `@ogdakke/fluidbox/elements` remains the only eager custom-element
 registration entry.
 
 Framework bindings remain subpath exports. React is the first composed binding. Solid, Vue, and
@@ -30,7 +30,7 @@ without a migration release.
 
 ## Source snapshots
 
-`LightboxSource` is pure synchronous metadata. It never contains DOM nodes or framework children.
+`FluidboxSource` is pure synchronous metadata. It never contains DOM nodes or framework children.
 The runtime may load media asynchronously, but `count`, `getItem(index)`, and `getIndex(id)` are
 synchronous for a source revision.
 
@@ -81,8 +81,8 @@ the beta contract.
 
 ## Origins and virtualized hosts
 
-DOM ownership is separate from source metadata. `LightboxOriginAdapter` resolves and reveals host
-elements. `LightboxOrigin` names three roles explicitly:
+DOM ownership is separate from source metadata. `FluidboxOriginAdapter` resolves and reveals host
+elements. `FluidboxOrigin` names three roles explicitly:
 
 | Field       | Purpose                                                              |
 | ----------- | -------------------------------------------------------------------- |
@@ -107,10 +107,10 @@ scrolling; the runtime cannot undo arbitrary host work performed after cancellat
 
 ## Controller
 
-The root package exports the plain runtime through the `CreateLightbox` signature:
+The root package exports the plain runtime through the `CreateFluidbox` signature:
 
 ```ts
-const viewer = createLightbox({
+const viewer = createFluidbox({
   source,
   origins,
   portal: {
@@ -192,15 +192,15 @@ The runtime owns the body portal, measured frame, transforms, clipping, native s
 surfaces, focus containment, inert background, and accessibility status. Applications own controls,
 captions, thumbnail decorations, and every framework-created descendant.
 
-An indexed `LightboxSource` is also the gallery API. The runtime renders a bounded native-scrolling
+An indexed `FluidboxSource` is also the gallery API. The runtime renders a bounded native-scrolling
 window around the active item, so callers do not create a second gallery object or mount every item.
 
-`LightboxOptions.portal` mounts application controls and captions once into a stable target inside the
+`FluidboxOptions.portal` mounts application controls and captions once into a stable target inside the
 body portal. It receives the controller and a lifetime signal and may return an idempotent disposer.
 The runtime calls the disposer before removing the target. Plain JavaScript appends DOM there; React,
 Vue, Solid, and Angular bindings use their native portal or teleport mechanism.
 
-`LightboxRenderer.mount()` receives a stable target, item, index, and abort signal. It may return a
+`FluidboxRenderer.mount()` receives a stable target, item, index, and abort signal. It may return a
 disposer. The adapter invokes the disposer before removing the target. Framework adapters use their
 native portal/teleport mechanism; the runtime never manually reparents a framework-owned node.
 
@@ -222,16 +222,16 @@ Two behaviors are supported:
   Pass `frameLayer` when a mask or other layer must remain clipped by the animated image frame;
   the runtime moves that element into the frame and restores it to its card on close.
 
-The overlay target exposes `data-lightbox-phase="preview|opening|open|dragging|closing"` and
-`--lightbox-progress`, where `1` is the preview pose and `0` is fully open. This supports both
+The overlay target exposes `data-fluidbox-phase="preview|opening|open|dragging|closing"` and
+`--fluidbox-progress`, where `1` is the preview pose and `0` is fully open. This supports both
 immediate and continuous behavior:
 
 ```css
 .photo-badge {
-  opacity: var(--lightbox-progress, 1);
+  opacity: var(--fluidbox-progress, 1);
 }
 
-.photo-caption[data-lightbox-phase="opening"] {
+.photo-caption[data-fluidbox-phase="opening"] {
   visibility: hidden;
 }
 ```
@@ -249,28 +249,28 @@ the fallback. Selecting another item disposes the old traveling renderer once it
 The first composed React contract is:
 
 ```tsx
-<Lightbox.Root source={source} origins={origins}>
-  <Lightbox.Item id="photo-1">
-    <Lightbox.Trigger asChild>
+<Fluidbox.Root source={source} origins={origins}>
+  <Fluidbox.Item id="photo-1">
+    <Fluidbox.Trigger asChild>
       <button>
         <img src="/thumb/photo-1.jpg" alt="A footpath through tall grass" />
-        <Lightbox.ThumbnailOverlay behavior="host" className="photo-badge">
+        <Fluidbox.ThumbnailOverlay behavior="host" className="photo-badge">
           1 of 20
-        </Lightbox.ThumbnailOverlay>
+        </Fluidbox.ThumbnailOverlay>
       </button>
-    </Lightbox.Trigger>
-  </Lightbox.Item>
+    </Fluidbox.Trigger>
+  </Fluidbox.Item>
 
-  <Lightbox.Portal>
-    <Lightbox.Content />
-    <Lightbox.Previous>Previous</Lightbox.Previous>
-    <Lightbox.Next>Next</Lightbox.Next>
-    <Lightbox.Close>Close</Lightbox.Close>
-  </Lightbox.Portal>
-</Lightbox.Root>
+  <Fluidbox.Portal>
+    <Fluidbox.Content />
+    <Fluidbox.Previous>Previous</Fluidbox.Previous>
+    <Fluidbox.Next>Next</Fluidbox.Next>
+    <Fluidbox.Close>Close</Fluidbox.Close>
+  </Fluidbox.Portal>
+</Fluidbox.Root>
 ```
 
-`useLightbox()` returns stable controller commands. `useLightboxState(selector)` uses stable external
+`useFluidbox()` returns stable controller commands. `useFluidboxState(selector)` uses stable external
 store snapshots. `asChild` accepts one element, composes its ref and event handler, and does not run
 the part action when the consumer prevents the event. `Previous` and `Next` expose native disabled
 state at finite ends.
@@ -281,22 +281,22 @@ that can close to that trigger. The render callback receives the selected item a
 the host preview can follow navigation without a separate `Origin` component:
 
 ```tsx
-<Lightbox.Root items={photos}>
-  <Lightbox.Trigger item={photos[0]} items={photos} asChild>
+<Fluidbox.Root items={photos}>
+  <Fluidbox.Trigger item={photos[0]} items={photos} asChild>
     {({ item }) => (
       <button type="button">
-        <img src={item?.thumbnail?.src} alt="" data-lightbox-origin />
-        <Lightbox.ThumbnailOverlay>+{photos.length - 1}</Lightbox.ThumbnailOverlay>
+        <img src={item?.thumbnail?.src} alt="" data-fluidbox-origin />
+        <Fluidbox.ThumbnailOverlay>+{photos.length - 1}</Fluidbox.ThumbnailOverlay>
       </button>
     )}
-  </Lightbox.Trigger>
-  <Lightbox.Portal>
-    <Lightbox.Close />
-  </Lightbox.Portal>
-</Lightbox.Root>
+  </Fluidbox.Trigger>
+  <Fluidbox.Portal>
+    <Fluidbox.Close />
+  </Fluidbox.Portal>
+</Fluidbox.Root>
 ```
 
-`ThumbnailOverlay` inherits all IDs from its trigger; host overlays receive `--lightbox-progress`
+`ThumbnailOverlay` inherits all IDs from its trigger; host overlays receive `--fluidbox-progress`
 through opening and closing. The runtime uses a matching single-item origin before a shared gallery origin. If neither is mounted
 and visible, close uses the existing scale and fade fallback. A trigger with plain element children
 also works; the callback is only needed when its preview changes with selection. Keep the visual node
@@ -332,21 +332,21 @@ define their callback order. The controller and source replacement APIs cover th
 
 ## Public styling hooks
 
-The supported public selectors during migration are the parts listed in `LIGHTBOX.md`: trigger,
+The supported public selectors during migration are the parts listed in `FLUIDBOX.md`: trigger,
 preview, target, overlay, container, backdrop, dialog, slides, slide, frame, media, content, close,
-filmstrip, filmstrip item, transition layer, and transition content. `data-lightbox-state`,
-`data-lightbox-phase`, `data-open`, `data-closed`, `data-starting-style`, `data-ending-style`,
+filmstrip, filmstrip item, transition layer, and transition content. `data-fluidbox-state`,
+`data-fluidbox-phase`, `data-open`, `data-closed`, `data-starting-style`, `data-ending-style`,
 `data-dragging`, `data-dismissing`, `data-zoomed`, `aria-hidden`, and `aria-selected` are public state
 hooks where that document lists them.
 
-The documented custom properties in `LIGHTBOX.md` are public with their listed owner, units, and
+The documented custom properties in `FLUIDBOX.md` are public with their listed owner, units, and
 lifetime. Undocumented generated nodes, attributes, inline properties, class names, and internal
 CSS variables are not extension points. Required geometry, scrolling, clipping, touch behavior,
 focus visibility, and modal isolation remain structural behavior even when appearance is replaced.
 
 ## Compatibility and versioning
 
-`createLightbox()` and the composed React binding are the implemented beta contract. Changes to
+`createFluidbox()` and the composed React binding are the implemented beta contract. Changes to
 command results, source semantics, event ordering, renderer ownership, public selectors, or
 custom-property meaning require a documented migration. Additive media descriptor fields and new
 optional parts may ship in a minor release. Internal DOM, animation objects, and unlisted styling

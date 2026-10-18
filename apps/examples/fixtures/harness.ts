@@ -1,9 +1,9 @@
 import { mountSite } from "../src/site";
 import type {
-  AppGallery,
-  LightboxItem,
-  LightboxOriginAdapter,
-  LightboxSource,
+  FluidboxGalleryElement,
+  FluidboxItem,
+  FluidboxOriginAdapter,
+  FluidboxSource,
 } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import "./site.css";
@@ -25,15 +25,15 @@ const target = shadow ? root.attachShadow({ mode: "open" }) : root;
 if (shadow) {
   const style = document.createElement("style");
   style.textContent =
-    "app-gallery { display: flex; gap: 16px } app-lightbox { display: block; width: 120px } app-lightbox > button { all: unset; display: block; cursor: pointer } app-lightbox img { width: 100%; height: auto }";
+    "fluidbox-gallery { display: flex; gap: 16px } fluidbox-item { display: block; width: 120px } fluidbox-item > button { all: unset; display: block; cursor: pointer } fluidbox-item img { width: 100%; height: auto }";
   target.append(style);
 }
 if (params.has("virtual")) {
-  const gallery = document.createElement("app-gallery") as AppGallery;
+  const gallery = document.createElement("fluidbox-gallery") as FluidboxGalleryElement;
   gallery.setAttribute("aria-label", "Virtual source gallery");
   target.append(gallery);
   const origins = new Map<string, HTMLElement>();
-  const source: LightboxSource<LightboxItem> = {
+  const source: FluidboxSource<FluidboxItem> = {
     count,
     getItem(index) {
       const src = index % 2 ? "/second.svg" : "/first.svg";
@@ -54,7 +54,7 @@ if (params.has("virtual")) {
       return Number.isInteger(index) && index >= 0 && index < count ? index : null;
     },
   };
-  const originAdapter: LightboxOriginAdapter = {
+  const originAdapter: FluidboxOriginAdapter = {
     getOrigin(id) {
       const trigger = origins.get(id);
       return trigger ? { trigger, visual: trigger } : null;
@@ -77,13 +77,13 @@ if (params.has("virtual")) {
   }
   renderWindow(0);
   Object.assign(window, { __renderVirtualWindow: renderWindow });
-  if (filmstrip) gallery.append(document.createElement("app-filmstrip"));
+  if (filmstrip) gallery.append(document.createElement("fluidbox-filmstrip"));
 } else {
-  const gallery = document.createElement("app-gallery");
+  const gallery = document.createElement("fluidbox-gallery");
   if (params.has("hide-close-button")) gallery.setAttribute("hide-close-button", "");
   gallery.setAttribute("aria-label", "Test gallery");
   for (let index = 0; index < count; index++) {
-    const lightbox = document.createElement("app-lightbox");
+    const lightbox = document.createElement("fluidbox-item");
     lightbox.setAttribute("item-id", String(index));
     lightbox.dataset.testIndex = String(index);
     const trigger = document.createElement("button");
@@ -111,7 +111,7 @@ if (params.has("virtual")) {
     lightbox.append(template);
     gallery.append(lightbox);
   }
-  if (filmstrip) gallery.append(document.createElement("app-filmstrip"));
+  if (filmstrip) gallery.append(document.createElement("fluidbox-filmstrip"));
   target.append(gallery);
 }
 (document.documentElement as HTMLElement).dataset.fixtureReady = "";

@@ -70,9 +70,9 @@
           </p>
         </header>
         <div class="stage">
-          <app-gallery id="mosaic" class="mosaic" aria-label="Landscape gallery">
-            <app-filmstrip></app-filmstrip>
-          </app-gallery>
+          <fluidbox-gallery id="mosaic" class="mosaic" aria-label="Landscape gallery">
+            <fluidbox-filmstrip></fluidbox-filmstrip>
+          </fluidbox-gallery>
         </div>
         <details class="fb-code">
           <summary>Markup</summary>
@@ -81,19 +81,19 @@
   import "@ogdakke/fluidbox/styles.css";
 &lt;/script&gt;
 
-&lt;app-gallery aria-label="Landscapes"&gt;
-  &lt;app-lightbox item-id="dune"&gt;
-    &lt;button slot="trigger" type="button" data-lightbox-preview&gt;
+&lt;fluidbox-gallery aria-label="Landscapes"&gt;
+  &lt;fluidbox-item item-id="dune"&gt;
+    &lt;button slot="trigger" type="button" data-fluidbox-preview&gt;
       &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
     &lt;/button&gt;
     &lt;template slot="content"&gt;
       &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
     &lt;/template&gt;
     &lt;span slot="caption"&gt;Dune at golden hour&lt;/span&gt;
-  &lt;/app-lightbox&gt;
+  &lt;/fluidbox-item&gt;
   &lt;!-- …more items --&gt;
-  &lt;app-filmstrip&gt;&lt;/app-filmstrip&gt;
-&lt;/app-gallery&gt;</code></pre>
+  &lt;fluidbox-filmstrip&gt;&lt;/fluidbox-filmstrip&gt;
+&lt;/fluidbox-gallery&gt;</code></pre>
         </details>
       </section>
       <section class="section" aria-labelledby="integrations-title">
@@ -107,7 +107,7 @@
             ><span class="fb-number">01</span>
             <h3>Elements <span>→</span></h3>
             <p>
-              Declarative <code>&lt;app-gallery&gt;</code> markup, plus an indexed 100,000-item
+              Declarative <code>&lt;fluidbox-gallery&gt;</code> markup, plus an indexed 100,000-item
               source.
             </p></a
           >
@@ -115,7 +115,7 @@
             ><span class="fb-number">02</span>
             <h3>Headless <span>→</span></h3>
             <p>
-              <code>createLightbox()</code> with your own thumbnails and a portal for custom chrome.
+              <code>createFluidbox()</code> with your own thumbnails and a portal for custom chrome.
             </p></a
           >
           <a class="fb-cell integration" href="/react/"

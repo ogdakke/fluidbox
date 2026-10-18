@@ -1,7 +1,7 @@
 import { mountSite } from "../src/site";
 import { createApp, h, shallowRef } from "vue";
 import { FluidboxGallery } from "@ogdakke/fluidbox/vue";
-import type { AppGallery } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox";
 import { alternateSource, source } from "./source";
 import "./frameworks.css";
 
@@ -23,7 +23,10 @@ createApp({
             "button",
             {
               type: "button",
-              onClick: () => document.querySelector<AppGallery>("app-gallery")?.open({ index: 0 }),
+              onClick: () =>
+                document
+                  .querySelector<FluidboxGalleryElement>("fluidbox-gallery")
+                  ?.open({ index: 0 }),
             },
             "Open gallery",
           ),

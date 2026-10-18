@@ -6,24 +6,24 @@ order: 6
 
 # Filmstrip and sheet
 
-Two optional pieces ship as their own entries, so their code loads only when you import them. Pass each one to `createLightbox`, or to `Lightbox.Root` in React.
+Two optional pieces ship as their own entries, so their code loads only when you import them. Pass each one to `createFluidbox`, or to `Fluidbox.Root` in React.
 
 ```ts
-import { createLightbox } from "@ogdakke/fluidbox";
+import { createFluidbox } from "@ogdakke/fluidbox";
 import { filmstrip } from "@ogdakke/fluidbox/filmstrip";
 import { sheet } from "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/styles.css";
 import "@ogdakke/fluidbox/sheet.css";
 
 const details = sheet();
-const viewer = createLightbox({ source, filmstrip: filmstrip(), sheet: details });
+const viewer = createFluidbox({ source, filmstrip: filmstrip(), sheet: details });
 ```
 
 ## Filmstrip
 
 `filmstrip()` docks a scrubbable row of thumbnails along the bottom of the viewer when the source has more than one item. Tapping a thumbnail moves to it, and the strip follows swipes, arrow keys and `goTo`. It keeps itself in step when you call `setSource`. Its styles are in `styles.css`.
 
-Each thumbnail is a `button` with `data-lightbox-filmstrip-item` and `data-index`, inside a listbox labelled "Gallery filmstrip". The dialog gets `data-filmstrip` while a strip is docked. To draw your own thumbnails, pass `renderItem`:
+Each thumbnail is a `button` with `data-fluidbox-filmstrip-item` and `data-index`, inside a listbox labelled "Gallery filmstrip". The dialog gets `data-filmstrip` while a strip is docked. To draw your own thumbnails, pass `renderItem`:
 
 ```ts
 filmstrip({
@@ -33,13 +33,13 @@ filmstrip({
 });
 ```
 
-In React, `Lightbox.Filmstrip` renders the same strip as a component.
+In React, `Fluidbox.Filmstrip` renders the same strip as a component.
 
 ## Sheet
 
 `sheet()` adds a panel that rises over the photo, as the replies on X and the comments on Instagram do on a phone. The photo and the sheet share one native scroller with a snap point per stop, so swipes, momentum and rubber-banding are the browser's own. Scroll-driven animations fit the photo into the room left above the sheet, so no script runs while it moves.
 
-Stop `0` is the sheet at rest: away below the screen, or peeking by `--lightbox-sheet-peek`. Each snap point adds a stop above it, lowest first:
+Stop `0` is the sheet at rest: away below the screen, or peeking by `--fluidbox-sheet-peek`. Each snap point adds a stop above it, lowest first:
 
 ```ts
 const replies = sheet({
@@ -56,7 +56,7 @@ const replies = sheet({
 
 The default is `["60%", "content"]` with the `"flight"` dismiss. A stop set in pixels or percent is always reachable: the sheet stretches to it when its content is shorter. A `"content"` stop follows the content, so with little content it sits lower and the space above it shows. With `dismiss: "flight"`, a second flick down while the sheet is still lowering goes straight into the flight.
 
-Render your own element with `data-lightbox-sheet` into `replies.slot`, or pass `render` and the runtime makes one and fills it for each item:
+Render your own element with `data-fluidbox-sheet` into `replies.slot`, or pass `render` and the runtime makes one and fills it for each item:
 
 ```ts
 sheet({
@@ -70,12 +70,12 @@ Inside the sheet:
 
 | Attribute                    | Effect                                                                                      |
 | ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `data-lightbox-sheet-handle` | Draws a grab bar.                                                                           |
-| `data-lightbox-sheet-scroll` | The part that scrolls once the sheet is at its top stop. Without one, the whole sheet does. |
+| `data-fluidbox-sheet-handle` | Draws a grab bar.                                                                           |
+| `data-fluidbox-sheet-scroll` | The part that scrolls once the sheet is at its top stop. Without one, the whole sheet does. |
 
 Below the top stop a swipe anywhere on the sheet moves the sheet; at the top, its content scrolls, and a pull down from the top of the content carries on into the sheet, as React Aria's sheet does.
 
-Give any element `data-lightbox-sheet-stop="1"` to raise the sheet to that stop when clicked, such as a reply count or a "View all comments" link. Clicking it again at that stop lowers the sheet. The runtime keeps `aria-expanded` on these triggers and moves focus into the sheet once it settles. Escape, a tap above the sheet and the close button lower it before they close the viewer. Drive it from code with `replies.set(2)`, read `replies.stop`, and `replies.subscribe(listener)` to follow it. The dialog also dispatches `lightbox-sheet-change` with `detail.stop`.
+Give any element `data-fluidbox-sheet-stop="1"` to raise the sheet to that stop when clicked, such as a reply count or a "View all comments" link. Clicking it again at that stop lowers the sheet. The runtime keeps `aria-expanded` on these triggers and moves focus into the sheet once it settles. Escape, a tap above the sheet and the close button lower it before they close the viewer. Drive it from code with `replies.set(2)`, read `replies.stop`, and `replies.subscribe(listener)` to follow it. The dialog also dispatches `fluidbox-sheet-change` with `detail.stop`.
 
 ### Text fields and the keyboard
 
@@ -87,30 +87,30 @@ A drawer library on top of the viewer would bring a second gesture system that f
 
 ### React
 
-Pass the sheet to `Lightbox.Root` and render its content with `Lightbox.Sheet`, which portals into the slot. `useLightboxSheet` returns the current stop:
+Pass the sheet to `Fluidbox.Root` and render its content with `Fluidbox.Sheet`, which portals into the slot. `useFluidboxSheet` returns the current stop:
 
 ```tsx
-import { Lightbox, useLightboxSheet } from "@ogdakke/fluidbox/react";
+import { Fluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/react";
 import { sheet } from "@ogdakke/fluidbox/sheet";
 
 function Viewer() {
   const replies = useMemo(() => sheet({ snapPoints: ["62%", "100%"] }), []);
-  const stop = useLightboxSheet(replies);
+  const stop = useFluidboxSheet(replies);
   return (
-    <Lightbox.Root source={source} sheet={replies}>
+    <Fluidbox.Root source={source} sheet={replies}>
       {/* triggers and items */}
-      <Lightbox.Portal>
-        <Lightbox.Content />
-        <button data-lightbox-sheet-stop="1">Replies</button>
-      </Lightbox.Portal>
-      <Lightbox.Sheet sheet={replies}>
-        <section data-lightbox-sheet data-lightbox-chrome aria-label="Replies">
-          <div data-lightbox-sheet-handle />
-          <ul data-lightbox-sheet-scroll>{/* replies */}</ul>
+      <Fluidbox.Portal>
+        <Fluidbox.Content />
+        <button data-fluidbox-sheet-stop="1">Replies</button>
+      </Fluidbox.Portal>
+      <Fluidbox.Sheet sheet={replies}>
+        <section data-fluidbox-sheet data-fluidbox-chrome aria-label="Replies">
+          <div data-fluidbox-sheet-handle />
+          <ul data-fluidbox-sheet-scroll>{/* replies */}</ul>
           <ReplyForm />
         </section>
-      </Lightbox.Sheet>
-    </Lightbox.Root>
+      </Fluidbox.Sheet>
+    </Fluidbox.Root>
   );
 }
 ```
@@ -121,35 +121,35 @@ Set these on the dialog. The runtime reads the first five, so they can change wi
 
 | Variable                                                         | Default            | Effect                                                            |
 | ---------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------- |
-| `--lightbox-sheet-enabled`                                       | `1`                | `0` turns the sheet off, as for a wide screen with a sidebar.     |
-| `--lightbox-sheet-photo`                                         | `fit`              | `fit` shrinks the photo into the room above; `push` slides it up. |
-| `--lightbox-sheet-peek`                                          | `0px`              | How much of the sheet shows at rest.                              |
-| `--lightbox-sheet-gap`                                           | `12px`             | Space between the photo and the sheet.                            |
-| `--lightbox-sheet-fit-limit`                                     | `55%`              | How much the sheet covers before a fitting photo rises instead.   |
-| `--lightbox-sheet-top`                                           | safe area + `56px` | Space above the sheet at its tallest.                             |
-| `--lightbox-sheet-fade`                                          | `1`                | `0` keeps the photo showing behind the sheet at the top stop.     |
-| `--lightbox-sheet-radius`, `-max-width`, `-background`, `-color` |                    | The panel's look.                                                 |
+| `--fluidbox-sheet-enabled`                                       | `1`                | `0` turns the sheet off, as for a wide screen with a sidebar.     |
+| `--fluidbox-sheet-photo`                                         | `fit`              | `fit` shrinks the photo into the room above; `push` slides it up. |
+| `--fluidbox-sheet-peek`                                          | `0px`              | How much of the sheet shows at rest.                              |
+| `--fluidbox-sheet-gap`                                           | `12px`             | Space between the photo and the sheet.                            |
+| `--fluidbox-sheet-fit-limit`                                     | `55%`              | How much the sheet covers before a fitting photo rises instead.   |
+| `--fluidbox-sheet-top`                                           | safe area + `56px` | Space above the sheet at its tallest.                             |
+| `--fluidbox-sheet-fade`                                          | `1`                | `0` keeps the photo showing behind the sheet at the top stop.     |
+| `--fluidbox-sheet-radius`, `-max-width`, `-background`, `-color` |                    | The panel's look.                                                 |
 
 As it scrolls, the dialog's state properties follow on the compositor:
 
 | Property                    | Value                                                            |
 | --------------------------- | ---------------------------------------------------------------- |
-| `--lightbox-sheet-visible`  | Pixels of the sheet showing.                                     |
-| `--lightbox-sheet-progress` | `0` at rest to `1` at the first stop.                            |
-| `--lightbox-sheet-expand`   | `0` at the first stop to `1` at the last.                        |
-| `--lightbox-sheet-dismiss`  | `0` at rest to `1` with the photo scrolled away, for `"scroll"`. |
+| `--fluidbox-sheet-visible`  | Pixels of the sheet showing.                                     |
+| `--fluidbox-sheet-progress` | `0` at rest to `1` at the first stop.                            |
+| `--fluidbox-sheet-expand`   | `0` at the first stop to `1` at the last.                        |
+| `--fluidbox-sheet-dismiss`  | `0` at rest to `1` with the photo scrolled away, for `"scroll"`. |
 
 The dialog also gets `data-sheet` with the stop number, `data-sheet-raised` above stop 0 and `data-sheet-expanded` at the top stop. Use them to fade a caption as the sheet rises:
 
 ```css
 .caption {
-  opacity: clamp(0, 1 - var(--lightbox-sheet-progress) * 2.5, 1);
+  opacity: clamp(0, 1 - var(--fluidbox-sheet-progress) * 2.5, 1);
 }
 
 @media (min-width: 900px) {
-  [data-lightbox-dialog]:has(.replies) {
-    --lightbox-sheet-enabled: 0;
-    --lightbox-stage-right: 350px;
+  [data-fluidbox-dialog]:has(.replies) {
+    --fluidbox-sheet-enabled: 0;
+    --fluidbox-stage-right: 350px;
   }
 }
 ```

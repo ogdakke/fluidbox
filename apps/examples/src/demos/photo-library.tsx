@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Lightbox, useLightbox } from "@ogdakke/fluidbox/react";
+import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import type {
-  LightboxController,
-  LightboxEvent,
-  LightboxOriginAdapter,
-  LightboxSource,
+  FluidboxController,
+  FluidboxEvent,
+  FluidboxOriginAdapter,
+  FluidboxSource,
 } from "@ogdakke/fluidbox";
 import "./photo-library.css";
 
@@ -56,9 +56,9 @@ type PhotoItem = ReturnType<typeof photoAt>;
 function ControllerBridge({
   controllerRef,
 }: {
-  controllerRef: React.RefObject<LightboxController<PhotoItem> | null>;
+  controllerRef: React.RefObject<FluidboxController<PhotoItem> | null>;
 }) {
-  const controller = useLightbox<PhotoItem>();
+  const controller = useFluidbox<PhotoItem>();
   useEffect(() => {
     controllerRef.current = controller;
     return () => {
@@ -105,7 +105,7 @@ export function PhotoLibrary({
   embedded?: boolean;
 }) {
   const count = new URLSearchParams(location.search).get("count") === "100000" ? 100_000 : 10_000;
-  const gallery = useRef<LightboxController<PhotoItem> | null>(null);
+  const gallery = useRef<FluidboxController<PhotoItem> | null>(null);
   const scrollElement = useRef<HTMLDivElement | null>(null);
   const origins = useRef(new Map<string, HTMLButtonElement>());
   const revealOrigin = useRef<
@@ -117,7 +117,7 @@ export function PhotoLibrary({
   const [lastViewed, setLastViewed] = useState<number | null>(null);
   const pendingResizeAnchor = useRef<number | null>(null);
   const { rows, photoToRow } = useMemo(() => makeRows(count, columns), [count, columns]);
-  const source = useMemo<LightboxSource<PhotoItem>>(
+  const source = useMemo<FluidboxSource<PhotoItem>>(
     () => ({
       count,
       getItem(index) {
@@ -132,7 +132,7 @@ export function PhotoLibrary({
     }),
     [count, images],
   );
-  const originAdapter = useMemo<LightboxOriginAdapter>(
+  const originAdapter = useMemo<FluidboxOriginAdapter>(
     () => ({
       getOrigin(id) {
         const element = origins.current.get(id);
@@ -206,8 +206,8 @@ export function PhotoLibrary({
     });
   };
 
-  const onLightboxEvent = useCallback(
-    (event: LightboxEvent) => {
+  const onFluidboxEvent = useCallback(
+    (event: FluidboxEvent) => {
       if (event.type === "selection-settle" && event.index >= 0 && event.index < count) {
         setLastViewed(event.index);
       }
@@ -258,7 +258,7 @@ export function PhotoLibrary({
   const visibleEnd = lastRow?.kind === "photos" ? lastRow.firstPhoto + lastRow.count : visibleStart;
 
   return (
-    <Lightbox.Root source={source} origins={originAdapter} onEvent={onLightboxEvent}>
+    <Fluidbox.Root source={source} origins={originAdapter} onEvent={onFluidboxEvent}>
       <ControllerBridge controllerRef={gallery} />
       <main
         className={embedded ? "library-page library-page--embedded" : "library-page"}
@@ -338,12 +338,12 @@ export function PhotoLibrary({
             Mounted range {visibleStart}–{visibleEnd}.
           </span>
         </p>
-        <Lightbox.Portal>
-          {showFilmstrip && <Lightbox.Filmstrip />}
-          <Lightbox.Previous aria-label="Previous photo" />
-          <Lightbox.Next aria-label="Next photo" />
-          <Lightbox.Close aria-label="Close" />
-        </Lightbox.Portal>
+        <Fluidbox.Portal>
+          {showFilmstrip && <Fluidbox.Filmstrip />}
+          <Fluidbox.Previous aria-label="Previous photo" />
+          <Fluidbox.Next aria-label="Next photo" />
+          <Fluidbox.Close aria-label="Close" />
+        </Fluidbox.Portal>
         <div className="library-scroll" ref={scrollElement} tabIndex={0} aria-label="Photo library">
           <div className="library-track" style={{ height: virtualizer.getTotalSize() }}>
             {virtualRows.map((virtualRow) => {
@@ -377,12 +377,12 @@ export function PhotoLibrary({
                         const index = row.firstPhoto + offset;
                         const photo = photoAt(index, images);
                         return (
-                          <Lightbox.Item key={photo.id} id={photo.id}>
-                            <Lightbox.Trigger asChild>
+                          <Fluidbox.Item key={photo.id} id={photo.id}>
+                            <Fluidbox.Trigger asChild>
                               <button
                                 type="button"
                                 className="library-photo"
-                                data-lightbox-preview=""
+                                data-fluidbox-preview=""
                                 data-photo-id={photo.id}
                                 data-photo-index={index}
                                 aria-label={`Open ${photo.media.alt}, item ${index + 1} of ${count}`}
@@ -406,8 +406,8 @@ export function PhotoLibrary({
                                 />
                                 <span>{String(index + 1).padStart(5, "0")}</span>
                               </button>
-                            </Lightbox.Trigger>
-                          </Lightbox.Item>
+                            </Fluidbox.Trigger>
+                          </Fluidbox.Item>
                         );
                       })}
                     </div>
@@ -422,6 +422,6 @@ export function PhotoLibrary({
           viewed” recenters it if you scroll elsewhere after closing.
         </p>
       </main>
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }

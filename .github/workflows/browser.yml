@@ -53,7 +53,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: current-lightbox-baseline
+          name: current-fluidbox-baseline
           path: |
             test-results/capture
             tests/browser/interactions.spec.ts-snapshots

@@ -1,6 +1,6 @@
 import { mountSite } from "../src/site";
-import { arraySource, createLightbox } from "@ogdakke/fluidbox";
-import type { LightboxController, LightboxItem, LightboxOrigin } from "@ogdakke/fluidbox";
+import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
+import type { FluidboxController, FluidboxItem, FluidboxOrigin } from "@ogdakke/fluidbox";
 import { artItem, artSrc, sceneById } from "../src/art";
 import { mapEmbedUrl, mapView } from "../src/map-view";
 import "./flight.css";
@@ -14,8 +14,8 @@ type FlightCase = {
   readonly title: string;
   /** What a correct flight looks like, shown under the card. */
   readonly expect: string;
-  readonly items: LightboxItem[];
-  /** The card's inner markup. The visual box carries `data-lightbox-origin`. */
+  readonly items: FluidboxItem[];
+  /** The card's inner markup. The visual box carries `data-fluidbox-origin`. */
   readonly markup: string;
   /**
    * The card holds several items of one gallery. Each `data-flight-item`
@@ -23,12 +23,12 @@ type FlightCase = {
    */
   readonly group?: boolean;
   /** Extra wiring once the controller exists. */
-  readonly setup?: (controller: LightboxController, trigger: HTMLElement) => void;
+  readonly setup?: (controller: FluidboxController, trigger: HTMLElement) => void;
 };
 
 const art = (id: string, itemId = `flight-${id}`) => artItem(sceneById(id), itemId);
 const scrollerScenes = ["canyon", "coast", "lagoon", "dune"];
-const video: LightboxItem = {
+const video: FluidboxItem = {
   id: "flight-video",
   media: {
     type: "video",
@@ -41,7 +41,7 @@ const video: LightboxItem = {
   },
   thumbnail: { src: "/video/drift-poster.jpg", width: 960, height: 540 },
 };
-const inlineVideo = `<video data-lightbox-origin autoplay loop muted playsinline poster="/video/drift-poster.jpg">
+const inlineVideo = `<video data-fluidbox-origin autoplay loop muted playsinline poster="/video/drift-poster.jpg">
   <source src="/video/drift.webm" type="video/webm" />
   <source src="/video/drift.mp4" type="video/mp4" />
 </video>`;
@@ -52,42 +52,42 @@ const cases: FlightCase[] = [
     title: "Cropped image",
     expect: "The image grows out of the crop and its corners straighten. No fade.",
     items: [art("aurora")],
-    markup: `<span class="flight-visual" data-lightbox-origin><img src="${artSrc(sceneById("aurora"))}" alt="" /></span>`,
+    markup: `<span class="flight-visual" data-fluidbox-origin><img src="${artSrc(sceneById("aurora"))}" alt="" /></span>`,
   },
   {
     id: "contain",
     title: "Letterboxed image",
     expect: "The whole image is visible in the card; the flight should not crop it first.",
     items: [art("coast")],
-    markup: `<span class="flight-visual flight-visual--contain" data-lightbox-origin><img src="${artSrc(sceneById("coast"))}" alt="" /></span>`,
+    markup: `<span class="flight-visual flight-visual--contain" data-fluidbox-origin><img src="${artSrc(sceneById("coast"))}" alt="" /></span>`,
   },
   {
     id: "position",
     title: "Top-anchored crop",
     expect: "The card shows the top of the image. The flight should start from that crop.",
     items: [art("fjord")],
-    markup: `<span class="flight-visual flight-visual--top" data-lightbox-origin><img src="${artSrc(sceneById("fjord"))}" alt="" /></span>`,
+    markup: `<span class="flight-visual flight-visual--top" data-fluidbox-origin><img src="${artSrc(sceneById("fjord"))}" alt="" /></span>`,
   },
   {
     id: "different",
     title: "Different picture",
     expect: "The card shows another image. The slide fades in over it; no picture-in-picture.",
     items: [art("lagoon")],
-    markup: `<span class="flight-visual" data-lightbox-origin><img src="${artSrc(sceneById("ridge"))}" alt="" /></span>`,
+    markup: `<span class="flight-visual" data-fluidbox-origin><img src="${artSrc(sceneById("ridge"))}" alt="" /></span>`,
   },
   {
     id: "text",
     title: "Text card",
     expect: "No image at all. The slide fades in as it grows and fades back into the card.",
     items: [art("dune")],
-    markup: `<span class="flight-text" data-lightbox-origin><strong>04</strong><span>Open the dunes</span></span>`,
+    markup: `<span class="flight-text" data-fluidbox-origin><strong>04</strong><span>Open the dunes</span></span>`,
   },
   {
     id: "badge",
     title: "Travelling badge",
     expect: "The badge rides on the image at its own size and lands where it started.",
     items: [art("meadow")],
-    markup: `<span class="flight-visual" data-lightbox-origin><img src="${artSrc(sceneById("meadow"))}" alt="" /><span class="flight-badge-host" data-flight-badge-host><span class="flight-badge">New</span></span></span>`,
+    markup: `<span class="flight-visual" data-fluidbox-origin><img src="${artSrc(sceneById("meadow"))}" alt="" /><span class="flight-badge-host" data-flight-badge-host><span class="flight-badge">New</span></span></span>`,
     setup(controller, trigger) {
       const host = trigger.querySelector<HTMLElement>("[data-flight-badge-host]")!;
       controller.registerThumbnailOverlay("flight-meadow", {
@@ -96,7 +96,7 @@ const cases: FlightCase[] = [
         renderer: {
           mount({ target }) {
             // Travel content fades near the card by default; a badge stays on the image.
-            target.style.setProperty("--lightbox-transition-content-opacity", "1");
+            target.style.setProperty("--fluidbox-transition-content-opacity", "1");
             const badge = document.createElement("span");
             badge.className = "flight-badge";
             badge.textContent = "New";
@@ -116,7 +116,7 @@ const cases: FlightCase[] = [
     markup: `<span class="flight-scroller" data-flight-scroller>${scrollerScenes
       .map(
         (id, index) =>
-          `<button type="button" class="flight-trigger flight-scroller__item" data-flight-item="flight-${id}"${index === 0 ? " data-flight-trigger" : ""} aria-label="Open ${sceneById(id).title}"><span class="flight-visual" data-lightbox-origin><img src="${artSrc(sceneById(id))}" alt="" /></span></button>`,
+          `<button type="button" class="flight-trigger flight-scroller__item" data-flight-item="flight-${id}"${index === 0 ? " data-flight-trigger" : ""} aria-label="Open ${sceneById(id).title}"><span class="flight-visual" data-fluidbox-origin><img src="${artSrc(sceneById(id))}" alt="" /></span></button>`,
       )
       .join("")}</span>`,
   },
@@ -125,14 +125,14 @@ const cases: FlightCase[] = [
     title: "Sticky card",
     expect: "Scroll the page while it closes. The flight follows the card.",
     items: [art("alpine")],
-    markup: `<span class="flight-visual flight-visual--sticky" data-lightbox-origin><img src="${artSrc(sceneById("alpine"))}" alt="" /></span>`,
+    markup: `<span class="flight-visual flight-visual--sticky" data-fluidbox-origin><img src="${artSrc(sceneById("alpine"))}" alt="" /></span>`,
   },
   {
     id: "scaled",
     title: "Scaled ancestor",
     expect: "The card sits in a scaled container. The flight matches its painted size.",
     items: [art("ridge")],
-    markup: `<span class="flight-scaled"><span class="flight-visual" data-lightbox-origin><img src="${artSrc(sceneById("ridge"))}" alt="" /></span></span>`,
+    markup: `<span class="flight-scaled"><span class="flight-visual" data-fluidbox-origin><img src="${artSrc(sceneById("ridge"))}" alt="" /></span></span>`,
   },
   {
     id: "video-poster",
@@ -140,7 +140,7 @@ const cases: FlightCase[] = [
     expect:
       "The poster grows into the player, controls and all, so playback never stops; closing lands on the poster.",
     items: [video],
-    markup: `<span class="flight-visual" data-lightbox-origin><img src="/video/drift-poster.jpg" alt="" /><span class="flight-play" aria-hidden="true">▶</span></span>`,
+    markup: `<span class="flight-visual" data-fluidbox-origin><img src="/video/drift-poster.jpg" alt="" /><span class="flight-play" aria-hidden="true">▶</span></span>`,
   },
   {
     id: "video-inline",
@@ -166,12 +166,12 @@ const cases: FlightCase[] = [
         thumbnail: { src: "/map/preview.svg", width: mapView.width, height: mapView.height },
       },
     ],
-    markup: `<span class="flight-visual" data-lightbox-origin><img src="/map/preview.svg" alt="" /></span>`,
+    markup: `<span class="flight-visual" data-fluidbox-origin><img src="/map/preview.svg" alt="" /></span>`,
   },
 ];
 
 const grid = document.querySelector<HTMLElement>("[data-flight-cases]")!;
-const viewers: Record<string, LightboxController> = {};
+const viewers: Record<string, FluidboxController> = {};
 
 for (const flight of cases) {
   const cell = document.createElement("article");
@@ -191,11 +191,11 @@ for (const flight of cases) {
     flight.group
       ? cell.querySelector<HTMLElement>(`[data-flight-item="${CSS.escape(id)}"]`)
       : trigger;
-  const origin = (id: string): LightboxOrigin | null => {
+  const origin = (id: string): FluidboxOrigin | null => {
     const button = triggerFor(id);
     if (!button) return null;
     const visual =
-      button.querySelector<HTMLElement>("[data-lightbox-origin]") ??
+      button.querySelector<HTMLElement>("[data-fluidbox-origin]") ??
       button.querySelector<HTMLElement>("video") ??
       button;
     const thumbnail = visual.matches("img") ? visual : visual.querySelector("img");
@@ -205,7 +205,7 @@ for (const flight of cases) {
       thumbnail: (thumbnail as HTMLImageElement | null) ?? undefined,
     };
   };
-  const controller = createLightbox({
+  const controller = createFluidbox({
     source: arraySource(flight.items),
     origins: {
       getOrigin: (id) => (flight.items.some((item) => item.id === id) ? origin(id) : null),
@@ -222,7 +222,7 @@ for (const flight of cases) {
 
 // Scroll the first photo a third of the way out, so the scroller clips its left side.
 const scroller = document.querySelector<HTMLElement>("[data-flight-scroller]");
-const scrolled = scroller?.querySelector<HTMLElement>("[data-lightbox-origin]");
+const scrolled = scroller?.querySelector<HTMLElement>("[data-fluidbox-origin]");
 if (scroller && scrolled) {
   const rect = scrolled.getBoundingClientRect();
   scroller.scrollLeft += rect.left - scroller.getBoundingClientRect().left + rect.width / 3;

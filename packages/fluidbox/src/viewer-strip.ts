@@ -1,0 +1,907 @@
+import type {
+  FluidboxDispose,
+  FluidboxImageCandidate,
+  FluidboxItem,
+  FluidboxRenderer,
+  FluidboxSource,
+} from "./public-api";
+import { observeDecodedPreview } from "./decoded-preview";
+
+const WINDOW_SIZE = 31;
+const LOAD_RADIUS = 1;
+
+interface ViewerSlide {
+  readonly element: HTMLDivElement;
+  readonly frame: HTMLDivElement;
+  readonly picture?: HTMLPictureElement;
+  readonly placeholder?: HTMLImageElement;
+  readonly preview?: HTMLImageElement;
+  /** Snapshot shown over embedded media until it has loaded, and while closing. */
+  readonly cover?: HTMLImageElement;
+  readonly image: HTMLElement;
+  readonly error: HTMLDivElement;
+  loaded: boolean;
+  opening: boolean;
+  deferFull: boolean;
+  decoded: boolean;
+  fullApplied: boolean;
+  imageVersion: number;
+  previewController?: AbortController;
+  controller?: AbortController;
+  /** A playing origin's picture, shown until the slide's player catches up with it. */
+  videoHandoff?: AbortController;
+  dispose?: FluidboxDispose;
+}
+
+function candidateSet(candidates: readonly FluidboxImageCandidate[] | undefined) {
+  return candidates?.map((candidate) => `${candidate.src} ${candidate.width}w`).join(", ") ?? "";
+}
+
+function resourceSet(resource: {
+  readonly candidates?: readonly FluidboxImageCandidate[];
+  readonly srcset?: string;
+}) {
+  if (resource.srcset && resource.candidates?.length) {
+    throw new TypeError("Fluidbox image resources cannot define both srcset and candidates.");
+  }
+  return resource.srcset ?? candidateSet(resource.candidates);
+}
+
+/** Bounded native-scrolling gallery for the plain DOM runtime. */
+export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
+  readonly element: HTMLDivElement;
+  readonly #ownerDocument: Document;
+  readonly #slides = new Map<number, ViewerSlide>();
+  readonly #observer: ResizeObserver;
+  readonly #controller = new AbortController();
+  readonly #onSelect: (index: number, settled: boolean) => void;
+  readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  #source: FluidboxSource<TItem>;
+  #index = 0;
+  #base = 0;
+  #width = 0;
+  #mounted = false;
+  #rebasing = false;
+  #rebaseFrame = 0;
+  #instantFrame = 0;
+  #instantTarget: number | null = null;
+  #frozen = false;
+  #frozenLeft = 0;
+  #userOwned = false;
+  #userScrolled = false;
+  #touching = false;
+  #settleTimer: ReturnType<typeof setTimeout> | undefined;
+  #selection:
+    | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
+    | undefined;
+
+  constructor(
+    ownerDocument: Document,
+    source: FluidboxSource<TItem>,
+    onSelect: (index: number, settled: boolean) => void,
+    renderers: Readonly<Record<string, FluidboxRenderer<TItem>>> = {},
+  ) {
+    this.#ownerDocument = ownerDocument;
+    this.#source = source;
+    this.#onSelect = onSelect;
+    this.#renderers = renderers;
+    this.element = ownerDocument.createElement("div");
+    this.element.dataset.fluidboxSlides = "";
+    this.element.setAttribute("aria-label", "Gallery items");
+    this.#renderWindow(0, 0);
+    const { signal } = this.#controller;
+    this.element.addEventListener("scroll", this.#onScroll, { passive: true, signal });
+    this.element.addEventListener("scrollend", this.#settled, { signal });
+    for (const type of ["pointerdown", "touchstart", "wheel"] as const) {
+      this.element.addEventListener(type, this.#takeControl, {
+        capture: true,
+        passive: true,
+        signal,
+      });
+    }
+    for (const type of ["pointerup", "pointercancel", "touchend", "touchcancel"] as const) {
+      this.element.addEventListener(type, this.#releaseControl, {
+        capture: true,
+        passive: true,
+        signal,
+      });
+    }
+    this.#observer = new ResizeObserver(([entry]) => {
+      if (!entry || entry.contentRect.width === this.#width) return;
+      this.#width = entry.contentRect.width;
+      this.#align(this.#index);
+    });
+  }
+
+  get index() {
+    return this.#index;
+  }
+
+  get active() {
+    const slide = this.#slides.get(this.#index);
+    if (!slide) throw new Error("The viewer source has no active image.");
+    return slide;
+  }
+
+  get activeItem() {
+    return this.#source.getItem(this.#index);
+  }
+
+  get snapOffset() {
+    return this.#frozen ? this.#frozenLeft - (this.#index - this.#base) * this.#width : 0;
+  }
+
+  setSource(source: FluidboxSource<TItem>) {
+    this.#resolveSelection();
+    this.#source = source;
+    this.#index = Math.max(0, Math.min(this.#index, source.count - 1));
+    for (const slide of this.#slides.values()) {
+      this.#unload(slide);
+      slide.element.remove();
+    }
+    for (const slide of this.#slides.values()) this.#unload(slide);
+    this.#slides.clear();
+    this.#base = 0;
+    this.#renderWindow(this.#index, this.#index);
+    this.#align(this.#index);
+  }
+
+  mount() {
+    if (!this.#mounted) {
+      this.#mounted = true;
+      this.#observer.observe(this.element);
+    }
+    // The exact width, as the resize observer reports it. clientWidth rounds,
+    // and index × rounded width drifts off the slides on a fractional viewport.
+    this.#width = this.element.getBoundingClientRect().width;
+    this.#align(this.#index);
+    this.#loadWindow();
+  }
+
+  unmount() {
+    if (!this.#mounted) return;
+    this.#mounted = false;
+    this.#observer.disconnect();
+    this.#resolveSelection();
+    for (const slide of this.#slides.values()) {
+      slide.opening = false;
+      slide.deferFull = false;
+      this.#unload(slide);
+    }
+  }
+
+  select(index: number, smooth: boolean): Promise<void> {
+    if (!Number.isInteger(index) || index < 0 || index >= this.#source.count) {
+      throw new RangeError(`Viewer strip index ${index} is out of range.`);
+    }
+    // A newer selection owns the strip. Cancel the previous smooth-scroll
+    // fallback before rebasing its virtual window, otherwise that stale timer
+    // can jump to a slide which has already been recycled.
+    this.#resolveSelection();
+    if (!this.#slides.has(index)) this.#renderWindow(index, smooth ? this.#index : index);
+    if (!this.#mounted || !smooth || index === this.#index) {
+      this.#jump(index);
+      return Promise.resolve();
+    }
+    this.element.scrollTo({ left: (index - this.#base) * this.#width, behavior: "smooth" });
+    return new Promise<void>((resolve) => {
+      this.#selection = {
+        index,
+        resolve,
+        timeout: setTimeout(() => {
+          this.#jump(index);
+          this.#resolveSelection();
+        }, 600),
+      };
+    });
+  }
+
+  destroy() {
+    this.#controller.abort();
+    this.#observer.disconnect();
+    cancelAnimationFrame(this.#rebaseFrame);
+    cancelAnimationFrame(this.#instantFrame);
+    clearTimeout(this.#settleTimer);
+    this.#resolveSelection();
+    for (const slide of this.#slides.values()) this.#unload(slide);
+    this.#slides.clear();
+    this.element.remove();
+  }
+
+  freeze() {
+    if (this.#frozen) return;
+    this.#frozenLeft = this.element.scrollLeft;
+    this.#frozen = true;
+    this.element.dataset.fluidboxFrozen = "";
+    this.element.scrollTo({ left: this.#frozenLeft, behavior: "instant" });
+  }
+
+  resume() {
+    if (!this.#frozen) return;
+    this.element.scrollTo({ left: this.#frozenLeft, behavior: "instant" });
+    this.element.style.removeProperty("--fluidbox-scroll-compensation");
+    this.#frozen = false;
+    delete this.element.dataset.fluidboxFrozen;
+    this.#align(this.#index);
+  }
+
+  #makeSlide(index: number) {
+    const item = this.#source.getItem(index);
+    const element = this.#ownerDocument.createElement("div");
+    element.dataset.fluidboxSlide = "";
+    element.setAttribute("role", "group");
+    element.setAttribute("aria-label", `Item ${index + 1} of ${this.#source.count}`);
+    element.setAttribute("aria-hidden", String(index !== this.#index));
+    const frame = this.#ownerDocument.createElement("div");
+    frame.dataset.fluidboxFrame = "";
+    // Size against the slide (a size container), never the viewport: 100vw
+    // includes a desktop scrollbar and can differ by a fraction on iOS, which
+    // left the image a sliver wider or narrower than its slide.
+    frame.style.setProperty(
+      "--fluidbox-item-width",
+      `min(100cqw, calc(var(--fluidbox-content-height, var(--fluidbox-height, 100svh)) * ${item.media.width / item.media.height}))`,
+    );
+    frame.style.setProperty(
+      "--fluidbox-item-height",
+      `min(${(item.media.height / item.media.width) * 100}cqw, var(--fluidbox-content-height, var(--fluidbox-height, 100svh)))`,
+    );
+    const error = this.#ownerDocument.createElement("div");
+    error.dataset.fluidboxError = "";
+    error.hidden = true;
+    error.setAttribute("role", "alert");
+    const retry = this.#ownerDocument.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Retry";
+    retry.addEventListener("click", () => this.#retry(index));
+    error.append("Unable to load media. ", retry);
+    let picture: HTMLPictureElement | undefined;
+    let placeholder: HTMLImageElement | undefined;
+    let preview: HTMLImageElement | undefined;
+    let cover: HTMLImageElement | undefined;
+    let media: HTMLElement;
+    if (item.media.type === "image") {
+      frame.dataset.fluidboxImageFrame = "";
+      if (item.placeholder?.src) {
+        placeholder = this.#ownerDocument.createElement("img");
+        placeholder.dataset.fluidboxSlidePlaceholder = "";
+        placeholder.alt = "";
+        placeholder.setAttribute("aria-hidden", "true");
+        placeholder.decoding = "sync";
+        placeholder.src = item.placeholder.src;
+        frame.append(placeholder);
+      }
+      if (item.preview?.src || item.thumbnail?.src) {
+        preview = this.#ownerDocument.createElement("img");
+        preview.dataset.fluidboxSlidePreview = "";
+        preview.alt = "";
+        preview.setAttribute("aria-hidden", "true");
+        // A preview is small and usually already decoded for the page; paint it
+        // on the first frame it appears in.
+        preview.decoding = "sync";
+        frame.append(preview);
+      }
+      picture = this.#ownerDocument.createElement("picture");
+      picture.dataset.fluidboxPicture = "";
+      picture.style.display = "contents";
+      const image = this.#ownerDocument.createElement("img");
+      image.alt = item.media.alt;
+      image.width = item.media.width;
+      image.height = item.media.height;
+      image.decoding = "async";
+      image.draggable = false;
+      image.dataset.fluidboxImagePending = "";
+      image.addEventListener(
+        "load",
+        () => {
+          void this.#revealImage(slide, slide.imageVersion);
+        },
+        { signal: this.#controller.signal },
+      );
+      image.addEventListener(
+        "error",
+        () => {
+          error.hidden = false;
+          retry.tabIndex = index === this.#index ? 0 : -1;
+        },
+        { signal: this.#controller.signal },
+      );
+      picture.append(image);
+      frame.append(picture);
+      media = image;
+    } else if (item.media.type === "video") {
+      const video = this.#ownerDocument.createElement("video");
+      video.controls = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.setAttribute("aria-label", item.media.title);
+      frame.append(video);
+      media = video;
+    } else if (item.media.type === "iframe") {
+      const iframe = this.#ownerDocument.createElement("iframe");
+      iframe.title = item.media.title;
+      iframe.loading = "lazy";
+      iframe.setAttribute("allowfullscreen", "");
+      frame.append(iframe);
+      media = iframe;
+      cover = this.#ownerDocument.createElement("img");
+      cover.dataset.fluidboxMediaCover = "";
+      cover.alt = "";
+      cover.setAttribute("aria-hidden", "true");
+      cover.decoding = "sync";
+      const coverSrc = item.preview?.src ?? item.thumbnail?.src;
+      if (coverSrc) cover.src = coverSrc;
+      frame.append(cover);
+    } else {
+      const content = this.#ownerDocument.createElement("div");
+      content.dataset.fluidboxItemContent = "";
+      content.setAttribute("aria-label", item.media.title);
+      frame.append(content);
+      media = content;
+    }
+    media.dataset.fluidboxMedia = "";
+    media.style.setProperty(
+      "--fluidbox-media-aspect",
+      `${item.media.width} / ${item.media.height}`,
+    );
+    frame.append(error);
+    element.append(frame);
+    const slide = {
+      element,
+      frame,
+      picture,
+      placeholder,
+      preview,
+      cover,
+      image: media,
+      error,
+      loaded: false,
+      opening: false,
+      deferFull: false,
+      decoded: false,
+      fullApplied: false,
+      imageVersion: 0,
+    } satisfies ViewerSlide;
+    return slide;
+  }
+
+  prepareOpening(index: number, origin?: HTMLImageElement) {
+    const slide = this.#slides.get(index);
+    const item = this.#source.getItem(index);
+    if (slide?.cover) {
+      // Embedded pages paint long after the opening motion starts. The origin's
+      // snapshot covers the frame until the embed reports that it has loaded.
+      const src = item.preview?.src ?? item.thumbnail?.src ?? origin?.currentSrc ?? origin?.src;
+      if (src) slide.cover.src = src;
+      return;
+    }
+    if (!slide || item.media.type !== "image" || !(slide.image instanceof HTMLImageElement)) return;
+    slide.opening = true;
+    const decodedPreview = origin ? observeDecodedPreview(origin) : null;
+    const preview =
+      decodedPreview ||
+      item.preview?.src ||
+      item.thumbnail?.src ||
+      origin?.currentSrc ||
+      origin?.src;
+    if (preview) {
+      slide.imageVersion += 1;
+      // The card's image is already decoded. Asynchronous decoding lets Safari
+      // skip painting it on the opening's first frame, which reads as a blink.
+      if (decodedPreview) slide.image.decoding = "sync";
+      if (decodedPreview) delete slide.image.dataset.fluidboxImagePending;
+      else slide.image.dataset.fluidboxImagePending = "";
+      for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
+      slide.image.removeAttribute("srcset");
+      slide.image.removeAttribute("sizes");
+      slide.image.src = preview;
+    }
+    slide.controller?.abort();
+    slide.controller = undefined;
+    slide.loaded = false;
+    slide.decoded = false;
+    slide.fullApplied = false;
+    slide.deferFull = decodedPreview !== null;
+    this.#load(index, slide);
+  }
+
+  /**
+   * Continue an origin video's playback in the slide. Until the player has
+   * caught up, a canvas keeps painting the origin's own frames, so the opening
+   * starts on the frame the card shows and the picture never stops moving.
+   */
+  continueVideo(index: number, origin: HTMLVideoElement) {
+    const slide = this.#slides.get(index);
+    const item = this.#source.getItem(index);
+    const video = slide?.image;
+    if (!slide || item.media.type !== "video" || !(video instanceof HTMLVideoElement)) return;
+    slide.videoHandoff?.abort();
+    if (origin.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !origin.videoWidth) return;
+    const handoff = new AbortController();
+    slide.videoHandoff = handoff;
+    const canvas = this.#ownerDocument.createElement("canvas");
+    canvas.dataset.fluidboxVideoStandIn = "";
+    canvas.setAttribute("aria-hidden", "true");
+    canvas.width = origin.videoWidth;
+    canvas.height = origin.videoHeight;
+    const context = canvas.getContext("2d");
+    const paint = () => {
+      try {
+        context?.drawImage(origin, 0, 0, canvas.width, canvas.height);
+      } catch {
+        // A frame that cannot be drawn leaves the last one in place.
+      }
+    };
+    paint();
+    slide.frame.append(canvas);
+    const playing = !origin.paused && !origin.ended;
+    let frameRequest = 0;
+    let videoFrameRequest = 0;
+    const follow = () => {
+      if (handoff.signal.aborted) return;
+      paint();
+      if ("requestVideoFrameCallback" in origin) {
+        videoFrameRequest = origin.requestVideoFrameCallback(follow);
+      } else {
+        frameRequest = requestAnimationFrame(follow);
+      }
+    };
+    if (playing) follow();
+    handoff.signal.addEventListener(
+      "abort",
+      () => {
+        cancelAnimationFrame(frameRequest);
+        if (videoFrameRequest && "cancelVideoFrameCallback" in origin) {
+          origin.cancelVideoFrameCallback(videoFrameRequest);
+        }
+        // An animation on a detached element may never finish, and the opening waits on it.
+        for (const animation of canvas.getAnimations()) animation.cancel();
+        canvas.remove();
+        if (slide.videoHandoff === handoff) slide.videoHandoff = undefined;
+      },
+      { once: true },
+    );
+    video.muted = origin.muted;
+    video.loop = origin.loop;
+    video.preload = "auto";
+    const signal = handoff.signal;
+    const once = (type: string) =>
+      new Promise<void>((resolve) => {
+        video.addEventListener(type, () => resolve(), { once: true, signal });
+      });
+    const presented = () =>
+      new Promise<void>((resolve) => {
+        if ("requestVideoFrameCallback" in video) video.requestVideoFrameCallback(() => resolve());
+        else requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    const seek = async (time: number) => {
+      if (Math.abs(video.currentTime - time) < 0.01 && video.readyState >= 2) return;
+      const seeked = once("seeked");
+      video.currentTime = time;
+      await seeked;
+    };
+    void (async () => {
+      if (video.readyState < HTMLMediaElement.HAVE_METADATA) await once("loadedmetadata");
+      if (signal.aborted) return;
+      await seek(origin.currentTime);
+      // The origin kept playing during the first seek; the second is short.
+      if (!signal.aborted && playing) await seek(origin.currentTime);
+      if (signal.aborted) return;
+      if (playing) await video.play().catch(() => undefined);
+      if (signal.aborted) return;
+      await presented();
+      handoff.abort();
+    })();
+  }
+
+  completeOpening(index: number) {
+    const slide = this.#slides.get(index);
+    if (!slide) return;
+    slide.opening = false;
+    slide.deferFull = false;
+    if (slide.decoded) this.#applyImage(index, slide);
+    else this.#load(index, slide);
+  }
+
+  #renderWindow(anchor: number, scrollIndex: number) {
+    const size = Math.min(WINDOW_SIZE, this.#source.count);
+    if (size === 0) return;
+    const base = Math.max(0, Math.min(anchor - Math.floor(size / 2), this.#source.count - size));
+    if (base === this.#base && this.#slides.size === size) return;
+    for (const [index, slide] of this.#slides) {
+      if (index >= base && index < base + size) continue;
+      this.#unload(slide);
+      slide.element.remove();
+      this.#slides.delete(index);
+    }
+    let insertionPoint = this.element.firstChild;
+    for (let index = base; index < base + size; index++) {
+      let slide = this.#slides.get(index);
+      if (!slide) {
+        slide = this.#makeSlide(index);
+        this.#slides.set(index, slide);
+        this.element.insertBefore(slide.element, insertionPoint);
+      } else {
+        insertionPoint = slide.element.nextSibling;
+      }
+    }
+    this.#rebasing = true;
+    this.#base = base;
+    this.#align(scrollIndex);
+    cancelAnimationFrame(this.#rebaseFrame);
+    this.#rebaseFrame = requestAnimationFrame(() => {
+      this.#rebasing = false;
+      this.#onScroll();
+    });
+    if (this.#mounted) this.#loadWindow();
+  }
+
+  #jump(index: number) {
+    this.#instantTarget = index;
+    this.element.style.scrollSnapType = "none";
+    this.#align(index);
+    this.#sync(index, false);
+    cancelAnimationFrame(this.#instantFrame);
+    this.#instantFrame = requestAnimationFrame(this.#alignInstant);
+  }
+
+  #alignInstant = () => {
+    const index = this.#instantTarget;
+    if (index === null) return;
+    const left = (index - this.#base) * this.#width;
+    if (Math.abs(this.element.scrollLeft - left) > 1) {
+      this.element.scrollTo({ left, behavior: "instant" });
+      this.#instantFrame = requestAnimationFrame(this.#alignInstant);
+      return;
+    }
+    this.#instantTarget = null;
+    this.#instantFrame = 0;
+    this.element.style.removeProperty("scroll-snap-type");
+  };
+
+  #align(index: number) {
+    if (!this.#width) return;
+    this.element.scrollTo({ left: (index - this.#base) * this.#width, behavior: "instant" });
+  }
+
+  #sync(forcedIndex?: number, notify = true) {
+    if (!this.#source.count) return;
+    const left = this.#frozen ? this.#frozenLeft : this.element.scrollLeft;
+    const index =
+      forcedIndex ??
+      Math.max(
+        0,
+        Math.min(this.#source.count - 1, this.#base + Math.round(left / Math.max(1, this.#width))),
+      );
+    if (index === this.#index) return;
+    const previous = this.#slides.get(this.#index);
+    previous?.element.setAttribute("aria-hidden", "true");
+    const previousRetry = previous?.error.querySelector("button");
+    if (previousRetry) previousRetry.tabIndex = -1;
+    this.#index = index;
+    this.active.element.setAttribute("aria-hidden", "false");
+    const activeRetry = this.active.error.querySelector("button");
+    if (activeRetry) activeRetry.tabIndex = 0;
+    this.#loadWindow();
+    if (notify) this.#onSelect(index, false);
+  }
+
+  #loadWindow() {
+    for (const [index, slide] of this.#slides) {
+      if (Math.abs(index - this.#index) <= LOAD_RADIUS) this.#load(index, slide);
+      else this.#unload(slide);
+    }
+  }
+
+  #load(index: number, slide: ViewerSlide) {
+    const item = this.#source.getItem(index);
+    this.#loadPreview(item, slide);
+    if (slide.deferFull) return;
+    if (slide.loaded) {
+      if (slide.image instanceof HTMLImageElement)
+        slide.image.fetchPriority = index === this.#index ? "high" : "low";
+      return;
+    }
+    slide.error.hidden = true;
+    if (item.media.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
+      const current = slide.image.getAttribute("src");
+      if (!current) {
+        // Nothing paints yet, so the full image can stream straight in.
+        this.#applyImage(index, slide);
+      } else if (this.#painted(slide.image) && this.#showsFull(slide.image, item)) {
+        // The preview is the full image. Rewriting the same source would make
+        // Safari decode it again and paint nothing in between.
+        slide.fullApplied = true;
+        slide.image.loading = "eager";
+        slide.image.fetchPriority = index === this.#index ? "high" : "low";
+      } else {
+        const controller = new AbortController();
+        // Decode the exact candidate the slide will pick before it swaps, so the
+        // preview stays on screen until the sharper picture can paint at once.
+        const loader = this.#stage(item, slide);
+        slide.controller = controller;
+        const abort = () => {
+          loader.removeAttribute("srcset");
+          loader.src = "";
+        };
+        controller.signal.addEventListener("abort", abort, { once: true });
+        void loader
+          .decode()
+          .then(() => {
+            if (controller.signal.aborted) return;
+            slide.decoded = true;
+            if (!slide.opening) this.#applyImage(index, slide);
+          })
+          .catch(() => {
+            if (!controller.signal.aborted) {
+              slide.error.hidden = false;
+              slide.error.querySelector("button")!.tabIndex = index === this.#index ? 0 : -1;
+            }
+          })
+          .finally(() => {
+            controller.signal.removeEventListener("abort", abort);
+            if (slide.controller === controller) slide.controller = undefined;
+          });
+      }
+    } else if (item.media.type === "video" && slide.image instanceof HTMLVideoElement) {
+      slide.image.src = item.media.src;
+      if (item.media.poster) slide.image.poster = item.media.poster.src;
+    } else if (item.media.type === "iframe" && slide.image instanceof HTMLIFrameElement) {
+      const frame = slide.frame;
+      const controller = new AbortController();
+      slide.controller = controller;
+      delete frame.dataset.fluidboxMediaReady;
+      slide.image.addEventListener(
+        "load",
+        () => {
+          // The load event fires before the embedded page's first paint.
+          const view = this.#ownerDocument.defaultView;
+          const timer = view?.setTimeout(() => (frame.dataset.fluidboxMediaReady = ""), 200);
+          controller.signal.addEventListener("abort", () => view?.clearTimeout(timer));
+        },
+        { once: true, signal: controller.signal },
+      );
+      slide.image.src = item.media.src;
+      if (item.media.allow) slide.image.allow = item.media.allow;
+      if (item.media.referrerPolicy) slide.image.referrerPolicy = item.media.referrerPolicy;
+      if (item.media.sandbox) slide.image.setAttribute("sandbox", item.media.sandbox);
+    } else if (item.media.type === "custom") {
+      const renderer = this.#renderers[item.media.renderer];
+      if (!renderer) throw new TypeError(`Unknown lightbox renderer: ${item.media.renderer}`);
+      const controller = new AbortController();
+      slide.controller = controller;
+      slide.dispose =
+        renderer.mount({ item, index, target: slide.image, signal: controller.signal }) ??
+        undefined;
+    }
+    slide.loaded = true;
+  }
+
+  #unload(slide: ViewerSlide) {
+    slide.videoHandoff?.abort();
+    slide.previewController?.abort();
+    slide.previewController = undefined;
+    if (!slide.loaded) return;
+    slide.controller?.abort();
+    slide.controller = undefined;
+    slide.dispose?.();
+    slide.dispose = undefined;
+    slide.opening = false;
+    slide.deferFull = false;
+    slide.decoded = false;
+    slide.fullApplied = false;
+    slide.error.hidden = true;
+    for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
+    if (slide.image instanceof HTMLMediaElement) {
+      slide.image.pause();
+      slide.image.removeAttribute("src");
+      slide.image.load();
+    } else if (slide.image instanceof HTMLIFrameElement) {
+      delete slide.frame.dataset.fluidboxMediaReady;
+      slide.image.removeAttribute("src");
+    } else if (slide.image instanceof HTMLImageElement) {
+      slide.imageVersion += 1;
+      slide.image.dataset.fluidboxImagePending = "";
+      slide.image.removeAttribute("src");
+      slide.image.removeAttribute("srcset");
+      slide.image.removeAttribute("sizes");
+    } else {
+      slide.image.replaceChildren();
+    }
+    slide.loaded = false;
+  }
+
+  #applyImage(index: number, slide: ViewerSlide) {
+    const item = this.#source.getItem(index);
+    if (item.media.type !== "image" || !(slide.image instanceof HTMLImageElement) || !slide.picture)
+      return;
+    slide.imageVersion += 1;
+    const version = slide.imageVersion;
+    slide.fullApplied = true;
+    // The full image decodes off the main thread. An image that already paints
+    // a preview keeps it until the new source is ready; only an empty one hides.
+    // A staged source is already decoded and swaps in on the next frame.
+    slide.image.decoding = slide.decoded ? "sync" : "async";
+    if (!this.#painted(slide.image)) slide.image.dataset.fluidboxImagePending = "";
+    for (const source of slide.picture.querySelectorAll("source")) source.remove();
+    for (const resource of item.media.sources ?? []) {
+      const source = this.#ownerDocument.createElement("source");
+      source.srcset = resourceSet(resource);
+      if (resource.sizes) source.sizes = resource.sizes;
+      if (resource.media) source.media = resource.media;
+      if (resource.type) source.type = resource.type;
+      slide.picture.insertBefore(source, slide.image);
+    }
+    this.#writeSet(slide.image, item.media, slide);
+    // Neighboring images must begin loading before native scrolling exposes them.
+    slide.image.loading = "eager";
+    slide.image.fetchPriority = index === this.#index ? "high" : "low";
+    slide.image.src = item.media.src;
+    void this.#revealImage(slide, version);
+    slide.decoded = false;
+    slide.error.hidden = true;
+  }
+
+  #painted(image: HTMLImageElement) {
+    return (
+      image.dataset.fluidboxImagePending === undefined && image.complete && image.naturalWidth > 0
+    );
+  }
+
+  /** Whether the image already shows the one candidate the full media resolves to. */
+  #showsFull(image: HTMLImageElement, item: TItem) {
+    if (item.media.type !== "image") return false;
+    if (item.media.sources?.length || resourceSet(item.media)) return false;
+    const base = this.#ownerDocument.baseURI;
+    return new URL(image.currentSrc || image.src, base).href === new URL(item.media.src, base).href;
+  }
+
+  #writeSet(
+    image: HTMLImageElement | HTMLSourceElement,
+    resource: {
+      readonly srcset?: string;
+      readonly candidates?: readonly FluidboxImageCandidate[];
+      readonly sizes?: string;
+    },
+    slide: ViewerSlide,
+  ) {
+    const set = resourceSet(resource);
+    if (set) image.srcset = set;
+    else image.removeAttribute("srcset");
+    const sizes = resource.sizes;
+    if (!sizes) image.removeAttribute("sizes");
+    else if (image.isConnected || !/\bauto\b/.test(sizes)) image.sizes = sizes;
+    // A detached copy has no layout for `sizes="auto"`; give it the slide's width.
+    else image.sizes = `${Math.max(1, slide.frame.offsetWidth)}px`;
+  }
+
+  /** A detached copy of the slide's picture that loads the same candidate. */
+  #stage(item: TItem, slide: ViewerSlide) {
+    const picture = this.#ownerDocument.createElement("picture");
+    const image = this.#ownerDocument.createElement("img");
+    if (item.media.type === "image") {
+      for (const resource of item.media.sources ?? []) {
+        const source = this.#ownerDocument.createElement("source");
+        this.#writeSet(source, resource, slide);
+        if (resource.media) source.media = resource.media;
+        if (resource.type) source.type = resource.type;
+        picture.append(source);
+      }
+      this.#writeSet(image, item.media, slide);
+      image.src = item.media.src;
+    }
+    picture.append(image);
+    return image;
+  }
+
+  #loadPreview(item: TItem, slide: ViewerSlide) {
+    const image = slide.preview;
+    const src = item.preview?.src ?? item.thumbnail?.src;
+    if (!image || !src || image.hasAttribute("data-fluidbox-image-ready")) return;
+    if (slide.previewController) return;
+    const controller = new AbortController();
+    slide.previewController = controller;
+    image.src = src;
+    void image
+      .decode()
+      .then(() => {
+        if (!controller.signal.aborted) image.dataset.fluidboxImageReady = "";
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (slide.previewController === controller) slide.previewController = undefined;
+      });
+  }
+
+  async #revealImage(slide: ViewerSlide, version: number) {
+    const image = slide.image;
+    if (!(image instanceof HTMLImageElement)) return;
+    try {
+      await image.decode();
+    } catch {
+      return;
+    }
+    if (slide.imageVersion !== version) return;
+    delete image.dataset.fluidboxImagePending;
+    if (slide.fullApplied) slide.error.hidden = true;
+  }
+
+  #retry(index: number) {
+    const slide = this.#slides.get(index);
+    if (!slide) return;
+    slide.controller?.abort();
+    slide.controller = undefined;
+    slide.loaded = false;
+    slide.decoded = false;
+    this.#load(index, slide);
+  }
+
+  #onScroll = () => {
+    if (this.#frozen) {
+      const offset = this.element.scrollLeft - this.#frozenLeft;
+      this.element.style.setProperty("--fluidbox-scroll-compensation", `${offset}px`);
+      return;
+    }
+    if (this.#instantTarget !== null) {
+      const left = (this.#instantTarget - this.#base) * this.#width;
+      if (Math.abs(this.element.scrollLeft - left) > 1) return;
+      this.#instantTarget = null;
+      cancelAnimationFrame(this.#instantFrame);
+      this.#instantFrame = 0;
+      this.element.style.removeProperty("scroll-snap-type");
+    }
+    if (this.#rebasing || !this.#width) return;
+    if (!this.#userOwned && !this.#selection) return;
+    if (this.#userOwned) this.#userScrolled = true;
+    // Delayed events from an instant align are not navigation. Let only a
+    // native gesture or a pending smooth selection derive an index from the
+    // physical scroll position. The forced sync in #jump already made an
+    // instant selection authoritative.
+    this.#sync(undefined, this.#userOwned);
+    clearTimeout(this.#settleTimer);
+    if (!this.#touching) this.#settleTimer = setTimeout(this.#settled, 180);
+  };
+
+  #settled = () => {
+    if (this.#touching || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
+    clearTimeout(this.#settleTimer);
+    if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
+    if (this.#userOwned && this.#userScrolled) this.#onSelect(this.#index, true);
+    this.#userOwned = false;
+    this.#userScrolled = false;
+    if (this.#selection?.index === this.#index) this.#resolveSelection();
+    if (this.#index - this.#base < 8 || this.#index - this.#base >= this.#slides.size - 8) {
+      this.#renderWindow(this.#index, this.#index);
+    }
+  };
+
+  #resolveSelection() {
+    if (!this.#selection) return;
+    clearTimeout(this.#selection.timeout);
+    this.#selection.resolve();
+    this.#selection = undefined;
+  }
+
+  #takeControl = (event: Event) => {
+    this.#userOwned = true;
+    this.#userScrolled = false;
+    this.#touching = event.type === "pointerdown" || event.type === "touchstart";
+  };
+
+  #releaseControl = (event: Event) => {
+    this.#touching = false;
+    if (!this.#userScrolled) {
+      // A browser taking over a native pan emits pointercancel before its
+      // first scroll event. Keep ownership briefly so that the first scroll
+      // event updates the selected slide.
+      if (event.type === "pointercancel") {
+        clearTimeout(this.#settleTimer);
+        this.#settleTimer = setTimeout(this.#settled, 180);
+      } else {
+        this.#userOwned = false;
+      }
+      return;
+    }
+    clearTimeout(this.#settleTimer);
+    this.#settleTimer = setTimeout(this.#settled, 180);
+  };
+}

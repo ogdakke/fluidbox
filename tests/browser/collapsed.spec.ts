@@ -4,7 +4,7 @@ import { holdMotion } from "./support/hold-motion";
 test.use({ video: "on", trace: "on" });
 
 const gallerySelector = "#collapsed-gallery";
-const dialogSelector = "[data-lightbox-dialog]";
+const dialogSelector = "[data-fluidbox-dialog]";
 
 type Frame = {
   time: number;
@@ -28,8 +28,8 @@ async function loadGallery(page: Page) {
 }
 
 async function openVisible(gallery: Locator, index: number, page: Page) {
-  await gallery.locator("app-lightbox").nth(index).locator('[slot="trigger"]').click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
+  await gallery.locator("fluidbox-item").nth(index).locator('[slot="trigger"]').click();
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
 }
 
 /**
@@ -70,15 +70,15 @@ async function startFrameProbe(page: Page) {
     let running = true;
     const record = () => {
       const teaser = document.querySelector<HTMLElement>(selector + " > [data-preview-more]");
-      const dialog = document.querySelector<HTMLElement>("[data-lightbox-dialog]");
+      const dialog = document.querySelector<HTMLElement>("[data-fluidbox-dialog]");
       const source = dialog?.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+        '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
       );
-      const flight = document.querySelector<HTMLElement>("[data-lightbox-flight]");
-      const flightFrame = flight?.querySelector<HTMLElement>("[data-lightbox-frame]");
-      const layer = document.querySelector<HTMLElement>("[data-lightbox-transition-layer]");
+      const flight = document.querySelector<HTMLElement>("[data-fluidbox-flight]");
+      const flightFrame = flight?.querySelector<HTMLElement>("[data-fluidbox-frame]");
+      const layer = document.querySelector<HTMLElement>("[data-fluidbox-transition-layer]");
       const label = document.querySelector<HTMLElement>(
-        "[data-lightbox-transition-content] [data-collapsed-label]",
+        "[data-fluidbox-transition-content] [data-collapsed-label]",
       );
       const painted = (element: HTMLElement | null | undefined) =>
         !!element &&
@@ -88,7 +88,7 @@ async function startFrameProbe(page: Page) {
         time: performance.now(),
         preview: teaser?.querySelector('[slot="trigger"] img')?.getAttribute("src") ?? null,
         concealed: teaser?.hasAttribute("data-preview-concealed") ?? false,
-        state: dialog?.getAttribute("data-lightbox-state") ?? null,
+        state: dialog?.getAttribute("data-fluidbox-state") ?? null,
         sourcePainted: painted(source),
         flightPainted: painted(flight),
         flightRadius: flightFrame ? getComputedStyle(flightFrame).borderRadius : null,
@@ -106,7 +106,7 @@ async function startFrameProbe(page: Page) {
     const states = new MutationObserver(record);
     states.observe(document.body, {
       attributes: true,
-      attributeFilter: ["data-lightbox-state"],
+      attributeFilter: ["data-fluidbox-state"],
       subtree: true,
     });
     Object.assign(window, {
@@ -162,9 +162,9 @@ test("visible items preserve the collapsed card while hidden items replace it", 
   }
 
   await teaser.locator('[slot="trigger"]').click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 4 of 10",
   );
@@ -206,7 +206,7 @@ test("visible items preserve the collapsed card while hidden items replace it", 
   await expect(preview).toHaveAttribute("src", hiddenSource!);
 
   await teaser.locator('[slot="trigger"]').click();
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 4 of 10",
   );
@@ -216,10 +216,10 @@ test("keyboard opening and backdrop click complete a full gallery interaction", 
   page,
 }) => {
   const { gallery } = await loadGallery(page);
-  const trigger = gallery.locator("app-lightbox").first().locator('[slot="trigger"]');
+  const trigger = gallery.locator("fluidbox-item").first().locator('[slot="trigger"]');
   await trigger.focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
   await page.mouse.click(5, 5);
   await expect(page.locator(dialogSelector)).toHaveCount(0);
 });
@@ -232,7 +232,7 @@ test("the collapsed card carries its asymmetric corners into the opening transit
   const radii = await page.evaluate(async () => {
     for (let attempt = 0; attempt < 30; attempt++) {
       const frame = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+        '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
       );
       const animation = frame
         ?.getAnimations()
@@ -273,11 +273,11 @@ test("the collapsed card carries its asymmetric corners into the opening transit
 
 test("the first card carries its left corners into the opening transition", async ({ page }) => {
   const { gallery } = await loadGallery(page);
-  await gallery.locator("app-lightbox").first().locator('[slot="trigger"]').click();
+  await gallery.locator("fluidbox-item").first().locator('[slot="trigger"]').click();
   const radii = await page.evaluate(async () => {
     for (let attempt = 0; attempt < 30; attempt++) {
       const frame = document.querySelector<HTMLElement>(
-        '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+        '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
       );
       const animation = frame
         ?.getAnimations()
@@ -308,15 +308,15 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
     const samples: Array<Record<string, number | string | null>> = [];
     let running = true;
     const sample = () => {
-      const layer = document.querySelector<HTMLElement>("[data-lightbox-transition-layer]");
-      const target = document.querySelector<HTMLElement>("[data-lightbox-transition-content]");
+      const layer = document.querySelector<HTMLElement>("[data-fluidbox-transition-layer]");
+      const target = document.querySelector<HTMLElement>("[data-fluidbox-transition-content]");
       const label = target?.querySelector<HTMLElement>("[data-collapsed-label]");
       samples.push({
         time: performance.now(),
         state:
-          document.querySelector("[data-lightbox-dialog]")?.getAttribute("data-lightbox-state") ??
+          document.querySelector("[data-fluidbox-dialog]")?.getAttribute("data-fluidbox-state") ??
           null,
-        phase: layer?.getAttribute("data-lightbox-phase") ?? null,
+        phase: layer?.getAttribute("data-fluidbox-phase") ?? null,
         layer: layer ? Number(getComputedStyle(layer).opacity) : 0,
         label: label ? Number(getComputedStyle(label).opacity) : 0,
         target: target ? Number(getComputedStyle(target).opacity) : 0,
@@ -347,7 +347,7 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
     sample();
     window.__motion.release();
   });
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
   await page.waitForTimeout(100);
   const samples = await page.evaluate(() => {
     const probe = window as unknown as Window & {
@@ -381,9 +381,9 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
 test("the teaser content is already opaque when close settles", async ({ page }, testInfo) => {
   const { teaser } = await loadGallery(page);
   await teaser.locator('[slot="trigger"]').click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
   await page.keyboard.press("ArrowRight");
-  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+  await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 4 of 10",
   );
@@ -394,15 +394,15 @@ test("the teaser content is already opaque when close settles", async ({ page },
       const teaser = document.querySelector<HTMLElement>(
         "#collapsed-gallery > [data-preview-more]",
       )!;
-      const layer = document.querySelector<HTMLElement>("[data-lightbox-transition-layer]");
+      const layer = document.querySelector<HTMLElement>("[data-fluidbox-transition-layer]");
       const clone = document.querySelector<HTMLElement>(
-        "[data-lightbox-transition-content] [data-collapsed-label]",
+        "[data-fluidbox-transition-content] [data-collapsed-label]",
       );
       const staticLabel = teaser.querySelector<HTMLElement>("[data-collapsed-label]");
       const visible = getComputedStyle(teaser).visibility !== "hidden";
       return {
         state:
-          document.querySelector("[data-lightbox-dialog]")?.getAttribute("data-lightbox-state") ??
+          document.querySelector("[data-fluidbox-dialog]")?.getAttribute("data-fluidbox-state") ??
           "closed",
         label: clone
           ? Number(getComputedStyle(clone).opacity)
@@ -471,9 +471,9 @@ test("the teaser content is already opaque when close settles", async ({ page },
 test("close button completes an interaction without a collapsed card", async ({ page }) => {
   await page.goto("/harness.html");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
-  await page.locator("app-lightbox").first().click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-lightbox-state", "open");
-  await page.locator("[data-lightbox-close]").click();
+  await page.locator("fluidbox-item").first().click();
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await page.locator("[data-fluidbox-close]").click();
   await expect(page.locator(dialogSelector)).toHaveCount(0);
 });
 
@@ -485,7 +485,7 @@ test("slow and fast wheel dismissal each finish at the source", async ({ page },
   for (const deltas of [Array(10).fill(-50) as number[], [-500]]) {
     await openVisible(gallery, 0, page);
     await startFrameProbe(page);
-    const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+    const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
     const bounds = (await frame.boundingBox())!;
     await wheelSteps(page, bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, deltas);
     await expect(page.locator(dialogSelector)).toHaveCount(0);
@@ -501,7 +501,7 @@ test("vertical wheel dismissal responds during horizontal navigation", async ({
   const { gallery } = await loadGallery(page);
   await openVisible(gallery, 0, page);
   await startFrameProbe(page);
-  const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+  const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
   const bounds = (await frame.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
   await page.mouse.wheel(120, 0);
@@ -520,7 +520,7 @@ test("touch drag closes immediately, including during horizontal snap", async ({
   for (const sideways of [false, true]) {
     await openVisible(gallery, 0, page);
     await startFrameProbe(page);
-    const frame = page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]');
+    const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
     const bounds = (await frame.boundingBox())!;
     const x = bounds.x + bounds.width / 2;
     const y = bounds.y + bounds.height / 2;

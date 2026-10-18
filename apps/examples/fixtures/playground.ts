@@ -1,5 +1,5 @@
 import { mountSite } from "../src/site";
-import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement, FluidboxItem, FluidboxSource } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import "./playground.css";
 
@@ -7,10 +7,10 @@ mountSite("fixtures", {
   fixture: "Playground · the original two-image gallery and a 100,000-item indexed source",
 });
 
-const gallery = document.querySelector<AppGallery>("#virtual-gallery")!;
+const gallery = document.querySelector<FluidboxGalleryElement>("#virtual-gallery")!;
 const origins = new Map<string, HTMLButtonElement>();
 const count = 100_000;
-const source: LightboxSource<LightboxItem> = {
+const source: FluidboxSource<FluidboxItem> = {
   count,
   getItem(index) {
     const src = index % 2 ? "/second.svg" : "/first.svg";
@@ -58,7 +58,7 @@ function renderWindow(start: number) {
     caption.textContent = `Item ${index + 1}`;
     button.append(image, caption);
     button.addEventListener("click", () => gallery.open({ index }));
-    gallery.insertBefore(button, gallery.querySelector("app-filmstrip"));
+    gallery.insertBefore(button, gallery.querySelector("fluidbox-filmstrip"));
     origins.set(String(index), button);
   }
 }

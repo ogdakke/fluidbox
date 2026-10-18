@@ -1,12 +1,12 @@
 import { mountSite } from "../src/site";
-import { arraySource, createLightbox } from "@ogdakke/fluidbox";
+import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
 import type {
-  AppGallery,
-  LightboxController,
-  LightboxItem,
-  LightboxOrigin,
-  LightboxStatus,
-  LightboxTarget,
+  FluidboxGalleryElement,
+  FluidboxController,
+  FluidboxItem,
+  FluidboxOrigin,
+  FluidboxStatus,
+  FluidboxTarget,
 } from "@ogdakke/fluidbox";
 import { artItem, artSrc, scenes } from "../src/art";
 import "./safari-chrome.css";
@@ -26,7 +26,7 @@ const settings = {
     label: "Page header",
     options: { none: "None", sticky: "Sticky", fixed: "Fixed" },
   },
-  filmstrip: { label: "Filmstrip", options: { off: "Off", on: "On (app-gallery)" } },
+  filmstrip: { label: "Filmstrip", options: { off: "Off", on: "On (fluidbox-gallery)" } },
   fit: { label: "viewport-fit", options: { auto: "auto", cover: "cover" } },
   probe: { label: "Probe colour", options: { solid: "Solid", translucent: "Translucent" } },
 } as const;
@@ -167,7 +167,7 @@ for (const probe of probes) {
 }
 
 // Gallery: every scene twice, so the page is long enough to collapse the toolbar.
-const items: LightboxItem[] = [...scenes, ...scenes].map((scene, index) =>
+const items: FluidboxItem[] = [...scenes, ...scenes].map((scene, index) =>
   artItem(scene, `lab-${index}-${scene.id}`),
 );
 const gallery = document.querySelector<HTMLElement>("[data-lab-gallery]")!;
@@ -178,36 +178,36 @@ for (const [index, item] of items.entries()) {
   button.type = "button";
   button.className = "fb-cell lab-tile";
   button.setAttribute("aria-label", `Open ${scene.title}`);
-  button.innerHTML = `<img data-lightbox-origin src="${artSrc(scene)}" alt="" />`;
+  button.innerHTML = `<img data-fluidbox-origin src="${artSrc(scene)}" alt="" />`;
   gallery.append(button);
   triggers.set(item.id, button);
 }
 
-let status: LightboxStatus = "closed";
-const origin = (id: string): LightboxOrigin | null => {
+let status: FluidboxStatus = "closed";
+const origin = (id: string): FluidboxOrigin | null => {
   const trigger = triggers.get(id);
   if (!trigger) return null;
   const thumbnail = trigger.querySelector("img")!;
   return { trigger, visual: thumbnail, thumbnail };
 };
-function onStatus(next: LightboxStatus) {
+function onStatus(next: FluidboxStatus) {
   if (next === status) return;
   status = next;
   updateReadout();
 }
-function connect(controller: LightboxController, open: (target: LightboxTarget) => unknown) {
+function connect(controller: FluidboxController, open: (target: FluidboxTarget) => unknown) {
   for (const [id, trigger] of triggers) trigger.addEventListener("click", () => void open({ id }));
   window.safariChromeLab = controller;
 }
 
 if (current.filmstrip === "on") {
   // The filmstrip is a gallery element feature. The gallery wraps the grid so
-  // its hidden <app-filmstrip> marker never counts as a grid cell.
+  // its hidden <fluidbox-filmstrip> marker never counts as a grid cell.
   void import("@ogdakke/fluidbox/elements").then(async () => {
-    const element = document.createElement("app-gallery") as AppGallery;
+    const element = document.createElement("fluidbox-gallery") as FluidboxGalleryElement;
     element.setAttribute("aria-label", "Lab gallery");
     gallery.replaceWith(element);
-    element.append(gallery, document.createElement("app-filmstrip"));
+    element.append(gallery, document.createElement("fluidbox-filmstrip"));
     element.source = arraySource(items);
     element.origins = { getOrigin: origin };
     const controller = await element.whenReady();
@@ -215,7 +215,7 @@ if (current.filmstrip === "on") {
     connect(controller, (target) => element.open(target));
   });
 } else {
-  const controller = createLightbox({
+  const controller = createFluidbox({
     source: arraySource(items),
     origins: { getOrigin: origin },
     onEvent(event) {
@@ -265,6 +265,6 @@ updateReadout();
 
 declare global {
   interface Window {
-    safariChromeLab: LightboxController;
+    safariChromeLab: FluidboxController;
   }
 }

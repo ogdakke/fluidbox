@@ -1,11 +1,11 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import type { LightboxItem } from "@ogdakke/fluidbox";
-import { Lightbox } from "@ogdakke/fluidbox/react";
+import type { FluidboxItem } from "@ogdakke/fluidbox";
+import { Fluidbox } from "@ogdakke/fluidbox/react";
 import { artItem, sceneById } from "../art";
 import { mapEmbedUrl, mapView } from "../map-view";
 
-const productItems: LightboxItem[] = [
+const productItems: FluidboxItem[] = [
   {
     id: "react-runner",
     media: {
@@ -19,7 +19,7 @@ const productItems: LightboxItem[] = [
   },
 ];
 
-const mapItems: LightboxItem[] = [
+const mapItems: FluidboxItem[] = [
   {
     id: "react-map",
     media: {
@@ -42,12 +42,12 @@ const previewItems = ["aurora", "ridge", "fjord", "lagoon", "alpine"].map((id) =
 
 function ViewerControls({ gallery = false }: { gallery?: boolean }) {
   return (
-    <Lightbox.Portal>
-      {gallery && <Lightbox.Previous />}
-      {gallery && <Lightbox.Next />}
-      <Lightbox.Close />
-      {gallery && <Lightbox.Filmstrip />}
-    </Lightbox.Portal>
+    <Fluidbox.Portal>
+      {gallery && <Fluidbox.Previous />}
+      {gallery && <Fluidbox.Next />}
+      <Fluidbox.Close />
+      {gallery && <Fluidbox.Filmstrip />}
+    </Fluidbox.Portal>
   );
 }
 
@@ -73,18 +73,18 @@ function Card({
 
 function ProductCard() {
   return (
-    <Lightbox.Root items={productItems}>
+    <Fluidbox.Root items={productItems}>
       <Card
         title="Image inside a card"
         note="Only the photo flies. The badge rides along on the transition layer."
       >
-        <Lightbox.Trigger item={productItems[0]} asChild>
+        <Fluidbox.Trigger item={productItems[0]} asChild>
           <button type="button" className="product" aria-label="View the Coral Runner shoe">
-            <span className="product__image" data-lightbox-origin>
+            <span className="product__image" data-fluidbox-origin>
               <img src="/runner.svg" alt="" width="1000" height="700" />
-              <Lightbox.ThumbnailOverlay behavior="travel" className="product__layer">
+              <Fluidbox.ThumbnailOverlay behavior="travel" className="product__layer">
                 <span className="product__badge">New color</span>
-              </Lightbox.ThumbnailOverlay>
+              </Fluidbox.ThumbnailOverlay>
             </span>
             <span className="product__details">
               <span>
@@ -94,75 +94,75 @@ function ProductCard() {
               <span className="product__price">$124</span>
             </span>
           </button>
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
       </Card>
       <ViewerControls />
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
 function MapCard() {
   return (
-    <Lightbox.Root items={mapItems}>
+    <Fluidbox.Root items={mapItems}>
       <Card
         title="Preview to live iframe"
         note="A static tile snapshot opens the real OpenStreetMap embed."
       >
-        <Lightbox.Trigger item={mapItems[0]} asChild>
+        <Fluidbox.Trigger item={mapItems[0]} asChild>
           <button type="button" className="map" aria-label="Open the store map">
-            <span className="map__preview" data-lightbox-origin>
+            <span className="map__preview" data-fluidbox-origin>
               <img src="/map/preview.svg" alt="" width="1000" height="700" />
               <span className="map__pin" aria-hidden="true" />
             </span>
             <span className="map__pill">Open map ↗</span>
             <span className="map__credit">© OpenStreetMap contributors</span>
           </button>
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
       </Card>
       <ViewerControls />
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
 function AlbumCard() {
   return (
-    <Lightbox.Root items={albumItems}>
+    <Fluidbox.Root items={albumItems}>
       <Card title="Text as the origin" note="No image at all. Every slide closes back to the card.">
-        <Lightbox.Trigger items={albumItems} item={albumItems[0]} asChild>
+        <Fluidbox.Trigger items={albumItems} item={albumItems[0]} asChild>
           <button type="button" className="album">
             <span className="album__count">{String(albumItems.length).padStart(2, "0")}</span>
             <span className="album__title">Open the collection</span>
             <span className="album__hint">Warm landscapes · browse all ↗</span>
           </button>
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
       </Card>
       <ViewerControls gallery />
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 
 function PreviewCard() {
   return (
-    <Lightbox.Root items={previewItems}>
+    <Fluidbox.Root items={previewItems}>
       <Card
         title="One preview, many slides"
         note="The cover follows the slide you're on, and the count fades as it opens."
       >
-        <Lightbox.Trigger items={previewItems} item={previewItems[0]} asChild>
+        <Fluidbox.Trigger items={previewItems} item={previewItems[0]} asChild>
           {({ item }) => (
             <button type="button" className="cover" aria-label="Open the preview gallery">
-              <span className="cover__preview" data-lightbox-origin>
+              <span className="cover__preview" data-fluidbox-origin>
                 <img src={item?.thumbnail?.src} alt="" />
-                <Lightbox.ThumbnailOverlay className="cover__count">
+                <Fluidbox.ThumbnailOverlay className="cover__count">
                   +{previewItems.length - 1}
-                </Lightbox.ThumbnailOverlay>
+                </Fluidbox.ThumbnailOverlay>
               </span>
             </button>
           )}
-        </Lightbox.Trigger>
+        </Fluidbox.Trigger>
       </Card>
       <ViewerControls gallery />
-    </Lightbox.Root>
+    </Fluidbox.Root>
   );
 }
 

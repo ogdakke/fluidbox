@@ -2,7 +2,7 @@
 import { createSignal, For } from "solid-js";
 import { render } from "solid-js/web";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/solid";
-import type { AppGallery } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox";
 import {
   artSrc,
   formatCount,
@@ -16,8 +16,8 @@ import { originsWithin } from "./origins";
 declare module "solid-js" {
   namespace JSX {
     interface IntrinsicElements {
-      "app-gallery": JSX.HTMLAttributes<AppGallery>;
-      "app-filmstrip": JSX.HTMLAttributes<HTMLElement>;
+      "fluidbox-gallery": JSX.HTMLAttributes<FluidboxGalleryElement>;
+      "fluidbox-filmstrip": JSX.HTMLAttributes<HTMLElement>;
     }
   }
 }
@@ -25,7 +25,7 @@ declare module "solid-js" {
 const collections = frameworkCollections("solid");
 
 function SolidGallery() {
-  let gallery: AppGallery | undefined;
+  let gallery: FluidboxGalleryElement | undefined;
   const [current, setCurrent] = createSignal(0);
   const collection = () => collections[current()]!;
   const bind = useFluidboxGallery(() => collection().source);
@@ -41,11 +41,11 @@ function SolidGallery() {
           Switch source <span aria-hidden="true">→ {collections[1 - current()]!.label}</span>
         </button>
       </header>
-      <app-gallery
+      <fluidbox-gallery
         class="thumb-row"
         aria-label="Solid gallery"
         ref={(node) => {
-          gallery = node as AppGallery;
+          gallery = node as FluidboxGalleryElement;
           gallery.origins = originsWithin(() => gallery);
           bind(gallery);
         }}
@@ -63,15 +63,15 @@ function SolidGallery() {
             </button>
           )}
         </For>
-        <app-filmstrip />
-      </app-gallery>
+        <fluidbox-filmstrip />
+      </fluidbox-gallery>
       <code class="framework-panel__api">useFluidboxGallery(source)</code>
     </article>
   );
 }
 
 function SolidIndexed() {
-  let gallery: AppGallery | undefined;
+  let gallery: FluidboxGalleryElement | undefined;
   const { source, sceneAt, count } = indexedArt(100_000);
   const [start, setStart] = createSignal(0);
   const [requested, setRequested] = createSignal("50000");
@@ -110,11 +110,11 @@ function SolidIndexed() {
           {formatCount(count)}
         </output>
       </form>
-      <app-gallery
+      <fluidbox-gallery
         class="virtual-grid"
         aria-label="Solid indexed gallery"
         ref={(node) => {
-          gallery = node as AppGallery;
+          gallery = node as FluidboxGalleryElement;
           gallery.origins = originsWithin(() => gallery);
           bind(gallery);
         }}
@@ -128,13 +128,13 @@ function SolidIndexed() {
               aria-label={`Open gallery item ${index + 1}`}
               onClick={() => void gallery?.open({ index })}
             >
-              <img src={artSrc(sceneAt(index))} alt="" data-lightbox-origin />
+              <img src={artSrc(sceneAt(index))} alt="" data-fluidbox-origin />
               <span>#{formatCount(index + 1)}</span>
             </button>
           )}
         </For>
-        <app-filmstrip />
-      </app-gallery>
+        <fluidbox-filmstrip />
+      </fluidbox-gallery>
     </div>
   );
 }

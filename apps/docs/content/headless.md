@@ -6,12 +6,12 @@ order: 2
 
 # Headless runtime
 
-`createLightbox()` runs the viewer without custom elements or a framework. You own the thumbnails and any controls; the runtime owns motion, gestures, focus, and the body-level portal.
+`createFluidbox()` runs the viewer without custom elements or a framework. You own the thumbnails and any controls; the runtime owns motion, gestures, focus, and the body-level portal.
 
 ## Create a viewer
 
 ```ts
-import { arraySource, createLightbox } from "@ogdakke/fluidbox";
+import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/styles.css";
 
 const source = arraySource([
@@ -28,7 +28,7 @@ const source = arraySource([
   },
 ]);
 
-const viewer = createLightbox({
+const viewer = createFluidbox({
   source,
   origins: {
     getOrigin(id) {
@@ -44,14 +44,14 @@ for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]"))
 }
 ```
 
-Importing the package is safe on the server. Calling `createLightbox()` needs a DOM.
+Importing the package is safe on the server. Calling `createFluidbox()` needs a DOM.
 
 ## Bring your own controls
 
 A portal renderer mounts once into a stable target inside the viewer. It receives the controller and a lifetime signal, and may return a disposer.
 
 ```ts
-const viewer = createLightbox({
+const viewer = createFluidbox({
   source,
   origins,
   portal: {
@@ -83,7 +83,7 @@ State updates are discrete snapshots. Per-frame motion stays in CSS variables, s
 ## Guard and observe commands
 
 ```ts
-createLightbox({
+createFluidbox({
   source,
   onBeforeCommand(event) {
     if (event.command === "close" && formIsDirty) event.preventDefault();

@@ -65,7 +65,7 @@ Embedded pages paint well after the opening motion starts. The runtime covers th
 Custom media names a renderer; the renderer mounts whatever you like into a stable target.
 
 ```ts
-const viewer = createLightbox({
+const viewer = createFluidbox({
   source: arraySource([
     {
       id: "chart",

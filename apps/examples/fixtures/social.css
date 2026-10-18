@@ -1,9 +1,9 @@
 /* Social viewers. Page layout comes from the Safari chrome lab; tokens from @ogdakke/fluidbox-design.
    The structure follows X and Instagram; the look stays ours: monochrome,
    hairlines, square controls.
-   Inside the viewer: --lightbox-stage-* insets make room around the photo,
-   data-lightbox-chrome fades the floating layers in after the opening flight and
-   out when a dismiss starts, and the sheet entry raises data-lightbox-sheet over
+   Inside the viewer: --fluidbox-stage-* insets make room around the photo,
+   data-fluidbox-chrome fades the floating layers in after the opening flight and
+   out when a dismiss starts, and the sheet entry raises data-fluidbox-sheet over
    the photo on a phone. */
 
 /* Shared pieces. */
@@ -194,17 +194,17 @@
    the photo. The stage leaves room for both, so the photo, the opening flight
    and the arrows keep to it; zoom pans under the see-through action row. The
    close button moves to the top left, as on X. */
-[data-lightbox-dialog]:has(.x-layer) {
+[data-fluidbox-dialog]:has(.x-layer) {
   --x-aside: 350px;
   --x-bar: 52px;
-  --lightbox-stage-right: var(--x-aside);
-  --lightbox-stage-bottom: var(--x-bar);
-  --lightbox-sheet-enabled: 0;
+  --fluidbox-stage-right: var(--x-aside);
+  --fluidbox-stage-bottom: var(--x-bar);
+  --fluidbox-sheet-enabled: 0;
 }
-[data-lightbox-dialog]:has(.x-layer[data-aside="closed"]) {
+[data-fluidbox-dialog]:has(.x-layer[data-aside="closed"]) {
   --x-aside: 0px;
 }
-[data-lightbox-dialog]:has(.x-layer) [data-lightbox-close] {
+[data-fluidbox-dialog]:has(.x-layer) [data-fluidbox-close] {
   top: 12px;
   right: auto;
   left: 12px;
@@ -345,16 +345,16 @@
 /* X on a phone: the post sits over the bottom of the photo, and the reply count
    raises the replies in a sheet as the photo shrinks into the room above it. */
 @media (width < 900px) {
-  [data-lightbox-overlay]:has(.x-layer) {
-    --lightbox-backdrop-background: #0a0a0a;
+  [data-fluidbox-overlay]:has(.x-layer) {
+    --fluidbox-backdrop-background: #0a0a0a;
   }
-  [data-lightbox-dialog]:has(.x-layer) {
+  [data-fluidbox-dialog]:has(.x-layer) {
     --x-aside: 0px;
     --x-bar: 0px;
-    --lightbox-sheet-enabled: 1;
-    --lightbox-sheet-radius: 0px;
+    --fluidbox-sheet-enabled: 1;
+    --fluidbox-sheet-radius: 0px;
   }
-  [data-lightbox-dialog]:has(.x-layer) :is([data-lightbox-previous], [data-lightbox-next]),
+  [data-fluidbox-dialog]:has(.x-layer) :is([data-fluidbox-previous], [data-fluidbox-next]),
   .x-layer,
   .x-aside {
     display: none;
@@ -362,18 +362,18 @@
   .x-phone {
     position: absolute;
     /* The gradient runs on under the browser's bars, where the sheet waits. */
-    inset: auto 0 calc(-1 * var(--lightbox-sheet-reach, 0px));
+    inset: auto 0 calc(-1 * var(--fluidbox-sheet-reach, 0px));
     z-index: 6;
     display: block;
     padding: 48px 16px
-      calc(4px + env(safe-area-inset-bottom, 0px) + var(--lightbox-sheet-reach, 0px));
+      calc(4px + env(safe-area-inset-bottom, 0px) + var(--fluidbox-sheet-reach, 0px));
     background: linear-gradient(transparent, rgb(10 10 10 / 0.55) 32px, rgb(10 10 10 / 0.85));
     color: #ededee;
     font-size: 15px;
     line-height: 1.35;
   }
   .x-phone__fade {
-    opacity: clamp(0, 1 - var(--lightbox-sheet-progress) * 2.5, 1);
+    opacity: clamp(0, 1 - var(--fluidbox-sheet-progress) * 2.5, 1);
   }
   /* Swipes on the post go through to the photo's scroller, which raises the
      replies; only its buttons take touches. */
@@ -437,7 +437,7 @@
     padding: 10px 16px;
     border-top: 1px solid var(--fb-line);
     border-bottom: 0;
-    background: var(--lightbox-sheet-background);
+    background: var(--fluidbox-sheet-background);
   }
 }
 
@@ -501,26 +501,26 @@
 /* Instagram viewer, wide: a fixed card, centred, of a 4:5 photo box and a 400px
    panel. Every photo letterboxes inside the box and the next one slides in
    within it; the arrows and close button belong to the screen. */
-[data-lightbox-dialog]:has(.ig-layer) {
+[data-fluidbox-dialog]:has(.ig-layer) {
   --ig-panel: 400px;
   --ig-margin: 24px;
-  --ig-height: calc(var(--lightbox-height, 100svh) - 2 * var(--ig-margin));
+  --ig-height: calc(var(--fluidbox-height, 100svh) - 2 * var(--ig-margin));
   /* Whole pixels, or the strip lands on a subpixel and the next photo shows a sliver. */
   --ig-box: round(down, min(var(--ig-height) * 0.8, 100vw - var(--ig-panel) - 160px), 1px);
   --ig-left: round(down, (100vw - var(--ig-box) - var(--ig-panel)) / 2, 1px);
-  --lightbox-stage-top: var(--ig-margin);
-  --lightbox-stage-bottom: var(--ig-margin);
-  --lightbox-stage-left: var(--ig-left);
-  --lightbox-stage-right: calc(var(--ig-left) + var(--ig-panel));
-  --lightbox-sheet-enabled: 0;
+  --fluidbox-stage-top: var(--ig-margin);
+  --fluidbox-stage-bottom: var(--ig-margin);
+  --fluidbox-stage-left: var(--ig-left);
+  --fluidbox-stage-right: calc(var(--ig-left) + var(--ig-panel));
+  --fluidbox-sheet-enabled: 0;
 }
-[data-lightbox-dialog]:has(.ig-layer) [data-lightbox-previous] {
+[data-fluidbox-dialog]:has(.ig-layer) [data-fluidbox-previous] {
   left: 16px;
 }
-[data-lightbox-dialog]:has(.ig-layer) [data-lightbox-next] {
+[data-fluidbox-dialog]:has(.ig-layer) [data-fluidbox-next] {
   right: 16px;
 }
-[data-lightbox-dialog]:has(.ig-layer) [data-lightbox-close] {
+[data-fluidbox-dialog]:has(.ig-layer) [data-fluidbox-close] {
   top: 16px;
   right: 16px;
 }
@@ -658,18 +658,18 @@
 /* Instagram on a phone: the photo spans the screen, and the caption peeks
    under it; drag it up for the comments. */
 @media (width < 900px) {
-  [data-lightbox-dialog]:has(.ig-layer) {
+  [data-fluidbox-dialog]:has(.ig-layer) {
     --ig-panel: 0px;
     --ig-margin: 0px;
     --ig-box: 100vw;
-    --lightbox-stage-top: 0px;
-    --lightbox-stage-bottom: var(--lightbox-sheet-peek);
-    --lightbox-sheet-enabled: 1;
-    --lightbox-sheet-peek: calc(150px + env(safe-area-inset-bottom, 0px));
-    --lightbox-sheet-gap: 0px;
-    --lightbox-sheet-radius: 0px;
+    --fluidbox-stage-top: 0px;
+    --fluidbox-stage-bottom: var(--fluidbox-sheet-peek);
+    --fluidbox-sheet-enabled: 1;
+    --fluidbox-sheet-peek: calc(150px + env(safe-area-inset-bottom, 0px));
+    --fluidbox-sheet-gap: 0px;
+    --fluidbox-sheet-radius: 0px;
   }
-  [data-lightbox-dialog]:has(.ig-layer) :is([data-lightbox-previous], [data-lightbox-next]),
+  [data-fluidbox-dialog]:has(.ig-layer) :is([data-fluidbox-previous], [data-fluidbox-next]),
   .ig-layer,
   .ig-panel {
     display: none;
@@ -681,7 +681,7 @@
     line-height: 1.35;
     box-shadow: none;
   }
-  .ig-sheet [data-lightbox-sheet-handle] {
+  .ig-sheet [data-fluidbox-sheet-handle] {
     margin-top: 6px;
   }
   .ig-caption {

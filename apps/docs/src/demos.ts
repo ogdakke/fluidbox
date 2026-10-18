@@ -7,13 +7,13 @@ import { scenes } from "@ogdakke/fluidbox-design/art-scenes";
 const demos: Record<string, (root: HTMLElement) => void> = {
   gallery(root) {
     const ids = root.dataset.scenes?.split(",") ?? scenes.map((scene) => scene.id);
-    const gallery = document.createElement("app-gallery");
+    const gallery = document.createElement("fluidbox-gallery");
     gallery.className = "doc-demo-gallery";
     gallery.setAttribute("aria-label", root.getAttribute("aria-label") ?? "Example gallery");
     for (const id of ids) {
       const scene = scenes.find((candidate) => candidate.id === id);
       if (!scene) continue;
-      const item = document.createElement("app-lightbox");
+      const item = document.createElement("fluidbox-item");
       item.setAttribute("item-id", `doc-${scene.id}`);
       item.style.setProperty("--ratio", String(scene.width / scene.height));
       const image = () =>
@@ -26,7 +26,7 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       const trigger = document.createElement("button");
       trigger.type = "button";
       trigger.slot = "trigger";
-      trigger.dataset.lightboxPreview = "";
+      trigger.dataset.fluidboxPreview = "";
       trigger.append(image());
       const content = document.createElement("template");
       content.setAttribute("slot", "content");
@@ -38,7 +38,7 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       gallery.append(item);
     }
     if (root.hasAttribute("data-filmstrip"))
-      gallery.append(document.createElement("app-filmstrip"));
+      gallery.append(document.createElement("fluidbox-filmstrip"));
     root.replaceChildren(gallery);
   },
 };
