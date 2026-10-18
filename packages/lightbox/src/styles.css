@@ -973,6 +973,16 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   [data-lightbox-slides] {
   overflow: hidden;
 }
+/* A photo dragged or closing in place moves toward the browser's bars; the
+   strip reaches under them and pads by the same, as the zoom viewport does, so
+   it isn't cut at the layout viewport. Nothing inside moves. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-dismissing]
+  [data-lightbox-slides] {
+  box-sizing: content-box;
+  margin-block: calc(-1 * var(--lightbox-chrome-reach, 0px));
+  padding-block: var(--lightbox-chrome-reach, 0px);
+}
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery][data-zoomed]
   [data-lightbox-slides] {

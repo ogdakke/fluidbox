@@ -158,6 +158,8 @@
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-stage] {
   position: relative;
+  /* Holds the strip's bleed under the bars in, instead of collapsing it through. */
+  display: flow-root;
   height: calc(100% - 2 * var(--lightbox-sheet-reach, 0px));
   animation: lightbox-sheet-hold linear both;
   animation-timeline: --lightbox-sheet;

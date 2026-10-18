@@ -1,3 +1,4 @@
+import { chromeReach } from "./chrome-reach";
 interface Pose {
   scale: number;
   x: number;
@@ -51,19 +52,6 @@ function rawZoom(scale: number, max: number): number {
   const range = Math.log(max);
   const raw = Math.abs(offset) / (0.55 * (1 - Math.min(Math.abs(offset) / range, 0.999)));
   return Math.exp(boundary + Math.sign(offset) * raw);
-}
-
-// How far the browser's own bars can reach past the layout viewport. iOS 26
-// Safari paints the page under its status bar and toolbar, but the zoom
-// viewport is a scroller and clips to its box, so it reaches under them. The
-// whole screen-to-window difference covers either bar wherever it sits; extra
-// reach only paints off screen. Standalone web apps get about zero.
-function chromeReach(): number {
-  if (!matchMedia("(pointer: coarse)").matches) return 0;
-  const long = Math.max(screen.width, screen.height);
-  const short = Math.min(screen.width, screen.height);
-  const screenHeight = innerWidth > innerHeight ? short : long;
-  return Math.max(0, Math.ceil(screenHeight - innerHeight));
 }
 
 /** Owns image zoom/pan while active; gallery navigation and dismissal stay outside. */
@@ -192,7 +180,7 @@ export class LightboxZoom {
     viewport.setAttribute("aria-label", "Zoomed image");
     const canvas = document.createElement("div");
     canvas.dataset.lightboxZoomCanvas = "";
-    viewport.style.setProperty("--lightbox-zoom-chrome", `${chromeReach()}px`);
+    viewport.style.setProperty("--lightbox-zoom-chrome", `${chromeReach(window)}px`);
     for (const side of ["top", "right", "bottom", "left"] as const) {
       viewport.style.setProperty(`--lightbox-zoom-stage-${side}`, `${g.stage[side]}px`);
     }

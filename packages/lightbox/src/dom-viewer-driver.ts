@@ -1,3 +1,4 @@
+import { chromeReach } from "./chrome-reach";
 import { originIsVisible } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
 import {
@@ -1363,6 +1364,7 @@ export class DomViewerDriver<
   // same for the same reason.
   #sizeContainer(view: Window) {
     this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
+    this.#portal.overlay.style.setProperty("--lightbox-chrome-reach", `${chromeReach(view)}px`);
     this.#pinContainer(view);
   }
 

@@ -6,6 +6,7 @@ import type {
   LightboxItem,
   LightboxSource,
 } from "./public-api";
+import { chromeReach } from "./chrome-reach";
 import { PhotoRoom } from "./photo-room";
 
 /**
@@ -99,19 +100,6 @@ function opensKeyboard(element: Element | null): element is HTMLElement {
   if (!(element instanceof HTMLElement)) return false;
   if (element instanceof HTMLInputElement) return !NO_KEYBOARD_INPUTS.has(element.type);
   return element instanceof HTMLTextAreaElement || element.isContentEditable;
-}
-
-// How far the browser's bars can reach past the layout viewport, as for zoom:
-// iOS 26 paints the page under its toolbar, and the sheet should be under it too.
-function chromeReach(view: Window): number {
-  if (!view.matchMedia("(pointer: coarse)").matches) return 0;
-  const { width, height } = view.screen;
-  const long = Math.max(width, height);
-  const short = Math.min(width, height);
-  return Math.max(
-    0,
-    Math.ceil((view.innerWidth > view.innerHeight ? short : long) - view.innerHeight),
-  );
 }
 
 type ScrollTimelineConstructor = new (options: {
