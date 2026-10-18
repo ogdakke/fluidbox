@@ -1,12 +1,6 @@
 import { dismissCloseValue, type CornerRadii } from "./lightbox-gesture";
-import {
-  cropPose,
-  emptyClip,
-  emptyRadii,
-  mapRadii,
-  type ImageClip,
-  type ThumbnailPose,
-} from "./transition-geometry";
+import { originPose } from "./origin-pose";
+import { cropPose, emptyClip, mixClip, type ImageClip } from "./transition-geometry";
 
 export interface ImageTransitionPose {
   readonly transform: DOMMatrix;
@@ -43,11 +37,15 @@ export function readImageTransitionPose(
     (Number.parseFloat(frameStyle.borderBottomRightRadius) || 0) * scale,
     (Number.parseFloat(frameStyle.borderBottomLeftRadius) || 0) * scale,
   ];
+  const width = image.offsetWidth;
+  const height = image.offsetHeight;
   return {
     transform,
     clip: {
-      x: Math.max(0, crop.e),
-      y: Math.max(0, crop.f),
+      top: Math.max(0, crop.f),
+      right: Math.max(0, width - crop.e - width * crop.a),
+      bottom: Math.max(0, height - crop.f - height * crop.d),
+      left: Math.max(0, crop.e),
       radii,
     },
   };
@@ -71,39 +69,26 @@ export function applyImageTransitionPose(
   return crop;
 }
 
-export function thumbnailTransitionPose(
+/**
+ * The pose that draws the media exactly as the origin paints it, relative to
+ * where the media box sits when it is not transformed.
+ */
+export function originTransitionPose(
   origin: HTMLElement,
+  picture: HTMLElement | null,
   frame: HTMLElement,
   image: HTMLElement,
   current: ImageTransitionPose = readImageTransitionPose(frame, image),
-): ThumbnailPose {
-  const from = origin.getBoundingClientRect();
+): ImageTransitionPose | null {
   const imageRect = image.getBoundingClientRect();
-  const to = {
+  return originPose({
+    origin,
+    picture,
+    width: image.offsetWidth,
+    height: image.offsetHeight,
     left: imageRect.left - current.transform.e,
     top: imageRect.top - current.transform.f,
-  };
-  const width = image.offsetWidth;
-  const height = image.offsetHeight;
-  if (!from.width || !from.height || !width || !height) {
-    return { transform: "none", ...emptyClip() };
-  }
-  const scale = Math.max(from.width / width, from.height / height);
-  const x = Math.max(0, (width - from.width / scale) / 2);
-  const y = Math.max(0, (height - from.height / scale) / 2);
-  const style = getComputedStyle(origin);
-  const radii: CornerRadii = [
-    Number.parseFloat(style.borderTopLeftRadius) || 0,
-    Number.parseFloat(style.borderTopRightRadius) || 0,
-    Number.parseFloat(style.borderBottomRightRadius) || 0,
-    Number.parseFloat(style.borderBottomLeftRadius) || 0,
-  ];
-  return {
-    transform: `translate(${from.left - to.left - x * scale}px, ${from.top - to.top - y * scale}px) scale(${scale})`,
-    x,
-    y,
-    radii,
-  };
+  });
 }
 
 interface ImageTransitionMotionOptions {
@@ -157,11 +142,7 @@ export function createImageTransitionMotion({
       value(from.transform.e, to.transform.e),
       value(from.transform.f, to.transform.f),
     ]);
-    const clip = {
-      x: value(from.clip.x, to.clip.x),
-      y: value(from.clip.y, to.clip.y),
-      radii: mapRadii(from.clip.radii, (start, corner) => value(start, to.clip.radii[corner]!)),
-    };
+    const clip = mixClip(from.clip, to.clip, value);
     const rendered = cropPose(matrix, clip, width, height);
     frame.push({
       offset,
@@ -184,12 +165,5 @@ export function createImageTransitionMotion({
 }
 
 export function openImageTransitionPose(): ImageTransitionPose {
-  return { transform: new DOMMatrix(), clip: { ...emptyClip(), radii: emptyRadii() } };
-}
-
-export function poseFromThumbnail(pose: ThumbnailPose): ImageTransitionPose {
-  return {
-    transform: new DOMMatrix(pose.transform === "none" ? undefined : pose.transform),
-    clip: { x: pose.x, y: pose.y, radii: pose.radii },
-  };
+  return { transform: new DOMMatrix(), clip: emptyClip() };
 }

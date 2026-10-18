@@ -22,13 +22,13 @@ const cases = [
 ] as const;
 
 /**
- * Cases the current flight cannot draw yet. It shows the media cropped from the
- * centre to the origin's whole box, so these jump at the start and end:
- * letterboxed or anchored crops, a card half hidden by a scroller, a clip that
- * was mid-playback, and an embed snapshot cropped once by the viewer and again
- * by the flight. They pass once the flight draws the origin itself.
+ * A playing clip hands its current frame to the player through a canvas. The
+ * Linux WebKit build cannot draw video frames into a canvas (the copy stays
+ * transparent), so there the player shows its own frame. Safari on Apple
+ * platforms draws them.
  */
-const knownGaps = new Set<string>(["contain", "position", "scroll", "video-inline", "iframe"]);
+const cannotDrawVideo = (id: string, browserName: string) =>
+  id === "video-inline" && browserName === "webkit" && process.platform === "linux";
 
 /**
  * The player keeps its native controls through the flight on purpose, so
@@ -167,9 +167,12 @@ async function prepareCase(page: Page, id: string) {
 }
 
 for (const id of cases) {
-  test(`flight from the "${id}" card starts and ends on the card`, async ({ page }) => {
+  test(`flight from the "${id}" card starts and ends on the card`, async ({
+    page,
+    browserName,
+  }) => {
     test.skip(intendedDifferences.has(id), "the player keeps its native controls in flight");
-    test.fail(knownGaps.has(id), "the flight still draws the media, not the origin");
+    test.skip(cannotDrawVideo(id, browserName), "this WebKit build cannot draw video frames");
     const trigger = await prepareCase(page, id);
     const box = await visibleOrigin(page, id);
     expect(box.width).toBeGreaterThan(20);
@@ -390,4 +393,41 @@ test("an opening never reloads a picture that is already on screen", async ({ pa
   );
   // The slide is built with the card's decoded image; nothing replaces it.
   expect(writes).toEqual([]);
+});
+
+test("a playing clip keeps playing from the same moment in the player and back", async ({
+  page,
+}) => {
+  await page.goto("/flight.html");
+  const card = page.locator('[data-flight-case="video-inline"] video');
+  await card.scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => {
+    const video = document.querySelector<HTMLVideoElement>(
+      '[data-flight-case="video-inline"] video',
+    );
+    return !!video && !video.paused && video.currentTime > 1 && video.currentTime < 3;
+  });
+  const clicked = await card.evaluate((video: HTMLVideoElement) => video.currentTime);
+  await page.locator('[data-flight-case="video-inline"] [data-flight-trigger]').click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  const player = dialog.locator("video");
+  await expect(page.locator("[data-lightbox-video-stand-in]")).toHaveCount(0);
+  const playing = await player.evaluate((video: HTMLVideoElement) => ({
+    paused: video.paused,
+    time: video.currentTime,
+  }));
+  expect(playing.paused, "the player stopped the clip").toBe(false);
+  // Not restarted from the beginning: it continues from where the card was.
+  expect(playing.time).toBeGreaterThan(clicked - 0.1);
+
+  const closedAt = await player.evaluate((video: HTMLVideoElement) => video.currentTime);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  const back = await card.evaluate((video: HTMLVideoElement) => ({
+    paused: video.paused,
+    time: video.currentTime,
+  }));
+  expect(back.paused).toBe(false);
+  expect(back.time).toBeGreaterThan(closedAt - 0.1);
 });

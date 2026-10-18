@@ -14,9 +14,8 @@ import {
   applyImageTransitionPose,
   createImageTransitionMotion,
   openImageTransitionPose,
-  poseFromThumbnail,
+  originTransitionPose,
   readImageTransitionPose,
-  thumbnailTransitionPose,
   type ImageTransitionPose,
 } from "./image-transition-motion";
 import type {
@@ -43,7 +42,8 @@ import {
 import { ViewerStrip } from "./viewer-strip";
 import { activeViewer } from "./viewer-ownership";
 import { handoffDecodedFlightImage } from "./flight-image";
-import { mapRadii } from "./transition-geometry";
+import { mapRadii, mixInsets } from "./transition-geometry";
+import { originPose, originPicture } from "./origin-pose";
 import { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 
 const OPEN_DURATION = 300;
@@ -80,8 +80,9 @@ interface PreparedOpen<TItem extends LightboxItem> {
   readonly item: TItem;
   readonly index: number;
   readonly origin: HTMLElement | null;
+  readonly picture: HTMLElement | null;
   readonly animations: Animation[];
-  readonly start: PaintedPose;
+  readonly start: PaintedPose & { readonly fromOrigin: boolean };
   readonly motion: ReturnType<typeof createImageTransitionMotion>;
 }
 
@@ -94,8 +95,10 @@ function finitePose(pose: PaintedPose) {
     transform.d,
     transform.e,
     transform.f,
-    clip.x,
-    clip.y,
+    clip.top,
+    clip.right,
+    clip.bottom,
+    clip.left,
     ...clip.radii,
   ].every(Number.isFinite);
 }
@@ -125,6 +128,8 @@ export class DomViewerDriver<
   #animations: Animation[] = [];
   #interruptedPose: PaintedPose | undefined;
   #activeOrigin: HTMLElement | null = null;
+  /** The element in the active origin that paints the item, when it does. */
+  #activePicture: HTMLElement | null = null;
   #activeTrigger: HTMLElement | null = null;
   #flight: HTMLDivElement | undefined;
   #flightFrame: HTMLDivElement | undefined;
@@ -141,6 +146,7 @@ export class DomViewerDriver<
   #flightViewerOrigin = { x: 0, y: 0 };
   #closeStart: ImageTransitionPose | undefined;
   #closeTargetOrigin: HTMLElement | null = null;
+  #closeTargetPicture: HTMLElement | null = null;
   #closeDuration = 0;
   #closeOriginObserver: ResizeObserver | undefined;
   #closeRetargetFrame = 0;
@@ -348,8 +354,10 @@ export class DomViewerDriver<
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
     const crossfade = !!from && !originMatchesItem(context.origin, context.item);
-    const start = this.#openingStart(from, undefined, crossfade);
-    const motion = this.#openingMotion(start, !!from, undefined, crossfade);
+    const picture = this.#originPicture(from, context.origin, crossfade);
+    if (picture instanceof HTMLVideoElement) this.#strip?.continueVideo(context.index, picture);
+    const start = this.#openingStart(from, picture, undefined, crossfade);
+    const motion = this.#openingMotion(start, start.fromOrigin, undefined, crossfade);
     this.#applyMediaPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = start.frameOpacity;
     this.#portal.backdrop.style.opacity = start.backdropOpacity;
@@ -364,6 +372,7 @@ export class DomViewerDriver<
       item: context.item,
       index: context.index,
       origin: from,
+      picture,
       animations,
       start,
       motion,
@@ -437,17 +446,24 @@ export class DomViewerDriver<
     const origin = context.origin?.visual;
     const from =
       prepared?.origin ?? (origin && origin.isConnected && originIsVisible(origin) ? origin : null);
-    this.#activeOrigin = from;
     const crossfade = !!from && !originMatchesItem(context.origin, context.item);
+    const picture = prepared
+      ? prepared.picture
+      : this.#originPicture(from, context.origin, crossfade);
+    this.#activeOrigin = from;
+    this.#activePicture = picture;
+    if (!prepared && picture instanceof HTMLVideoElement) {
+      this.#strip?.continueVideo(context.index, picture);
+    }
     this.#keepThumbnailVisible(crossfade ? context.origin?.thumbnail : undefined);
     const start =
       prepared && !interruptedPose
         ? prepared.start
-        : this.#openingStart(from, interruptedPose, crossfade);
+        : this.#openingStart(from, picture, interruptedPose, crossfade);
     const motion =
       prepared && !interruptedPose
         ? prepared.motion
-        : this.#openingMotion(start, !!from, interruptedPose, crossfade);
+        : this.#openingMotion(start, start.fromOrigin, interruptedPose, crossfade);
     const overlayFrom = interruptedPose ? this.#thumbnailOverlays.currentProgress(1) : 1;
     this.#thumbnailOverlays.prepare(
       context.item,
@@ -518,6 +534,11 @@ export class DomViewerDriver<
     this.#takeInterruptedPose();
     const origin = context.origin?.visual;
     this.#activeOrigin = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    this.#activePicture = this.#originPicture(
+      this.#activeOrigin,
+      context.origin,
+      !originMatchesItem(context.origin, context.item),
+    );
     this.#setActiveTrigger(context.origin?.trigger ?? null);
     const selected = this.#strip?.index === context.index;
     // A native swipe updates the strip before it reports the selected index.
@@ -559,20 +580,23 @@ export class DomViewerDriver<
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
     const closing = this.#strip?.activeItem;
     this.#closeCrossfade = !!from && !!closing && !originMatchesItem(context.origin, closing);
+    const picture = this.#originPicture(from, context.origin, this.#closeCrossfade);
+    if (picture instanceof HTMLVideoElement) this.#handBackVideo(picture);
     this.#keepThumbnailVisible(this.#closeCrossfade ? context.origin?.thumbnail : undefined);
     const start = interruptedPose ?? {
       ...readImageTransitionPose(this.#frame, this.#media),
       frameOpacity: "1",
       backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
     };
-    let target = from
-      ? poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, start))
-      : {
-          transform: new DOMMatrix(start.transform.toString())
-            .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
-            .scale(0.96),
-          clip: start.clip,
-        };
+    const originTarget = from
+      ? originTransitionPose(from, picture, this.#frame, this.#media, start)
+      : null;
+    let target = originTarget ?? {
+      transform: new DOMMatrix(start.transform.toString())
+        .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+        .scale(0.96),
+      clip: start.clip,
+    };
     const travel = Math.max(
       Math.abs(target.transform.e - start.transform.e),
       Math.abs(target.transform.f - start.transform.f),
@@ -585,7 +609,7 @@ export class DomViewerDriver<
     // Moving an iframe or video into the body-level flight would reload it or
     // reset playback, so embedded media close inside their own frame instead.
     const embedded = media instanceof HTMLIFrameElement || media instanceof HTMLMediaElement;
-    if (from && !embedded) {
+    if (from && originTarget && !embedded) {
       const source = media;
       const prepared =
         source instanceof HTMLImageElement &&
@@ -594,7 +618,7 @@ export class DomViewerDriver<
           ? this.#preparedFlight
           : undefined;
       this.#preparedFlight = undefined;
-      const flight = this.#createCloseFlight(start, from, media, prepared?.image);
+      const flight = this.#createCloseFlight(start, from, picture, media, prepared?.image);
       frame = flight.frame;
       media = flight.media;
       target = flight.target;
@@ -617,7 +641,8 @@ export class DomViewerDriver<
       this.#preparedFlight = undefined;
     }
     this.#closeStart = start;
-    this.#closeTargetOrigin = from;
+    this.#closeTargetOrigin = originTarget ? from : null;
+    this.#closeTargetPicture = picture;
     this.#closeDuration = duration;
     const motion = createImageTransitionMotion({
       opening: false,
@@ -630,7 +655,7 @@ export class DomViewerDriver<
       duration,
       response: duration * 0.9,
       samples: 60,
-      fadeFrame: !from,
+      fadeFrame: !originTarget,
       crossfade: this.#closeCrossfade,
     });
     const overlayFrom = this.#thumbnailOverlays.currentProgress(0);
@@ -645,7 +670,7 @@ export class DomViewerDriver<
     }
     this.#applyMediaPose(frame, media, start);
     // Embedded media lands on a static snapshot, so fade the snapshot back in.
-    const cover = from
+    const cover = originTarget
       ? frame.querySelector<HTMLImageElement>(":scope > [data-lightbox-media-cover][src]")
       : null;
     const animations = [
@@ -653,6 +678,7 @@ export class DomViewerDriver<
       media.animate(motion.image, this.#motionOptions(motion.duration)),
       frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+      ...this.#animateFallbacks(frame, motion.image, motion.duration),
       ...(cover
         ? [
             cover.animate([{ opacity: getComputedStyle(cover).opacity }, { opacity: 1 }], {
@@ -731,18 +757,46 @@ export class DomViewerDriver<
     return thumbnail && originShowsItem(thumbnail, context.item) ? thumbnail : undefined;
   }
 
+  /** The card's own video picks up where the player is, so it lands on the same frame. */
+  #handBackVideo(origin: HTMLVideoElement) {
+    const player = this.#media;
+    if (!(player instanceof HTMLVideoElement) || player.readyState < HTMLMediaElement.HAVE_METADATA)
+      return;
+    if (Math.abs(origin.currentTime - player.currentTime) > 0.01) {
+      origin.currentTime = player.currentTime;
+    }
+    if (!player.paused && !player.ended) void origin.play().catch(() => undefined);
+  }
+
+  /** The element that paints the item in the origin, unless the flight crossfades over it. */
+  #originPicture(
+    from: HTMLElement | null,
+    origin: LightboxOrigin | null | undefined,
+    crossfade: boolean,
+  ) {
+    if (!from || crossfade) return null;
+    const thumbnail = origin?.thumbnail;
+    if (thumbnail && (thumbnail === from || from.contains(thumbnail))) return thumbnail;
+    return originPicture(from);
+  }
+
   #openingStart(
     from: HTMLElement | null,
+    picture: HTMLElement | null,
     interrupted?: PaintedPose,
     crossfade = false,
-  ): PaintedPose {
-    if (interrupted) return interrupted;
+  ): PaintedPose & { readonly fromOrigin: boolean } {
+    if (interrupted) return { ...interrupted, fromOrigin: true };
     const openPose = openImageTransitionPose();
-    if (from) {
+    const pose = from
+      ? originTransitionPose(from, picture, this.#frame, this.#media, openPose)
+      : null;
+    if (pose) {
       return {
-        ...poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, openPose)),
+        ...pose,
         frameOpacity: crossfade ? "0" : "1",
         backdropOpacity: "0",
+        fromOrigin: true,
       };
     }
     return {
@@ -752,6 +806,7 @@ export class DomViewerDriver<
       clip: openPose.clip,
       frameOpacity: "0",
       backdropOpacity: "0",
+      fromOrigin: false,
     };
   }
 
@@ -791,8 +846,11 @@ export class DomViewerDriver<
   }
 
   #fallbackLayers(frame: HTMLElement) {
+    // Every layer that stands in for the media moves with it, so the frame's
+    // crop is the only crop. An embed's snapshot would otherwise be cropped
+    // to the frame and then again by its own cover fit.
     return frame.querySelectorAll<HTMLElement>(
-      "[data-lightbox-slide-placeholder], [data-lightbox-slide-preview]",
+      ":scope > :is([data-lightbox-slide-placeholder], [data-lightbox-slide-preview], [data-lightbox-media-cover], [data-lightbox-video-stand-in])",
     );
   }
 
@@ -1043,6 +1101,7 @@ export class DomViewerDriver<
   #createCloseFlight(
     start: ImageTransitionPose,
     origin: HTMLElement,
+    picture: HTMLElement | null,
     source: HTMLElement,
     prepared?: HTMLImageElement,
   ) {
@@ -1095,37 +1154,26 @@ export class DomViewerDriver<
         ? (source.closest<HTMLElement>("[data-lightbox-frame]") ?? this.#frame)
         : undefined;
     applyImageTransitionPose(frame, media, start);
-    const target = this.#flightTargetPose(origin, media);
+    const target = this.#flightTargetPose(origin, picture, media) ?? start;
     return { frame, media, target };
   }
 
-  #flightTargetPose(origin: HTMLElement, media: HTMLElement): ImageTransitionPose {
+  #flightTargetPose(
+    origin: HTMLElement,
+    picture: HTMLElement | null,
+    media: HTMLElement,
+  ): ImageTransitionPose | null {
     const view = this.#portal.overlay.ownerDocument.defaultView!;
-    const rect = origin.getBoundingClientRect();
-    const width = media.offsetWidth;
-    const height = media.offsetHeight;
-    const scale = Math.max(rect.width / Math.max(1, width), rect.height / Math.max(1, height));
-    const x = Math.max(0, (width - rect.width / scale) / 2);
-    const y = Math.max(0, (height - rect.height / scale) / 2);
-    const style = getComputedStyle(origin);
-    return {
-      transform: new DOMMatrix()
-        .translate(
-          rect.left + view.scrollX - this.#flightOrigin.x - x * scale,
-          rect.top + view.scrollY - this.#flightOrigin.y - y * scale,
-        )
-        .scale(scale),
-      clip: {
-        x,
-        y,
-        radii: [
-          Number.parseFloat(style.borderTopLeftRadius) || 0,
-          Number.parseFloat(style.borderTopRightRadius) || 0,
-          Number.parseFloat(style.borderBottomRightRadius) || 0,
-          Number.parseFloat(style.borderBottomLeftRadius) || 0,
-        ],
-      },
-    };
+    // The flight lives in document coordinates, so the pose is relative to its
+    // origin wherever the page has scrolled to now.
+    return originPose({
+      origin,
+      picture,
+      width: media.offsetWidth,
+      height: media.offsetHeight,
+      left: this.#flightOrigin.x - view.scrollX,
+      top: this.#flightOrigin.y - view.scrollY,
+    });
   }
 
   #removeFlight() {
@@ -1143,6 +1191,7 @@ export class DomViewerDriver<
     this.#flightSourceFrame = undefined;
     this.#closeStart = undefined;
     this.#closeTargetOrigin = null;
+    this.#closeTargetPicture = null;
     this.#closeDuration = 0;
     this.#closeOriginObserver?.disconnect();
     this.#closeOriginObserver = undefined;
@@ -1210,7 +1259,8 @@ export class DomViewerDriver<
     const frame = this.#flightFrame;
     const media = this.#flightMedia;
     if (!origin || !start || !frame || !media || this.#animations.length < 3) return;
-    const target = this.#flightTargetPose(origin, media);
+    const target = this.#flightTargetPose(origin, this.#closeTargetPicture, media);
+    if (!target) return;
     const motion = createImageTransitionMotion({
       opening: false,
       from: start,
@@ -1263,14 +1313,14 @@ export class DomViewerDriver<
     this.#preparedFlight = undefined;
     const origin = this.#activeOrigin;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const target = from
-      ? poseFromThumbnail(thumbnailTransitionPose(from, frame, this.#media, current))
-      : {
-          transform: new DOMMatrix()
-            .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
-            .scale(0.96),
-          clip: current.clip,
-        };
+    const target = (from
+      ? originTransitionPose(from, this.#activePicture, frame, this.#media, current)
+      : null) ?? {
+      transform: new DOMMatrix()
+        .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+        .scale(0.96),
+      clip: current.clip,
+    };
     const wheelTarget = wheelDirection ? new DOMMatrix(target.transform.toString()) : undefined;
     const wheelOffset = !wheelTarget
       ? 0
@@ -1291,10 +1341,8 @@ export class DomViewerDriver<
       closeOpacity: 1,
       borderRadii: current.clip.radii,
       targetRadii: target.clip.radii,
-      clipX: current.clip.x,
-      clipY: current.clip.y,
-      targetClipX: target.clip.x,
-      targetClipY: target.clip.y,
+      clip: current.clip,
+      targetClip: target.clip,
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       time: performance.now(),
@@ -1367,8 +1415,11 @@ export class DomViewerDriver<
       {
         transform: matrix,
         clip: {
-          x: state.clipX + (state.targetClipX - state.clipX) * progress,
-          y: state.clipY + (state.targetClipY - state.clipY) * progress,
+          ...mixInsets(
+            state.clip,
+            state.targetClip,
+            (start, end) => start + (end - start) * progress,
+          ),
           radii: mapRadii(
             state.borderRadii,
             (radius, index) => radius + (state.targetRadii[index]! - radius) * radiusProgress,

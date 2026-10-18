@@ -1,3 +1,4 @@
+import type { ClipInsets } from "./transition-geometry";
 const CENTER_ATTRACTION_RADIUS = 32;
 const CENTER_ATTRACTION_STRENGTH = 0.7;
 const TOUCH_SPRING_RESPONSE_NEAR = 0.11;
@@ -39,10 +40,9 @@ export interface LightboxDragStart {
   closeOpacity: number;
   borderRadii: CornerRadii;
   targetRadii: CornerRadii;
-  clipX: number;
-  clipY: number;
-  targetClipX: number;
-  targetClipY: number;
+  /** Media insets at the start of the drag and at the origin. */
+  clip: ClipInsets;
+  targetClip: ClipInsets;
   width: number;
   height: number;
   time: number;

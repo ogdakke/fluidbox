@@ -28,6 +28,8 @@ interface ViewerSlide {
   imageVersion: number;
   previewController?: AbortController;
   controller?: AbortController;
+  /** A playing origin's picture, shown until the slide's player catches up with it. */
+  videoHandoff?: AbortController;
   dispose?: LightboxDispose;
 }
 
@@ -402,6 +404,95 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#load(index, slide);
   }
 
+  /**
+   * Continue an origin video's playback in the slide. Until the player has
+   * caught up, a canvas keeps painting the origin's own frames, so the opening
+   * starts on the frame the card shows and the picture never stops moving.
+   */
+  continueVideo(index: number, origin: HTMLVideoElement) {
+    const slide = this.#slides.get(index);
+    const item = this.#source.getItem(index);
+    const video = slide?.image;
+    if (!slide || item.media.type !== "video" || !(video instanceof HTMLVideoElement)) return;
+    slide.videoHandoff?.abort();
+    if (origin.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !origin.videoWidth) return;
+    const handoff = new AbortController();
+    slide.videoHandoff = handoff;
+    const canvas = this.#ownerDocument.createElement("canvas");
+    canvas.dataset.lightboxVideoStandIn = "";
+    canvas.setAttribute("aria-hidden", "true");
+    canvas.width = origin.videoWidth;
+    canvas.height = origin.videoHeight;
+    const context = canvas.getContext("2d");
+    const paint = () => {
+      try {
+        context?.drawImage(origin, 0, 0, canvas.width, canvas.height);
+      } catch {
+        // A frame that cannot be drawn leaves the last one in place.
+      }
+    };
+    paint();
+    slide.frame.append(canvas);
+    const playing = !origin.paused && !origin.ended;
+    let frameRequest = 0;
+    let videoFrameRequest = 0;
+    const follow = () => {
+      if (handoff.signal.aborted) return;
+      paint();
+      if ("requestVideoFrameCallback" in origin) {
+        videoFrameRequest = origin.requestVideoFrameCallback(follow);
+      } else {
+        frameRequest = requestAnimationFrame(follow);
+      }
+    };
+    if (playing) follow();
+    handoff.signal.addEventListener(
+      "abort",
+      () => {
+        cancelAnimationFrame(frameRequest);
+        if (videoFrameRequest && "cancelVideoFrameCallback" in origin) {
+          origin.cancelVideoFrameCallback(videoFrameRequest);
+        }
+        // An animation on a detached element may never finish, and the opening waits on it.
+        for (const animation of canvas.getAnimations()) animation.cancel();
+        canvas.remove();
+        if (slide.videoHandoff === handoff) slide.videoHandoff = undefined;
+      },
+      { once: true },
+    );
+    video.muted = origin.muted;
+    video.loop = origin.loop;
+    video.preload = "auto";
+    const signal = handoff.signal;
+    const once = (type: string) =>
+      new Promise<void>((resolve) => {
+        video.addEventListener(type, () => resolve(), { once: true, signal });
+      });
+    const presented = () =>
+      new Promise<void>((resolve) => {
+        if ("requestVideoFrameCallback" in video) video.requestVideoFrameCallback(() => resolve());
+        else requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    const seek = async (time: number) => {
+      if (Math.abs(video.currentTime - time) < 0.01 && video.readyState >= 2) return;
+      const seeked = once("seeked");
+      video.currentTime = time;
+      await seeked;
+    };
+    void (async () => {
+      if (video.readyState < HTMLMediaElement.HAVE_METADATA) await once("loadedmetadata");
+      if (signal.aborted) return;
+      await seek(origin.currentTime);
+      // The origin kept playing during the first seek; the second is short.
+      if (!signal.aborted && playing) await seek(origin.currentTime);
+      if (signal.aborted) return;
+      if (playing) await video.play().catch(() => undefined);
+      if (signal.aborted) return;
+      await presented();
+      handoff.abort();
+    })();
+  }
+
   completeOpening(index: number) {
     const slide = this.#slides.get(index);
     if (!slide) return;
@@ -586,6 +677,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   }
 
   #unload(slide: ViewerSlide) {
+    slide.videoHandoff?.abort();
     slide.previewController?.abort();
     slide.previewController = undefined;
     if (!slide.loaded) return;
