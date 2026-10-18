@@ -25,6 +25,7 @@ import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { arraySource } from "./array-source";
+import type { LightboxSheet, LightboxSheetStop } from "./sheet";
 import { createLightbox } from "./create-lightbox";
 import { FilmstripRuntime, filmstripCommandOptions } from "./filmstrip-runtime";
 import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
@@ -213,6 +214,8 @@ function Root<TItem extends LightboxItem>({
   items,
   origins,
   renderers,
+  filmstrip,
+  sheet,
   onBeforeCommand,
   onEvent,
   children,
@@ -244,6 +247,8 @@ function Root<TItem extends LightboxItem>({
       source: store.source,
       origins,
       renderers: runtimeRenderers,
+      filmstrip,
+      sheet,
       onBeforeCommand,
       onEvent,
       portal: {
@@ -259,7 +264,7 @@ function Root<TItem extends LightboxItem>({
       store.detach();
       controller.destroy();
     };
-  }, [onBeforeCommand, onEvent, origins, renderers, store]);
+  }, [filmstrip, onBeforeCommand, onEvent, origins, renderers, sheet, store]);
 
   useLayoutEffect(() => {
     void store.setSource(resolvedSource);
@@ -702,6 +707,17 @@ export function useLightboxState<TSelected>(
     () => store.state,
   );
   return selector(state);
+}
+
+/** The stop a sheet from `@ogdakke/fluidbox/sheet` rests at, re-rendering as it changes. */
+export function useLightboxSheet(
+  sheet: Pick<LightboxSheet, "stop" | "subscribe">,
+): LightboxSheetStop {
+  return useSyncExternalStore(
+    (listener) => sheet.subscribe(listener),
+    () => sheet.stop,
+    () => sheet.stop,
+  );
 }
 
 export const Lightbox = {

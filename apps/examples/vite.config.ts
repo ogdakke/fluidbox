@@ -31,6 +31,9 @@ function packageSource(command: "build" | "serve") {
     resolve(import.meta.dirname, "../../packages/lightbox/src", file);
   return [
     { find: "@ogdakke/fluidbox/styles.css", replacement: source("styles.css") },
+    { find: "@ogdakke/fluidbox/sheet.css", replacement: source("sheet.css") },
+    { find: "@ogdakke/fluidbox/filmstrip", replacement: source("filmstrip-extension.ts") },
+    { find: "@ogdakke/fluidbox/sheet", replacement: source("sheet.ts") },
     ...["elements", "react", "solid", "vue", "angular"].map((entry) => ({
       find: `@ogdakke/fluidbox/${entry}`,
       replacement: source(`${entry}.ts`),

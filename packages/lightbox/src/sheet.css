@@ -1,0 +1,127 @@
+/* Sheet extension. Import with @ogdakke/fluidbox/sheet. Every length here is a
+   custom property on the dialog; override any of them in your own CSS. The
+   runtime reads the ones marked "read" and writes the ones marked "state". */
+@property --lightbox-sheet-peek {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --lightbox-sheet-gap {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --lightbox-sheet-max-height {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-sheet-host] {
+  /* Read: 0 turns the sheet off, as for wide screens with a sidebar instead. */
+  --lightbox-sheet-enabled: 1;
+  /* Read: fit shrinks the photo into the room above the sheet; push slides it up. */
+  --lightbox-sheet-photo: fit;
+  /* Read: the sheet showing at the photo stop. */
+  --lightbox-sheet-peek: 0px;
+  /* Read: space between the photo and the sheet. */
+  --lightbox-sheet-gap: 12px;
+  /* Read: the info stop's height; taller content gets a full stop as well. */
+  --lightbox-sheet-max-height: 60svh;
+  /* Space above the sheet at the full stop. */
+  --lightbox-sheet-top: calc(env(safe-area-inset-top, 0px) + 56px);
+  --lightbox-sheet-radius: 18px;
+  --lightbox-sheet-max-width: 640px;
+  --lightbox-sheet-background: var(--fb-bg, Canvas);
+  --lightbox-sheet-color: var(--fb-fg, CanvasText);
+  /* State: --lightbox-sheet-visible (px), --lightbox-sheet-progress (0 at the
+     photo, 1 at info) and --lightbox-sheet-expand (0 at info, 1 at full). */
+  --lightbox-sheet-visible: 0px;
+  --lightbox-sheet-progress: 0;
+  --lightbox-sheet-expand: 0;
+  /* The photo keeps clear of the peeking sheet. */
+  --lightbox-stage-bottom: var(--lightbox-sheet-peek);
+}
+
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet] {
+  position: absolute;
+  z-index: 7;
+  inset: auto 0 0;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--lightbox-sheet-max-width);
+  max-height: calc(var(--lightbox-height, 100svh) - var(--lightbox-sheet-top));
+  margin-inline: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  border-radius: var(--lightbox-sheet-radius) var(--lightbox-sheet-radius) 0 0;
+  background: var(--lightbox-sheet-background);
+  color: var(--lightbox-sheet-color);
+  box-shadow:
+    0 -1px 0 rgb(0 0 0 / 0.06),
+    0 -12px 40px rgb(0 0 0 / 0.18);
+  transform: translateY(calc(100% - var(--lightbox-sheet-visible)));
+  touch-action: none;
+}
+/* Tucked away and still: out of sight, out of the tab order. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-sheet="photo"]:not(
+    [data-sheet-raised],
+    [data-sheet-peeking],
+    [data-sheet-moving],
+    [data-sheet-dragging]
+  )
+  [data-lightbox-sheet] {
+  visibility: hidden;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-sheet="full"]:not([data-sheet-moving], [data-sheet-dragging])
+  [data-lightbox-sheet] {
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+/* A grab handle; add one as the sheet's first child. */
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-sheet-handle] {
+  display: block;
+  width: 36px;
+  height: 5px;
+  margin: 8px auto 4px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0;
+  background: currentColor;
+  opacity: 0.25;
+}
+
+/* Choreography: the arrows centre on the photo, the filmstrip gives way, and the
+   photo can't be dismissed or zoomed while the sheet is up. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-sheet-host]
+  :is([data-lightbox-previous], [data-lightbox-next]) {
+  translate: 0 calc(var(--lightbox-sheet-visible) / -2 + var(--lightbox-sheet-peek) / 2);
+}
+/* Past the info stop there is no room left for the photo: it fades out rather
+   than shrink to a stamp. Set --lightbox-sheet-fade: 0 to keep it. */
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-sheet-host]
+  [data-lightbox-slide] {
+  opacity: calc(1 - var(--lightbox-sheet-expand) * var(--lightbox-sheet-fade, 1));
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-lightbox-sheet-host]
+  [data-lightbox-filmstrip-dock] {
+  opacity: calc(1 - var(--lightbox-sheet-progress) * 3);
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-sheet-raised]
+  [data-lightbox-filmstrip-dock] {
+  pointer-events: none;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-sheet="full"]
+  [data-lightbox-close] {
+  background: var(--accent, rgb(20 20 20 / 0.72));
+}

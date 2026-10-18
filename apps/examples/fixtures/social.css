@@ -1,57 +1,154 @@
 /* Social viewers. Page layout comes from the Safari chrome lab; tokens from @ogdakke/fluidbox-design.
    Inside the viewer: --lightbox-stage-* insets make room around the photo,
-   --lightbox-media-* attach a panel to it, and data-lightbox-chrome fades the
-   floating layers in after the opening flight and out when a dismiss starts. */
+   data-lightbox-chrome fades the floating layers in after the opening flight and
+   out when a dismiss starts, and the sheet entry raises data-lightbox-sheet over
+   the photo on a phone. */
 
-.byline {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  line-height: 1.2;
+:root {
+  --x-blue: #1d9bf0;
+  --x-pink: #f91880;
+  --x-green: #00ba7c;
 }
-.byline small {
+
+/* Shared pieces. */
+.avatar {
   display: block;
+  flex: none;
+  border-radius: 50%;
+  background: var(--fb-surface);
+  object-fit: cover;
+}
+.avatar[data-shape="square"] {
+  border-radius: 22%;
+}
+.name {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.name strong {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badge {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  fill: var(--x-blue);
+}
+.badge[data-kind="gold"] {
+  fill: #e2b719;
+}
+.icon {
+  display: block;
+  flex: none;
+}
+.count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 6px 0 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.count .icon {
+  box-sizing: content-box;
+  padding: 7px;
+  margin: -7px 0 -7px -7px;
+  border-radius: 50%;
+  transition:
+    background 120ms,
+    color 120ms;
+}
+.count:hover {
+  color: var(--x-blue);
+}
+.count:hover .icon {
+  background: color-mix(in srgb, var(--x-blue) 14%, transparent);
+}
+.count[data-icon="repost"]:hover {
+  color: var(--x-green);
+}
+.count[data-icon="like"]:hover {
+  color: var(--x-pink);
+}
+.count[data-icon="repost"]:hover .icon {
+  background: color-mix(in srgb, var(--x-green) 14%, transparent);
+}
+.count[data-icon="like"]:hover .icon {
+  background: color-mix(in srgb, var(--x-pink) 14%, transparent);
+}
+.x-muted,
+.ig-muted {
   color: var(--fb-muted);
 }
-.avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--fb-invert-bg);
-  color: var(--fb-invert-fg);
-  font-weight: 600;
-}
 
-/* Twitter feed. */
-.tw-feed {
-  display: grid;
-  gap: 16px;
+/* X feed. */
+.x-feed {
   max-width: 600px;
   margin: 0 var(--fb-gutter) 28px;
-}
-.tw-post {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
   border: 1px solid var(--fb-line);
+  border-radius: 16px;
+  overflow: hidden;
 }
-.tw-post p {
+.x-post {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 16px 6px;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.x-post + .x-post {
+  border-top: 1px solid var(--fb-line);
+}
+.x-post__body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.x-post p,
+.x-reply p {
   margin: 0;
+  overflow-wrap: anywhere;
 }
-.tw-grid {
+.x-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.x-head .x-muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.x-head > .icon {
+  margin-left: auto;
+  color: var(--fb-muted);
+}
+.x-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px;
+  margin-top: 8px;
   overflow: hidden;
-  border-radius: 12px;
+  border: 1px solid var(--fb-line);
+  border-radius: 16px;
 }
-.tw-grid[data-count="1"] {
+.x-grid[data-count="1"] {
   grid-template-columns: 1fr;
 }
-.tw-grid button,
+.x-grid button,
 .ig-grid button {
   display: block;
   padding: 0;
@@ -59,154 +156,362 @@
   background: none;
   cursor: zoom-in;
 }
-.tw-grid img {
+.x-grid img {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 10;
   object-fit: cover;
 }
-.tw-grid[data-count="1"] img {
+.x-grid[data-count="2"] img {
+  aspect-ratio: 4 / 5;
+}
+.x-grid[data-count="1"] img {
   aspect-ratio: auto;
-  max-height: 480px;
+  max-height: 510px;
+}
+.x-counts {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--fb-muted);
+}
+.x-counts__end {
+  display: flex;
+  gap: 4px;
+}
+.x-counts--small {
+  max-width: 300px;
 }
 
-/* Twitter viewer. The stage is the dialog less the sidebar and the action row;
-   the photo, zoom, arrows and close button all keep to it. */
-[data-lightbox-dialog]:has(.tw-layer) {
-  --tw-aside: 360px;
-  --tw-bar: 56px;
-  --lightbox-stage-right: var(--tw-aside);
-  --lightbox-stage-bottom: var(--tw-bar);
+/* X viewer, wide: a black stage, the post and its replies in a sidebar, and the
+   counts under the photo. The stage leaves room for both, so the photo, zoom
+   and the arrows keep to it; the close button moves to the top left, as on X. */
+[data-lightbox-overlay]:has(.x-layer) {
+  --lightbox-backdrop-background: #000;
 }
-[data-lightbox-dialog]:has(.tw-layer[data-aside="closed"]) {
-  --tw-aside: 0px;
+[data-lightbox-dialog]:has(.x-layer) {
+  --x-aside: 350px;
+  --x-bar: 52px;
+  --lightbox-stage-right: var(--x-aside);
+  --lightbox-stage-bottom: var(--x-bar);
+  --lightbox-sheet-enabled: 0;
 }
-.tw-aside {
+[data-lightbox-dialog]:has(.x-layer[data-aside="closed"]) {
+  --x-aside: 0px;
+}
+[data-lightbox-dialog]:has(.x-layer) [data-lightbox-close] {
+  top: 12px;
+  right: auto;
+  left: 12px;
+  width: 36px;
+  height: 36px;
+}
+/* Round, translucent controls as on X; the design system squares them elsewhere. */
+[data-lightbox-dialog]:has(.x-layer)
+  :is([data-lightbox-close], [data-lightbox-previous], [data-lightbox-next]) {
+  border: 0;
+  border-radius: 50%;
+  background: rgb(15 20 25 / 0.75);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+[data-lightbox-dialog]:has(.x-layer) :is([data-lightbox-previous], [data-lightbox-next]) {
+  width: 36px;
+  height: 36px;
+}
+.x-layer {
   position: absolute;
-  inset: 0 0 0 auto;
+  inset: 0;
   z-index: 6;
+  pointer-events: none;
+  color: #e7e9ea;
+}
+.x-layer > * {
+  pointer-events: auto;
+}
+.x-toggle {
+  position: absolute;
+  top: 12px;
+  right: calc(var(--x-aside) + 12px);
   display: grid;
-  align-content: start;
-  gap: 14px;
-  width: 360px;
-  padding: 20px;
-  overflow-y: auto;
-  background: var(--fb-bg);
-  color: var(--fb-fg);
-  border-left: 1px solid var(--fb-line);
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(15 20 25 / 0.75);
+  color: inherit;
+  cursor: pointer;
 }
-.tw-aside p {
-  margin: 0;
-  font-size: 18px;
+.x-layer[data-aside="closed"] .x-toggle .icon {
+  rotate: 180deg;
 }
-.tw-aside ul,
-.ig-panel ul {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-  padding: 14px 0 0;
-  list-style: none;
-  border-top: 1px solid var(--fb-line);
-}
-.tw-actions {
+.x-bar {
   position: absolute;
   left: 0;
   bottom: 0;
-  z-index: 6;
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   align-items: center;
-  width: calc(100% - var(--tw-aside));
-  height: var(--tw-bar);
+  box-sizing: border-box;
+  width: min(100% - var(--x-aside), 600px);
+  height: var(--x-bar);
+  padding: 0 16px;
+  margin-left: max(0px, (100% - var(--x-aside) - 600px) / 2);
 }
-.tw-actions button,
-.tw-toggle,
-.tw-pills button,
-.ig-actions button {
-  height: var(--fb-control-height);
-  padding: 0 14px;
-  border: 1px solid var(--fb-line-strong);
+.x-aside {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 6;
+  box-sizing: border-box;
+  width: var(--x-aside);
+  padding: 12px 16px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--fb-bg);
   color: var(--fb-fg);
+  border-left: 1px solid var(--fb-line);
+  font-size: 15px;
+  line-height: 1.35;
+}
+.x-author {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+.x-author > span {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+.x-follow {
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fb-fg);
+  color: var(--fb-bg);
   font: inherit;
   font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
 }
-.tw-toggle {
-  position: absolute;
-  top: 16px;
-  right: calc(var(--tw-aside) + 72px);
-  z-index: 6;
+.x-text {
+  margin: 12px 0;
+  font-size: 17px;
+  line-height: 1.4;
 }
-.tw-mobile,
-.tw-reply {
+.x-date {
+  margin: 0 0 12px;
+}
+.x-date strong {
+  color: var(--fb-fg);
+}
+.x-counts--rule {
+  padding: 4px 0;
+  border-block: 1px solid var(--fb-line);
+}
+.x-composer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--fb-line);
+}
+.x-composer input {
+  min-width: 0;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 17px;
+  outline: none;
+}
+.x-composer button {
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fb-fg);
+  color: var(--fb-bg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.5;
+}
+.x-replies {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.x-reply {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 0 2px;
+}
+.x-reply + .x-reply {
+  border-top: 1px solid var(--fb-line);
+}
+.x-reply > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.x-phone,
+.x-sheet {
   display: none;
 }
 
-/* X on a phone: no sidebar; the post, pills and a reply field sit along the bottom, over the photo. */
+/* X on a phone: the post sits over the bottom of the photo, and the reply count
+   raises the replies in a sheet as the photo shrinks into the room above it. */
 @media (width < 900px) {
-  [data-lightbox-dialog]:has(.tw-layer) {
-    --tw-aside: 0px;
-    --tw-bar: 0px;
+  [data-lightbox-overlay]:has(.x-layer) {
+    --lightbox-backdrop-background: #000;
   }
-  .tw-aside,
-  .tw-actions,
-  .tw-toggle {
+  [data-lightbox-dialog]:has(.x-layer) {
+    --x-aside: 0px;
+    --x-bar: 0px;
+    --lightbox-sheet-enabled: 1;
+    --lightbox-sheet-max-height: 62svh;
+  }
+  [data-lightbox-dialog]:has(.x-layer) :is([data-lightbox-previous], [data-lightbox-next]),
+  .x-layer,
+  .x-aside {
     display: none;
   }
-  .tw-mobile {
+  .x-phone {
     position: absolute;
-    inset: auto 0 calc(64px + env(safe-area-inset-bottom, 0px));
-    z-index: 6;
-    display: grid;
-    gap: 12px;
-    padding: 16px;
-    color: var(--fb-fg);
-    background: linear-gradient(transparent, var(--fb-bg) 30%);
-  }
-  .tw-mobile p {
-    margin: 0;
-  }
-  .tw-pills {
-    display: flex;
-    gap: 8px;
-  }
-  .tw-pills button {
-    flex: 1;
-    border-radius: 999px;
-    background: var(--fb-surface);
-  }
-  .tw-reply {
-    position: absolute;
-    inset: auto 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    inset: auto 0 0;
     z-index: 6;
     display: block;
-    height: 44px;
-    padding: 0 18px;
-    border: 1px solid var(--fb-line-strong);
-    border-radius: 999px;
-    background: var(--fb-surface);
-    color: var(--fb-fg);
-    font: inherit;
+    padding: 48px 16px calc(4px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(transparent, rgb(0 0 0 / 0.55) 32px, rgb(0 0 0 / 0.82));
+    color: #e7e9ea;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+  .x-phone__fade {
+    opacity: clamp(0, 1 - var(--lightbox-sheet-progress) * 2.5, 1);
+  }
+  [data-sheet-raised] .x-phone {
+    pointer-events: none;
+  }
+  .x-phone .x-follow {
+    background: #eff3f4;
+    color: #0f1419;
+  }
+  .x-phone .x-muted {
+    color: #a3adb5;
+  }
+  .x-phone .x-text {
+    display: -webkit-box;
+    margin: 10px 0 6px;
+    overflow: hidden;
+    font-size: 15px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+  .x-phone .x-counts {
+    color: inherit;
+  }
+  .x-sheet {
+    display: block;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+  .x-sheet__head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 16px 10px;
+    border-bottom: 1px solid var(--fb-line);
+    font-size: 17px;
+  }
+  .x-sheet__head .x-muted {
+    font-size: 15px;
+  }
+  .x-sheet .x-replies {
+    padding: 0 16px;
+  }
+  .x-sheet .x-composer {
+    position: sticky;
+    bottom: 0;
+    padding: 10px 16px;
+    border-top: 1px solid var(--fb-line);
+    border-bottom: 0;
+    background: var(--lightbox-sheet-background);
   }
 }
 
-/* Instagram grid. */
+/* Instagram profile. */
+.ig-profile {
+  max-width: 760px;
+  margin: 0 var(--fb-gutter) 28px;
+  font-size: 14px;
+}
+.ig-profile__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+  padding: 8px 4px 24px;
+}
+.ig-profile__head p {
+  margin: 0 0 10px;
+}
+.ig-profile__name {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 19px;
+}
+.ig-profile__name strong {
+  font-weight: 400;
+}
+.ig-profile__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+}
 .ig-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 3px;
-  max-width: 720px;
-  margin: 0 var(--fb-gutter) 28px;
+  padding-top: 3px;
+  border-top: 1px solid var(--fb-line);
 }
 .ig-grid img {
   display: block;
   width: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 5;
   object-fit: cover;
 }
+.ig-follow {
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #0095f6;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ig-follow--solid {
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #0095f6;
+  color: #fff;
+  font-size: 14px;
+}
 
-/* Instagram viewer: a fixed card, centred, of a 4:5 photo box and a 400px
+/* Instagram viewer, wide: a fixed card, centred, of a 4:5 photo box and a 400px
    panel. Every photo letterboxes inside the box and the next one slides in
    within it; the arrows and close button belong to the screen. */
 [data-lightbox-dialog]:has(.ig-layer) {
@@ -220,6 +525,7 @@
   --lightbox-stage-bottom: var(--ig-margin);
   --lightbox-stage-left: var(--ig-left);
   --lightbox-stage-right: calc(var(--ig-left) + var(--ig-panel));
+  --lightbox-sheet-enabled: 0;
 }
 [data-lightbox-dialog]:has(.ig-layer) [data-lightbox-previous] {
   left: 16px;
@@ -242,42 +548,177 @@
   border-radius: 6px 0 0 6px;
   background: var(--fb-surface);
 }
-.ig-panel ul {
-  align-content: start;
-  overflow-y: auto;
-}
 .ig-panel {
   position: absolute;
   top: var(--ig-margin);
   left: calc(var(--ig-left) + var(--ig-box));
   z-index: 6;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
-  gap: 14px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: var(--ig-panel);
   height: var(--ig-height);
-  padding: 16px;
   overflow: hidden;
   border-radius: 0 6px 6px 0;
   background: var(--fb-bg);
   color: var(--fb-fg);
+  font-size: 14px;
+  line-height: 1.35;
 }
-.ig-panel p {
+.ig-author {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--fb-line);
+}
+.ig-author > span {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+.ig-author small {
+  font-size: 12px;
+}
+.ig-comments {
+  display: grid;
+  align-content: start;
+  gap: 16px;
   margin: 0;
+  padding: 16px;
+  overflow-y: auto;
+  list-style: none;
+}
+.ig-comment {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+.ig-comment p {
+  margin: 0;
+}
+.ig-comment .ig-muted {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.ig-comment > .icon {
+  margin-top: 6px;
+}
+.ig-panel footer {
+  padding: 4px 16px 0;
+  border-top: 1px solid var(--fb-line);
 }
 .ig-actions {
   display: flex;
   gap: 8px;
+  padding: 4px 0;
+}
+.ig-actions .count {
+  padding: 4px;
+}
+.ig-actions .count .icon {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+}
+.ig-actions .count:hover {
+  color: inherit;
+  opacity: 0.6;
+}
+.ig-actions .count:hover .icon {
+  background: none;
+}
+.ig-actions .count[data-icon="bookmark"] {
+  margin-left: auto;
+}
+.ig-likes,
+.ig-date {
+  margin: 0 0 4px;
+}
+.ig-date {
+  font-size: 12px;
+}
+.ig-add {
+  display: flex;
+  gap: 8px;
+  margin: 8px -16px 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--fb-line);
+}
+.ig-add input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.ig-add button {
+  border: 0;
+  background: none;
+  color: #0095f6;
+  font: inherit;
+  font-weight: 600;
+  opacity: 0.5;
+}
+.ig-sheet {
+  display: none;
 }
 
+/* Instagram on a phone: the photo spans the screen, and the caption peeks
+   under it; drag it up for the comments. */
 @media (width < 900px) {
   [data-lightbox-dialog]:has(.ig-layer) {
     --ig-panel: 0px;
     --ig-margin: 0px;
     --ig-box: 100vw;
+    --lightbox-stage-top: 0px;
+    --lightbox-stage-bottom: var(--lightbox-sheet-peek);
+    --lightbox-sheet-enabled: 1;
+    --lightbox-sheet-peek: calc(150px + env(safe-area-inset-bottom, 0px));
+    --lightbox-sheet-gap: 0px;
+    --lightbox-sheet-max-height: 55svh;
   }
+  [data-lightbox-dialog]:has(.ig-layer) :is([data-lightbox-previous], [data-lightbox-next]),
+  .ig-layer,
   .ig-panel {
     display: none;
+  }
+  .ig-sheet {
+    display: block;
+    padding-inline: 12px;
+    font-size: 14px;
+    line-height: 1.35;
+    box-shadow: none;
+  }
+  .ig-sheet [data-lightbox-sheet-handle] {
+    margin-top: 6px;
+  }
+  .ig-caption {
+    display: -webkit-box;
+    margin: 0 0 4px;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .ig-more {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--fb-muted);
+    font: inherit;
+    cursor: pointer;
+  }
+  .ig-sheet .ig-comments {
+    margin-top: 12px;
+    padding: 12px 0 16px;
+    overflow: visible;
+    border-top: 1px solid var(--fb-line);
   }
 }
 

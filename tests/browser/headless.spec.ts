@@ -1252,3 +1252,25 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
 });
+
+test("the filmstrip option docks thumbnails that navigate the viewer", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.evaluate(() => void window.headlessFilmstripViewer.open({ id: "one" }));
+
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-filmstrip", /.*/);
+  const items = page.locator("[data-lightbox-filmstrip-item]");
+  await expect(items.first()).toBeVisible();
+  await expect(page.locator("[data-lightbox-filmstrip]")).toHaveAttribute(
+    "aria-label",
+    "Gallery filmstrip",
+  );
+
+  await page.locator('[data-lightbox-filmstrip-item][data-index="1"]').click();
+  await expect
+    .poll(() => page.evaluate(() => window.headlessFilmstripViewer.state.activeIndex))
+    .toBe(1);
+
+  await page.evaluate(() => void window.headlessFilmstripViewer.close());
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
+});

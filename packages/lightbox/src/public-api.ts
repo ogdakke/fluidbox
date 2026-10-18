@@ -233,8 +233,43 @@ export interface LightboxZoomOptions {
   readonly max?: number;
 }
 
+export interface LightboxExtensionContext<TItem extends LightboxItem = LightboxItem> {
+  /** The viewer dialog. Extensions add their own elements and attributes to it. */
+  readonly dialog: HTMLElement;
+  readonly controller: LightboxController<TItem>;
+  readonly source: LightboxSource<TItem>;
+  /** Aborted when the lightbox is destroyed. */
+  readonly signal: AbortSignal;
+}
+
+/** What the viewer asks of a mounted extension. Every hook is optional. */
+export interface LightboxExtensionInstance<TItem extends LightboxItem = LightboxItem> {
+  setSource?(source: LightboxSource<TItem>): void;
+  /** A vertical touch drag on the photo. Return true to take it from the dismiss gesture. */
+  claimDrag?(deltaY: number): boolean;
+  drag?(phase: "start" | "move" | "end" | "cancel", clientY: number): void;
+  /** A vertical wheel or trackpad scroll over the photo. Return true to consume it. */
+  wheel?(deltaY: number): boolean;
+  /** Return true to consume the key, as a sheet does with Escape. */
+  keydown?(event: KeyboardEvent): boolean;
+  /** False while zoom would fight the extension. */
+  allowsZoom?(): boolean;
+  /** Runs before the closing flight, so the viewer can settle into its resting pose. */
+  beforeClose?(): void | Promise<void>;
+  destroy(): void;
+}
+
+/** A feature that plugs into the viewer, such as filmstrip() or sheet(). Each comes from its own entry, so it costs nothing until imported. */
+export interface LightboxExtension<TItem extends LightboxItem = LightboxItem> {
+  mount(context: LightboxExtensionContext<TItem>): LightboxExtensionInstance<TItem>;
+}
+
 export interface LightboxOptions<TItem extends LightboxItem = LightboxItem> {
   readonly source: LightboxSource<TItem>;
+  /** A thumbnail strip along the bottom, from `@ogdakke/fluidbox/filmstrip`. */
+  readonly filmstrip?: LightboxExtension<TItem>;
+  /** A panel that rises from the bottom over the photo, from `@ogdakke/fluidbox/sheet`. */
+  readonly sheet?: LightboxExtension<TItem>;
   readonly origins?: LightboxOriginAdapter;
   readonly renderers?: Readonly<Record<string, LightboxRenderer<TItem>>>;
   readonly portal?: LightboxPortalRenderer<TItem>;

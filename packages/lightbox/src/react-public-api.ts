@@ -3,6 +3,7 @@ import type {
   LightboxBeforeCommandEvent,
   LightboxController,
   LightboxEvent,
+  LightboxExtension,
   LightboxItem,
   LightboxOriginAdapter,
   LightboxSource,
@@ -23,6 +24,10 @@ export type LightboxReactRenderer<TItem extends LightboxItem = LightboxItem> = (
 export type LightboxRootProps<TItem extends LightboxItem = LightboxItem> = {
   readonly origins?: LightboxOriginAdapter;
   readonly renderers?: Readonly<Record<string, LightboxReactRenderer<TItem>>>;
+  /** From `@ogdakke/fluidbox/filmstrip`. Keep it stable, as with useMemo or a module constant. */
+  readonly filmstrip?: LightboxExtension<TItem>;
+  /** From `@ogdakke/fluidbox/sheet`. Render its content with `data-lightbox-sheet` in a Portal. */
+  readonly sheet?: LightboxExtension<TItem>;
   readonly onBeforeCommand?: (event: LightboxBeforeCommandEvent) => void;
   readonly onEvent?: (event: LightboxEvent) => void;
   readonly children?: ReactNode;

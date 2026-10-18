@@ -1,5 +1,6 @@
 import { mountSite } from "../src/site";
 import { arraySource, createLightbox } from "@ogdakke/fluidbox";
+import { filmstrip } from "@ogdakke/fluidbox/filmstrip";
 import type { LightboxController, LightboxItem, LightboxRenderer } from "@ogdakke/fluidbox";
 import "./headless.css";
 
@@ -117,6 +118,13 @@ const secondaryViewer: LightboxController<DemoItem> = createLightbox({
   origins,
   renderers,
 });
+// The filmstrip is an option: its code loads only with this import.
+const filmstripViewer: LightboxController<DemoItem> = createLightbox({
+  source,
+  origins,
+  renderers,
+  filmstrip: filmstrip(),
+});
 const protectedViewer: LightboxController<DemoItem> = createLightbox({
   source,
   origins,
@@ -137,9 +145,11 @@ declare global {
     headlessViewer: typeof viewer;
     headlessSecondaryViewer: typeof secondaryViewer;
     headlessProtectedViewer: typeof protectedViewer;
+    headlessFilmstripViewer: typeof filmstripViewer;
   }
 }
 
 window.headlessViewer = viewer;
 window.headlessSecondaryViewer = secondaryViewer;
+window.headlessFilmstripViewer = filmstripViewer;
 window.headlessProtectedViewer = protectedViewer;

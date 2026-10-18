@@ -21,6 +21,8 @@ import {
 import type {
   LightboxController,
   LightboxDispose,
+  LightboxExtension,
+  LightboxExtensionInstance,
   LightboxItem,
   LightboxOrigin,
   LightboxPortalRenderer,
@@ -125,6 +127,10 @@ export class DomViewerDriver<
   #controller: LightboxController<TItem> | undefined;
   #strip: ViewerStrip<TItem> | undefined;
   #portalDispose: LightboxDispose | undefined;
+  #source: LightboxSource<TItem> | undefined;
+  #extensions: LightboxExtensionInstance<TItem>[] = [];
+  /** The extension that took the current vertical touch drag, if one did. */
+  #dragExtension: LightboxExtensionInstance<TItem> | undefined;
   #animations: Animation[] = [];
   #interruptedPose: PaintedPose | undefined;
   #activeOrigin: HTMLElement | null = null;
@@ -296,18 +302,34 @@ export class DomViewerDriver<
     return this.#zoomLoad;
   }
 
-  connect(controller: LightboxController<TItem>, renderer?: LightboxPortalRenderer<TItem>) {
+  connect(
+    controller: LightboxController<TItem>,
+    renderer?: LightboxPortalRenderer<TItem>,
+    extensions: readonly (LightboxExtension<TItem> | undefined)[] = [],
+  ) {
     this.#controller = controller;
-    if (!renderer) return;
     this.#portalDispose =
-      renderer.mount({
+      renderer?.mount({
         target: this.#portal.portalTarget,
         controller,
         signal: this.#lifetime.signal,
       }) ?? undefined;
+    for (const extension of extensions) {
+      if (!extension || !this.#source) continue;
+      this.#extensions.push(
+        extension.mount({
+          dialog: this.#portal.dialog,
+          controller,
+          source: this.#source,
+          signal: this.#lifetime.signal,
+        }),
+      );
+    }
   }
 
   setSource(source: LightboxSource<TItem>) {
+    this.#source = source;
+    for (const extension of this.#extensions) extension.setSource?.(source);
     this.#discardPreparation();
     this.#preparedFlight = undefined;
     if (this.#strip) {
@@ -579,6 +601,13 @@ export class DomViewerDriver<
   }
 
   async close(context: ViewerSessionCloseContext) {
+    const settling = this.#extensions
+      .map((extension) => extension.beforeClose?.())
+      .filter((result): result is Promise<void> => result instanceof Promise);
+    if (settling.length) {
+      await Promise.all(settling);
+      if (context.signal.aborted) return;
+    }
     this.#zoom?.suspend();
     this.#cancelAnimations(true);
     const interruptedPose = this.#takeInterruptedPose(false);
@@ -741,6 +770,8 @@ export class DomViewerDriver<
     this.#cancelAnimations(false);
     this.#portalDispose?.();
     this.#portalDispose = undefined;
+    for (const extension of this.#extensions) extension.destroy();
+    this.#extensions = [];
     this.#strip?.destroy();
     this.#strip = undefined;
     this.#finishClose();
@@ -1155,6 +1186,7 @@ export class DomViewerDriver<
   #prepareZoom() {
     if (
       this.#controller?.state.status !== "open" ||
+      this.#extensions.some((extension) => extension.allowsZoom?.() === false) ||
       this.#flight ||
       !this.#strip ||
       !(this.#media instanceof HTMLImageElement)
@@ -1694,7 +1726,10 @@ export class DomViewerDriver<
 
   #onKeydown = (event: KeyboardEvent) => {
     if (!this.#portal.overlay.isConnected) return;
-    if (event.key === "Escape") {
+    if (this.#extensions.some((extension) => extension.keydown?.(event))) {
+      event.preventDefault();
+      event.stopPropagation();
+    } else if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
       void this.#controller?.close({ reason: "keyboard" });
@@ -1778,7 +1813,7 @@ export class DomViewerDriver<
         (target) =>
           target instanceof HTMLElement &&
           target.matches(
-            `${includeMedia ? "video, audio, " : ""}iframe, input, select, textarea, button, summary, a[href], [contenteditable], [data-lightbox-filmstrip]`,
+            `${includeMedia ? "video, audio, " : ""}iframe, input, select, textarea, button, summary, a[href], [contenteditable], [data-lightbox-filmstrip], [data-lightbox-sheet]`,
           ),
       );
   }
@@ -1793,6 +1828,7 @@ export class DomViewerDriver<
     ) {
       return;
     }
+    this.#dragExtension = undefined;
     this.#pointer = {
       id: event.pointerId,
       x: event.clientX,
@@ -1821,19 +1857,38 @@ export class DomViewerDriver<
     this.#suppressClick = true;
     clearTimeout(this.#suppressClickTimer);
     this.#suppressClickTimer = setTimeout(() => (this.#suppressClick = false), 400);
+    if (!this.#dragGesture.active && !this.#dragExtension) {
+      this.#dragExtension = this.#extensions.find((extension) => extension.claimDrag?.(y));
+      this.#dragExtension?.drag?.("start", pointer.y);
+    }
+    if (this.#dragExtension) {
+      this.#dragExtension.drag?.("move", event.clientY);
+      return;
+    }
     this.#beginDrag();
     this.#dragGesture.moveTouch(x, y);
   };
 
   #onPointerEnd = (event: PointerEvent) => {
     if (event.pointerId !== this.#pointer?.id) return;
+    if (this.#releaseExtensionDrag("end", event.clientY)) return;
     this.#endDrag();
   };
 
   #onPointerCancel = (event: PointerEvent) => {
     if (event.pointerId !== this.#pointer?.id) return;
+    if (this.#releaseExtensionDrag("cancel", event.clientY)) return;
     this.#endDrag(true);
   };
+
+  #releaseExtensionDrag(phase: "end" | "cancel", clientY: number) {
+    const extension = this.#dragExtension;
+    if (!extension) return false;
+    this.#dragExtension = undefined;
+    this.#pointer = undefined;
+    extension.drag?.(phase, clientY);
+    return true;
+  }
 
   #onWheel = (event: WheelEvent) => {
     if (this.#controller?.state.status === "closing") {
@@ -1852,6 +1907,12 @@ export class DomViewerDriver<
     }
     event.preventDefault();
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+    if (
+      !this.#dragGesture.active &&
+      this.#extensions.some((extension) => extension.wheel?.(event.deltaY * unit))
+    ) {
+      return;
+    }
     const direction = Math.sign(-event.deltaY);
     this.#beginDrag(direction);
     this.#dragGesture.moveWheel(event.deltaY * unit);

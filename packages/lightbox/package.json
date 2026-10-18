@@ -13,8 +13,10 @@
     "./src/gallery.ts",
     "./src/filmstrip.ts",
     "./src/styles.css",
+    "./src/sheet.css",
     "./dist/elements.js",
-    "./dist/styles.css"
+    "./dist/styles.css",
+    "./dist/sheet.css"
   ],
   "exports": {
     ".": {
@@ -41,9 +43,21 @@
       "types": "./dist/angular.d.ts",
       "import": "./dist/angular.js"
     },
+    "./filmstrip": {
+      "types": "./dist/filmstrip.d.ts",
+      "import": "./dist/filmstrip.js"
+    },
+    "./sheet": {
+      "types": "./dist/sheet.d.ts",
+      "import": "./dist/sheet.js"
+    },
     "./styles.css": {
       "types": "./dist/styles.css.d.ts",
       "default": "./dist/styles.css"
+    },
+    "./sheet.css": {
+      "types": "./dist/sheet.css.d.ts",
+      "default": "./dist/sheet.css"
     }
   },
   "scripts": {

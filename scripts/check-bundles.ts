@@ -2,7 +2,16 @@ import { readFile, writeFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import { build } from "tsdown";
 
-const entrypoints = ["root", "elements", "react", "solid", "vue", "angular"] as const;
+const entrypoints = [
+  "root",
+  "elements",
+  "react",
+  "solid",
+  "vue",
+  "angular",
+  "filmstrip",
+  "sheet",
+] as const;
 type Entry = (typeof entrypoints)[number];
 const frameworkPeers = ["react", "react-dom", "solid-js", "vue", "@angular/core"] as const;
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -12,33 +21,41 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   solid: ["solid-js"],
   vue: ["vue"],
   angular: ["@angular/core"],
+  filmstrip: [],
+  sheet: [],
 };
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 18_600,
-  elements: 25_000,
-  react: 22_700,
+  root: 23_100,
+  elements: 28_100,
+  react: 27_550,
   solid: 1_500,
   vue: 1_500,
   angular: 1_500,
+  filmstrip: 3_100,
+  sheet: 3_600,
 };
 const cssGzipLimit = 5_300;
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 40_100,
-  elements: 26_850,
-  react: 26_350,
-  solid: 27_100,
-  vue: 27_225,
-  angular: 27_100,
+  root: 33_100,
+  elements: 32_100,
+  react: 31_550,
+  solid: 32_350,
+  vue: 32_450,
+  angular: 32_350,
+  filmstrip: 3_100,
+  sheet: 3_600,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 43_920,
-  elements: 30_780,
-  react: 30_280,
-  solid: 31_040,
-  vue: 31_160,
-  angular: 31_030,
+  root: 38_350,
+  elements: 37_350,
+  react: 36_800,
+  solid: 37_600,
+  vue: 37_700,
+  angular: 37_600,
+  filmstrip: 8_400,
+  sheet: 5_100,
 };
 
 type Chunk = Extract<
@@ -65,6 +82,8 @@ if (
 }
 const jsonPath = jsonIndex === -1 ? null : process.argv[jsonIndex + 1];
 const css = sizeOf(await readFile("packages/lightbox/dist/styles.css"));
+// The sheet ships its own stylesheet on top of the base one.
+const sheetCss = sizeOf(await readFile("packages/lightbox/dist/sheet.css"));
 const tsdownInfo = JSON.parse(await readFile("node_modules/tsdown/package.json", "utf8")) as {
   version: string;
 };
@@ -163,9 +182,10 @@ for (const name of entrypoints) {
     }),
     { rawBytes: 0, gzipBytes: 0 },
   );
+  const entryCss = name === "sheet" ? sheetCss : css;
   const activationWithCss = {
-    rawBytes: activationJs.rawBytes + css.rawBytes,
-    gzipBytes: activationJs.gzipBytes + css.gzipBytes,
+    rawBytes: activationJs.rawBytes + entryCss.rawBytes,
+    gzipBytes: activationJs.gzipBytes + entryCss.gzipBytes,
   };
   const forbidden = [...externals].filter((specifier) => {
     const peer = peerFor(specifier);
@@ -173,6 +193,10 @@ for (const name of entrypoints) {
   });
   const initialCode = initialChunks.map((chunk) => chunk.code).join("\n");
   const registersLightbox = /customElements\.define\([`"']app-lightbox[`"']/.test(initialCode);
+  // Extensions cost nothing until imported: no core entry may carry their code.
+  const activationCode = activationChunks.map((chunk) => chunk.code).join("\n");
+  const carriesExtension =
+    name !== "filmstrip" && name !== "sheet" && /lightboxSheetHost/.test(activationCode);
   const errors = [
     unresolved.size && `unresolved runtime externals: ${[...unresolved].join(", ")}`,
     forbidden.length && `unexpected framework imports: ${forbidden.join(", ")}`,
@@ -184,6 +208,7 @@ for (const name of entrypoints) {
       `activation with CSS gzip budget exceeded (${activationWithCssGzipLimits[name]} B)`,
     name !== "elements" && registersLightbox && "custom elements loaded eagerly",
     name === "elements" && !registersLightbox && "custom element registration missing",
+    carriesExtension && "sheet extension bundled into a core entry",
   ].filter((error): error is string => typeof error === "string");
 
   report.entries[name] = {
