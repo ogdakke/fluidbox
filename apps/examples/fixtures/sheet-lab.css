@@ -158,6 +158,9 @@ html[data-lab-backdrop="blur"] .sl-backdrop {
 
 .sl-figure {
   display: grid;
+  /* A fixed track, so the image's max-height resolves and a tall photo
+     narrows to fit the height instead of overflowing it. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   height: 100%;
   margin: 0;
