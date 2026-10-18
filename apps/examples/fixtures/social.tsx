@@ -256,7 +256,9 @@ function Composer({ me }: { me: Person }) {
     <form className="x-composer" onSubmit={(event) => event.preventDefault()}>
       <Avatar person={me} size={32} />
       <input aria-label="Post your reply" placeholder="Post your reply" />
-      <button type="submit">Reply</button>
+      <button type="submit" className="fb-button fb-button--primary fb-button--small" disabled>
+        Reply
+      </button>
     </form>
   );
 }
@@ -297,7 +299,7 @@ function XViewer({ replies }: { replies: LightboxSheet }) {
               <Name person={active.by} />
               <span className="x-muted">@{active.by.handle}</span>
             </span>
-            <button type="button" className="x-follow">
+            <button type="button" className="fb-button fb-button--primary fb-button--small">
               Follow
             </button>
           </header>
@@ -330,7 +332,7 @@ function XViewer({ replies }: { replies: LightboxSheet }) {
                 <Name person={active.by} />
                 <span className="x-muted">@{active.by.handle}</span>
               </span>
-              <button type="button" className="x-follow">
+              <button type="button" className="fb-button fb-button--primary fb-button--small">
                 Follow
               </button>
             </header>
@@ -516,7 +518,7 @@ function InstagramProfile() {
           <div>
             <p className="ig-profile__name">
               <Name person={profile} />
-              <button type="button" className="ig-follow ig-follow--solid">
+              <button type="button" className="fb-button fb-button--primary fb-button--small">
                 Follow
               </button>
             </p>
@@ -607,8 +609,9 @@ function App() {
             out as soon as a dismiss starts, by drag or by close. A cancelled drag brings it back.
           </li>
           <li>
-            <strong>Zoom and the stage: fixed.</strong> Zoom pans, bounds and centres inside the
-            stage, so it no longer fills under the action row or the sidebar.
+            <strong>Zoom and the stage: fixed.</strong> Zoom centres inside the stage and pans under
+            its insets, so a zoomed photo runs under the action row but still stops at the stage
+            edge. --lightbox-zoom-clip keeps it inside instead.
           </li>
           <li>
             <strong>Instagram's card: fixed.</strong> The stage insets alone make the box, and the

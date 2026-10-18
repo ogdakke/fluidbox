@@ -84,9 +84,9 @@ export function Badge({ kind }: { kind: "blue" | "gold" }) {
     >
       <path d={rosette} />
       <path
+        className="badge__check"
         d="M7.6 12.3l3 3 5.9-6.3"
         fill="none"
-        stroke="#fff"
         strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"

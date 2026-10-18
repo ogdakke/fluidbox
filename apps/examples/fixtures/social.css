@@ -1,14 +1,10 @@
 /* Social viewers. Page layout comes from the Safari chrome lab; tokens from @ogdakke/fluidbox-design.
+   The structure follows X and Instagram; the look stays ours: monochrome,
+   hairlines, square controls.
    Inside the viewer: --lightbox-stage-* insets make room around the photo,
    data-lightbox-chrome fades the floating layers in after the opening flight and
    out when a dismiss starts, and the sheet entry raises data-lightbox-sheet over
    the photo on a phone. */
-
-:root {
-  --x-blue: #1d9bf0;
-  --x-pink: #f91880;
-  --x-green: #00ba7c;
-}
 
 /* Shared pieces. */
 .avatar {
@@ -37,10 +33,13 @@
   flex: none;
   width: 1.15em;
   height: 1.15em;
-  fill: var(--x-blue);
+  fill: var(--fb-fg);
+}
+.badge__check {
+  stroke: var(--fb-bg);
 }
 .badge[data-kind="gold"] {
-  fill: #e2b719;
+  fill: var(--fb-highlight);
 }
 .icon {
   display: block;
@@ -64,28 +63,15 @@
   box-sizing: content-box;
   padding: 7px;
   margin: -7px 0 -7px -7px;
-  border-radius: 50%;
   transition:
     background 120ms,
     color 120ms;
 }
 .count:hover {
-  color: var(--x-blue);
+  color: var(--fb-fg);
 }
 .count:hover .icon {
-  background: color-mix(in srgb, var(--x-blue) 14%, transparent);
-}
-.count[data-icon="repost"]:hover {
-  color: var(--x-green);
-}
-.count[data-icon="like"]:hover {
-  color: var(--x-pink);
-}
-.count[data-icon="repost"]:hover .icon {
-  background: color-mix(in srgb, var(--x-green) 14%, transparent);
-}
-.count[data-icon="like"]:hover .icon {
-  background: color-mix(in srgb, var(--x-pink) 14%, transparent);
+  background: var(--fb-surface-2);
 }
 .x-muted,
 .ig-muted {
@@ -93,20 +79,19 @@
 }
 
 /* X feed. */
+/* The feed is part of the page: posts run in a column with a hairline between. */
 .x-feed {
-  max-width: 600px;
-  margin: 0 var(--fb-gutter) 28px;
-  border: 1px solid var(--fb-line);
-  border-radius: 16px;
-  overflow: hidden;
+  max-width: 640px;
+  margin: 0 0 28px;
+  padding: 0 var(--fb-gutter);
 }
 .x-post {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   gap: 12px;
-  padding: 12px 16px 6px;
+  padding: 16px 0 8px;
   font-size: 15px;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 .x-post + .x-post {
   border-top: 1px solid var(--fb-line);
@@ -142,8 +127,7 @@
   gap: 2px;
   margin-top: 8px;
   overflow: hidden;
-  border: 1px solid var(--fb-line);
-  border-radius: 16px;
+  border-radius: var(--fb-image-radius);
 }
 .x-grid[data-count="1"] {
   grid-template-columns: 1fr;
@@ -170,26 +154,46 @@
   aspect-ratio: auto;
   max-height: 510px;
 }
+/* Equal columns that shrink, so a narrow post never pushes past the screen. */
 .x-counts {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   align-items: center;
   color: var(--fb-muted);
+}
+.x-counts:not(:has(.x-counts__end)) {
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
 }
 .x-counts__end {
   display: flex;
   gap: 4px;
 }
+/* On a narrow phone, as in X's app: a smaller avatar and no bookmark in the row. */
+@media (width < 480px) {
+  .x-post {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .x-post .avatar {
+    width: 36px;
+    height: 36px;
+  }
+  .x-post .count {
+    gap: 2px;
+    font-size: 12px;
+  }
+  .x-post .x-counts__end [data-icon="bookmark"] {
+    display: none;
+  }
+}
 .x-counts--small {
   max-width: 300px;
 }
 
-/* X viewer, wide: a black stage, the post and its replies in a sidebar, and the
-   counts under the photo. The stage leaves room for both, so the photo, zoom
-   and the arrows keep to it; the close button moves to the top left, as on X. */
-[data-lightbox-overlay]:has(.x-layer) {
-  --lightbox-backdrop-background: #000;
-}
+/* X viewer, wide: the post and its replies in a sidebar, and the counts under
+   the photo. The stage leaves room for both, so the photo, the opening flight
+   and the arrows keep to it; zoom pans under the see-through action row. The
+   close button moves to the top left, as on X. */
 [data-lightbox-dialog]:has(.x-layer) {
   --x-aside: 350px;
   --x-bar: 52px;
@@ -204,28 +208,13 @@
   top: 12px;
   right: auto;
   left: 12px;
-  width: 36px;
-  height: 36px;
-}
-/* Round, translucent controls as on X; the design system squares them elsewhere. */
-[data-lightbox-dialog]:has(.x-layer)
-  :is([data-lightbox-close], [data-lightbox-previous], [data-lightbox-next]) {
-  border: 0;
-  border-radius: 50%;
-  background: rgb(15 20 25 / 0.75);
-  color: #fff;
-  backdrop-filter: blur(4px);
-}
-[data-lightbox-dialog]:has(.x-layer) :is([data-lightbox-previous], [data-lightbox-next]) {
-  width: 36px;
-  height: 36px;
 }
 .x-layer {
   position: absolute;
   inset: 0;
   z-index: 6;
   pointer-events: none;
-  color: #e7e9ea;
+  color: var(--fb-fg);
 }
 .x-layer > * {
   pointer-events: auto;
@@ -236,14 +225,17 @@
   right: calc(var(--x-aside) + 12px);
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: rgb(15 20 25 / 0.75);
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-bg);
   color: inherit;
   cursor: pointer;
+}
+.x-toggle:hover {
+  border-color: var(--fb-fg);
+  background: var(--fb-surface-2);
 }
 .x-layer[data-aside="closed"] .x-toggle .icon {
   rotate: 180deg;
@@ -260,6 +252,7 @@
   height: var(--x-bar);
   padding: 0 16px;
   margin-left: max(0px, (100% - var(--x-aside) - 600px) / 2);
+  color: var(--fb-muted);
 }
 .x-aside {
   position: absolute;
@@ -286,18 +279,6 @@
   display: grid;
   min-width: 0;
   line-height: 1.25;
-}
-.x-follow {
-  height: 32px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--fb-fg);
-  color: var(--fb-bg);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
 }
 .x-text {
   margin: 12px 0;
@@ -330,20 +311,12 @@
   background: none;
   color: inherit;
   font: inherit;
-  font-size: 17px;
+  font-size: 16px;
   outline: none;
 }
-.x-composer button {
-  height: 34px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--fb-fg);
-  color: var(--fb-bg);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  opacity: 0.5;
+.x-composer input::placeholder,
+.ig-add input::placeholder {
+  color: var(--fb-faint);
 }
 .x-replies {
   margin: 0;
@@ -373,13 +346,15 @@
    raises the replies in a sheet as the photo shrinks into the room above it. */
 @media (width < 900px) {
   [data-lightbox-overlay]:has(.x-layer) {
-    --lightbox-backdrop-background: #000;
+    --lightbox-backdrop-background: #0a0a0a;
   }
   [data-lightbox-dialog]:has(.x-layer) {
     --x-aside: 0px;
     --x-bar: 0px;
     --lightbox-sheet-enabled: 1;
     --lightbox-sheet-max-height: 62svh;
+    --lightbox-sheet-radius: 0px;
+    --lightbox-sheet-radius: 0px;
   }
   [data-lightbox-dialog]:has(.x-layer) :is([data-lightbox-previous], [data-lightbox-next]),
   .x-layer,
@@ -392,8 +367,8 @@
     z-index: 6;
     display: block;
     padding: 48px 16px calc(4px + env(safe-area-inset-bottom, 0px));
-    background: linear-gradient(transparent, rgb(0 0 0 / 0.55) 32px, rgb(0 0 0 / 0.82));
-    color: #e7e9ea;
+    background: linear-gradient(transparent, rgb(10 10 10 / 0.55) 32px, rgb(10 10 10 / 0.85));
+    color: #ededee;
     font-size: 15px;
     line-height: 1.35;
   }
@@ -403,12 +378,20 @@
   [data-sheet-raised] .x-phone {
     pointer-events: none;
   }
-  .x-phone .x-follow {
-    background: #eff3f4;
-    color: #0f1419;
+  /* Over the photo the page's light controls would glare; these keep to the dark. */
+  .x-phone .fb-button {
+    border-color: #ededee;
+    background: #ededee;
+    color: #0a0a0a;
   }
   .x-phone .x-muted {
-    color: #a3adb5;
+    color: #a3a3ab;
+  }
+  .x-phone .badge {
+    fill: #ededee;
+  }
+  .x-phone .badge__check {
+    stroke: #0a0a0a;
   }
   .x-phone .x-text {
     display: -webkit-box;
@@ -453,7 +436,8 @@
 /* Instagram profile. */
 .ig-profile {
   max-width: 760px;
-  margin: 0 var(--fb-gutter) 28px;
+  margin: 0 0 28px;
+  padding: 0 var(--fb-gutter);
   font-size: 14px;
 }
 .ig-profile__head {
@@ -498,17 +482,12 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #0095f6;
+  color: inherit;
   font: inherit;
   font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
-}
-.ig-follow--solid {
-  padding: 0 16px;
-  border-radius: 8px;
-  background: #0095f6;
-  color: #fff;
-  font-size: 14px;
 }
 
 /* Instagram viewer, wide: a fixed card, centred, of a 4:5 photo box and a 400px
@@ -545,7 +524,6 @@
   width: var(--ig-box);
   height: var(--ig-height);
   z-index: -1;
-  border-radius: 6px 0 0 6px;
   background: var(--fb-surface);
 }
 .ig-panel {
@@ -558,7 +536,7 @@
   width: var(--ig-panel);
   height: var(--ig-height);
   overflow: hidden;
-  border-radius: 0 6px 6px 0;
+  border-left: 1px solid var(--fb-line);
   background: var(--fb-bg);
   color: var(--fb-fg);
   font-size: 14px;
@@ -661,10 +639,9 @@
 .ig-add button {
   border: 0;
   background: none;
-  color: #0095f6;
+  color: var(--fb-faint);
   font: inherit;
   font-weight: 600;
-  opacity: 0.5;
 }
 .ig-sheet {
   display: none;
@@ -683,6 +660,8 @@
     --lightbox-sheet-peek: calc(150px + env(safe-area-inset-bottom, 0px));
     --lightbox-sheet-gap: 0px;
     --lightbox-sheet-max-height: 55svh;
+    --lightbox-sheet-radius: 0px;
+    --lightbox-sheet-radius: 0px;
   }
   [data-lightbox-dialog]:has(.ig-layer) :is([data-lightbox-previous], [data-lightbox-next]),
   .ig-layer,
