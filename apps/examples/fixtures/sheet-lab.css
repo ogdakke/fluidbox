@@ -170,6 +170,15 @@ html[data-lab-backdrop="blur"] .sl-backdrop {
   animation-range: 0px var(--sl-d);
 }
 
+@keyframes sl-widen {
+  from {
+    scale: 1;
+  }
+  to {
+    scale: var(--sl-zoom, 1);
+  }
+}
+
 @keyframes sl-pull {
   from {
     scale: 0.88;
@@ -181,6 +190,11 @@ html[data-lab-backdrop="blur"] .sl-backdrop {
 
 .sl-figure img {
   display: block;
+  /* Widens from its top edge over the push; the stage's translate places it. */
+  transform-origin: 50% 0;
+  animation: sl-widen linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: var(--sl-d) calc(var(--sl-d) + var(--sl-p));
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
@@ -383,7 +397,8 @@ html[data-lab-debug="on"] .sl-backdrop {
   .sl-underlay,
   .sl-panel,
   .sl-stage,
-  .sl-figure {
+  .sl-figure,
+  .sl-figure img {
     animation: none;
   }
 

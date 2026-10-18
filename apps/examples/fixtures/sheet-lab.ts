@@ -208,7 +208,19 @@ function measure() {
     // panel overlaps a tall enough photo instead, its rounded top over the
     // photo's bottom edge; the floating pane keeps clear of it.
     const gap = current.overscroll === "on" ? -24 : 12;
+    // A photo narrower than the screen, like a tall screenshot, widens to the
+    // full width as iOS Photos does, from its top edge, while the stage carries
+    // its bottom to the same gap from the panel. Both run over the whole push.
+    const zoom = slide.clientWidth / photo.offsetWidth;
+    if (zoom > 1.01) {
+      const bottom = height - gap - photo.offsetTop - zoom * photo.offsetHeight;
+      slide.style.setProperty("--sl-zoom", String(zoom));
+      slide.style.setProperty("--sl-hold", `${bottom}px`);
+      slide.style.setProperty("--sl-hold-range", `${panelHeight}px`);
+      continue;
+    }
     const hold = Math.min(height - (photo.offsetTop + photo.offsetHeight) - gap, panelHeight);
+    slide.style.setProperty("--sl-zoom", "1");
     slide.style.setProperty("--sl-hold", `${hold}px`);
     slide.style.setProperty("--sl-hold-range", `${hold >= 1 ? hold : panelHeight}px`);
   }
