@@ -17,11 +17,17 @@ type FlightCase = {
   readonly items: LightboxItem[];
   /** The card's inner markup. The visual box carries `data-lightbox-origin`. */
   readonly markup: string;
+  /**
+   * The card holds several items of one gallery. Each `data-flight-item`
+   * button opens its own item and is its origin.
+   */
+  readonly group?: boolean;
   /** Extra wiring once the controller exists. */
   readonly setup?: (controller: LightboxController, trigger: HTMLElement) => void;
 };
 
 const art = (id: string, itemId = `flight-${id}`) => artItem(sceneById(id), itemId);
+const scrollerScenes = ["canyon", "coast", "lagoon", "dune"];
 const video: LightboxItem = {
   id: "flight-video",
   media: {
@@ -104,9 +110,15 @@ const cases: FlightCase[] = [
     id: "scroll",
     title: "Inside a scroller",
     expect:
-      "The scroller hides a third of the card. The flight leaves from and lands on the visible part.",
-    items: [art("canyon")],
-    markup: `<span class="flight-scroller" data-flight-scroller><span class="flight-scroller__spacer"></span><span class="flight-visual" data-lightbox-origin><img src="${artSrc(sceneById("canyon"))}" alt="" /></span><span class="flight-scroller__spacer"></span></span>`,
+      "Four photos in one gallery. The scroller hides a third of the first; every flight leaves from and lands on the visible part.",
+    items: scrollerScenes.map((id) => art(id)),
+    group: true,
+    markup: `<span class="flight-scroller" data-flight-scroller>${scrollerScenes
+      .map(
+        (id, index) =>
+          `<button type="button" class="flight-trigger flight-scroller__item" data-flight-item="flight-${id}"${index === 0 ? " data-flight-trigger" : ""} aria-label="Open ${sceneById(id).title}"><span class="flight-visual" data-lightbox-origin><img src="${artSrc(sceneById(id))}" alt="" /></span></button>`,
+      )
+      .join("")}</span>`,
   },
   {
     id: "sticky",
@@ -166,35 +178,54 @@ for (const flight of cases) {
   cell.className = "fb-cell flight-case";
   cell.dataset.flightCase = flight.id;
   cell.innerHTML = `
-    <button type="button" class="flight-trigger" data-flight-trigger aria-label="Open ${flight.title}">${flight.markup}</button>
+    ${
+      flight.group
+        ? `<div class="flight-group">${flight.markup}</div>`
+        : `<button type="button" class="flight-trigger" data-flight-trigger aria-label="Open ${flight.title}">${flight.markup}</button>`
+    }
     <h3>${flight.title}</h3>
     <p>${flight.expect}</p>`;
   grid.append(cell);
   const trigger = cell.querySelector<HTMLElement>("[data-flight-trigger]")!;
-  const origin = (): LightboxOrigin => {
+  const triggerFor = (id: string) =>
+    flight.group
+      ? cell.querySelector<HTMLElement>(`[data-flight-item="${CSS.escape(id)}"]`)
+      : trigger;
+  const origin = (id: string): LightboxOrigin | null => {
+    const button = triggerFor(id);
+    if (!button) return null;
     const visual =
-      trigger.querySelector<HTMLElement>("[data-lightbox-origin]") ??
-      trigger.querySelector<HTMLElement>("video") ??
-      trigger;
+      button.querySelector<HTMLElement>("[data-lightbox-origin]") ??
+      button.querySelector<HTMLElement>("video") ??
+      button;
     const thumbnail = visual.matches("img") ? visual : visual.querySelector("img");
-    return { trigger, visual, thumbnail: (thumbnail as HTMLImageElement | null) ?? undefined };
+    return {
+      trigger: button,
+      visual,
+      thumbnail: (thumbnail as HTMLImageElement | null) ?? undefined,
+    };
   };
   const controller = createLightbox({
     source: arraySource(flight.items),
-    origins: { getOrigin: (id) => (flight.items.some((item) => item.id === id) ? origin() : null) },
+    origins: {
+      getOrigin: (id) => (flight.items.some((item) => item.id === id) ? origin(id) : null),
+    },
   });
   flight.setup?.(controller, trigger);
-  trigger.addEventListener("click", () => {
-    void controller.open({ id: flight.items[0]!.id }, { reason: "trigger" });
-  });
+  for (const item of flight.items) {
+    triggerFor(item.id)?.addEventListener("click", () => {
+      void controller.open({ id: item.id }, { reason: "trigger" });
+    });
+  }
   viewers[flight.id] = controller;
 }
 
-// Scroll the card a third of the way out, so the scroller clips its left side.
+// Scroll the first photo a third of the way out, so the scroller clips its left side.
 const scroller = document.querySelector<HTMLElement>("[data-flight-scroller]");
 const scrolled = scroller?.querySelector<HTMLElement>("[data-lightbox-origin]");
 if (scroller && scrolled) {
-  scroller.scrollLeft = scrolled.offsetLeft - scroller.offsetLeft + scrolled.offsetWidth / 3;
+  const rect = scrolled.getBoundingClientRect();
+  scroller.scrollLeft += rect.left - scroller.getBoundingClientRect().left + rect.width / 3;
 }
 
 if (new URLSearchParams(location.search).has("slow")) {

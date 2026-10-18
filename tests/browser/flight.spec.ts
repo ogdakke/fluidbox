@@ -314,6 +314,24 @@ test("the card stays painted until the opening has been on screen for a frame", 
   expect(seen.at(-1), "the card is hidden once the overlay has painted").toBe("hidden");
 });
 
+test("every photo in the scroller opens its own slide of one gallery", async ({ page }) => {
+  await prepareCase(page, "scroll");
+  const items = page.locator('[data-flight-case="scroll"] [data-flight-item]');
+  await expect(items).toHaveCount(4);
+  const second = items.nth(1);
+  await second.scrollIntoViewIfNeeded();
+  await second.click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
+  await expect(second.locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+  // The viewer browses the whole gallery, and the card it hides follows.
+  await page.keyboard.press("ArrowRight");
+  await expect(items.nth(2).locator("img")).toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+  await expect(second.locator("img")).not.toHaveAttribute("data-lightbox-thumbnail-hidden");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+});
+
 test("a travelling badge never widens the page", async ({ page }) => {
   // On a phone the card is nearly as wide as the screen, so the growing badge
   // layer passes the right edge. A wider page makes mobile Safari zoom it out.
