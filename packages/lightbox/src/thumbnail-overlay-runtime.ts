@@ -163,6 +163,9 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
       if (active.frameLayer && active.frameLayer.parentElement !== frame)
         frame.append(active.frameLayer);
       this.#position(active.target, frame);
+      // A close flight is appended to the body after the opening created this
+      // target. Move the target after it so the content stays above the image.
+      if (active.target.nextElementSibling) this.#document.body.append(active.target);
     }
     this.set(phase, progress);
   }

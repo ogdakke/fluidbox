@@ -30,6 +30,13 @@ const cases = [
  */
 const knownGaps = new Set<string>(["contain", "position", "scroll", "video-inline", "iframe"]);
 
+/**
+ * The player keeps its native controls through the flight on purpose, so
+ * playback is never interrupted. The poster card has none, and whether the
+ * controls show without hover depends on the browser.
+ */
+const intendedDifferences = new Set<string>(["video-poster"]);
+
 type Box = { x: number; y: number; width: number; height: number };
 
 /**
@@ -98,7 +105,15 @@ async function armHold(page: Page, at: "start" | "middle" | "end") {
           "[data-lightbox-overlay] [data-lightbox-frame], [data-lightbox-flight] [data-lightbox-frame]",
         ),
       ).some((frame) =>
-        frame.getAnimations().some((animation) => animation.playState === "running"),
+        frame
+          .getAnimations()
+          // CSS transitions can start before the runtime has assembled its flight.
+          .some(
+            (animation) =>
+              animation.playState === "running" &&
+              !(animation instanceof CSSTransition) &&
+              !(animation instanceof CSSAnimation),
+          ),
       );
       if (!moving) return;
       clearInterval(timer);
@@ -153,6 +168,7 @@ async function prepareCase(page: Page, id: string) {
 
 for (const id of cases) {
   test(`flight from the "${id}" card starts and ends on the card`, async ({ page }) => {
+    test.skip(intendedDifferences.has(id), "the player keeps its native controls in flight");
     test.fail(knownGaps.has(id), "the flight still draws the media, not the origin");
     const trigger = await prepareCase(page, id);
     const box = await visibleOrigin(page, id);
@@ -202,6 +218,52 @@ test("a travelling badge keeps its size through the flight", async ({ page }) =>
     .locator("[data-lightbox-transition-content]")
     .evaluate((target) => Number(getComputedStyle(target).opacity));
   expect(opacity, "the badge is visible mid-flight").toBeGreaterThan(0.9);
+  // The badge is near-black with white text. If the flying image covered it,
+  // this patch would be the light photo with no dark pixels at all.
+  const patch = await page.screenshot({
+    clip: {
+      x: travelling.x + travelling.width / 2 - 6,
+      y: travelling.y + travelling.height / 2 - 4,
+      width: 12,
+      height: 8,
+    },
+    animations: "allow",
+  });
+  const dark = await page.evaluate(async (base64) => {
+    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const context = canvas.getContext("2d")!;
+    context.drawImage(bitmap, 0, 0);
+    const data = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    let count = 0;
+    for (let index = 0; index < data.length; index += 4) {
+      if (data[index]! + data[index + 1]! + data[index + 2]! < 150) count++;
+    }
+    return count / (data.length / 4);
+  }, patch.toString("base64"));
+  expect(dark, "the badge paints above the flying image").toBeGreaterThan(0.3);
   expect(travelling.width).toBeCloseTo(size.width, -1);
   expect(travelling.height).toBeCloseTo(size.height, -1);
+});
+
+test("a wheel during the opening takes over and dismisses", async ({ page }, testInfo) => {
+  test.skip(!!testInfo.project.use.isMobile, "Wheel input is a desktop scenario.");
+  // ?slow plays the opening at a tenth of its speed, so the wheel lands mid-flight.
+  await page.goto("/flight.html?slow");
+  const trigger = page.locator('[data-flight-case="cover"] [data-flight-trigger]');
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click();
+  const dialog = page.locator("[data-lightbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "opening");
+  await page.waitForTimeout(400);
+  const box = (await trigger.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(dialog, "the wheel lands while the opening still plays").toHaveAttribute(
+    "data-lightbox-state",
+    "opening",
+  );
+  await page.mouse.wheel(0, -500);
+  await expect(dialog).toHaveAttribute("data-lightbox-state", "closing");
+  await expect(dialog).toHaveCount(0, { timeout: 15_000 });
 });

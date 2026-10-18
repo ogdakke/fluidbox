@@ -125,7 +125,8 @@ const cases: FlightCase[] = [
   {
     id: "video-poster",
     title: "Poster to video",
-    expect: "The poster grows into the player without a flash; closing lands on the poster.",
+    expect:
+      "The poster grows into the player, controls and all, so playback never stops; closing lands on the poster.",
     items: [video],
     markup: `<span class="flight-visual" data-lightbox-origin><img src="/video/drift-poster.jpg" alt="" /><span class="flight-play" aria-hidden="true">▶</span></span>`,
   },
@@ -197,14 +198,22 @@ if (scroller && scrolled) {
 }
 
 if (new URLSearchParams(location.search).has("slow")) {
-  // Web Animations has no global rate, so slow each animation as it starts.
-  const slow = () => {
-    for (const animation of document.getAnimations()) {
-      if (animation.playbackRate === 1) animation.updatePlaybackRate(0.1);
-    }
-    requestAnimationFrame(slow);
+  // Web Animations has no global rate. Slow script animations as they are
+  // created, and CSS animations on a timer (WebKit throttles frame callbacks).
+  const animate = Object.getOwnPropertyDescriptor(Element.prototype, "animate")!.value as (
+    this: Element,
+    ...args: Parameters<Element["animate"]>
+  ) => Animation;
+  Element.prototype.animate = function (this: Element, ...args: Parameters<Element["animate"]>) {
+    const animation = animate.apply(this, args);
+    animation.playbackRate = 0.1;
+    return animation;
   };
-  requestAnimationFrame(slow);
+  setInterval(() => {
+    for (const animation of document.getAnimations()) {
+      if (animation.playbackRate === 1) animation.playbackRate = 0.1;
+    }
+  }, 16);
 }
 
 declare global {

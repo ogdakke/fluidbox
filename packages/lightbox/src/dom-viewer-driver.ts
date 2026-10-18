@@ -496,7 +496,8 @@ export class DomViewerDriver<
     if (context.signal.aborted) return;
     this.#setState("open");
     this.#strip?.completeOpening(context.index);
-    this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
+    // A gesture that interrupted the opening owns the overlays until it settles.
+    if (!this.#dragGesture.active) this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
     this.#thumbnailOverlays.finishControlsReveal();
     delete this.#portal.dialog.dataset.galleryControlsRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-gallery-controls-reveal-delay");
@@ -1224,8 +1225,14 @@ export class DomViewerDriver<
     this.#thumbnailOverlays.retarget(this.#animations, motion.frame);
   }
 
+  /** Gestures take over an opening in flight as well as a settled viewer. */
+  #acceptsGestures() {
+    const status = this.#controller?.state.status;
+    return status === "open" || status === "opening";
+  }
+
   #beginDrag(wheelDirection = 0) {
-    if (this.#dragGesture.active || this.#controller?.state.status !== "open") return;
+    if (this.#dragGesture.active || !this.#acceptsGestures()) return;
     this.#zoom?.suspend();
     this.#cancelAnimations(true);
     const frame = this.#frame;
@@ -1515,12 +1522,6 @@ export class DomViewerDriver<
       target.toggleAttribute("data-opening", state === "opening");
       target.toggleAttribute("data-dismissing", state === "closing");
     }
-    // Native video controls and their loading spinner would ride along with the flight.
-    for (const video of this.#portal.dialog.querySelectorAll<HTMLVideoElement>(
-      "video[data-lightbox-media]",
-    )) {
-      video.controls = state === "open";
-    }
     if (state === "closed") {
       delete this.#portal.dialog.dataset.galleryControlsRevealing;
       this.#portal.dialog.style.removeProperty("--lightbox-gallery-controls-reveal-delay");
@@ -1618,7 +1619,7 @@ export class DomViewerDriver<
     if (
       event.pointerType !== "touch" ||
       !event.isPrimary ||
-      this.#controller?.state.status !== "open" ||
+      !this.#acceptsGestures() ||
       this.#zoom?.zoomed ||
       this.#eventUsesNativeInteraction(event)
     ) {
@@ -1674,7 +1675,7 @@ export class DomViewerDriver<
     if (
       event.ctrlKey ||
       this.#zoom?.zoomed ||
-      this.#controller?.state.status !== "open" ||
+      !this.#acceptsGestures() ||
       Math.abs(event.deltaY) <= Math.abs(event.deltaX) * 1.3 ||
       this.#eventUsesNativeInteraction(event, false) ||
       (event.target instanceof Element && event.target.closest("[data-lightbox-portal]"))
