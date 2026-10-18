@@ -1,0 +1,262 @@
+/* Social viewers. Page layout comes from the Safari chrome lab; tokens from @ogdakke/fluidbox-design.
+   Everything inside the viewer is consumer CSS against today's package: the
+   stage is made room for by resizing the slide strip, which is not an API. */
+
+.byline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.2;
+}
+.byline small {
+  display: block;
+  color: var(--fb-muted);
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--fb-invert-bg);
+  color: var(--fb-invert-fg);
+  font-weight: 600;
+}
+
+/* Twitter feed. */
+.tw-feed {
+  display: grid;
+  gap: 16px;
+  max-width: 600px;
+  margin: 0 var(--fb-gutter) 28px;
+}
+.tw-post {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--fb-line);
+}
+.tw-post p {
+  margin: 0;
+}
+.tw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+.tw-grid[data-count="1"] {
+  grid-template-columns: 1fr;
+}
+.tw-grid button,
+.ig-grid button {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.tw-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+.tw-grid[data-count="1"] img {
+  aspect-ratio: auto;
+  max-height: 480px;
+}
+
+/* Twitter viewer. The stage is the dialog less the sidebar and the action row. */
+[data-lightbox-dialog]:has(.tw-layer) {
+  --tw-aside: 360px;
+  --tw-bar: 56px;
+  --lightbox-content-height: calc(var(--lightbox-height, 100svh) - var(--tw-bar));
+}
+[data-lightbox-dialog]:has(.tw-layer[data-aside="closed"]) {
+  --tw-aside: 0px;
+}
+[data-lightbox-dialog]:has(.tw-layer) [data-lightbox-slides] {
+  width: calc(100% - var(--tw-aside));
+}
+[data-lightbox-dialog]:has(.tw-layer) :is([data-lightbox-close], [data-lightbox-next]) {
+  right: calc(var(--tw-aside) + 16px);
+}
+.tw-aside {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 6;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  width: 360px;
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  border-left: 1px solid var(--fb-line);
+}
+.tw-aside p {
+  margin: 0;
+  font-size: 18px;
+}
+.tw-aside ul,
+.ig-panel ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 0 0;
+  list-style: none;
+  border-top: 1px solid var(--fb-line);
+}
+.tw-actions {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: calc(100% - var(--tw-aside));
+  height: var(--tw-bar);
+}
+.tw-actions button,
+.tw-toggle,
+.tw-pills button,
+.ig-actions button {
+  height: var(--fb-control-height);
+  padding: 0 14px;
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  font: inherit;
+  font-size: 14px;
+}
+.tw-toggle {
+  position: absolute;
+  top: 16px;
+  right: calc(var(--tw-aside) + 72px);
+  z-index: 6;
+}
+.tw-mobile,
+.tw-reply {
+  display: none;
+}
+
+/* X on a phone: no sidebar; the post, pills and a reply field sit along the bottom, over the photo. */
+@media (width < 900px) {
+  [data-lightbox-dialog]:has(.tw-layer) {
+    --tw-aside: 0px;
+    --tw-bar: 0px;
+  }
+  .tw-aside,
+  .tw-actions,
+  .tw-toggle {
+    display: none;
+  }
+  .tw-mobile {
+    position: absolute;
+    inset: auto 0 calc(64px + env(safe-area-inset-bottom, 0px));
+    z-index: 6;
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    color: var(--fb-fg);
+    background: linear-gradient(transparent, var(--fb-bg) 30%);
+  }
+  .tw-mobile p {
+    margin: 0;
+  }
+  .tw-pills {
+    display: flex;
+    gap: 8px;
+  }
+  .tw-pills button {
+    flex: 1;
+    border-radius: 999px;
+    background: var(--fb-surface);
+  }
+  .tw-reply {
+    position: absolute;
+    inset: auto 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 6;
+    display: block;
+    height: 44px;
+    padding: 0 18px;
+    border: 1px solid var(--fb-line-strong);
+    border-radius: 999px;
+    background: var(--fb-surface);
+    color: var(--fb-fg);
+    font: inherit;
+  }
+}
+
+/* Instagram grid. */
+.ig-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  max-width: 720px;
+  margin: 0 var(--fb-gutter) 28px;
+}
+.ig-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+/* Instagram viewer. Shrinking the strip by the panel's width centres the
+   photo-plus-panel card; the panel's place and height come from the photo's
+   size, which the fixture computes itself. */
+[data-lightbox-dialog]:has(.ig-panel) {
+  --ig-panel: 400px;
+  --ig-margin: 48px;
+  --lightbox-content-height: calc(var(--lightbox-height, 100svh) - var(--ig-margin) * 2);
+}
+[data-lightbox-dialog]:has(.ig-panel) [data-lightbox-slides] {
+  width: calc(100% - var(--ig-panel));
+  padding-top: var(--ig-margin);
+}
+.ig-panel {
+  position: absolute;
+  top: calc(50% - var(--ig-photo-height) / 2);
+  left: calc((100% - var(--ig-panel)) / 2 + var(--ig-photo-width) / 2);
+  z-index: 6;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 14px;
+  width: var(--ig-panel);
+  height: var(--ig-photo-height);
+  padding: 16px;
+  overflow: hidden;
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+}
+.ig-panel p {
+  margin: 0;
+}
+.ig-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (width < 900px) {
+  [data-lightbox-dialog]:has(.ig-panel) {
+    --ig-panel: 0px;
+    --ig-margin: 0px;
+  }
+  .ig-panel {
+    display: none;
+  }
+}
+
+.findings {
+  display: grid;
+  gap: 10px;
+  max-width: 80ch;
+  margin: 0 var(--fb-gutter) 40px;
+  padding-left: 1.2em;
+}

@@ -57,7 +57,7 @@ function watchPackageSource(): Plugin {
 
 export default defineConfig(({ command }) => ({
   plugins: [
-    react({ include: /(react|photo-library)\.tsx$/ }),
+    react({ include: /(react|photo-library|social)\.tsx$/ }),
     solid({ include: /solid\.tsx$/ }),
     watchPackageSource(),
   ],
