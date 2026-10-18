@@ -34,6 +34,10 @@ Every `<app-lightbox>` requires a stable `item-id`, one trigger, and one inert c
 
 The template is inert, so full-size resources do not load while the gallery is closed. `<app-gallery>` owns one `createLightbox()` controller. `<app-lightbox>` only describes an item and its transition origin. Non-image template content uses the core custom-media renderer and is cloned into the bounded slide window.
 
+For image items, set `placeholder-src` on `<app-lightbox>` to a small data URL or other immediately
+available image. The runtime paints it behind the slide's preview and full image, including adjacent
+slides during a swipe. The full image only covers it after decoding.
+
 ## Parts
 
 The main viewer parts have data selectors. The runtime does not generate class names. The body-level overlay and flight layer are separate from `app-lightbox`, so selectors for open viewer parts should start at `[data-lightbox-overlay]` or `[data-lightbox-flight]`, not at the host element.
@@ -69,6 +73,16 @@ target, mark the nested element with `data-lightbox-target`; it takes precedence
 box. `data-lightbox-thumbnail` remains the optional image source for loading and filmstrip artwork.
 
 An indexed gallery assigns a canonical `LightboxSource` to `gallery.source` and a `LightboxOriginAdapter` to `gallery.origins`. Mark a mounted trigger's visible clipped box with `data-lightbox-origin`. The descendant image remains the media preview even when a wrapper supplies geometry and corner radius. A virtualized host can implement `revealOrigin(id, index, { signal, reason })`. Viewer motion never waits for it, and the runtime aborts stale reveals on selection, close, source replacement, and teardown.
+
+Call `await gallery.whenReady()` before using `gallery.controller` from application JavaScript. It
+resolves after the initial source is compiled and rejects if the element disconnects first. The
+controller supports grouped origins through `registerOrigin(ids, origin)` and host overlay registration.
+For a trigger that represents another gallery item, set `lightbox.openItemId` to that item's id.
+The trigger keeps its own `item-id`; pointer preparation and clicks open the override. If a host
+updates the preview image to match the selection, mark its `<picture>` or other preview container
+with `data-lightbox-dynamic-preview` so changes inside the preview, including traveling overlay
+mounts and image attributes, do not rebuild the gallery source.
+Use `hide-close-button` on `<app-gallery>` to omit its default close control.
 
 ## State
 

@@ -15,6 +15,7 @@ interface OriginRegistration {
 export class OriginRegistry {
   readonly #adapter: LightboxOriginAdapter | undefined;
   readonly #registrations = new Map<LightboxItemId, OriginRegistration>();
+  readonly #shared = new Map<LightboxItemId, OriginRegistration[]>();
   #hiddenId: LightboxItemId | null = null;
   #hiddenThumbnail: HTMLImageElement | null = null;
 
@@ -24,7 +25,14 @@ export class OriginRegistry {
 
   get(id: LightboxItemId): LightboxOrigin | null {
     const registered = this.#registrations.get(id);
-    if (registered) return registered.origin;
+    if (registered && registered.origin.trigger.isConnected !== false) return registered.origin;
+    const shared = this.#shared.get(id);
+    if (shared) {
+      for (let index = shared.length - 1; index >= 0; index -= 1) {
+        const origin = shared[index]!.origin;
+        if (origin.trigger.isConnected !== false) return origin;
+      }
+    }
 
     try {
       const origin = this.#adapter?.getOrigin(id) ?? null;
@@ -35,19 +43,38 @@ export class OriginRegistry {
     }
   }
 
-  register(id: LightboxItemId, origin: LightboxOrigin): LightboxDispose {
+  register(id: LightboxItemId, origin: LightboxOrigin, shared = false): LightboxDispose {
     const token = {};
     if (origin.thumbnail) observeDecodedPreview(origin.thumbnail);
-    this.#registrations.set(id, { origin, token });
-    if (id === this.#hiddenId) this.#hideOriginThumbnail(origin);
+    if (shared) {
+      const registrations = this.#shared.get(id) ?? [];
+      registrations.push({ origin, token });
+      this.#shared.set(id, registrations);
+    } else {
+      this.#registrations.set(id, { origin, token });
+    }
+    if (id === this.#hiddenId && this.get(id) === origin) this.#hideOriginThumbnail(origin);
     let disposed = false;
 
     return () => {
       if (disposed) return;
       disposed = true;
-      if (this.#registrations.get(id)?.token !== token) return;
-      this.#registrations.delete(id);
-      if (id === this.#hiddenId) this.#restoreThumbnail();
+      if (shared) {
+        const registrations = this.#shared.get(id);
+        const index =
+          registrations?.findIndex((registration) => registration.token === token) ?? -1;
+        if (index < 0) return;
+        registrations!.splice(index, 1);
+        if (!registrations!.length) this.#shared.delete(id);
+      } else {
+        if (this.#registrations.get(id)?.token !== token) return;
+        this.#registrations.delete(id);
+      }
+      if (id === this.#hiddenId) {
+        this.#restoreThumbnail();
+        const current = this.get(id);
+        if (current) this.#hideOriginThumbnail(current);
+      }
     };
   }
 
@@ -66,6 +93,7 @@ export class OriginRegistry {
   clear() {
     this.restoreThumbnail();
     this.#registrations.clear();
+    this.#shared.clear();
   }
 
   #hideOriginThumbnail(origin: LightboxOrigin) {

@@ -59,6 +59,9 @@ function firstContentElement(template: HTMLTemplateElement) {
 
 /** A declarative item definition. Its parent app-gallery owns the viewer controller. */
 export class AppLightbox extends HTMLElement {
+  /** Override the item opened by this trigger without changing its own item identity. */
+  openItemId: string | null = null;
+
   connectedCallback() {
     queueMicrotask(() => {
       if (!this.isConnected) return;
@@ -120,6 +123,9 @@ export class AppLightbox extends HTMLElement {
       ":scope > [slot=description]",
     )?.textContent?.trim();
     const metadata = {
+      ...(this.getAttribute("placeholder-src")
+        ? { placeholder: { src: this.getAttribute("placeholder-src")! } }
+        : {}),
       ...(thumbnail
         ? { thumbnail: imageResource(thumbnail), preview: imageResource(thumbnail) }
         : {}),

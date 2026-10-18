@@ -15,7 +15,7 @@ app-lightbox > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: none;
 }
 
-app-lightbox > [data-lightbox-trigger] {
+app-lightbox > :is([slot="trigger"], [data-lightbox-trigger]) {
   appearance: none;
   box-sizing: border-box;
   margin: 0;
@@ -34,7 +34,7 @@ app-lightbox > [data-lightbox-trigger] {
   touch-action: manipulation;
 }
 
-app-lightbox > [data-lightbox-trigger]:focus-visible {
+app-lightbox > :is([slot="trigger"], [data-lightbox-trigger]):focus-visible {
   outline: 1px solid var(--border, currentColor);
   outline-offset: 2px;
 }
@@ -283,10 +283,10 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 
 :is([data-lightbox-overlay], [data-lightbox-flight])[data-lightbox-overlay] {
-  --lightbox-browser-chrome-gutter: 5px;
-
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: var(--lightbox-page-height, 100vh);
   z-index: var(--layer-lightbox, 7);
 }
 
@@ -329,14 +329,16 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-flight-source-hidden] {
   visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-container] {
-  position: fixed;
-  inset: 0;
+  position: sticky;
+  top: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   place-items: center;
+  width: 100%;
   height: var(--lightbox-height, 100svh);
   isolation: isolate;
   overscroll-behavior: contain;
@@ -345,19 +347,13 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-backdrop] {
-  position: fixed;
+  position: absolute;
   inset: 0;
   background: var(--lightbox-backdrop-background, var(--background, #111));
   opacity: var(--lightbox-backdrop-opacity, 1);
   transform: translateZ(0);
   will-change: opacity;
   cursor: zoom-out;
-}
-
-:is([data-lightbox-overlay], [data-lightbox-flight])[data-lightbox-edge-released]
-  [data-lightbox-backdrop] {
-  top: var(--lightbox-browser-chrome-gutter);
-  bottom: var(--lightbox-browser-chrome-gutter);
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-dialog] {
@@ -710,6 +706,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-frame] {
   position: relative;
+  isolation: isolate;
   width: max-content;
   max-width: 100vw;
   max-height: var(--lightbox-height, 100svh);
@@ -719,11 +716,50 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   overflow: hidden;
   will-change: transform, border-radius;
 }
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-travel-layer] {
+  z-index: 3;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-image-frame] {
+  background: var(--lightbox-image-placeholder-background, rgb(127 127 127 / 0.12));
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-frame]
+  :is([data-lightbox-slide-placeholder], [data-lightbox-slide-preview]) {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: top left;
+  pointer-events: none;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-slide-placeholder] {
+  z-index: 0;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-slide-preview] {
+  z-index: 1;
+  visibility: hidden;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-slide-preview][data-lightbox-image-ready] {
+  visibility: visible;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-frame]
+  > [data-lightbox-picture]
+  > [data-lightbox-media] {
+  position: relative;
+  z-index: 2;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-media][data-lightbox-image-pending] {
+  visibility: hidden;
+}
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-transition-layer] {
   --lightbox-progress: 1;
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 3;
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -889,6 +925,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-error] {
   position: absolute;
+  z-index: 4;
   bottom: 8px;
   left: 8px;
   right: 8px;

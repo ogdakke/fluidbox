@@ -43,6 +43,21 @@ function ContractExample(): ReactElement {
 }
 void ContractExample;
 
+function GroupedTrigger(): ReactElement {
+  return (
+    <Lightbox.Root items={items}>
+      <Lightbox.Trigger items={items} item={items[0]} asChild>
+        {({ item, status }) => (
+          <button type="button" data-status={status}>
+            {item?.id}
+          </button>
+        )}
+      </Lightbox.Trigger>
+    </Lightbox.Root>
+  );
+}
+void GroupedTrigger;
+
 // @ts-expect-error item identity is required
 const missingId = <Lightbox.Item />;
 void missingId;

@@ -3,6 +3,7 @@ import { arraySource } from "../src/array-source";
 import type { LightboxCommandResult, LightboxEvent, LightboxItem } from "../src/public-api";
 import {
   ViewerSession,
+  type ViewerSessionCloseContext,
   type ViewerSessionDriver,
   type ViewerSessionMotionContext,
 } from "../src/viewer-session";
@@ -45,11 +46,17 @@ class TestDriver implements ViewerSessionDriver<(typeof items)[number]> {
   readonly opens: ViewerSessionMotionContext<(typeof items)[number]>[] = [];
   readonly selections: ViewerSessionMotionContext<(typeof items)[number]>[] = [];
   readonly closes: AbortSignal[] = [];
+  readonly closeOrigins: ViewerSessionCloseContext["origin"][] = [];
+  readonly sourceUpdates: unknown[] = [];
   readonly steps: Deferred[] = [];
   destroyed = false;
   registerThumbnailOverlay: NonNullable<
     ViewerSessionDriver<(typeof items)[number]>["registerThumbnailOverlay"]
   > = () => {};
+
+  setSource(source: unknown) {
+    this.sourceUpdates.push(source);
+  }
 
   prepare(context: { item: (typeof items)[number]; index: number; origin: null }) {
     this.preparations.push(context);
@@ -72,8 +79,9 @@ class TestDriver implements ViewerSessionDriver<(typeof items)[number]> {
     return step.promise;
   }
 
-  close({ signal }: { signal: AbortSignal }) {
+  close({ signal, origin }: ViewerSessionCloseContext) {
     this.closes.push(signal);
+    this.closeOrigins.push(origin);
     const step = deferred();
     this.steps.push(step);
     return step.promise;
@@ -232,6 +240,49 @@ describe("ViewerSession", () => {
     expect(secondDriverDispose).toHaveBeenCalledOnce();
   });
 
+  it("resolves a shared origin again after its close preview changes", async () => {
+    const driver = new TestDriver();
+    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const trigger = { isConnected: true } as HTMLElement;
+    const thumbnail = {
+      src: "/one.jpg",
+      currentSrc: "",
+      dataset: {},
+      addEventListener() {},
+    } as unknown as HTMLImageElement;
+    const firstVisual = { isConnected: true } as HTMLElement;
+    const secondVisual = { isConnected: true } as HTMLElement;
+    let dispose = () => {};
+    const prepareClose = vi.fn((item: LightboxItem) => {
+      thumbnail.src = item.media.type === "image" ? item.media.src : "";
+      dispose();
+      session.registerOrigin(["one", "two"], {
+        trigger,
+        visual: secondVisual,
+        thumbnail,
+      });
+    });
+    dispose = session.registerOrigin(["one", "two"], {
+      trigger,
+      visual: firstVisual,
+      thumbnail,
+      prepareClose,
+    });
+    const opening = session.open({ id: "one" });
+    driver.steps[0]!.resolve();
+    await opening;
+    const selecting = session.goTo({ id: "two" });
+    driver.steps[1]!.resolve();
+    await selecting;
+    const closing = session.close();
+    driver.steps[2]!.resolve();
+    await closing;
+
+    expect(prepareClose).toHaveBeenCalledWith(items[1], 1);
+    expect(thumbnail.src).toBe("/two.jpg");
+    expect(driver.closeOrigins[0]?.visual).toBe(secondVisual);
+  });
+
   it("aborts host reveal on selection and closes without waiting for it", async () => {
     const driver = new TestDriver();
     const revealSignals: AbortSignal[] = [];
@@ -306,6 +357,27 @@ describe("ViewerSession", () => {
     driver.steps[1]!.resolve();
     await expect(replacement).resolves.toEqual({ status: "completed", changed: true });
     expect(session.state).toMatchObject({ status: "open", activeId: "two", activeIndex: 0 });
+  });
+
+  it("keeps a close in progress when its source refreshes", async () => {
+    const driver = new TestDriver();
+    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const opening = session.open({ id: "two" });
+    driver.steps[0]!.resolve();
+    await opening;
+
+    const closing = session.close();
+    const update = session.setSource(arraySource([...items]));
+
+    await expect(update).resolves.toEqual({ status: "completed", changed: false });
+    expect(driver.closes).toHaveLength(1);
+    expect(driver.closes[0]!.aborted).toBe(false);
+    expect(driver.opens).toHaveLength(1);
+    expect(driver.sourceUpdates).toHaveLength(1);
+    driver.steps[1]!.resolve();
+    await expect(closing).resolves.toEqual({ status: "completed", changed: true });
+    expect(driver.sourceUpdates).toHaveLength(2);
+    expect(session.state).toMatchObject({ status: "closed", count: 3 });
   });
 
   it("rejects unexpected driver failures without leaving a pending command", async () => {

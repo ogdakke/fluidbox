@@ -76,6 +76,8 @@ export interface LightboxItem<TMedia extends LightboxMedia = LightboxMedia> {
   readonly id: LightboxItemId;
   readonly media: TMedia;
   readonly thumbnail?: LightboxImageResource;
+  /** Immediate image shown behind media until a decoded preview or full image is ready. */
+  readonly placeholder?: LightboxImageResource;
   readonly preview?: LightboxImageResource;
   readonly caption?: string;
   readonly description?: string;
@@ -95,6 +97,8 @@ export interface LightboxOrigin {
   readonly visual: HTMLElement;
   /** Optional decoded preview used while the full media loads. */
   readonly thumbnail?: HTMLImageElement;
+  /** Update authored preview content before the close target is measured. */
+  readonly prepareClose?: (item: LightboxItem, index: number) => void;
 }
 
 export type LightboxRevealReason = "open" | "selection";
@@ -216,6 +220,8 @@ export type LightboxThumbnailOverlayRegistration<TItem extends LightboxItem = Li
       readonly behavior: "travel";
       /** Existing host overlay. The runtime publishes phase and progress here. */
       readonly element: HTMLElement;
+      /** Optional mask to move into the animated frame and restore on close. */
+      readonly frameLayer?: HTMLElement;
       /** Mounts application-owned content into a runtime transition target. */
       readonly renderer: LightboxRenderer<TItem>;
     };
@@ -248,7 +254,10 @@ export interface LightboxController<TItem extends LightboxItem = LightboxItem> {
   next(options?: LightboxCommandOptions): Promise<LightboxCommandResult>;
   previous(options?: LightboxCommandOptions): Promise<LightboxCommandResult>;
   setSource(source: LightboxSource<TItem>): Promise<LightboxCommandResult>;
-  registerOrigin(id: LightboxItemId, origin: LightboxOrigin): LightboxDispose;
+  registerOrigin(
+    id: LightboxItemId | readonly LightboxItemId[],
+    origin: LightboxOrigin,
+  ): LightboxDispose;
   registerThumbnailOverlay(
     id: LightboxItemId,
     registration: LightboxThumbnailOverlayRegistration<TItem>,

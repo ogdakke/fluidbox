@@ -20,26 +20,41 @@ export type LightboxReactRenderer<TItem extends LightboxItem = LightboxItem> = (
   context: LightboxReactRenderContext<TItem>,
 ) => ReactNode;
 
-export interface LightboxRootProps<TItem extends LightboxItem = LightboxItem> {
-  readonly source: LightboxSource<TItem>;
+export type LightboxRootProps<TItem extends LightboxItem = LightboxItem> = {
   readonly origins?: LightboxOriginAdapter;
   readonly renderers?: Readonly<Record<string, LightboxReactRenderer<TItem>>>;
   readonly onBeforeCommand?: (event: LightboxBeforeCommandEvent) => void;
   readonly onEvent?: (event: LightboxEvent) => void;
   readonly children?: ReactNode;
-}
+} & (
+  | { readonly source: LightboxSource<TItem>; readonly items?: never }
+  | { readonly items: readonly TItem[]; readonly source?: never }
+);
 
 export interface LightboxItemProps {
   readonly id: string;
   readonly children?: ReactNode;
 }
 
-export interface LightboxTriggerProps extends Omit<
+export interface LightboxTriggerRenderContext<TItem extends LightboxItem = LightboxItem> {
+  /** Null when this trigger's items have been removed by source replacement. */
+  readonly item: TItem | null;
+  readonly index: number | null;
+  readonly status: LightboxState["status"];
+}
+
+export interface LightboxTriggerProps<TItem extends LightboxItem = LightboxItem> extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "children"
 > {
   readonly asChild?: boolean;
-  readonly children: ReactElement;
+  /** Item opened by this trigger. Defaults to the first ID in items or the enclosing Item. */
+  readonly item?: TItem | string;
+  /** Every item that may return to this origin on close. */
+  readonly items?: readonly (TItem | string)[];
+  readonly children:
+    | ReactElement
+    | ((context: LightboxTriggerRenderContext<TItem>) => ReactElement);
 }
 
 export interface LightboxPortalProps {
@@ -70,7 +85,7 @@ export interface LightboxFilmstripProps<
 export interface LightboxReactParts {
   Root: <TItem extends LightboxItem>(props: LightboxRootProps<TItem>) => ReactElement | null;
   Item: (props: LightboxItemProps) => ReactElement | null;
-  Trigger: (props: LightboxTriggerProps) => ReactElement | null;
+  Trigger: <TItem extends LightboxItem>(props: LightboxTriggerProps<TItem>) => ReactElement | null;
   Portal: (props: LightboxPortalProps) => ReactElement | null;
   Content: (props: LightboxContentProps) => ReactElement | null;
   ThumbnailOverlay: (props: LightboxThumbnailOverlayProps) => ReactElement | null;

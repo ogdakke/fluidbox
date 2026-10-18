@@ -60,4 +60,32 @@ describe("OriginRegistry", () => {
     expect(registry.get("photo-1")).toBeNull();
     expect(registry.get("photo-2")).toBeNull();
   });
+
+  it("uses a specific origin before a shared gallery card, then falls back to the card", () => {
+    const registry = new OriginRegistry();
+    const card = origin("card");
+    const thumbnail = origin("thumbnail");
+    const disposeCard = registry.register("photo-2", card, true);
+    const disposeThumbnail = registry.register("photo-2", thumbnail);
+
+    expect(registry.get("photo-2")).toBe(thumbnail);
+    disposeThumbnail();
+    expect(registry.get("photo-2")).toBe(card);
+    disposeCard();
+    expect(registry.get("photo-2")).toBeNull();
+  });
+
+  it("restores an earlier shared card when the newer one unmounts", () => {
+    const registry = new OriginRegistry();
+    const first = origin("first-card");
+    const second = origin("second-card");
+    const disposeFirst = registry.register("photo-2", first, true);
+    const disposeSecond = registry.register("photo-2", second, true);
+
+    expect(registry.get("photo-2")).toBe(second);
+    disposeSecond();
+    expect(registry.get("photo-2")).toBe(first);
+    disposeFirst();
+    expect(registry.get("photo-2")).toBeNull();
+  });
 });

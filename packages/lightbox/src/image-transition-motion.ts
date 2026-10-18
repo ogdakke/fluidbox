@@ -18,6 +18,7 @@ export interface ImageTransitionMotion {
   readonly image: Keyframe[];
   readonly radius: Keyframe[];
   readonly backdrop: Keyframe[];
+  readonly progress: Keyframe[];
   readonly duration: number;
 }
 
@@ -136,6 +137,7 @@ export function createImageTransitionMotion({
   const image: Keyframe[] = [];
   const radius: Keyframe[] = [];
   const backdrop: Keyframe[] = [];
+  const progress: Keyframe[] = [];
   for (let index = 0; index <= samples; index++) {
     const offset = index / samples;
     const elapsed = offset * duration;
@@ -166,8 +168,9 @@ export function createImageTransitionMotion({
       offset,
       opacity: value(backdropFrom, backdropTo),
     });
+    progress.push({ offset, opacity: value(0, 1) });
   }
-  return { frame, image, radius, backdrop, duration };
+  return { frame, image, radius, backdrop, progress, duration };
 }
 
 export function openImageTransitionPose(): ImageTransitionPose {

@@ -49,8 +49,6 @@ const TOUCH_DISMISS_DISTANCE = 60;
 const OPENING_SPRING_RESPONSE = 210;
 const TOUCH_OPENING_SPRING_RESPONSE = 380;
 const DISMISS_RADIUS_END = 0.1;
-const BROWSER_CHROME_RELEASE_PROGRESS = 0.34;
-const BROWSER_CHROME_RESTORE_PROGRESS = 0.2;
 const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
@@ -130,6 +128,7 @@ export class DomViewerDriver<
   #flightFrame: HTMLDivElement | undefined;
   #flightMedia: HTMLElement | undefined;
   #flightSource: HTMLElement | undefined;
+  #flightSourceFrame: HTMLElement | undefined;
   #flightMarker: Comment | undefined;
   #preparedFlight:
     | { source: HTMLImageElement; image: HTMLImageElement; ready: Promise<boolean> }
@@ -197,7 +196,10 @@ export class DomViewerDriver<
         if (
           event.target === this.#portal.dialog ||
           event.target === this.#portal.backdrop ||
-          event.target === this.#portal.container
+          event.target === this.#portal.container ||
+          (event.target instanceof Element &&
+            !!event.target.closest("[data-lightbox-slide]") &&
+            !event.target.closest("[data-lightbox-frame], [data-lightbox-filmstrip]"))
         ) {
           void this.#controller?.close({ reason: "pointer" });
         }
@@ -331,6 +333,7 @@ export class DomViewerDriver<
     this.#viewportWidth = view.innerWidth;
     this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
     this.#applyTheme(context.origin?.trigger ?? null);
+    this.#syncPageHeight();
     void this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
     this.#render(context.item, context.index);
@@ -342,7 +345,7 @@ export class DomViewerDriver<
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
     const start = this.#openingStart(from);
     const motion = this.#openingMotion(start, !!from);
-    applyImageTransitionPose(this.#frame, this.#media, start);
+    this.#applyMediaPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = start.frameOpacity;
     this.#portal.backdrop.style.opacity = start.backdropOpacity;
     const animations = this.#openingAnimations(motion);
@@ -387,6 +390,7 @@ export class DomViewerDriver<
     this.#portal.overlay.style.setProperty("--lightbox-height", `${view.innerHeight}px`);
     const focused = this.#portal.overlay.ownerDocument.activeElement;
     this.#applyTheme(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
+    this.#syncPageHeight();
     if (!prepared) {
       await this.#strip?.select(context.index, false);
       this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
@@ -442,12 +446,18 @@ export class DomViewerDriver<
     const controlsReady = motion.backdrop.find((keyframe) => Number(keyframe.opacity) >= 0.85);
     const controlsRevealDelay = Number(controlsReady?.offset ?? 0.7) * motion.duration;
     const controlsReveal = this.#thumbnailOverlays.prepareControlsReveal(controlsRevealDelay);
-    applyImageTransitionPose(this.#frame, this.#media, start);
+    this.#applyMediaPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = interruptedPose?.frameOpacity ?? (!from ? "0" : "1");
     this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
     const animations = [
       ...(prepared && !interruptedPose ? prepared.animations : this.#openingAnimations(motion)),
-      ...this.#thumbnailOverlays.animations(motion.frame, motion.duration, overlayFrom, 0),
+      ...this.#thumbnailOverlays.animations(
+        motion.frame,
+        motion.progress,
+        motion.duration,
+        overlayFrom,
+        0,
+      ),
     ];
     if (this.#portal.dialog.hasAttribute("data-lightbox-gallery")) {
       this.#portal.dialog.style.setProperty(
@@ -465,7 +475,9 @@ export class DomViewerDriver<
     }
     this.#synchronizeStart(animations);
     delete this.#portal.overlay.dataset.lightboxPrepared;
-    await this.#play(animations, context.signal);
+    await this.#play(animations, context.signal, () =>
+      this.#thumbnailOverlays.set("opening", 0, new DOMMatrix()),
+    );
     if (context.signal.aborted) return;
     await Promise.all([
       this.#waitForFilmstripReveal(context.signal),
@@ -505,7 +517,8 @@ export class DomViewerDriver<
       await this.#strip?.select(context.index, smooth);
     }
     this.#render(context.item, context.index);
-    this.#thumbnailOverlays.prepare(context.item, context.index, this.#frame, "open", 0);
+    // The overlay is invisible while open. Moving it between slide frames
+    // during native scrolling can invalidate the browser's painted snap.
     // Filmstrip movement is a direct preview scrub. The full-size image swaps
     // immediately while native scrolling continues under the user's finger.
     if (selected || context.reason === "filmstrip") return;
@@ -575,6 +588,8 @@ export class DomViewerDriver<
           }),
         );
         if (!handedOff) return this.#removeFlight();
+        this.#flightSourceFrame?.setAttribute("data-lightbox-flight-source-hidden", "");
+        this.#flight?.style.removeProperty("visibility");
       }
       this.#closeOriginObserver = new ResizeObserver(this.#scheduleCloseTargetUpdate);
       this.#closeOriginObserver.observe(from);
@@ -598,17 +613,33 @@ export class DomViewerDriver<
       fadeFrame: !from,
     });
     const overlayFrom = this.#thumbnailOverlays.currentProgress(0);
-    this.#thumbnailOverlays.set("closing", overlayFrom);
-    applyImageTransitionPose(frame, media, start);
+    if (this.#strip) {
+      this.#thumbnailOverlays.prepare(
+        this.#strip.activeItem,
+        this.#strip.index,
+        frame,
+        "closing",
+        overlayFrom,
+      );
+    }
+    this.#applyMediaPose(frame, media, start);
     const animations = [
       frame.animate(motion.frame, this.#motionOptions(motion.duration)),
       media.animate(motion.image, this.#motionOptions(motion.duration)),
       frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
-      ...this.#thumbnailOverlays.animations(motion.frame, motion.duration, overlayFrom, 1),
+      ...this.#thumbnailOverlays.animations(
+        motion.frame,
+        motion.progress,
+        motion.duration,
+        overlayFrom,
+        1,
+      ),
     ];
     this.#synchronizeStart(animations);
-    await this.#play(animations, context.signal);
+    await this.#play(animations, context.signal, () =>
+      this.#thumbnailOverlays.set("closing", 1, target.transform),
+    );
     if (context.signal.aborted) return;
     this.#finishClose();
   }
@@ -692,7 +723,32 @@ export class DomViewerDriver<
       this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
       this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
+      ...this.#animateFallbacks(this.#frame, motion.image, motion.duration),
     ];
+  }
+
+  #fallbackLayers(frame: HTMLElement) {
+    return frame.querySelectorAll<HTMLElement>(
+      "[data-lightbox-slide-placeholder], [data-lightbox-slide-preview]",
+    );
+  }
+
+  #applyMediaPose(
+    frame: HTMLElement,
+    media: HTMLElement,
+    pose: ImageTransitionPose,
+    size?: { readonly width: number; readonly height: number },
+  ) {
+    const crop = applyImageTransitionPose(frame, media, pose, size);
+    for (const layer of this.#fallbackLayers(frame)) {
+      layer.style.transform = crop.image.toString();
+    }
+  }
+
+  #animateFallbacks(frame: HTMLElement, keyframes: Keyframe[], duration: number) {
+    return Array.from(this.#fallbackLayers(frame), (layer) =>
+      layer.animate(keyframes, this.#motionOptions(duration)),
+    );
   }
 
   #discardPreparation() {
@@ -772,7 +828,7 @@ export class DomViewerDriver<
     trigger.setAttribute("aria-expanded", String(open));
   }
 
-  async #play(animations: Animation[], signal: AbortSignal) {
+  async #play(animations: Animation[], signal: AbortSignal, settle?: () => void) {
     this.#animations = animations;
     const cancel = () => this.#cancelAnimations(true);
     signal.addEventListener("abort", cancel, { once: true });
@@ -780,6 +836,9 @@ export class DomViewerDriver<
     signal.removeEventListener("abort", cancel);
     if (this.#animations !== animations) return;
     this.#animations = [];
+    // Filled animations otherwise reveal their preflight inline progress and
+    // transform for a frame when canceled, before the caller updates state.
+    settle?.();
     for (const animation of animations) animation.cancel();
     this.#clearMotionStyles();
   }
@@ -817,7 +876,7 @@ export class DomViewerDriver<
       this.#removeFlight();
       if (pose && finitePose(pose) && this.#media.offsetWidth && this.#media.offsetHeight) {
         this.#interruptedPose = pose;
-        applyImageTransitionPose(this.#frame, this.#media, pose);
+        this.#applyMediaPose(this.#frame, this.#media, pose);
         this.#frame.style.opacity = pose.frameOpacity;
         this.#portal.backdrop.style.opacity = pose.backdropOpacity;
       } else {
@@ -849,6 +908,9 @@ export class DomViewerDriver<
     this.#portal.backdrop.style.removeProperty("opacity");
     this.#media.style.removeProperty("opacity");
     this.#media.style.removeProperty("transform");
+    for (const layer of this.#fallbackLayers(this.#frame)) {
+      layer.style.removeProperty("transform");
+    }
     for (const property of [
       "--lightbox-drag-x",
       "--lightbox-drag-y",
@@ -903,7 +965,7 @@ export class DomViewerDriver<
     this.#dragGesture.cancel();
     this.#cancelAnimations(true);
     const interrupted = this.#takeInterruptedPose();
-    if (interrupted) applyImageTransitionPose(this.#frame, this.#media, interrupted);
+    if (interrupted) this.#applyMediaPose(this.#frame, this.#media, interrupted);
     return { image: this.#media, frame: this.#frame };
   }
 
@@ -944,6 +1006,7 @@ export class DomViewerDriver<
       (source instanceof HTMLImageElement ? (source.cloneNode(true) as HTMLImageElement) : source);
     if (media !== source) {
       media.removeAttribute("style");
+      flight.style.visibility = "hidden";
     } else {
       this.#flightMarker = ownerDocument.createComment("lightbox-flight-home");
       source.before(this.#flightMarker);
@@ -956,6 +1019,10 @@ export class DomViewerDriver<
     this.#flightFrame = frame;
     this.#flightMedia = media;
     this.#flightSource = source;
+    this.#flightSourceFrame =
+      media !== source
+        ? (source.closest<HTMLElement>("[data-lightbox-frame]") ?? this.#frame)
+        : undefined;
     applyImageTransitionPose(frame, media, start);
     const target = this.#flightTargetPose(origin, media);
     return { frame, media, target };
@@ -992,6 +1059,7 @@ export class DomViewerDriver<
 
   #removeFlight() {
     if (this.#flightSource) delete this.#flightSource.dataset.lightboxFlightSourceHidden;
+    if (this.#flightSourceFrame) delete this.#flightSourceFrame.dataset.lightboxFlightSourceHidden;
     if (this.#flightMarker?.parentNode && this.#flightSource) {
       this.#flightMarker.replaceWith(this.#flightSource);
     }
@@ -1001,6 +1069,7 @@ export class DomViewerDriver<
     this.#flightFrame = undefined;
     this.#flightMedia = undefined;
     this.#flightSource = undefined;
+    this.#flightSourceFrame = undefined;
     this.#closeStart = undefined;
     this.#closeTargetOrigin = null;
     this.#closeDuration = 0;
@@ -1028,6 +1097,7 @@ export class DomViewerDriver<
   #onResize = () => {
     const view = this.#portal.overlay.ownerDocument.defaultView;
     if (!view) return;
+    this.#syncPageHeight();
     const widthChanged = view.innerWidth !== this.#viewportWidth;
     if (this.#controller?.state.status === "closing") {
       if (widthChanged) {
@@ -1051,6 +1121,17 @@ export class DomViewerDriver<
       this.#clearMotionStyles();
     }
   };
+
+  #syncPageHeight() {
+    const ownerDocument = this.#portal.overlay.ownerDocument;
+    const view = ownerDocument.defaultView;
+    const height = Math.max(
+      ownerDocument.documentElement.scrollHeight,
+      ownerDocument.body.scrollHeight,
+      view?.innerHeight ?? 0,
+    );
+    this.#portal.overlay.style.setProperty("--lightbox-page-height", `${height}px`);
+  }
 
   #updateCloseTarget() {
     const origin = this.#closeTargetOrigin;
@@ -1089,6 +1170,15 @@ export class DomViewerDriver<
     this.#zoom?.suspend();
     this.#cancelAnimations(true);
     const frame = this.#frame;
+    if (this.#strip) {
+      this.#thumbnailOverlays.prepare(
+        this.#strip.activeItem,
+        this.#strip.index,
+        frame,
+        "dragging",
+        0,
+      );
+    }
     const current = readImageTransitionPose(frame, this.#media);
     const matrix = current.transform;
     this.#strip?.freeze();
@@ -1165,7 +1255,6 @@ export class DomViewerDriver<
     this.#portal.overlay.style.setProperty("--lightbox-drag-x", `${state.x}px`);
     this.#portal.overlay.style.setProperty("--lightbox-drag-y", `${state.y}px`);
     this.#portal.overlay.style.setProperty("--lightbox-dismiss-progress", String(progress));
-    if (!state.wheelTarget) this.#syncOverlayEdges(progress);
     const stretch = distance < 0 ? 1 + 0.12 * (1 - Math.exp(distance / 180)) : 1;
     const scale = 1 - progress * 0.3;
     const from = state.wheelTarget
@@ -1194,7 +1283,7 @@ export class DomViewerDriver<
     const radiusProgress = state.wheelTarget
       ? Math.min(1, progress / DISMISS_RADIUS_END)
       : dismissRadiusProgress(state.x, state.y);
-    applyImageTransitionPose(
+    this.#applyMediaPose(
       this.#frame,
       this.#media,
       {
@@ -1221,14 +1310,6 @@ export class DomViewerDriver<
       this.#preparedFlight = undefined;
       this.#clearMotionStyles();
       this.#strip?.resume();
-    }
-  }
-
-  #syncOverlayEdges(progress: number) {
-    if (progress >= BROWSER_CHROME_RELEASE_PROGRESS) {
-      this.#portal.overlay.dataset.lightboxEdgeReleased = "";
-    } else if (progress <= BROWSER_CHROME_RESTORE_PROGRESS) {
-      delete this.#portal.overlay.dataset.lightboxEdgeReleased;
     }
   }
 
@@ -1329,8 +1410,10 @@ export class DomViewerDriver<
       this.#media.animate(motion.image, this.#motionOptions(duration)),
       this.#frame.animate(motion.radius, this.#motionOptions(duration)),
       this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(duration)),
+      ...this.#animateFallbacks(this.#frame, motion.image, duration),
       ...this.#thumbnailOverlays.animations(
         motion.frame,
+        motion.progress,
         duration,
         this.#thumbnailOverlays.currentProgress(dragProgress(state)),
         0,
@@ -1345,7 +1428,6 @@ export class DomViewerDriver<
 
   #finishClose() {
     this.#strip?.resume();
-    delete this.#portal.overlay.dataset.lightboxEdgeReleased;
     this.#removeFlight();
     this.#thumbnailOverlays.finishClose();
     this.#setActiveTrigger(null);

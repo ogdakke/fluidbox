@@ -22,6 +22,8 @@ import type {
 } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
+import { arraySource } from "./array-source";
 import { createLightbox } from "./create-lightbox";
 import { FilmstripRuntime, filmstripCommandOptions } from "./filmstrip-runtime";
 import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
@@ -63,6 +65,7 @@ export type {
   LightboxRootProps,
   LightboxThumbnailOverlayProps,
   LightboxTriggerProps,
+  LightboxTriggerRenderContext,
   UseLightbox,
   UseLightboxState,
 } from "./react-public-api";
@@ -196,6 +199,7 @@ interface ReactLightboxContextValue {
 
 const LightboxContext = createContext<ReactLightboxContextValue | null>(null);
 const ItemContext = createContext<LightboxItemId | null>(null);
+const TriggerContext = createContext<readonly LightboxItemId[] | null>(null);
 
 function useLightboxContext(): ReactLightboxContextValue {
   const value = useContext(LightboxContext);
@@ -205,15 +209,17 @@ function useLightboxContext(): ReactLightboxContextValue {
 
 function Root<TItem extends LightboxItem>({
   source,
+  items,
   origins,
   renderers,
   onBeforeCommand,
   onEvent,
   children,
 }: LightboxRootProps<TItem>): ReactElement {
+  const resolvedSource = useMemo(() => source ?? arraySource(items!), [source, items]);
   const storeRef = useRef<ReactLightboxStore<TItem> | null>(null);
   if (!storeRef.current) {
-    storeRef.current = new ReactLightboxStore(source);
+    storeRef.current = new ReactLightboxStore(resolvedSource);
   }
   const store = storeRef.current;
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
@@ -255,8 +261,8 @@ function Root<TItem extends LightboxItem>({
   }, [onBeforeCommand, onEvent, origins, renderers, store]);
 
   useLayoutEffect(() => {
-    void store.setSource(source);
-  }, [source, store]);
+    void store.setSource(resolvedSource);
+  }, [resolvedSource, store]);
 
   const value = useMemo<ReactLightboxContextValue>(
     () => ({ store, portalTarget }),
@@ -269,22 +275,43 @@ function Item({ id, children }: LightboxItemProps): ReactElement {
   return createElement(ItemContext.Provider, { value: id }, children);
 }
 
-function Trigger({
+function Trigger<TItem extends LightboxItem>({
   asChild = false,
+  item,
+  items,
   children,
   onClick,
   onPointerDown,
   onPointerUp,
   onPointerCancel,
   ...attributes
-}: LightboxTriggerProps) {
+}: LightboxTriggerProps<TItem>) {
   const { store } = useLightboxContext();
-  const id = useContext(ItemContext);
-  if (!id) throw new Error("<Lightbox.Trigger> must be rendered inside <Lightbox.Item>.");
+  const enclosingId = useContext(ItemContext);
+  const itemId = (value: TItem | string): string => (typeof value === "string" ? value : value.id);
+  const id = item ? itemId(item) : items?.[0] ? itemId(items[0]) : enclosingId;
+  if (!id)
+    throw new Error("<Lightbox.Trigger> needs item, items, or an enclosing <Lightbox.Item>.");
+  const ids = items ? [...new Set(items.map(itemId))] : [id];
+  if (!ids.includes(id)) ids.unshift(id);
+  const state = useLightboxState((current) => current);
+  const [lastPreviewId, setLastPreviewId] = useState<string | null>(null);
+  const activeId = state.activeId && ids.includes(state.activeId) ? state.activeId : null;
+  const previewId = activeId ?? lastPreviewId ?? id;
+  const previewIndex = store.source.getIndex(previewId) ?? store.source.getIndex(id);
+  const previewItem = previewIndex === null ? null : (store.source.getItem(previewIndex) as TItem);
+  const rendered =
+    typeof children === "function"
+      ? children({
+          item: previewItem,
+          index: previewIndex,
+          status: activeId ? state.status : "closed",
+        })
+      : children;
   const disposeRef = useRef<LightboxDispose | undefined>(undefined);
   const preparationRef = useRef<LightboxDispose | undefined>(undefined);
   const preparationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const child = Children.only(children);
+  const child = Children.only(rendered);
   const childProps = isValidElement<Record<string, unknown>>(child) ? child.props : {};
   const childRef =
     "ref" in childProps
@@ -304,8 +331,18 @@ function Trigger({
     const thumbnail = visual.matches("img")
       ? (visual as HTMLImageElement)
       : (visual.querySelector("img") ?? undefined);
-    const origin: LightboxOrigin = { trigger: element, visual, thumbnail };
-    disposeRef.current = store.controller.registerOrigin(id, origin);
+    const origin: LightboxOrigin = {
+      trigger: element,
+      visual,
+      thumbnail,
+      prepareClose(selected) {
+        if (typeof children === "function") {
+          flushSync(() => setLastPreviewId(selected.id));
+        }
+      },
+    };
+    const knownIds = ids.filter((candidate) => store.source.getIndex(candidate) !== null);
+    if (knownIds.length) disposeRef.current = store.controller.registerOrigin(knownIds, origin);
   };
   useEffect(
     () => () => {
@@ -358,27 +395,35 @@ function Trigger({
   };
 
   if (asChild) {
-    return cloneElement(child, {
-      ...attributes,
-      ref: setRef,
-      onClick: handleClick,
-      onPointerDown: handlePointerDown,
-      onPointerUp: handlePointerUp,
-      onPointerCancel: handlePointerCancel,
-    } as never);
+    return createElement(
+      TriggerContext.Provider,
+      { value: ids },
+      cloneElement(child, {
+        ...attributes,
+        ref: setRef,
+        onClick: handleClick,
+        onPointerDown: handlePointerDown,
+        onPointerUp: handlePointerUp,
+        onPointerCancel: handlePointerCancel,
+      } as never),
+    );
   }
   return createElement(
-    "button",
-    {
-      ...attributes,
-      ref: setRef,
-      onClick: handleClick,
-      onPointerDown: handlePointerDown,
-      onPointerUp: handlePointerUp,
-      onPointerCancel: handlePointerCancel,
-      type: attributes.type ?? "button",
-    },
-    child,
+    TriggerContext.Provider,
+    { value: ids },
+    createElement(
+      "button",
+      {
+        ...attributes,
+        ref: setRef,
+        onClick: handleClick,
+        onPointerDown: handlePointerDown,
+        onPointerUp: handlePointerUp,
+        onPointerCancel: handlePointerCancel,
+        type: attributes.type ?? "button",
+      },
+      child,
+    ),
   );
 }
 
@@ -398,8 +443,9 @@ const ThumbnailOverlay = forwardRef<HTMLSpanElement, LightboxThumbnailOverlayPro
   function ThumbnailOverlay({ behavior = "host", children, ...attributes }, forwardedRef) {
     const { store } = useLightboxContext();
     const id = useContext(ItemContext);
-    if (!id)
-      throw new Error("<Lightbox.ThumbnailOverlay> must be rendered inside <Lightbox.Item>.");
+    const triggerIds = useContext(TriggerContext);
+    const ids = triggerIds ?? (id ? [id] : null);
+    if (!ids) throw new Error("<Lightbox.ThumbnailOverlay> needs an enclosing Trigger or Item.");
     const disposeRef = useRef<LightboxDispose | undefined>(undefined);
     const setRef = (element: HTMLSpanElement | null) => {
       disposeRef.current?.();
@@ -420,7 +466,12 @@ const ThumbnailOverlay = forwardRef<HTMLSpanElement, LightboxThumbnailOverlayPro
                 },
               }
             : { behavior, element };
-        disposeRef.current = store.controller.registerThumbnailOverlay(id, registration);
+        const disposers = ids
+          .filter((candidate) => store.source.getIndex(candidate) !== null)
+          .map((candidate) => store.controller.registerThumbnailOverlay(candidate, registration));
+        disposeRef.current = () => {
+          for (const dispose of disposers) dispose();
+        };
       }
     };
     useEffect(() => () => disposeRef.current?.(), []);

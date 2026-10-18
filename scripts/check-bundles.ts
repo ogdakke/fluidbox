@@ -16,9 +16,9 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 18_020,
+  root: 18_600,
   elements: 25_000,
-  react: 21_600,
+  react: 22_700,
   solid: 1_500,
   vue: 1_500,
   angular: 1_500,
@@ -26,19 +26,19 @@ const initialGzipLimits: Record<Entry, number> = {
 const cssGzipLimit = 5_000;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 40_100,
-  elements: 26_200,
-  react: 25_250,
-  solid: 26_310,
-  vue: 26_435,
-  angular: 26_300,
+  elements: 26_850,
+  react: 26_350,
+  solid: 27_100,
+  vue: 27_225,
+  angular: 27_100,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 43_920,
-  elements: 30_200,
-  react: 29_200,
-  solid: 30_240,
-  vue: 30_365,
-  angular: 30_230,
+  elements: 30_780,
+  react: 30_280,
+  solid: 31_040,
+  vue: 31_160,
+  angular: 31_030,
 };
 
 type Chunk = Extract<

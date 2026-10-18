@@ -117,6 +117,7 @@ export class ViewerSession<
   #state: LightboxState;
   #pending: PendingCommand | undefined;
   #revealController: AbortController | undefined;
+  #sourceRefreshPending = false;
   #destroyed = false;
 
   constructor(options: LightboxOptions<TItem>, driver: ViewerSessionDriver<TItem>) {
@@ -169,12 +170,24 @@ export class ViewerSession<
     this.#abortReveal();
     this.#publish("closing", this.#state.activeIndex, this.#state.activeIndex);
     this.#emit({ type: "status-change", status: "closing" });
-    const origin = this.#state.activeId ? this.#origins.get(this.#state.activeId) : null;
+    const activeIndex = this.#state.activeIndex;
+    const activeItem = activeIndex === null ? null : this.#source.getItem(activeIndex);
+    const origin = activeItem ? this.#origins.get(activeItem.id) : null;
+    if (activeItem && origin?.prepareClose) {
+      try {
+        origin.prepareClose(activeItem, activeIndex!);
+      } catch {
+        // A host preview update must not prevent the viewer from closing.
+      }
+    }
+    if (activeItem) this.#origins.hideThumbnail(activeItem.id);
+    const closeOrigin = activeItem ? this.#origins.get(activeItem.id) : null;
     void this.#run(operation, () =>
-      this.#driver.close({ origin, signal: operation.controller.signal, reason }),
+      this.#driver.close({ origin: closeOrigin, signal: operation.controller.signal, reason }),
     ).then((settled) => {
       if (!settled) return;
       this.#origins.restoreThumbnail();
+      this.#flushSourceRefresh();
       this.#publish("closed", null, null);
       this.#emit({ type: "status-change", status: "closed" });
       this.#finish(operation, completed(true));
@@ -207,6 +220,19 @@ export class ViewerSession<
   setSource(source: LightboxSource<TItem>) {
     this.#assertAlive();
     this.#validateSource(source);
+    // A thumbnail can change its media while the close flight targets it.
+    // Keep that flight running when the selected item still exists. Reopening
+    // here would turn a normal preview update into an interrupted close.
+    if (this.#state.status === "closing" && this.#state.activeId !== null) {
+      const index = source.getIndex(this.#state.activeId);
+      if (index !== null) {
+        const changed = index !== this.#state.activeIndex;
+        this.#source = source;
+        this.#sourceRefreshPending = true;
+        this.#publish("closing", index, index);
+        return Promise.resolve(completed(changed));
+      }
+    }
     this.#supersede();
     this.#abortReveal();
 
@@ -214,6 +240,7 @@ export class ViewerSession<
     const previousIndex = this.#state.activeIndex;
     this.#source = source;
     this.#driver.setSource?.(source);
+    this.#sourceRefreshPending = false;
 
     if (source.count === 0) {
       if (this.#state.status === "closed") {
@@ -239,10 +266,17 @@ export class ViewerSession<
     return this.#reconcileSelection(index, changed);
   }
 
-  registerOrigin(id: LightboxItemId, origin: LightboxOrigin): LightboxDispose {
+  registerOrigin(
+    id: LightboxItemId | readonly LightboxItemId[],
+    origin: LightboxOrigin,
+  ): LightboxDispose {
     this.#assertAlive();
-    this.#assertKnownId(id);
-    return this.#origins.register(id, origin);
+    const ids = typeof id === "string" ? [id] : [...new Set(id)];
+    for (const itemId of ids) this.#assertKnownId(itemId);
+    const disposers = ids.map((itemId) => this.#origins.register(itemId, origin, ids.length > 1));
+    return () => {
+      for (const dispose of disposers) dispose();
+    };
   }
 
   registerThumbnailOverlay(
@@ -297,6 +331,7 @@ export class ViewerSession<
     target: LightboxTarget,
     options: LightboxCommandOptions,
   ): Promise<LightboxCommandResult> {
+    this.#flushSourceRefresh();
     const item = this.#source.getItem(index);
     const reason = options.reason ?? "api";
     const key = `${this.#state.status === "open" ? "select" : "open"}:${item.id}`;
@@ -360,6 +395,12 @@ export class ViewerSession<
       this.#finish(operation, completed(true));
     });
     return operation.promise;
+  }
+
+  #flushSourceRefresh() {
+    if (!this.#sourceRefreshPending) return;
+    this.#sourceRefreshPending = false;
+    this.#driver.setSource?.(this.#source);
   }
 
   #reconcileSelection(index: number, changed: boolean) {

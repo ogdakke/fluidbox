@@ -29,8 +29,8 @@ export function createViewerPortal(
   const overlay = ownerDocument.createElement("div");
   overlay.dataset.lightboxOverlay = "";
   overlay.innerHTML = `
+    <div data-lightbox-backdrop></div>
     <div data-lightbox-container>
-      <div data-lightbox-backdrop></div>
       <div data-lightbox-dialog role="dialog" aria-modal="true"
            aria-label="Image viewer" tabindex="-1">
         <div data-lightbox-frame><img data-lightbox-media part="image" /></div>

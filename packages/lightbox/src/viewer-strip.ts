@@ -14,12 +14,17 @@ interface ViewerSlide {
   readonly element: HTMLDivElement;
   readonly frame: HTMLDivElement;
   readonly picture?: HTMLPictureElement;
+  readonly placeholder?: HTMLImageElement;
+  readonly preview?: HTMLImageElement;
   readonly image: HTMLElement;
   readonly error: HTMLDivElement;
   loaded: boolean;
   opening: boolean;
   deferFull: boolean;
   decoded: boolean;
+  fullApplied: boolean;
+  imageVersion: number;
+  previewController?: AbortController;
   controller?: AbortController;
   dispose?: LightboxDispose;
 }
@@ -112,6 +117,10 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     const slide = this.#slides.get(this.#index);
     if (!slide) throw new Error("The viewer source has no active image.");
     return slide;
+  }
+
+  get activeItem() {
+    return this.#source.getItem(this.#index);
   }
 
   get snapOffset() {
@@ -237,8 +246,28 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     retry.addEventListener("click", () => this.#retry(index));
     error.append("Unable to load media. ", retry);
     let picture: HTMLPictureElement | undefined;
+    let placeholder: HTMLImageElement | undefined;
+    let preview: HTMLImageElement | undefined;
     let media: HTMLElement;
     if (item.media.type === "image") {
+      frame.dataset.lightboxImageFrame = "";
+      if (item.placeholder?.src) {
+        placeholder = this.#ownerDocument.createElement("img");
+        placeholder.dataset.lightboxSlidePlaceholder = "";
+        placeholder.alt = "";
+        placeholder.setAttribute("aria-hidden", "true");
+        placeholder.decoding = "sync";
+        placeholder.src = item.placeholder.src;
+        frame.append(placeholder);
+      }
+      if (item.preview?.src || item.thumbnail?.src) {
+        preview = this.#ownerDocument.createElement("img");
+        preview.dataset.lightboxSlidePreview = "";
+        preview.alt = "";
+        preview.setAttribute("aria-hidden", "true");
+        preview.decoding = "async";
+        frame.append(preview);
+      }
       picture = this.#ownerDocument.createElement("picture");
       picture.dataset.lightboxPicture = "";
       picture.style.display = "contents";
@@ -248,16 +277,11 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       image.height = item.media.height;
       image.decoding = "async";
       image.draggable = false;
+      image.dataset.lightboxImagePending = "";
       image.addEventListener(
         "load",
         () => {
-          if (
-            new URL(image.currentSrc || image.src, this.#ownerDocument.baseURI).href ===
-            new URL(item.media.type === "image" ? item.media.src : "", this.#ownerDocument.baseURI)
-              .href
-          ) {
-            error.hidden = true;
-          }
+          void this.#revealImage(slide, slide.imageVersion);
         },
         { signal: this.#controller.signal },
       );
@@ -301,17 +325,22 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     );
     frame.append(error);
     element.append(frame);
-    return {
+    const slide = {
       element,
       frame,
       picture,
+      placeholder,
+      preview,
       image: media,
       error,
       loaded: false,
       opening: false,
       deferFull: false,
       decoded: false,
+      fullApplied: false,
+      imageVersion: 0,
     } satisfies ViewerSlide;
+    return slide;
   }
 
   prepareOpening(index: number, origin?: HTMLImageElement) {
@@ -327,6 +356,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       origin?.currentSrc ||
       origin?.src;
     if (preview) {
+      slide.imageVersion += 1;
+      if (decodedPreview) delete slide.image.dataset.lightboxImagePending;
+      else slide.image.dataset.lightboxImagePending = "";
       for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
       slide.image.removeAttribute("srcset");
       slide.image.removeAttribute("sizes");
@@ -336,6 +368,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.controller = undefined;
     slide.loaded = false;
     slide.decoded = false;
+    slide.fullApplied = false;
     slide.deferFull = decodedPreview !== null;
     this.#load(index, slide);
   }
@@ -440,13 +473,14 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   }
 
   #load(index: number, slide: ViewerSlide) {
+    const item = this.#source.getItem(index);
+    this.#loadPreview(item, slide);
     if (slide.deferFull) return;
     if (slide.loaded) {
       if (slide.image instanceof HTMLImageElement)
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
       return;
     }
-    const item = this.#source.getItem(index);
     slide.error.hidden = true;
     if (item.media.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
       const current = slide.image.getAttribute("src");
@@ -503,6 +537,8 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
   }
 
   #unload(slide: ViewerSlide) {
+    slide.previewController?.abort();
+    slide.previewController = undefined;
     if (!slide.loaded) return;
     slide.controller?.abort();
     slide.controller = undefined;
@@ -511,6 +547,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.opening = false;
     slide.deferFull = false;
     slide.decoded = false;
+    slide.fullApplied = false;
     slide.error.hidden = true;
     for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
     if (slide.image instanceof HTMLMediaElement) {
@@ -520,6 +557,8 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     } else if (slide.image instanceof HTMLIFrameElement) {
       slide.image.removeAttribute("src");
     } else if (slide.image instanceof HTMLImageElement) {
+      slide.imageVersion += 1;
+      slide.image.dataset.lightboxImagePending = "";
       slide.image.removeAttribute("src");
       slide.image.removeAttribute("srcset");
       slide.image.removeAttribute("sizes");
@@ -533,6 +572,10 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     const item = this.#source.getItem(index);
     if (item.media.type !== "image" || !(slide.image instanceof HTMLImageElement) || !slide.picture)
       return;
+    slide.imageVersion += 1;
+    const version = slide.imageVersion;
+    slide.fullApplied = true;
+    slide.image.dataset.lightboxImagePending = "";
     for (const source of slide.picture.querySelectorAll("source")) source.remove();
     for (const resource of item.media.sources ?? []) {
       const source = this.#ownerDocument.createElement("source");
@@ -545,11 +588,45 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.image.srcset = resourceSet(item.media);
     if (item.media.sizes) slide.image.sizes = item.media.sizes;
     else slide.image.removeAttribute("sizes");
-    slide.image.loading = index === this.#index ? "eager" : "lazy";
+    // Neighboring images must begin loading before native scrolling exposes them.
+    slide.image.loading = "eager";
     slide.image.fetchPriority = index === this.#index ? "high" : "low";
     slide.image.src = item.media.src;
+    void this.#revealImage(slide, version);
     slide.decoded = false;
     slide.error.hidden = true;
+  }
+
+  #loadPreview(item: TItem, slide: ViewerSlide) {
+    const image = slide.preview;
+    const src = item.preview?.src ?? item.thumbnail?.src;
+    if (!image || !src || image.hasAttribute("data-lightbox-image-ready")) return;
+    if (slide.previewController) return;
+    const controller = new AbortController();
+    slide.previewController = controller;
+    image.src = src;
+    void image
+      .decode()
+      .then(() => {
+        if (!controller.signal.aborted) image.dataset.lightboxImageReady = "";
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (slide.previewController === controller) slide.previewController = undefined;
+      });
+  }
+
+  async #revealImage(slide: ViewerSlide, version: number) {
+    const image = slide.image;
+    if (!(image instanceof HTMLImageElement)) return;
+    try {
+      await image.decode();
+    } catch {
+      return;
+    }
+    if (slide.imageVersion !== version) return;
+    delete image.dataset.lightboxImagePending;
+    if (slide.fullApplied) slide.error.hidden = true;
   }
 
   #retry(index: number) {
@@ -577,10 +654,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       this.element.style.removeProperty("scroll-snap-type");
     }
     if (this.#rebasing || !this.#width) return;
-    if (!this.#userOwned && !this.#selection) {
-      this.#align(this.#index);
-      return;
-    }
+    if (!this.#userOwned && !this.#selection) return;
     if (this.#userOwned) this.#userScrolled = true;
     // Delayed events from an instant align are not navigation. Let only a
     // native gesture or a pending smooth selection derive an index from the
@@ -621,8 +695,8 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     this.#touching = false;
     if (!this.#userScrolled) {
       // A browser taking over a native pan emits pointercancel before its
-      // first scroll event. Keep ownership briefly so that scroll is treated
-      // as the user's swipe instead of being aligned back to the old slide.
+      // first scroll event. Keep ownership briefly so that the first scroll
+      // event updates the selected slide.
       if (event.type === "pointercancel") {
         clearTimeout(this.#settleTimer);
         this.#settleTimer = setTimeout(this.#settled, 180);

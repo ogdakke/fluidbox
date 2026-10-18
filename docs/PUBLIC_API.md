@@ -49,11 +49,18 @@ const source = arraySource([
         { src: "/full/photo-1-2400.jpg", width: 2400 },
       ],
     },
+    placeholder: { src: "data:image/png;base64,..." },
+    preview: { src: "/thumb/photo-1-480.jpg", width: 480, height: 320 },
     thumbnail: { src: "/thumb/photo-1.jpg", width: 480, height: 320 },
     caption: "Late summer",
   },
 ]);
 ```
+
+For images, `placeholder` stays painted beneath the media while the preview and the browser-selected
+full resource decode. The runtime loads the selected image and its immediate neighbors eagerly; it
+never moves the strip to prefetch them. A decoded preview can replace the placeholder, and a failed
+full resource leaves the fallback visible with a retry control.
 
 IDs are non-empty and unique within a snapshot. `arraySource()` copies the input array, builds its ID
 map once, and throws for an empty or duplicate item ID. An empty source is valid. `getItem()` throws
@@ -212,6 +219,8 @@ Two behaviors are supported:
   so it can hide or transform while the viewer moves.
 - `travel` renders an application-owned copy into a runtime transition target. It requires a
   renderer. This supports content that follows the image without moving framework-owned DOM.
+  Pass `frameLayer` when a mask or other layer must remain clipped by the animated image frame;
+  the runtime moves that element into the frame and restores it to its card on close.
 
 The overlay target exposes `data-lightbox-phase="preview|opening|open|dragging|closing"` and
 `--lightbox-progress`, where `1` is the preview pose and `0` is fully open. This supports both
@@ -265,6 +274,57 @@ The first composed React contract is:
 store snapshots. `asChild` accepts one element, composes its ref and event handler, and does not run
 the part action when the consumer prevents the event. `Previous` and `Next` expose native disabled
 state at finite ends.
+
+For an in-memory gallery, `Root` accepts `items` and creates its indexed source. A trigger can map
+several item IDs to one origin. `item` selects the slide opened by a click, while `items` lists slides
+that can close to that trigger. The render callback receives the selected item and viewer status, so
+the host preview can follow navigation without a separate `Origin` component:
+
+```tsx
+<Lightbox.Root items={photos}>
+  <Lightbox.Trigger item={photos[0]} items={photos} asChild>
+    {({ item }) => (
+      <button type="button">
+        <img src={item?.thumbnail?.src} alt="" data-lightbox-origin />
+        <Lightbox.ThumbnailOverlay>+{photos.length - 1}</Lightbox.ThumbnailOverlay>
+      </button>
+    )}
+  </Lightbox.Trigger>
+  <Lightbox.Portal>
+    <Lightbox.Close />
+  </Lightbox.Portal>
+</Lightbox.Root>
+```
+
+`ThumbnailOverlay` inherits all IDs from its trigger; host overlays receive `--lightbox-progress`
+through opening and closing. The runtime uses a matching single-item origin before a shared gallery origin. If neither is mounted
+and visible, close uses the existing scale and fade fallback. A trigger with plain element children
+also works; the callback is only needed when its preview changes with selection. Keep the visual node
+mounted while its content changes so the handoff geometry stays stable.
+
+Plain JavaScript can register the same origin for several IDs with
+`controller.registerOrigin(ids, origin)`. `origin.prepareClose(item, index)` is a synchronous hook for
+updating an authored preview before the runtime measures the close target. It must not depend on
+asynchronous rendering. The controller calls it again for each close attempt, including interrupted
+motion; an exception in the hook does not block closing.
+
+```js
+const preview = card.querySelector("img");
+const dispose = controller.registerOrigin(
+  photos.map((photo) => photo.id),
+  {
+    trigger: card,
+    visual: preview,
+    thumbnail: preview,
+    prepareClose(item) {
+      preview.src = item.thumbnail?.src ?? item.media.src;
+    },
+  },
+);
+```
+
+Dispose the registration when the card unmounts. If its preview element is replaced, register the
+new element during `prepareClose`; the runtime resolves the origin again after the hook returns.
 
 Controlled `open` and `activeId` props are intentionally absent from the first locked React surface.
 They will be added only after delayed acceptance, rejection, interrupted motion, and teardown tests

@@ -15,9 +15,13 @@ interface ActiveOverlay<TItem extends LightboxItem> {
   readonly controller?: AbortController;
   readonly target?: HTMLDivElement;
   readonly dispose?: LightboxDispose;
+  readonly frameLayer?: HTMLElement;
+  readonly marker?: Comment;
+  readonly previousStyles?: ReadonlyMap<string, string>;
 }
 
 let progressRegistered = false;
+const opacityResponse = 0.65;
 
 /** Publishes thumbnail-overlay motion without taking ownership of application DOM. */
 export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
@@ -66,9 +70,30 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
       this.#disposeActive();
       if (!registration) return;
       if (registration.behavior === "travel") {
+        const frameLayer = registration.frameLayer;
+        let marker: Comment | undefined;
+        let previousStyles: Map<string, string> | undefined;
+        if (frameLayer?.isConnected) {
+          marker = this.#document.createComment("lightbox-frame-layer");
+          frameLayer.before(marker);
+          frameLayer.dataset.lightboxTravelLayer = "";
+          this.#publish(frameLayer, phase, progress);
+          previousStyles = new Map();
+          const computed = getComputedStyle(frameLayer);
+          for (const property of [
+            "--lightbox-layer-color",
+            "--lightbox-layer-mask-opacity",
+            "--lightbox-transition-layer-opacity",
+          ]) {
+            previousStyles.set(property, frameLayer.style.getPropertyValue(property));
+            frameLayer.style.setProperty(property, computed.getPropertyValue(property));
+          }
+          frame.append(frameLayer);
+        }
         const target = this.#document.createElement("div");
         target.dataset.lightboxTransitionContent = "";
         target.setAttribute("aria-hidden", "true");
+        this.#publish(target, phase, progress);
         const controller = new AbortController();
         this.#position(target, frame);
         this.#document.body.append(target);
@@ -86,27 +111,39 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
           controller,
           target,
           dispose: dispose ?? undefined,
+          frameLayer,
+          marker,
+          previousStyles,
         };
       } else {
         this.#active = { id: item.id, item, index, registration };
       }
     } else if (active.target) {
+      if (active.frameLayer && active.frameLayer.parentElement !== frame)
+        frame.append(active.frameLayer);
       this.#position(active.target, frame);
     }
     this.set(phase, progress);
   }
 
-  animations(frameMotion: Keyframe[], duration: number, from: number, to: number): Animation[] {
+  animations(
+    frameMotion: Keyframe[],
+    progressMotion: Keyframe[],
+    duration: number,
+    from: number,
+    to: number,
+  ): Animation[] {
     const active = this.#active;
     if (!active) return [];
     const options: KeyframeAnimationOptions = { duration, easing: "linear", fill: "both" };
-    const progress = [
-      { "--lightbox-progress": String(from) },
-      { "--lightbox-progress": String(to) },
-    ] as Keyframe[];
-    const targets = [active.registration.element, active.target].filter(
-      (element): element is HTMLElement => !!element && element.isConnected,
-    );
+    const progress = progressMotion.map(({ offset, opacity }) => {
+      const traveled = Math.min(1, Math.max(0, Number(opacity)));
+      const fade = to < from ? 1 - (1 - traveled) ** opacityResponse : traveled ** opacityResponse;
+      return { offset, "--lightbox-progress": String(from + (to - from) * fade) };
+    }) as Keyframe[];
+    const targets = [
+      ...new Set([active.registration.element, active.frameLayer, active.target]),
+    ].filter((element): element is HTMLElement => !!element && element.isConnected);
     const animations = targets.map((target) => target.animate(progress, options));
     if (!active.target) return animations;
     animations.push(
@@ -133,6 +170,9 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     const active = this.#active;
     if (!active) return;
     this.#publish(active.registration.element, phase, progress);
+    if (active.frameLayer && active.frameLayer !== active.registration.element) {
+      this.#publish(active.frameLayer, phase, progress);
+    }
     if (!active.target) return;
     this.#publish(active.target, phase, progress);
     if (transform) {
@@ -205,7 +245,7 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
   preservePaint() {
     const active = this.#active;
     if (!active) return;
-    for (const target of [active.registration.element, active.target]) {
+    for (const target of new Set([active.registration.element, active.frameLayer, active.target])) {
       if (!target?.isConnected) continue;
       const style = getComputedStyle(target);
       target.style.setProperty(
@@ -241,10 +281,20 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
   #position(target: HTMLElement, frame: HTMLElement) {
     const view = this.#document.defaultView!;
     const rect = frame.getBoundingClientRect();
-    target.style.setProperty("--lightbox-transition-width", `${rect.width}px`);
-    target.style.setProperty("--lightbox-transition-height", `${rect.height}px`);
-    target.style.setProperty("--lightbox-transition-left", `${rect.left + view.scrollX}px`);
-    target.style.setProperty("--lightbox-transition-top", `${rect.top + view.scrollY}px`);
+    // The target receives the frame's transform animation. Position it at the
+    // frame's layout box so the current transform is not applied twice.
+    const transformValue = getComputedStyle(frame).transform;
+    const transform = new DOMMatrix(transformValue === "none" ? undefined : transformValue);
+    target.style.setProperty("--lightbox-transition-width", `${frame.offsetWidth}px`);
+    target.style.setProperty("--lightbox-transition-height", `${frame.offsetHeight}px`);
+    target.style.setProperty(
+      "--lightbox-transition-left",
+      `${rect.left - transform.e + view.scrollX}px`,
+    );
+    target.style.setProperty(
+      "--lightbox-transition-top",
+      `${rect.top - transform.f + view.scrollY}px`,
+    );
   }
 
   #counterScaleTargets(target: HTMLElement) {
@@ -265,6 +315,17 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     active.controller?.abort();
     active.dispose?.();
     active.target?.remove();
+    if (active.frameLayer && active.marker?.isConnected) {
+      delete active.frameLayer.dataset.lightboxTravelLayer;
+      active.marker.replaceWith(active.frameLayer);
+      for (const [property, value] of active.previousStyles ?? []) {
+        if (value) active.frameLayer.style.setProperty(property, value);
+        else active.frameLayer.style.removeProperty(property);
+      }
+      if (active.frameLayer !== active.registration.element) {
+        this.#publish(active.frameLayer, "preview", 1);
+      }
+    }
     if (this.#registrations.get(active.id) === active.registration) {
       this.#publish(active.registration.element, "preview", 1);
     } else {

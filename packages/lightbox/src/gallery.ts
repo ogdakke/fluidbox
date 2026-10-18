@@ -25,6 +25,7 @@ const SOURCE_ATTRIBUTES = new Set([
   "alt",
   "title",
   "poster",
+  "placeholder-src",
   "aria-label",
 ]);
 
@@ -57,6 +58,10 @@ export class AppGallery extends HTMLElement {
   #unsubscribe: LightboxDispose | undefined;
   #returnFocus: HTMLElement | null = null;
   #lastStatus: LightboxState["status"] = "closed";
+  #readyWaiters: Array<{
+    resolve(controller: LightboxController): void;
+    reject(error: unknown): void;
+  }> = [];
 
   connectedCallback() {
     if (!this.hasAttribute("tabindex")) this.tabIndex = -1;
@@ -68,10 +73,15 @@ export class AppGallery extends HTMLElement {
     this.addEventListener("pointercancel", this.#discardPreparation, { signal, passive: true });
     this.#observer = new MutationObserver((records) => {
       if (
-        records.some(
-          (record) =>
-            record.type === "childList" || SOURCE_ATTRIBUTES.has(record.attributeName ?? ""),
-        )
+        records.some((record) => {
+          if (
+            record.target instanceof Element &&
+            record.target.closest("[data-lightbox-dynamic-preview]")
+          ) {
+            return false;
+          }
+          return record.type === "childList" || SOURCE_ATTRIBUTES.has(record.attributeName ?? "");
+        })
       ) {
         this.#queueRefresh();
       }
@@ -81,6 +91,12 @@ export class AppGallery extends HTMLElement {
   }
 
   disconnectedCallback() {
+    for (const waiter of this.#readyWaiters) {
+      waiter.reject(
+        new DOMException("app-gallery disconnected before it was ready.", "AbortError"),
+      );
+    }
+    this.#readyWaiters = [];
     this.#observer?.disconnect();
     this.#observer = undefined;
     this.#events?.abort();
@@ -96,6 +112,15 @@ export class AppGallery extends HTMLElement {
 
   get controller() {
     return this.#controller;
+  }
+
+  /** Resolve once the gallery controller has compiled its initial source. */
+  whenReady(): Promise<LightboxController> {
+    if (this.#controller) return Promise.resolve(this.#controller);
+    if (!this.isConnected) {
+      return Promise.reject(new DOMException("app-gallery is not connected.", "InvalidStateError"));
+    }
+    return new Promise((resolve, reject) => this.#readyWaiters.push({ resolve, reject }));
   }
 
   get source() {
@@ -155,7 +180,13 @@ export class AppGallery extends HTMLElement {
     queueMicrotask(() => {
       this.#refreshQueued = false;
       if (this.isConnected) {
-        this.#refreshPromise = this.#refreshPromise.then(() => this.#refresh());
+        this.#refreshPromise = this.#refreshPromise
+          .then(() => this.#refresh())
+          .catch((error) => {
+            for (const waiter of this.#readyWaiters) waiter.reject(error);
+            this.#readyWaiters = [];
+            throw error;
+          });
       }
     });
   }
@@ -210,6 +241,8 @@ export class AppGallery extends HTMLElement {
     }
     this.#paintState(this.#controller.state);
     this.#rebuildFilmstrip();
+    for (const waiter of this.#readyWaiters) waiter.resolve(this.#controller);
+    this.#readyWaiters = [];
   }
 
   #mountPortal(target: HTMLElement, controller: LightboxController) {
@@ -221,7 +254,8 @@ export class AppGallery extends HTMLElement {
     close.addEventListener("click", () => void controller.close({ reason: "api" }));
     previous.addEventListener("click", () => void controller.previous({ reason: "api" }));
     next.addEventListener("click", () => void controller.next({ reason: "api" }));
-    target.append(previous, next, close);
+    target.append(previous, next);
+    if (!this.hasAttribute("hide-close-button")) target.append(close);
     this.#rebuildFilmstrip();
     return () => {
       this.#filmstrip?.destroy();
@@ -303,14 +337,14 @@ export class AppGallery extends HTMLElement {
   #onClick = (event: MouseEvent) => {
     const lightbox = this.#declarativeTarget(event);
     if (!lightbox || event.defaultPrevented) return;
-    void this.#open({ id: lightbox.itemId }, "trigger");
+    void this.#open({ id: lightbox.openItemId ?? lightbox.itemId }, "trigger");
   };
 
   #onPointerDown = (event: PointerEvent) => {
     const lightbox = this.#declarativeTarget(event);
     if (!lightbox || !event.isPrimary || event.button !== 0) return;
     this.#discardPreparation();
-    this.#preparation = this.#controller?.prepare({ id: lightbox.itemId });
+    this.#preparation = this.#controller?.prepare({ id: lightbox.openItemId ?? lightbox.itemId });
   };
 
   #onPointerUp = () => {
