@@ -1,0 +1,207 @@
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * Flight conformance: whatever the origin looks like, the first painted frame
+ * of an opening and the last painted frame of a closing must look like the
+ * card itself. Anything else is a visible pop at the start or end of a flight.
+ */
+
+const cases = [
+  "cover",
+  "contain",
+  "position",
+  "different",
+  "text",
+  "badge",
+  "scroll",
+  "sticky",
+  "scaled",
+  "video-poster",
+  "video-inline",
+  "iframe",
+] as const;
+
+/**
+ * Cases the current flight cannot draw yet. It shows the media cropped from the
+ * centre to the origin's whole box, so these jump at the start and end:
+ * letterboxed or anchored crops, a card half hidden by a scroller, a clip that
+ * was mid-playback, and an embed snapshot cropped once by the viewer and again
+ * by the flight. They pass once the flight draws the origin itself.
+ */
+const knownGaps = new Set<string>(["contain", "position", "scroll", "video-inline", "iframe"]);
+
+type Box = { x: number; y: number; width: number; height: number };
+
+/**
+ * The origin's whole box, clipped only by the viewport and inset past
+ * antialiasing. A scroller hides part of the card; a flight that spills over
+ * the scroller's edge must show up here too.
+ */
+async function visibleOrigin(page: Page, id: string): Promise<Box> {
+  return page.evaluate((id) => {
+    const trigger = document.querySelector(`[data-flight-case="${id}"] [data-flight-trigger]`)!;
+    const visual = trigger.querySelector<HTMLElement>("[data-lightbox-origin]") ?? trigger;
+    const rect = visual.getBoundingClientRect();
+    const left = Math.max(0, rect.left);
+    const top = Math.max(0, rect.top);
+    const right = Math.min(innerWidth, rect.right);
+    const bottom = Math.min(innerHeight, rect.bottom);
+    const inset = 3;
+    return {
+      x: Math.round(left + inset),
+      y: Math.round(top + inset),
+      width: Math.round(right - left - inset * 2),
+      height: Math.round(bottom - top - inset * 2),
+    };
+  }, id);
+}
+
+/** Mean per-channel difference between two PNGs, from 0 (same) to 1. */
+async function difference(page: Page, a: Buffer, b: Buffer): Promise<number> {
+  return page.evaluate(
+    async ([first, second]) => {
+      const pixels = async (base64: string) => {
+        const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const context = canvas.getContext("2d")!;
+        context.drawImage(bitmap, 0, 0);
+        return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      };
+      const [x, y] = await Promise.all([pixels(first), pixels(second)]);
+      if (x.length !== y.length) return 1;
+      let total = 0;
+      for (let index = 0; index < x.length; index += 4) {
+        total +=
+          Math.abs(x[index]! - y[index]!) +
+          Math.abs(x[index + 1]! - y[index + 1]!) +
+          Math.abs(x[index + 2]! - y[index + 2]!);
+      }
+      return total / ((x.length / 4) * 3 * 255);
+    },
+    [a.toString("base64"), b.toString("base64")] as const,
+  );
+}
+
+/**
+ * Arm a hold before the action that starts a flight. The page checks every
+ * frame, so even a loaded browser cannot finish the motion between polls.
+ */
+async function armHold(page: Page, at: "start" | "middle" | "end") {
+  await page.evaluate((at) => {
+    const state = window as unknown as { flightHeld?: boolean };
+    state.flightHeld = false;
+    // A timer, not requestAnimationFrame: WebKit throttles frames in busy parallel runs.
+    const timer = setInterval(() => {
+      const moving = Array.from(
+        document.querySelectorAll(
+          "[data-lightbox-overlay] [data-lightbox-frame], [data-lightbox-flight] [data-lightbox-frame]",
+        ),
+      ).some((frame) =>
+        frame.getAnimations().some((animation) => animation.playState === "running"),
+      );
+      if (!moving) return;
+      clearInterval(timer);
+      for (const animation of document.getAnimations()) {
+        // A paused animation can paint a stale compositor frame. A crawling one
+        // paints the held time, and stopping short of the end keeps it unfinished.
+        const end = Number(animation.effect?.getComputedTiming().endTime ?? 0);
+        animation.playbackRate = 1e-6;
+        animation.currentTime =
+          at === "start" ? 0 : at === "middle" ? end / 2 : Math.max(0, end - 1);
+      }
+      // Give the held pose time to paint.
+      setTimeout(() => {
+        state.flightHeld = true;
+      }, 120);
+    }, 4);
+  }, at);
+}
+
+async function held(page: Page) {
+  await page.waitForFunction(() => (window as unknown as { flightHeld?: boolean }).flightHeld);
+}
+
+async function prepareCase(page: Page, id: string) {
+  await page.goto("/flight.html");
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(
+      Array.from(document.images, (image) => image.decode().catch(() => undefined)),
+    );
+    // Hold each inline clip mid-way, as a playing card would be when clicked.
+    await Promise.all(
+      Array.from(document.querySelectorAll("video"), async (video) => {
+        video.autoplay = false;
+        video.pause();
+        if (video.readyState < 1) {
+          await new Promise((resolve) =>
+            video.addEventListener("loadedmetadata", resolve, { once: true }),
+          );
+        }
+        video.currentTime = 1.5;
+        await new Promise((resolve) => video.addEventListener("seeked", resolve, { once: true }));
+      }),
+    );
+  });
+  const trigger = page.locator(`[data-flight-case="${id}"] [data-flight-trigger]`);
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.hover();
+  await page.waitForTimeout(100);
+  return trigger;
+}
+
+for (const id of cases) {
+  test(`flight from the "${id}" card starts and ends on the card`, async ({ page }) => {
+    test.fail(knownGaps.has(id), "the flight still draws the media, not the origin");
+    const trigger = await prepareCase(page, id);
+    const box = await visibleOrigin(page, id);
+    expect(box.width).toBeGreaterThan(20);
+    const before = await page.screenshot({ clip: box, animations: "allow" });
+
+    await armHold(page, "start");
+    await trigger.click();
+    await held(page);
+    const opening = await page.screenshot({ clip: box, animations: "allow" });
+    const openDifference = await difference(page, before, opening);
+
+    await page.evaluate(() => {
+      for (const animation of document.getAnimations()) animation.playbackRate = 1;
+    });
+    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+      "data-lightbox-state",
+      "open",
+    );
+    await armHold(page, "end");
+    await page.keyboard.press("Escape");
+    await held(page);
+    const closing = await page.screenshot({ clip: box, animations: "allow" });
+    const closeDifference = await difference(page, before, closing);
+
+    expect.soft(openDifference, "first opening frame differs from the card").toBeLessThan(0.03);
+    expect.soft(closeDifference, "last closing frame differs from the card").toBeLessThan(0.03);
+  });
+}
+
+test("a travelling badge keeps its size through the flight", async ({ page }) => {
+  const trigger = await prepareCase(page, "badge");
+  const badge = page.locator('[data-flight-case="badge"] .flight-badge');
+  const size = (await badge.boundingBox())!;
+  await trigger.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await armHold(page, "middle");
+  await page.keyboard.press("Escape");
+  await held(page);
+  const travelling = (await page
+    .locator("[data-lightbox-transition-content] .flight-badge")
+    .boundingBox())!;
+  const opacity = await page
+    .locator("[data-lightbox-transition-content]")
+    .evaluate((target) => Number(getComputedStyle(target).opacity));
+  expect(opacity, "the badge is visible mid-flight").toBeGreaterThan(0.9);
+  expect(travelling.width).toBeCloseTo(size.width, -1);
+  expect(travelling.height).toBeCloseTo(size.height, -1);
+});

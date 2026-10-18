@@ -1,4 +1,5 @@
 import { originIsVisible } from "./origin-geometry";
+import { originMatchesItem, originShowsItem } from "./origin-match";
 import {
   backdropVisibility,
   boundDismissVelocity,
@@ -22,6 +23,7 @@ import type {
   LightboxController,
   LightboxDispose,
   LightboxItem,
+  LightboxOrigin,
   LightboxPortalRenderer,
   LightboxRenderer,
   LightboxSource,
@@ -129,6 +131,8 @@ export class DomViewerDriver<
   #flightMedia: HTMLElement | undefined;
   #flightSource: HTMLElement | undefined;
   #flightSourceFrame: HTMLElement | undefined;
+  #closeCrossfade = false;
+  #crossfadeThumbnail: HTMLElement | undefined;
   #flightMarker: Comment | undefined;
   #preparedFlight:
     | { source: HTMLImageElement; image: HTMLImageElement; ready: Promise<boolean> }
@@ -335,7 +339,7 @@ export class DomViewerDriver<
     this.#applyTheme(context.origin?.trigger ?? null);
     this.#syncPageHeight();
     void this.#strip?.select(context.index, false);
-    this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
+    this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
     this.#render(context.item, context.index);
     this.#portal.overlay.dataset.lightboxPrepared = "";
     this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
@@ -343,8 +347,9 @@ export class DomViewerDriver<
 
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const start = this.#openingStart(from);
-    const motion = this.#openingMotion(start, !!from);
+    const crossfade = !!from && !originMatchesItem(context.origin, context.item);
+    const start = this.#openingStart(from, undefined, crossfade);
+    const motion = this.#openingMotion(start, !!from, undefined, crossfade);
     this.#applyMediaPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = start.frameOpacity;
     this.#portal.backdrop.style.opacity = start.backdropOpacity;
@@ -393,7 +398,7 @@ export class DomViewerDriver<
     this.#syncPageHeight();
     if (!prepared) {
       await this.#strip?.select(context.index, false);
-      this.#strip?.prepareOpening(context.index, context.origin?.thumbnail);
+      this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
     }
     this.#render(context.item, context.index);
     this.#setActiveTrigger(context.origin?.trigger ?? null);
@@ -429,12 +434,16 @@ export class DomViewerDriver<
     const from =
       prepared?.origin ?? (origin && origin.isConnected && originIsVisible(origin) ? origin : null);
     this.#activeOrigin = from;
+    const crossfade = !!from && !originMatchesItem(context.origin, context.item);
+    this.#keepThumbnailVisible(crossfade ? context.origin?.thumbnail : undefined);
     const start =
-      prepared && !interruptedPose ? prepared.start : this.#openingStart(from, interruptedPose);
+      prepared && !interruptedPose
+        ? prepared.start
+        : this.#openingStart(from, interruptedPose, crossfade);
     const motion =
       prepared && !interruptedPose
         ? prepared.motion
-        : this.#openingMotion(start, !!from, interruptedPose);
+        : this.#openingMotion(start, !!from, interruptedPose, crossfade);
     const overlayFrom = interruptedPose ? this.#thumbnailOverlays.currentProgress(1) : 1;
     this.#thumbnailOverlays.prepare(
       context.item,
@@ -447,7 +456,7 @@ export class DomViewerDriver<
     const controlsRevealDelay = Number(controlsReady?.offset ?? 0.7) * motion.duration;
     const controlsReveal = this.#thumbnailOverlays.prepareControlsReveal(controlsRevealDelay);
     this.#applyMediaPose(this.#frame, this.#media, start);
-    this.#frame.style.opacity = interruptedPose?.frameOpacity ?? (!from ? "0" : "1");
+    this.#frame.style.opacity = interruptedPose?.frameOpacity ?? start.frameOpacity;
     this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
     const animations = [
       ...(prepared && !interruptedPose ? prepared.animations : this.#openingAnimations(motion)),
@@ -543,6 +552,9 @@ export class DomViewerDriver<
     }
     const origin = context.origin?.visual;
     const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    const closing = this.#strip?.activeItem;
+    this.#closeCrossfade = !!from && !!closing && !originMatchesItem(context.origin, closing);
+    this.#keepThumbnailVisible(this.#closeCrossfade ? context.origin?.thumbnail : undefined);
     const start = interruptedPose ?? {
       ...readImageTransitionPose(this.#frame, this.#media),
       frameOpacity: "1",
@@ -614,6 +626,7 @@ export class DomViewerDriver<
       response: duration * 0.9,
       samples: 60,
       fadeFrame: !from,
+      crossfade: this.#closeCrossfade,
     });
     const overlayFrom = this.#thumbnailOverlays.currentProgress(0);
     if (this.#strip) {
@@ -663,6 +676,7 @@ export class DomViewerDriver<
   destroy() {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    this.#keepThumbnailVisible(undefined);
     this.#lifetime.abort();
     clearTimeout(this.#suppressClickTimer);
     this.#dragGesture.cancel();
@@ -694,13 +708,35 @@ export class DomViewerDriver<
     this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
   }
 
-  #openingStart(from: HTMLElement | null, interrupted?: PaintedPose): PaintedPose {
+  /**
+   * The session hides the origin's image while its item is open. A crossfading
+   * flight fades over the card, so the card's own image must stay painted.
+   */
+  #keepThumbnailVisible(thumbnail: HTMLElement | undefined) {
+    if (this.#crossfadeThumbnail === thumbnail) return;
+    if (this.#crossfadeThumbnail)
+      delete this.#crossfadeThumbnail.dataset.lightboxThumbnailCrossfade;
+    this.#crossfadeThumbnail = thumbnail;
+    if (thumbnail) thumbnail.dataset.lightboxThumbnailCrossfade = "";
+  }
+
+  /** The origin's image, when it shows the item being opened. */
+  #matchingThumbnail(context: { item: TItem; origin?: LightboxOrigin | null }) {
+    const thumbnail = context.origin?.thumbnail;
+    return thumbnail && originShowsItem(thumbnail, context.item) ? thumbnail : undefined;
+  }
+
+  #openingStart(
+    from: HTMLElement | null,
+    interrupted?: PaintedPose,
+    crossfade = false,
+  ): PaintedPose {
     if (interrupted) return interrupted;
     const openPose = openImageTransitionPose();
     if (from) {
       return {
         ...poseFromThumbnail(thumbnailTransitionPose(from, this.#frame, this.#media, openPose)),
-        frameOpacity: "1",
+        frameOpacity: crossfade ? "0" : "1",
         backdropOpacity: "0",
       };
     }
@@ -714,7 +750,12 @@ export class DomViewerDriver<
     };
   }
 
-  #openingMotion(start: PaintedPose, hasOrigin: boolean, interrupted?: PaintedPose) {
+  #openingMotion(
+    start: PaintedPose,
+    hasOrigin: boolean,
+    interrupted?: PaintedPose,
+    crossfade = false,
+  ) {
     const response = matchMedia("(hover: none) and (pointer: coarse)").matches
       ? TOUCH_OPENING_SPRING_RESPONSE
       : OPENING_SPRING_RESPONSE;
@@ -730,6 +771,7 @@ export class DomViewerDriver<
       response,
       samples: 24,
       fadeFrame: !hasOrigin && !interrupted,
+      crossfade: crossfade && !interrupted,
     });
   }
 
@@ -1167,6 +1209,7 @@ export class DomViewerDriver<
       duration: this.#closeDuration,
       response: this.#closeDuration * 0.9,
       samples: 60,
+      crossfade: this.#closeCrossfade,
     });
     const [frameAnimation, mediaAnimation, radiusAnimation] = this.#animations;
     if (frameAnimation?.effect instanceof KeyframeEffect) {
@@ -1443,6 +1486,7 @@ export class DomViewerDriver<
   }
 
   #finishClose() {
+    this.#keepThumbnailVisible(undefined);
     this.#strip?.resume();
     this.#removeFlight();
     this.#thumbnailOverlays.finishClose();
@@ -1470,6 +1514,12 @@ export class DomViewerDriver<
       target.toggleAttribute("data-ending-style", state === "closing");
       target.toggleAttribute("data-opening", state === "opening");
       target.toggleAttribute("data-dismissing", state === "closing");
+    }
+    // Native video controls and their loading spinner would ride along with the flight.
+    for (const video of this.#portal.dialog.querySelectorAll<HTMLVideoElement>(
+      "video[data-lightbox-media]",
+    )) {
+      video.controls = state === "open";
     }
     if (state === "closed") {
       delete this.#portal.dialog.dataset.galleryControlsRevealing;

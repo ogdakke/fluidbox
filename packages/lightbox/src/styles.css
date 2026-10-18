@@ -277,6 +277,11 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   visibility: hidden !important;
 }
 
+/* A crossfading flight fades over the card, so the card keeps its image. */
+[data-lightbox-thumbnail-hidden][data-lightbox-thumbnail-crossfade] {
+  visibility: visible !important;
+}
+
 /* Keep root rule specificity; :where keeps descendant defaults easy to override. */
 :is([data-lightbox-overlay], [data-lightbox-flight]) {
   display: block;
@@ -480,8 +485,9 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   display: none;
 }
 
-:where([data-lightbox-overlay], [data-lightbox-flight])
-  [data-lightbox-dialog][data-lightbox-gallery] {
+/* Every dialog fills the viewport. A dialog that shrinks to its media would
+   clip the opening and closing flights to the media's column. */
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-dialog] {
   --lightbox-content-height: var(--lightbox-height, 100svh);
   min-width: 0;
   min-height: 0;
@@ -718,6 +724,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-travel-layer] {
   z-index: 3;
+  transform-origin: top left;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-image-frame] {
   background: var(--lightbox-image-placeholder-background, rgb(127 127 127 / 0.12));
@@ -762,7 +769,9 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   transition: opacity 0.25s ease-out;
 }
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-media-cover]:not([src]),
+/* The snapshot stays through the opening flight, so a fast embed never swaps framing mid-flight. */
 :where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog]:not([data-opening])
   [data-lightbox-media-ready]
   > [data-lightbox-media-cover] {
   opacity: 0;

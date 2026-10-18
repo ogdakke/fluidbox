@@ -118,7 +118,12 @@ interface ImageTransitionMotionOptions {
   readonly response: number;
   readonly samples: number;
   readonly fadeFrame?: boolean;
+  /** The origin looks different from the media: fade the frame over the origin near the origin. */
+  readonly crossfade?: boolean;
 }
+
+/** Share of the motion, nearest the origin, over which a crossfading frame fades. */
+const CROSSFADE_SPAN = 0.4;
 
 export function createImageTransitionMotion({
   opening,
@@ -132,6 +137,7 @@ export function createImageTransitionMotion({
   response,
   samples,
   fadeFrame = false,
+  crossfade = false,
 }: ImageTransitionMotionOptions): ImageTransitionMotion {
   const frame: Keyframe[] = [];
   const image: Keyframe[] = [];
@@ -160,7 +166,11 @@ export function createImageTransitionMotion({
     frame.push({
       offset,
       transform: rendered.frame.toString(),
-      ...(fadeFrame ? { opacity: opening ? offset : 1 - offset } : {}),
+      ...(fadeFrame
+        ? { opacity: opening ? offset : 1 - offset }
+        : crossfade
+          ? { opacity: Math.min(1, (opening ? offset : 1 - offset) / CROSSFADE_SPAN) }
+          : {}),
     });
     image.push({ offset, transform: rendered.image.toString() });
     radius.push({ offset, borderRadius: rendered.borderRadius });

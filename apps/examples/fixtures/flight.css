@@ -1,0 +1,186 @@
+/* Flight conformance fixture. Tokens come from @ogdakke/fluidbox-design. */
+
+.flight-page {
+  width: min(100%, var(--fb-page));
+  margin: 0 auto;
+  border-inline: 1px solid var(--fb-line);
+}
+
+.flight-head {
+  display: grid;
+  gap: 10px;
+  padding: 40px var(--fb-gutter) 28px;
+  border-bottom: 1px solid var(--fb-line);
+}
+
+.flight-head h1 {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  letter-spacing: -0.04em;
+}
+
+.flight-head p:last-child {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--fb-muted);
+}
+
+.flight-grid {
+  --fb-columns: 3;
+}
+
+.flight-case {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.flight-case h3 {
+  margin-top: 6px;
+  font-size: 14.5px;
+}
+
+.flight-case p {
+  margin: 0;
+  color: var(--fb-muted);
+  font-size: 13px;
+}
+
+.flight-trigger {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: zoom-in;
+}
+
+.flight-visual {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 14px;
+  aspect-ratio: 4 / 3;
+  background: var(--fb-surface-2);
+}
+
+.flight-visual :is(img, video) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.flight-visual--contain {
+  padding: 12px;
+}
+
+.flight-visual--contain img {
+  object-fit: contain;
+}
+
+.flight-visual--top img {
+  object-position: top;
+}
+
+.flight-visual--sticky {
+  position: sticky;
+  top: calc(var(--fb-header-height) + 12px);
+}
+
+.flight-case[data-flight-case="sticky"] {
+  min-height: 520px;
+}
+
+.flight-text {
+  display: grid;
+  align-content: end;
+  gap: 4px;
+  aspect-ratio: 4 / 3;
+  padding: 18px;
+  border: 1px solid var(--fb-line-strong);
+}
+
+.flight-text strong {
+  margin-bottom: auto;
+  font-family: var(--fb-font-mono);
+  font-size: 2.2rem;
+  font-weight: 400;
+}
+
+.flight-text span {
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.flight-badge-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.flight-badge-host[data-lightbox-phase]:not([data-lightbox-phase="preview"]) {
+  visibility: hidden;
+}
+
+.flight-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  background: #0a0a0a;
+  color: #fff;
+  font-family: var(--fb-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flight-scroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  border-radius: 14px;
+}
+
+.flight-scroller > .flight-visual {
+  flex: 0 0 70%;
+}
+
+.flight-scroller__spacer {
+  flex: 0 0 40%;
+  border-radius: 14px;
+  background: var(--fb-surface);
+}
+
+.flight-scaled {
+  display: block;
+  transform: scale(0.8);
+  transform-origin: top left;
+}
+
+.flight-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: #0a0a0a;
+  color: #fff;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .flight-grid {
+    --fb-columns: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .flight-grid {
+    --fb-columns: 1;
+  }
+}

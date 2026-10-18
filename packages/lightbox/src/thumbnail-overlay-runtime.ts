@@ -18,6 +18,38 @@ interface ActiveOverlay<TItem extends LightboxItem> {
   readonly frameLayer?: HTMLElement;
   readonly marker?: Comment;
   readonly previousStyles?: ReadonlyMap<string, string>;
+  readonly layerAnimations: Animation[];
+}
+
+function counterScale(matrix: DOMMatrix) {
+  return `scale(${1 / Math.max(0.0001, Math.abs(matrix.a))}, ${1 / Math.max(0.0001, Math.abs(matrix.d))})`;
+}
+
+/** The travelling copy follows the frame; its children undo the frame's scale. */
+function targetMotion(frameMotion: Keyframe[]): Keyframe[] {
+  return frameMotion.map(({ offset, transform }) => {
+    const value = String(transform ?? "none");
+    return {
+      offset,
+      transform: value,
+      "--lightbox-transition-counter-transform": counterScale(
+        new DOMMatrix(value === "none" ? undefined : value),
+      ),
+    };
+  });
+}
+
+/**
+ * A travel layer sits inside the full-size media frame, so the frame's scale
+ * would shrink it with the image. Lay it out at the frame's painted size and
+ * scale it back up, so its content keeps the size it had on the thumbnail.
+ */
+function travelLayerStyle(transform: string | DOMMatrix | null | undefined) {
+  const value = String(transform ?? "none");
+  const matrix = new DOMMatrix(value === "none" ? undefined : value);
+  const x = Math.max(0.0001, Math.abs(matrix.a));
+  const y = Math.max(0.0001, Math.abs(matrix.d));
+  return { transform: `scale(${1 / x}, ${1 / y})`, width: `${x * 100}%`, height: `${y * 100}%` };
 }
 
 let progressRegistered = false;
@@ -33,15 +65,23 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     this.#document = ownerDocument;
     const css = ownerDocument.defaultView?.CSS;
     if (!progressRegistered && css && "registerProperty" in css) {
-      try {
-        css.registerProperty({
-          name: "--lightbox-progress",
-          syntax: "<number>",
+      const properties: PropertyDefinition[] = [
+        { name: "--lightbox-progress", syntax: "<number>", inherits: true, initialValue: "1" },
+        // Renderers may mount content after the motion starts. An inherited,
+        // interpolable counter transform reaches children that arrive late.
+        {
+          name: "--lightbox-transition-counter-transform",
+          syntax: "<transform-list>",
           inherits: true,
-          initialValue: "1",
-        });
-      } catch {
-        // A custom-element viewer or another direct viewer may have registered it.
+          initialValue: "scale(1)",
+        },
+      ];
+      for (const property of properties) {
+        try {
+          css.registerProperty(property);
+        } catch {
+          // A custom-element viewer or another direct viewer may have registered it.
+        }
       }
       progressRegistered = true;
     }
@@ -114,9 +154,10 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
           frameLayer,
           marker,
           previousStyles,
+          layerAnimations: [],
         };
       } else {
-        this.#active = { id: item.id, item, index, registration };
+        this.#active = { id: item.id, item, index, registration, layerAnimations: [] };
       }
     } else if (active.target) {
       if (active.frameLayer && active.frameLayer.parentElement !== frame)
@@ -145,13 +186,19 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
       ...new Set([active.registration.element, active.frameLayer, active.target]),
     ].filter((element): element is HTMLElement => !!element && element.isConnected);
     const animations = targets.map((target) => target.animate(progress, options));
-    if (!active.target) return animations;
-    animations.push(
-      active.target.animate(
-        frameMotion.map(({ offset, transform }) => ({ offset, transform })),
+    if (active.frameLayer?.isConnected) {
+      const layer = active.frameLayer.animate(
+        frameMotion.map(({ offset, transform }) => ({
+          offset,
+          ...travelLayerStyle(transform as string | undefined),
+        })),
         options,
-      ),
-    );
+      );
+      active.layerAnimations.push(layer);
+      animations.push(layer);
+    }
+    if (!active.target) return animations;
+    animations.push(active.target.animate(targetMotion(frameMotion), options));
     const counterMotion = frameMotion.map(({ offset, transform }) => {
       const value = String(transform ?? "none");
       const matrix = new DOMMatrix(value === "none" ? undefined : value);
@@ -173,11 +220,16 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     if (active.frameLayer && active.frameLayer !== active.registration.element) {
       this.#publish(active.frameLayer, phase, progress);
     }
+    const frame = active.frameLayer?.parentElement;
+    if (active.frameLayer?.dataset.lightboxTravelLayer !== undefined && frame) {
+      Object.assign(active.frameLayer.style, travelLayerStyle(getComputedStyle(frame).transform));
+    }
     if (!active.target) return;
     this.#publish(active.target, phase, progress);
     if (transform) {
       active.target.style.setProperty("--lightbox-transition-transform", transform.toString());
-      const counter = `scale(${1 / Math.max(0.0001, Math.abs(transform.a))}, ${1 / Math.max(0.0001, Math.abs(transform.d))})`;
+      const counter = counterScale(transform);
+      active.target.style.setProperty("--lightbox-transition-counter-transform", counter);
       for (const target of this.#counterScaleTargets(active.target)) {
         target.style.setProperty("--lightbox-transition-counter-transform", counter);
       }
@@ -216,6 +268,22 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
 
   retarget(animations: readonly Animation[], frameMotion: Keyframe[]) {
     const target = this.#active?.target;
+    const layer = this.#active?.frameLayer;
+    for (const animation of animations) {
+      if (
+        layer &&
+        animation.effect instanceof KeyframeEffect &&
+        animation.effect.target === layer
+      ) {
+        if (!animation.effect.getKeyframes().some((frame) => frame.width)) continue;
+        animation.effect.setKeyframes(
+          frameMotion.map(({ offset, transform }) => ({
+            offset,
+            ...travelLayerStyle(transform as string | undefined),
+          })),
+        );
+      }
+    }
     if (!target) return;
     const counterTargets = new Set(this.#counterScaleTargets(target));
     const counterMotion = frameMotion.map(({ offset, transform }) => {
@@ -233,9 +301,7 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
         effectTarget === target &&
         animation.effect.getKeyframes().some((frame) => frame.transform)
       ) {
-        animation.effect.setKeyframes(
-          frameMotion.map(({ offset, transform }) => ({ offset, transform })),
-        );
+        animation.effect.setKeyframes(targetMotion(frameMotion));
       } else if (effectTarget instanceof HTMLElement && counterTargets.has(effectTarget)) {
         animation.effect.setKeyframes(counterMotion);
       }
@@ -253,10 +319,15 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
         style.getPropertyValue("--lightbox-progress"),
       );
     }
+    if (active.frameLayer?.dataset.lightboxTravelLayer !== undefined) {
+      const { transform, width, height } = getComputedStyle(active.frameLayer);
+      Object.assign(active.frameLayer.style, { transform, width, height });
+    }
     if (active.target) {
       const matrix = new DOMMatrix(getComputedStyle(active.target).transform);
       active.target.style.setProperty("--lightbox-transition-transform", matrix.toString());
-      const counter = `scale(${1 / Math.max(0.0001, Math.abs(matrix.a))}, ${1 / Math.max(0.0001, Math.abs(matrix.d))})`;
+      const counter = counterScale(matrix);
+      active.target.style.setProperty("--lightbox-transition-counter-transform", counter);
       for (const target of this.#counterScaleTargets(active.target)) {
         target.style.setProperty("--lightbox-transition-counter-transform", counter);
       }
@@ -315,8 +386,12 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     active.controller?.abort();
     active.dispose?.();
     active.target?.remove();
+    for (const animation of active.layerAnimations) animation.cancel();
     if (active.frameLayer && active.marker?.isConnected) {
       delete active.frameLayer.dataset.lightboxTravelLayer;
+      for (const property of ["transform", "width", "height"] as const) {
+        active.frameLayer.style[property] = "";
+      }
       active.marker.replaceWith(active.frameLayer);
       for (const [property, value] of active.previousStyles ?? []) {
         if (value) active.frameLayer.style.setProperty(property, value);

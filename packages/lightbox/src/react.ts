@@ -301,6 +301,9 @@ function Trigger<TItem extends LightboxItem>({
   const previewId = activeId ?? lastPreviewId ?? id;
   const previewIndex = store.source.getIndex(previewId) ?? store.source.getIndex(id);
   const previewItem = previewIndex === null ? null : (store.source.getItem(previewIndex) as TItem);
+  // A trigger that renders the last viewed slide reopens on that slide, so the
+  // flight starts from the picture the card is showing.
+  const openId = previewItem?.id ?? id;
   const rendered =
     typeof children === "function"
       ? children({
@@ -367,7 +370,7 @@ function Trigger<TItem extends LightboxItem>({
     onPointerDown?.(event);
     if (event.defaultPrevented || !event.isPrimary || event.button !== 0) return;
     discardPreparation();
-    preparationRef.current = store.controller.prepare({ id });
+    preparationRef.current = store.controller.prepare({ id: openId });
   };
   const handlePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const childHandler = childProps.onPointerUp as
@@ -392,7 +395,7 @@ function Trigger<TItem extends LightboxItem>({
       | undefined;
     childClick?.(event);
     onClick?.(event);
-    if (!event.defaultPrevented) void store.controller.open({ id }, { reason: "trigger" });
+    if (!event.defaultPrevented) void store.controller.open({ id: openId }, { reason: "trigger" });
   };
 
   if (asChild) {
