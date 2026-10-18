@@ -1,10 +1,13 @@
 /** @jsxImportSource solid-js */
+import { mountChrome } from "../src/design/chrome";
 import { createSignal } from "solid-js";
 import { render } from "solid-js/web";
 import { useFluidboxGallery } from "@ogdakke/fluidbox/solid";
 import type { AppGallery } from "@ogdakke/fluidbox";
 import { alternateSource, source } from "./source";
 import "./frameworks.css";
+
+mountChrome("fixtures", { fixture: "Solid binding · indexed gallery with source replacement" });
 
 declare module "solid-js" {
   namespace JSX {

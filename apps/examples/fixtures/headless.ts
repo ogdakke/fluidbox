@@ -1,7 +1,11 @@
+import { mountChrome } from "../src/design/chrome";
 import { arraySource, createLightbox } from "@ogdakke/fluidbox";
 import type { LightboxController, LightboxItem, LightboxRenderer } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/styles.css";
 import "./headless.css";
+
+mountChrome("fixtures", {
+  fixture: "Headless runtime · custom renderers, a protected viewer, and a secondary viewer",
+});
 
 const source = arraySource<LightboxItem>([
   {

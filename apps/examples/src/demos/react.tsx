@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { LightboxItem } from "@ogdakke/fluidbox";
 import { Lightbox } from "@ogdakke/fluidbox/react";
 import { artItem, sceneById } from "../art";
+import { mapEmbedUrl, mapView } from "../map-view";
 
 const productItems: LightboxItem[] = [
   {
@@ -23,11 +24,12 @@ const mapItems: LightboxItem[] = [
     id: "react-map",
     media: {
       type: "iframe",
-      src: "/map-panel.html",
-      title: "Interactive map of the sample store area",
-      width: 1000,
-      height: 700,
+      src: mapEmbedUrl(),
+      title: mapView.title,
+      width: mapView.width,
+      height: mapView.height,
     },
+    thumbnail: { src: "/map/preview.svg", width: mapView.width, height: mapView.height },
   },
 ];
 
@@ -38,13 +40,13 @@ const previewItems = ["aurora", "ridge", "fjord", "lagoon", "alpine"].map((id) =
   artItem(sceneById(id), `react-preview-${id}`),
 );
 
-function ViewerControls({ filmstrip = false }: { filmstrip?: boolean }) {
+function ViewerControls({ gallery = false }: { gallery?: boolean }) {
   return (
     <Lightbox.Portal>
-      <Lightbox.Previous />
-      <Lightbox.Next />
+      {gallery && <Lightbox.Previous />}
+      {gallery && <Lightbox.Next />}
       <Lightbox.Close />
-      {filmstrip && <Lightbox.Filmstrip />}
+      {gallery && <Lightbox.Filmstrip />}
     </Lightbox.Portal>
   );
 }
@@ -72,13 +74,18 @@ function Card({
 function ProductCard() {
   return (
     <Lightbox.Root items={productItems}>
-      <Card title="Image inside a card" note="Only the photo flies. Price and badge stay put.">
+      <Card
+        title="Image inside a card"
+        note="Only the photo flies. The badge rides along on the transition layer."
+      >
         <Lightbox.Trigger item={productItems[0]} asChild>
           <button type="button" className="product" aria-label="View the Coral Runner shoe">
             <span className="product__image" data-lightbox-origin>
               <img src="/runner.svg" alt="" width="1000" height="700" />
+              <Lightbox.ThumbnailOverlay behavior="travel" className="product__layer">
+                <span className="product__badge">New color</span>
+              </Lightbox.ThumbnailOverlay>
             </span>
-            <span className="product__badge">New color</span>
             <span className="product__details">
               <span>
                 <strong>Coral Runner</strong>
@@ -97,13 +104,18 @@ function ProductCard() {
 function MapCard() {
   return (
     <Lightbox.Root items={mapItems}>
-      <Card title="Preview to live iframe" note="A static picture opens an interactive page.">
+      <Card
+        title="Preview to live iframe"
+        note="A static tile snapshot opens the real OpenStreetMap embed."
+      >
         <Lightbox.Trigger item={mapItems[0]} asChild>
           <button type="button" className="map" aria-label="Open the store map">
             <span className="map__preview" data-lightbox-origin>
-              <img src="/map-preview.svg" alt="" width="1000" height="700" />
+              <img src="/map/preview.svg" alt="" width="1000" height="700" />
+              <span className="map__pin" aria-hidden="true" />
             </span>
             <span className="map__pill">Open map ↗</span>
+            <span className="map__credit">© OpenStreetMap contributors</span>
           </button>
         </Lightbox.Trigger>
       </Card>
@@ -124,7 +136,7 @@ function AlbumCard() {
           </button>
         </Lightbox.Trigger>
       </Card>
-      <ViewerControls filmstrip />
+      <ViewerControls gallery />
     </Lightbox.Root>
   );
 }
@@ -149,7 +161,7 @@ function PreviewCard() {
           )}
         </Lightbox.Trigger>
       </Card>
-      <ViewerControls filmstrip />
+      <ViewerControls gallery />
     </Lightbox.Root>
   );
 }

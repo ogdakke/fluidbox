@@ -1,7 +1,11 @@
+import { mountChrome } from "../src/design/chrome";
 import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
-import "@ogdakke/fluidbox/styles.css";
 import "./playground.css";
+
+mountChrome("fixtures", {
+  fixture: "Playground · the original two-image gallery and a 100,000-item indexed source",
+});
 
 const gallery = document.querySelector<AppGallery>("#virtual-gallery")!;
 const origins = new Map<string, HTMLButtonElement>();

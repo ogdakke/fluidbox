@@ -1,71 +1,39 @@
-import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
-import { artSrc, scenes } from "../art";
+import type { AppGallery } from "@ogdakke/fluidbox";
+import { artSrc, formatCount, indexedArt, windowSize, windowStart } from "../art";
+import { originsWithin } from "./origins";
 
-const count = 100_000;
-const windowSize = 12;
-const sceneAt = (index: number) => scenes[(index * 7) % scenes.length]!;
-
+/** Vanilla host: renders 12 cards of a 100,000-item source and jumps anywhere in it. */
 export function mountIndexed(gallery: AppGallery, form: HTMLFormElement): void {
-  const origins = new Map<string, HTMLButtonElement>();
+  const { source, sceneAt, count } = indexedArt(100_000);
   const output = form.querySelector("output")!;
-
-  const source: LightboxSource<LightboxItem> = {
-    count,
-    getItem(index) {
-      const scene = sceneAt(index);
-      const src = artSrc(scene);
-      return {
-        id: String(index),
-        media: {
-          type: "image",
-          src,
-          alt: `${scene.title}, item ${index + 1}`,
-          width: scene.width,
-          height: scene.height,
-        },
-        thumbnail: { src, width: scene.width, height: scene.height },
-        caption: `${scene.title} · #${(index + 1).toLocaleString("en-US")}`,
-      };
-    },
-    getIndex(id) {
-      const index = Number(id);
-      return Number.isInteger(index) && index >= 0 && index < count ? index : null;
-    },
-  };
   gallery.source = source;
-  gallery.origins = {
-    getOrigin(id) {
-      const trigger = origins.get(id);
-      if (!trigger) return null;
-      const thumbnail = trigger.querySelector("img");
-      return { trigger, visual: thumbnail ?? trigger, thumbnail: thumbnail ?? undefined };
-    },
-  };
+  gallery.origins = originsWithin(() => gallery);
 
   const filmstrip = gallery.querySelector("app-filmstrip");
   function renderWindow(start: number) {
-    for (const button of origins.values()) button.remove();
-    origins.clear();
+    for (const card of gallery.querySelectorAll(".virtual-card")) card.remove();
     const end = Math.min(start + windowSize, count);
     for (let index = start; index < end; index++) {
       const scene = sceneAt(index);
       const button = document.createElement("button");
       button.type = "button";
       button.className = "virtual-card";
+      button.dataset.originId = String(index);
       button.setAttribute("aria-label", `Open gallery item ${index + 1}`);
       const image = document.createElement("img");
       image.src = artSrc(scene);
       image.alt = "";
       image.width = scene.width;
       image.height = scene.height;
+      // The image, not the captioned card, is the rounded box the viewer flies from.
+      image.dataset.lightboxOrigin = "";
       const caption = document.createElement("span");
-      caption.textContent = `#${(index + 1).toLocaleString("en-US")}`;
+      caption.textContent = `#${formatCount(index + 1)}`;
       button.append(image, caption);
       button.addEventListener("click", () => void gallery.open({ index }));
       gallery.insertBefore(button, filmstrip);
-      origins.set(String(index), button);
     }
-    output.textContent = `Showing ${(start + 1).toLocaleString("en-US")}–${end.toLocaleString("en-US")} of ${count.toLocaleString("en-US")}`;
+    output.textContent = `Showing ${formatCount(start + 1)}–${formatCount(end)} of ${formatCount(count)}`;
   }
   renderWindow(0);
 
@@ -74,7 +42,7 @@ export function mountIndexed(gallery: AppGallery, form: HTMLFormElement): void {
     const input = form.querySelector<HTMLInputElement>("input")!;
     const index = Math.max(0, Math.min(count - 1, Number(input.value) - 1));
     if (!Number.isFinite(index)) return;
-    renderWindow(Math.max(0, Math.min(count - windowSize, index - (index % windowSize))));
+    renderWindow(windowStart(index, count));
     void gallery.open({ index });
   });
 }

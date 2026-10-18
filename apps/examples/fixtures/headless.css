@@ -1,32 +1,29 @@
-:root {
-  color-scheme: dark;
-  font-family: system-ui, sans-serif;
-  background: #0b0b0b;
-  color: #f7f7f7;
-}
-
-body {
-  margin: 0;
-}
+/* Headless runtime fixture. Tokens come from src/design. */
 
 .headless-page {
-  max-width: 54rem;
+  width: min(100%, 900px);
   margin: 0 auto;
-  padding: 4rem 1.5rem;
+  padding: 40px var(--fb-gutter) 56px;
+  border-inline: 1px solid var(--fb-line);
+}
+
+.headless-page h1 {
+  margin-bottom: 20px;
+  font-size: 1.8rem;
 }
 
 .headless-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 8px;
 }
 
 .headless-grid button {
   overflow: hidden;
   padding: 0;
   border: 0;
-  border-radius: 1.25rem;
-  background: transparent;
+  border-radius: var(--fb-image-radius);
+  background: var(--fb-surface-2);
   cursor: zoom-in;
 }
 
@@ -46,19 +43,32 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: 8px;
   pointer-events: auto;
 }
 
 [data-demo-controls] button {
-  padding: 0.65rem 0.9rem;
-  border: 1px solid rgb(255 255 255 / 25%);
-  border-radius: 999px;
-  background: rgb(10 10 10 / 75%);
-  color: white;
+  height: var(--fb-control-height);
+  padding: 0 14px;
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+[data-demo-controls] button:hover:not(:disabled) {
+  border-color: var(--fb-fg);
+  background: var(--fb-surface-2);
 }
 
 [data-demo-caption] {
   min-width: 3rem;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--fb-line);
+  background: var(--fb-bg);
+  font-family: var(--fb-font-mono);
+  font-size: 12px;
   text-align: center;
 }

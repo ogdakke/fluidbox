@@ -118,7 +118,8 @@ test("viewer selectors stay isolated and honor stylesheet order", async ({ page 
     "rgb(12, 34, 56)",
   );
   await expect(overlay.locator("[data-lightbox-frame]").first()).toHaveCSS("overflow", "hidden");
-  await expect(close).toHaveCSS("width", "32px");
+  // The site's viewer theme loads after the package CSS and sizes the close control to 40px.
+  await expect(close).toHaveCSS("width", "40px");
 
   await page.addStyleTag({ content: "[data-lightbox-close] { width: 41px; }" });
   await expect(close).toHaveCSS("width", "41px");

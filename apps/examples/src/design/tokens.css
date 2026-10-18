@@ -1,0 +1,88 @@
+/*
+ * Fluidbox design tokens. Monochrome, hairline rules, square controls.
+ * Every page (showcase, framework pages, fixtures, and later the docs) reads these.
+ */
+
+@font-face {
+  font-family: "Geist";
+  src: url("./fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("./fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --fb-font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fb-font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --fb-bg: #ffffff;
+  --fb-fg: #0a0a0a;
+  --fb-muted: #5c5c63;
+  --fb-faint: #9b9ba3;
+  --fb-line: #e7e7ea;
+  --fb-line-strong: #cdcdd3;
+  --fb-cross: #9b9ba3;
+  --fb-surface: #fafafa;
+  --fb-surface-2: #f2f2f3;
+  --fb-invert-bg: #0a0a0a;
+  --fb-invert-fg: #ffffff;
+  --fb-highlight: #7c3aed;
+
+  /* Images keep a small radius; controls and frames stay square. */
+  --fb-image-radius: 6px;
+  --fb-control-height: 36px;
+  --fb-header-height: 44px;
+  --fb-gutter: clamp(16px, 3vw, 32px);
+  --fb-page: 1280px;
+  --fb-cross-size: 9px;
+  --fb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Viewer theme inputs. The runtime copies these six onto its body-level overlay. */
+  --background: var(--fb-bg);
+  --color: var(--fb-fg);
+  --accent: var(--fb-surface-2);
+  --primary: var(--fb-fg);
+  --border: var(--fb-line-strong);
+  --radius: 0px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --fb-bg: #0a0a0a;
+    --fb-fg: #ededee;
+    --fb-muted: #a3a3ab;
+    --fb-faint: #6b6b73;
+    --fb-line: #222225;
+    --fb-line-strong: #36363b;
+    --fb-cross: #5f5f67;
+    --fb-surface: #0f0f10;
+    --fb-surface-2: #18181a;
+    --fb-invert-bg: #ededee;
+    --fb-invert-fg: #0a0a0a;
+    --fb-highlight: #c4a5ff;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --fb-bg: #0a0a0a;
+  --fb-fg: #ededee;
+  --fb-muted: #a3a3ab;
+  --fb-faint: #6b6b73;
+  --fb-line: #222225;
+  --fb-line-strong: #36363b;
+  --fb-cross: #5f5f67;
+  --fb-surface: #0f0f10;
+  --fb-surface-2: #18181a;
+  --fb-invert-bg: #ededee;
+  --fb-invert-fg: #0a0a0a;
+  --fb-highlight: #c4a5ff;
+}

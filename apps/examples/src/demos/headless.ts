@@ -2,6 +2,9 @@ import { arraySource, createLightbox } from "@ogdakke/fluidbox";
 import type { LightboxController, LightboxItem } from "@ogdakke/fluidbox";
 import { artItem, artSrc, sceneById } from "../art";
 
+const icon = (path: string) =>
+  `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
+
 const picks = ["canyon", "coast", "ridge", "dune"].map(sceneById);
 
 export function mountHeadless(grid: HTMLElement): LightboxController<LightboxItem> {
@@ -27,8 +30,9 @@ export function mountHeadless(grid: HTMLElement): LightboxController<LightboxIte
     origins: {
       getOrigin(id) {
         const trigger = grid.querySelector<HTMLElement>(`[data-photo-id="${CSS.escape(id)}"]`);
-        const visual = trigger?.querySelector("img");
-        return trigger && visual ? { trigger, visual, thumbnail: visual } : null;
+        const thumbnail = trigger?.querySelector("img") ?? undefined;
+        // The rounded, clipped button is the visual so its corners carry through the flight.
+        return trigger ? { trigger, visual: trigger, thumbnail } : null;
       },
     },
     portal: {
@@ -36,10 +40,10 @@ export function mountHeadless(grid: HTMLElement): LightboxController<LightboxIte
         const bar = document.createElement("div");
         bar.className = "caption-bar";
         bar.innerHTML = `
-          <button type="button" data-action="previous" aria-label="Previous image">←</button>
+          <button type="button" data-action="previous" aria-label="Previous image">${icon("M14.5 5.5L8 12l6.5 6.5")}</button>
           <div class="caption-bar__text"><strong></strong><span></span></div>
-          <button type="button" data-action="next" aria-label="Next image">→</button>
-          <button type="button" data-action="close" aria-label="Close viewer">✕</button>
+          <button type="button" data-action="next" aria-label="Next image">${icon("M9.5 5.5L16 12l-6.5 6.5")}</button>
+          <button type="button" data-action="close" aria-label="Close viewer">${icon("M6 6l12 12M18 6L6 18")}</button>
         `;
         const title = bar.querySelector("strong")!;
         const counter = bar.querySelector(".caption-bar__text span")!;

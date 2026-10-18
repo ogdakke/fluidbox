@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>React — Fluidbox</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/src/pages/react.tsx"></script>
+  </head>
+  <body>
+    <main class="fb-shell">
+      <header class="page-head">
+        <p class="fb-label">@ogdakke/fluidbox/react</p>
+        <h1>React</h1>
+        <p>
+          Composed parts over the same runtime. Any element can be the origin, one trigger can stand
+          in for an album, and a virtualizer can host a hundred thousand photos.
+        </p>
+      </header>
+      <section class="section" aria-labelledby="origins-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">01</span>&nbsp;&nbsp;origins</p>
+          <h2 class="fb-rule-title" id="origins-title">Any element can be the origin</h2>
+          <p>
+            The image can sit inside a richer card, a static map can open a live one, and a text
+            card can stand in for a whole album.
+          </p>
+        </header>
+        <div class="stage">
+          <div id="react-root" class="fb-grid react-grid" aria-busy="true"></div>
+        </div>
+        <details class="fb-code">
+          <summary>Composition</summary>
+          <pre><code>import { Lightbox } from "@ogdakke/fluidbox/react";
+
+&lt;Lightbox.Root items={photos}&gt;
+  &lt;Lightbox.Trigger item={photos[0]} items={photos} asChild&gt;
+    {({ item }) =&gt; (
+      &lt;button type="button"&gt;
+        &lt;img src={item?.thumbnail?.src} alt="" data-lightbox-origin /&gt;
+        &lt;Lightbox.ThumbnailOverlay&gt;+{photos.length - 1}&lt;/Lightbox.ThumbnailOverlay&gt;
+      &lt;/button&gt;
+    )}
+  &lt;/Lightbox.Trigger&gt;
+  &lt;Lightbox.Portal&gt;
+    &lt;Lightbox.Previous /&gt; &lt;Lightbox.Next /&gt; &lt;Lightbox.Close /&gt;
+    &lt;Lightbox.Filmstrip /&gt;
+  &lt;/Lightbox.Portal&gt;
+&lt;/Lightbox.Root&gt;</code></pre>
+        </details>
+      </section>
+      <section class="section" aria-labelledby="virtualized-library-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">02</span>&nbsp;&nbsp;virtualized library</p>
+          <h2 class="fb-rule-title" id="virtualized-library-title">A virtualized photo library</h2>
+          <p>
+            TanStack Virtual mounts a few rows of a 10,000-photo grid.
+            <code>revealOrigin</code> scrolls the grid so the photo you close on is back under your
+            finger.
+          </p>
+        </header>
+        <div class="stage"><div id="library-root"></div></div>
+        <details class="fb-code">
+          <summary>Virtualizer and origins</summary>
+          <pre><code>const virtualizer = useVirtualizer({ count: rows.length, getScrollElement, estimateSize });
+const origins = {
+  getOrigin: (id) =&gt; ({ trigger: tiles.get(id), visual: tiles.get(id) }),
+  // Scroll the host grid so the selected photo is mounted and visible on close.
+  revealOrigin: (id, index, { signal }) =&gt; scrollToPhoto(index, signal),
+};
+
+&lt;Lightbox.Root source={source} origins={origins}&gt;
+  {virtualRows.map((row) =&gt; /* Lightbox.Item + Lightbox.Trigger per tile */)}
+&lt;/Lightbox.Root&gt;</code></pre>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>

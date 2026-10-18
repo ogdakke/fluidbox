@@ -1,3 +1,4 @@
+import { mountChrome } from "../src/design/chrome";
 import "@angular/compiler";
 import {
   Component,
@@ -12,6 +13,8 @@ import { useFluidboxGallery } from "@ogdakke/fluidbox/angular";
 import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
 import { alternateSource, source } from "./source";
 import "./frameworks.css";
+
+mountChrome("fixtures", { fixture: "Angular binding · indexed gallery with source replacement" });
 
 @Component({
   selector: "fluidbox-harness",

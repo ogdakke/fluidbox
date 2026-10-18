@@ -20,6 +20,8 @@ export function mountElements(gallery: HTMLElement): void {
     const trigger = document.createElement("button");
     trigger.type = "button";
     trigger.slot = "trigger";
+    // The rounded button clips the image, so it is the handoff box rather than the bare <img>.
+    trigger.dataset.lightboxPreview = "";
     trigger.append(image());
 
     const content = document.createElement("template");

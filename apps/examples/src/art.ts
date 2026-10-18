@@ -37,3 +37,41 @@ export function frameworkCollections(prefix: string): [ArtCollection, ArtCollect
     collection("Night", prefix, ["lagoon", "aurora"]),
   ];
 }
+
+/** A large indexed collection that cycles through the scenes. Hosts mount a small window of it. */
+export function indexedArt(count: number) {
+  const sceneAt = (index: number) => scenes[(index * 7) % scenes.length]!;
+  const source: LightboxSource<LightboxItem> = {
+    count,
+    getItem(index) {
+      const scene = sceneAt(index);
+      const src = artSrc(scene);
+      return {
+        id: String(index),
+        media: {
+          type: "image",
+          src,
+          alt: `${scene.title}, item ${index + 1}`,
+          width: scene.width,
+          height: scene.height,
+        },
+        thumbnail: { src, width: scene.width, height: scene.height },
+        caption: `${scene.title} · #${(index + 1).toLocaleString("en-US")}`,
+      };
+    },
+    getIndex(id) {
+      const index = Number(id);
+      return Number.isInteger(index) && index >= 0 && index < count ? index : null;
+    },
+  };
+  return { source, sceneAt, count };
+}
+
+export const windowSize = 12;
+
+/** First index of the 12-card window that contains `index`. */
+export function windowStart(index: number, count: number): number {
+  return Math.max(0, Math.min(count - windowSize, index - (index % windowSize)));
+}
+
+export const formatCount = (value: number) => value.toLocaleString("en-US");

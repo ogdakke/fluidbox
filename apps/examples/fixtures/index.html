@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Fixtures — Fluidbox</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/src/pages/fixtures.ts"></script>
+  </head>
+  <body>
+    <main class="fb-shell">
+      <header class="page-head">
+        <p class="fb-label">Test fixtures</p>
+        <h1>Fixtures</h1>
+        <p>
+          Bare pages with one scenario each. Playwright drives them; open one to reproduce a bug in
+          isolation.
+        </p>
+      </header>
+      <section class="section">
+        <div class="stage">
+          <div class="fb-grid fixture-list" style="--fb-columns: 2">
+            <a class="fb-cell" href="/photo-library.html"
+              ><h3>photo-library.html</h3>
+              <p>
+                10,000 photos in a TanStack Virtual grid with date headers. Add ?count=100000 for
+                more.
+              </p></a
+            >
+            <a class="fb-cell" href="/harness.html?count=30"
+              ><h3>harness.html</h3>
+              <p>
+                Bare element gallery. Flags: count, virtual, shadow, no-filmstrip, iframe, iframes,
+                pictures, hide-close-button.
+              </p></a
+            >
+            <a class="fb-cell" href="/harness.html?virtual&amp;count=100000"
+              ><h3>harness.html?virtual</h3>
+              <p>100,000 indexed items rendered as plain buttons.</p></a
+            >
+            <a class="fb-cell" href="/collapsed.html"
+              ><h3>collapsed.html</h3>
+              <p>
+                Three visible tiles; a +8 teaser stands in for the rest and travels with them.
+              </p></a
+            >
+            <a class="fb-cell" href="/headless.html"
+              ><h3>headless.html</h3>
+              <p>Custom renderers, a protected viewer, and a secondary viewer on one source.</p></a
+            >
+            <a class="fb-cell" href="/playground.html"
+              ><h3>playground.html</h3>
+              <p>The original two-image DOM gallery and indexed source.</p></a
+            >
+            <a class="fb-cell" href="/react.html"
+              ><h3>react.html</h3>
+              <p>React parts: product card, map, album, shared preview, source switching.</p></a
+            >
+            <a class="fb-cell" href="/solid.html"
+              ><h3>solid.html</h3>
+              <p>Solid binding with source replacement.</p></a
+            >
+            <a class="fb-cell" href="/vue.html"
+              ><h3>vue.html</h3>
+              <p>Vue binding with source replacement.</p></a
+            >
+            <a class="fb-cell" href="/angular.html"
+              ><h3>angular.html</h3>
+              <p>Angular binding with source replacement.</p></a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

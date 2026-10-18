@@ -6,8 +6,10 @@ export function originsWithin(root: () => ParentNode | null | undefined): Lightb
     getOrigin(id) {
       const trigger = root()?.querySelector<HTMLElement>(`[data-origin-id="${CSS.escape(id)}"]`);
       if (!trigger) return null;
-      const image = trigger.querySelector("img") ?? undefined;
-      return { trigger, visual: image ?? trigger, thumbnail: image };
+      // The visual is the clipped box: its border radius is what the flight morphs from and to.
+      const visual = trigger.querySelector<HTMLElement>("[data-lightbox-origin]") ?? trigger;
+      const thumbnail = trigger.querySelector("img") ?? undefined;
+      return { trigger, visual, thumbnail };
     },
   };
 }

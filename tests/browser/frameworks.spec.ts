@@ -1,35 +1,38 @@
 import { expect, test } from "@playwright/test";
 
-test("showcase mounts every demo and each one opens a viewer", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  await page.goto("/");
-  await expect(page.locator("[aria-busy]")).toHaveCount(0, { timeout: 15_000 });
+const sitePages: [path: string, openers: string[]][] = [
+  ["/", ["#mosaic app-lightbox [slot=trigger]"]],
+  ["/elements/", ["#mosaic app-lightbox [slot=trigger]", "#virtual-gallery .virtual-card"]],
+  ["/headless/", ["#headless-grid .headless-thumb"]],
+  ["/react/", [".product", ".map", ".album", ".cover", ".library-photo"]],
+  ["/solid/", ["#gallery-root .fb-thumb", "#indexed-root .virtual-card"]],
+  ["/vue/", ["#gallery-root .fb-thumb", "#indexed-root .virtual-card"]],
+  ["/angular/", ["#gallery-root .fb-thumb", "#indexed-root .virtual-card"]],
+];
 
-  const openers = [
-    page.locator("#mosaic app-lightbox [slot=trigger]").first(),
-    page.locator("#virtual-gallery .virtual-card").first(),
-    page.locator("#headless-grid .headless-thumb").first(),
-    page.getByRole("button", { name: "Open the preview gallery" }),
-    page.locator("#solid-root .thumb").first(),
-    page.locator("#vue-root .thumb").first(),
-    page.locator("#angular-root .thumb").first(),
-  ];
-  for (const opener of openers) {
-    await opener.scrollIntoViewIfNeeded();
-    await opener.click();
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
-      "data-lightbox-state",
-      "open",
-    );
-    await page.keyboard.press("Escape");
-    await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
-  }
-  expect(errors).toEqual([]);
-});
+for (const [path, openers] of sitePages) {
+  test(`site page ${path} mounts its demos and each one opens a viewer`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await page.goto(path);
+    await expect(page.locator("[aria-busy]")).toHaveCount(0, { timeout: 15_000 });
+    for (const selector of openers) {
+      const opener = page.locator(selector).first();
+      await opener.scrollIntoViewIfNeeded();
+      await opener.click();
+      await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+        "data-lightbox-state",
+        "open",
+      );
+      await page.keyboard.press("Escape");
+      await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+    }
+    expect(errors).toEqual([]);
+  });
+}
 
 test("React binding opens and navigates without custom elements", async ({ page }) => {
   const errors: string[] = [];

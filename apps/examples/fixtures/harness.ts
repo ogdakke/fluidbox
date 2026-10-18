@@ -1,3 +1,4 @@
+import { mountChrome } from "../src/design/chrome";
 import type {
   AppGallery,
   LightboxItem,
@@ -5,8 +6,12 @@ import type {
   LightboxSource,
 } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
-import "@ogdakke/fluidbox/styles.css";
 import "./site.css";
+
+mountChrome("fixtures", {
+  fixture:
+    "Harness · query flags: count, virtual, shadow, no-filmstrip, iframe, iframes, pictures, hide-close-button",
+});
 
 const root = document.querySelector<HTMLElement>("#fixture")!;
 const params = new URLSearchParams(location.search);

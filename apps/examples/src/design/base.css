@@ -1,0 +1,350 @@
+/* Base elements and shared components. Class names use the `fb-` prefix. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: calc(var(--fb-header-height) + 16px);
+}
+
+body {
+  margin: 0;
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  font:
+    15px/1.6 var(--fb-font-sans),
+    sans-serif;
+  font-feature-settings: "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--fb-line-strong);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--fb-font-mono);
+  font-size: 0.86em;
+}
+
+:not(pre) > code {
+  padding: 0.12em 0.36em;
+  background: var(--fb-surface-2);
+  border: 1px solid var(--fb-line);
+}
+
+:focus-visible {
+  outline: 1px solid var(--fb-fg);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--fb-fg);
+  color: var(--fb-bg);
+}
+
+/* Cross marks. Any `.fb-crossed` box gets "+" marks on its top-left and bottom-right corners. */
+
+.fb-crossed {
+  position: relative;
+}
+
+.fb-crossed::before,
+.fb-crossed::after,
+.fb-cross {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  width: var(--fb-cross-size);
+  height: var(--fb-cross-size);
+  background:
+    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 100% 1px no-repeat,
+    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 1px 100% no-repeat;
+  pointer-events: none;
+}
+
+.fb-crossed::before {
+  top: calc(var(--fb-cross-size) / -2 - 0.5px);
+  left: calc(var(--fb-cross-size) / -2 - 0.5px);
+}
+
+.fb-crossed::after {
+  right: calc(var(--fb-cross-size) / -2 - 0.5px);
+  bottom: calc(var(--fb-cross-size) / -2 - 0.5px);
+}
+
+/* Layout */
+
+.fb-shell {
+  width: min(100%, var(--fb-page));
+  margin-inline: auto;
+  border-inline: 1px solid var(--fb-line);
+}
+
+.fb-pad {
+  padding-inline: var(--fb-gutter);
+}
+
+.fb-label {
+  margin: 0;
+  color: var(--fb-muted);
+  font-family: var(--fb-font-mono);
+  font-size: 11.5px;
+  font-weight: 450;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fb-number {
+  color: var(--fb-faint);
+  font-family: var(--fb-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+/* Section title followed by a hairline that runs to the edge. */
+.fb-rule-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.fb-rule-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--fb-line);
+}
+
+.fb-muted {
+  color: var(--fb-muted);
+}
+
+/* Cell grid: hairlines between cells, crosses at every junction. */
+
+.fb-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--fb-columns, 3), minmax(0, 1fr));
+  border-top: 1px solid var(--fb-line);
+  border-left: 1px solid var(--fb-line);
+}
+
+.fb-grid > * {
+  position: relative;
+  min-width: 0;
+  border-right: 1px solid var(--fb-line);
+  border-bottom: 1px solid var(--fb-line);
+}
+
+.fb-grid > *::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  right: calc(var(--fb-cross-size) / -2 - 0.5px);
+  bottom: calc(var(--fb-cross-size) / -2 - 0.5px);
+  width: var(--fb-cross-size);
+  height: var(--fb-cross-size);
+  background:
+    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 100% 1px no-repeat,
+    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 1px 100% no-repeat;
+  pointer-events: none;
+}
+
+.fb-cell {
+  padding: 20px;
+}
+
+/* Controls: square, hairline, quiet. */
+
+.fb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--fb-control-height);
+  padding: 0 16px;
+  border: 1px solid var(--fb-line-strong);
+  border-radius: 0;
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.fb-button:hover {
+  background: var(--fb-surface-2);
+  border-color: var(--fb-fg);
+}
+
+.fb-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.fb-button--primary {
+  border-color: var(--fb-invert-bg);
+  background: var(--fb-invert-bg);
+  color: var(--fb-invert-fg);
+}
+
+.fb-button--primary:hover {
+  background: var(--fb-invert-bg);
+  color: var(--fb-invert-fg);
+  opacity: 0.86;
+}
+
+.fb-button--small {
+  height: 28px;
+  padding: 0 10px;
+  font-family: var(--fb-font-mono);
+  font-size: 11px;
+  font-weight: 450;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fb-button--icon {
+  width: var(--fb-control-height);
+  padding: 0;
+}
+
+.fb-input {
+  height: var(--fb-control-height);
+  padding: 0 12px;
+  border: 1px solid var(--fb-line-strong);
+  border-radius: 0;
+  background: var(--fb-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.fb-input:focus {
+  border-color: var(--fb-fg);
+  outline: none;
+}
+
+kbd,
+.fb-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-surface);
+  color: var(--fb-fg);
+  font-family: var(--fb-font-mono);
+  font-size: 11px;
+}
+
+/* Code block with a label bar. */
+
+.fb-code {
+  border: 1px solid var(--fb-line);
+  background: var(--fb-surface);
+}
+
+.fb-code > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: var(--fb-muted);
+  font-family: var(--fb-font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+
+.fb-code > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fb-code > summary::before {
+  content: "+";
+  width: 1ch;
+}
+
+.fb-code[open] > summary::before {
+  content: "−";
+}
+
+.fb-code[open] > summary {
+  border-bottom: 1px solid var(--fb-line);
+}
+
+.fb-code pre {
+  margin: 0;
+  padding: 16px;
+  overflow-x: auto;
+  color: var(--fb-fg);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+/* Images used as gallery thumbnails keep the shared image radius. */
+
+.fb-thumb {
+  display: block;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  border-radius: var(--fb-image-radius);
+  background: var(--fb-surface-2);
+  cursor: zoom-in;
+}
+
+.fb-thumb img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

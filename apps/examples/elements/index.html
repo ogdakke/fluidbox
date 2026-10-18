@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Elements — Fluidbox</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/src/pages/elements.ts"></script>
+  </head>
+  <body>
+    <main class="fb-shell">
+      <header class="page-head">
+        <p class="fb-label">Custom elements</p>
+        <h1>Elements</h1>
+        <p>
+          Register once with <code>@ogdakke/fluidbox/elements</code>, then write markup. Galleries,
+          filmstrips, and indexed sources need no framework.
+        </p>
+      </header>
+      <section class="section" aria-labelledby="dom-gallery-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">01</span>&nbsp;&nbsp;dom gallery</p>
+          <h2 class="fb-rule-title" id="dom-gallery-title">Plain markup, any aspect ratio</h2>
+          <p>
+            <code>&lt;app-gallery&gt;</code> collects every <code>&lt;app-lightbox&gt;</code> inside
+            it. The rounded trigger is the handoff box, so its corners carry through the flight.
+          </p>
+        </header>
+        <div class="stage">
+          <app-gallery id="mosaic" class="mosaic" aria-label="Landscape gallery">
+            <app-filmstrip></app-filmstrip>
+          </app-gallery>
+        </div>
+        <details class="fb-code">
+          <summary>Markup</summary>
+          <pre><code>&lt;script type="module"&gt;
+  import "@ogdakke/fluidbox/elements";
+  import "@ogdakke/fluidbox/styles.css";
+&lt;/script&gt;
+
+&lt;app-gallery aria-label="Landscapes"&gt;
+  &lt;app-lightbox item-id="dune"&gt;
+    &lt;button slot="trigger" type="button" data-lightbox-preview&gt;
+      &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
+    &lt;/button&gt;
+    &lt;template slot="content"&gt;
+      &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
+    &lt;/template&gt;
+    &lt;span slot="caption"&gt;Dune at golden hour&lt;/span&gt;
+  &lt;/app-lightbox&gt;
+  &lt;!-- …more items --&gt;
+  &lt;app-filmstrip&gt;&lt;/app-filmstrip&gt;
+&lt;/app-gallery&gt;</code></pre>
+        </details>
+      </section>
+      <section class="section" aria-labelledby="indexed-source-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">02</span>&nbsp;&nbsp;indexed source</p>
+          <h2 class="fb-rule-title" id="indexed-source-title">
+            100,000 items, 12 thumbnails in the DOM
+          </h2>
+          <p>
+            A <code>LightboxSource</code> describes the collection by index. The page renders only
+            the cards it shows; an origin adapter tells the viewer where each one is.
+          </p>
+        </header>
+        <div class="stage">
+          <form id="jump-form" class="jump">
+            <label class="fb-label" for="jump-index">Open item</label>
+            <input
+              id="jump-index"
+              class="fb-input"
+              name="index"
+              type="number"
+              min="1"
+              max="100000"
+              value="50000"
+              inputmode="numeric"
+            />
+            <button type="submit" class="fb-button fb-button--primary">Open</button>
+            <output class="jump__window"></output>
+          </form>
+          <app-gallery id="virtual-gallery" class="virtual-grid" aria-label="Indexed gallery">
+            <app-filmstrip></app-filmstrip>
+          </app-gallery>
+        </div>
+        <details class="fb-code">
+          <summary>Source and origins</summary>
+          <pre><code>gallery.source = {
+  count: 100_000,
+  getItem: (index) =&gt; ({ id: String(index), media: { type: "image", src, width, height } }),
+  getIndex: (id) =&gt; Number(id),
+};
+gallery.origins = {
+  getOrigin(id) {
+    const trigger = mountedCards.get(id);
+    return trigger ? { trigger, visual: trigger.querySelector("[data-lightbox-origin]") } : null;
+  },
+};
+gallery.open({ index: 49_999 });</code></pre>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>

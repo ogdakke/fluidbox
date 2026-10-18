@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Solid — Fluidbox</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/src/pages/solid.ts"></script>
+  </head>
+  <body>
+    <main class="fb-shell">
+      <header class="page-head">
+        <p class="fb-label">@ogdakke/fluidbox/solid</p>
+        <h1>Solid</h1>
+        <p>
+          <code>useFluidboxGallery(source)</code> returns a ref callback that keeps an
+          <code>&lt;app-gallery&gt;</code> in sync with a signal.
+        </p>
+      </header>
+      <section class="section" aria-labelledby="source-switching-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">01</span>&nbsp;&nbsp;source switching</p>
+          <h2 class="fb-rule-title" id="source-switching-title">Switch the source</h2>
+          <p>
+            The binding writes a new source to the gallery. The next open uses the new collection
+            and the thumbnails follow.
+          </p>
+        </header>
+        <div class="stage">
+          <div class="fb-grid" style="--fb-columns: 1">
+            <div id="gallery-root" class="framework-slot" aria-busy="true"></div>
+          </div>
+        </div>
+        <details class="fb-code">
+          <summary>Binding</summary>
+          <pre><code>const [source, setSource] = createSignal(photos);
+const bind = useFluidboxGallery(source);
+
+&lt;app-gallery ref={(node) =&gt; { gallery = node; bind(node); }}&gt;
+  &lt;For each={items()}&gt;
+    {(item, index) =&gt; &lt;button onClick={() =&gt; gallery.open({ index: index() })}&gt;…&lt;/button&gt;}
+  &lt;/For&gt;
+&lt;/app-gallery&gt;</code></pre>
+        </details>
+      </section>
+      <section class="section" aria-labelledby="indexed-window-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">02</span>&nbsp;&nbsp;indexed window</p>
+          <h2 class="fb-rule-title" id="indexed-window-title">100,000 items, rendered by Solid</h2>
+          <p>
+            The framework renders a 12-card window. Jump anywhere and the viewer opens from the card
+            it just mounted.
+          </p>
+        </header>
+        <div class="stage">
+          <div id="indexed-root" class="framework-slot" aria-busy="true"></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Headless — Fluidbox</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/src/pages/headless.ts"></script>
+  </head>
+  <body>
+    <main class="fb-shell">
+      <header class="page-head">
+        <p class="fb-label">Headless runtime</p>
+        <h1>Headless</h1>
+        <p>
+          <code>createLightbox()</code> needs no custom elements and no framework. You own the
+          thumbnails; the runtime owns motion, gestures, and focus.
+        </p>
+      </header>
+      <section class="section" aria-labelledby="caption-bar-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">01</span>&nbsp;&nbsp;caption bar</p>
+          <h2 class="fb-rule-title" id="caption-bar-title">Bring your own controls</h2>
+          <p>
+            A portal renderer mounts whatever chrome you want — here a caption bar with a counter,
+            wired to the controller's state.
+          </p>
+        </header>
+        <div class="stage"><div id="headless-grid" class="headless-grid"></div></div>
+        <details class="fb-code">
+          <summary>Controller</summary>
+          <pre><code>import { arraySource, createLightbox } from "@ogdakke/fluidbox";
+
+const viewer = createLightbox({
+  source: arraySource(photos),
+  origins: { getOrigin: (id) =&gt; ({ trigger, visual: trigger }) },
+  portal: {
+    mount({ target, controller, signal }) {
+      const bar = renderCaptionBar(controller);
+      const dispose = controller.subscribe((state) =&gt; bar.update(state));
+      target.append(bar.element);
+      return () =&gt; { dispose(); bar.element.remove(); };
+    },
+  },
+});
+thumbnail.addEventListener("click", () =&gt; viewer.open({ id }));</code></pre>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>

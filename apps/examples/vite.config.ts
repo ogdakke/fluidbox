@@ -1,14 +1,22 @@
 import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import react from "@vitejs/plugin-react";
 import solid from "vite-plugin-solid";
 import { defineConfig } from "vite";
 
-// Every top-level HTML file is a page: index.html is the showcase, the rest are test fixtures.
-const pages = Object.fromEntries(
-  readdirSync(import.meta.dirname)
-    .filter((file) => file.endsWith(".html"))
-    .map((file) => [file.slice(0, -".html".length), file]),
-);
+// Every HTML file is a page: index.html and */index.html are the site, the rest are test fixtures.
+function findPages(directory: string, prefix = ""): [string, string][] {
+  return readdirSync(join(directory, prefix), { withFileTypes: true }).flatMap((entry) => {
+    const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      return ["node_modules", "dist", "public", "src", "scripts"].includes(entry.name)
+        ? []
+        : findPages(directory, path);
+    }
+    return entry.name.endsWith(".html") ? [[path.slice(0, -".html".length), path]] : [];
+  });
+}
+const pages = Object.fromEntries(findPages(import.meta.dirname));
 
 export default defineConfig({
   plugins: [react({ include: /(react|photo-library)\.tsx$/ }), solid({ include: /solid\.tsx$/ })],

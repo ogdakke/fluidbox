@@ -1,7 +1,11 @@
+import { mountChrome } from "../src/design/chrome";
 import type { AppGallery, AppLightbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
-import "@ogdakke/fluidbox/styles.css";
 import "./site.css";
+
+mountChrome("fixtures", {
+  fixture: "Collapsed gallery · three visible tiles and a +8 teaser for the rest",
+});
 
 const gallery = document.querySelector<AppGallery>("#collapsed-gallery")!;
 const colors = ["#c83f4b", "#d39a32", "#4a7098", "#78914b", "#9166a3", "#3b9b9b"];

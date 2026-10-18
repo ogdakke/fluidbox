@@ -1,0 +1,144 @@
+/* Site header and footer shared by every page. */
+
+.fb-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: var(--fb-header-height);
+  border-bottom: 1px solid var(--fb-line);
+  background: color-mix(in srgb, var(--fb-bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.fb-header--static {
+  position: static;
+}
+
+.fb-header__inner {
+  display: flex;
+  height: 100%;
+}
+
+.fb-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-inline: var(--fb-gutter);
+  font-family: var(--fb-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.fb-brand__mark {
+  width: 14px;
+  height: 14px;
+  background:
+    linear-gradient(var(--fb-fg), var(--fb-fg)) left / 5px 100% no-repeat,
+    linear-gradient(var(--fb-fg), var(--fb-fg)) right top / 5px 60% no-repeat;
+}
+
+.fb-nav {
+  display: flex;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.fb-nav a,
+.fb-theme-toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  padding-inline: 18px;
+  border: 0;
+  border-left: 1px solid var(--fb-line);
+  background: none;
+  color: var(--fb-muted);
+  font-family: var(--fb-font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 120ms ease-out,
+    background 120ms ease-out;
+}
+
+.fb-nav a:hover,
+.fb-theme-toggle:hover {
+  background: var(--fb-surface);
+  color: var(--fb-fg);
+}
+
+.fb-nav a[aria-current="page"] {
+  color: var(--fb-fg);
+  box-shadow: inset 0 -2px 0 var(--fb-fg);
+}
+
+.fb-theme-toggle {
+  min-width: var(--fb-header-height);
+  padding: 0;
+}
+
+.fb-footer {
+  margin-top: 0;
+  border-top: 1px solid var(--fb-line);
+}
+
+.fb-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 20px 32px;
+  color: var(--fb-faint);
+  font-family: var(--fb-font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fb-footer__inner nav {
+  display: flex;
+  gap: 8px;
+}
+
+.fb-footer__inner nav span {
+  color: var(--fb-line-strong);
+}
+
+.fb-footer a {
+  text-decoration: none;
+}
+
+.fb-footer a:hover {
+  color: var(--fb-fg);
+}
+
+/* Fixtures get the same header plus a one-line strip naming the scenario. */
+.fb-fixture-strip {
+  border-bottom: 1px solid var(--fb-line);
+}
+
+.fb-fixture-strip__inner {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding-block: 10px;
+}
+
+@media (max-width: 760px) {
+  .fb-nav a {
+    min-width: 0;
+    padding-inline: 12px;
+  }
+  .fb-brand span:last-child {
+    display: none;
+  }
+}

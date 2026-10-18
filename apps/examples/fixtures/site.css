@@ -1,21 +1,15 @@
-:root {
-  color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  --background: #0b0b0b;
-  --color: CanvasText;
-  --accent: color-mix(in srgb, CanvasText 12%, Canvas);
-}
+/* Shared layout for the bare element fixtures (harness, collapsed). Tokens come from src/design. */
 
-body {
-  margin: 0;
-  background: var(--background);
-  color: var(--color);
-}
-
+/* Geometry matches the original fixture: several tests depend on which origins are on screen. */
 main {
   max-width: 900px;
   margin: 3rem auto;
   padding: 1rem;
+}
+
+main h1 {
+  margin-bottom: 20px;
+  font-size: 1.6rem;
 }
 
 app-gallery {
@@ -28,5 +22,21 @@ app-lightbox img {
   display: block;
   width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--fb-image-radius);
+}
+
+app-gallery > button[data-virtual-index] {
+  height: var(--fb-control-height);
+  margin: 0 8px 8px 0;
+  padding: 0 14px;
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-bg);
+  font-family: var(--fb-font-mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+app-gallery > button[data-virtual-index]:hover {
+  border-color: var(--fb-fg);
+  background: var(--fb-surface-2);
 }
