@@ -1004,19 +1004,23 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   [data-lightbox-image-frame] {
   background: transparent;
 }
-/* Reaches under the bars and pads by the same, so pan maths ignore the bleed. */
+/* Reaches under the stage insets and the browser's bars, and pads by the same,
+   so pan maths ignore the reach. */
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-zoom-viewport] {
   --lightbox-zoom-reach: var(--lightbox-zoom-bleed, var(--lightbox-zoom-chrome, 0px));
 
   --lightbox-zoom-reach-start: var(--lightbox-zoom-reach-top, var(--lightbox-zoom-reach));
   --lightbox-zoom-reach-end: var(--lightbox-zoom-reach-bottom, var(--lightbox-zoom-reach));
+  --lightbox-zoom-reach-inline-start: var(--lightbox-zoom-reach-left, 0px);
+  --lightbox-zoom-reach-inline-end: var(--lightbox-zoom-reach-right, 0px);
 
   position: absolute;
   inset: calc(var(--lightbox-zoom-stage-top, 0px) - var(--lightbox-zoom-reach-start))
-    var(--lightbox-zoom-stage-right, 0px)
+    calc(var(--lightbox-zoom-stage-right, 0px) - var(--lightbox-zoom-reach-inline-end))
     calc(var(--lightbox-zoom-stage-bottom, 0px) - var(--lightbox-zoom-reach-end))
-    var(--lightbox-zoom-stage-left, 0px);
-  padding-block: var(--lightbox-zoom-reach-start) var(--lightbox-zoom-reach-end);
+    calc(var(--lightbox-zoom-stage-left, 0px) - var(--lightbox-zoom-reach-inline-start));
+  padding: var(--lightbox-zoom-reach-start) var(--lightbox-zoom-reach-inline-end)
+    var(--lightbox-zoom-reach-end) var(--lightbox-zoom-reach-inline-start);
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;

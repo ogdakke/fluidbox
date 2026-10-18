@@ -94,6 +94,7 @@ export class LightboxZoom {
     width: 0,
     height: 0,
     stage: { top: 0, right: 0, bottom: 0, left: 0 },
+    clip: { top: false, right: false, bottom: false, left: false },
     viewportWidth: 0,
     viewportHeight: 0,
   };
@@ -195,9 +196,16 @@ export class LightboxZoom {
     for (const side of ["top", "right", "bottom", "left"] as const) {
       viewport.style.setProperty(`--lightbox-zoom-stage-${side}`, `${g.stage[side]}px`);
     }
-    // The bleed reaches under the browser's bars, never under a stage inset.
-    if (g.stage.top) viewport.style.setProperty("--lightbox-zoom-reach-top", "0px");
-    if (g.stage.bottom) viewport.style.setProperty("--lightbox-zoom-reach-bottom", "0px");
+    // The zoomed image pans under the stage insets, and on past them under the
+    // browser's bars, unless --lightbox-zoom-clip keeps it inside that side.
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      if (!g.stage[side]) continue;
+      const bleed = side === "top" || side === "bottom" ? " + var(--lightbox-zoom-reach)" : "";
+      viewport.style.setProperty(
+        `--lightbox-zoom-reach-${side}`,
+        g.clip[side] ? "0px" : `calc(${g.stage[side]}px${bleed})`,
+      );
+    }
     canvas.style.setProperty("--lightbox-zoom-canvas-width", `${canvasWidth}px`);
     canvas.style.setProperty("--lightbox-zoom-canvas-height", `${canvasHeight}px`);
     const anchor = document.createElement("div");
@@ -295,13 +303,14 @@ export class LightboxZoom {
     const matrix = new DOMMatrix(getComputedStyle(view.image).transform);
     const rect = view.frame.getBoundingClientRect();
     this.#pose = { scale: matrix.a, x: matrix.e, y: matrix.f };
-    const stage = this.#stageInsets();
+    const { stage, clip } = this.#stageInsets();
     this.#geometry = {
       left: rect.left,
       top: rect.top,
       width: view.image.offsetWidth,
       height: view.image.offsetHeight,
       stage,
+      clip,
       viewportWidth: innerWidth - stage.left - stage.right,
       viewportHeight: innerHeight - stage.top - stage.bottom,
     };
@@ -317,11 +326,22 @@ export class LightboxZoom {
     const style = dialog ? getComputedStyle(dialog) : null;
     const inset = (side: string) =>
       Math.max(0, parseFloat(style?.getPropertyValue(`--lightbox-stage-${side}`) ?? "") || 0);
+    // "stage" clips every side; otherwise a list of sides, such as "right bottom".
+    const words = (style?.getPropertyValue("--lightbox-zoom-clip") ?? "").trim().split(/\s+/);
+    const clipped = (side: string) => words.includes("stage") || words.includes(side);
     return {
-      top: inset("top"),
-      right: inset("right"),
-      bottom: inset("bottom"),
-      left: inset("left"),
+      stage: {
+        top: inset("top"),
+        right: inset("right"),
+        bottom: inset("bottom"),
+        left: inset("left"),
+      },
+      clip: {
+        top: clipped("top"),
+        right: clipped("right"),
+        bottom: clipped("bottom"),
+        left: clipped("left"),
+      },
     };
   }
 
