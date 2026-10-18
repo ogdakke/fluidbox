@@ -1,0 +1,297 @@
+/* Safari chrome lab. Tokens come from @ogdakke/fluidbox-design. */
+
+.lab-page {
+  width: min(100%, var(--fb-page));
+  margin: 0 auto;
+  border-inline: 1px solid var(--fb-line);
+}
+
+.lab-head {
+  display: grid;
+  gap: 10px;
+  padding: 40px var(--fb-gutter) 28px;
+  border-bottom: 1px solid var(--fb-line);
+}
+
+.lab-head h1 {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  letter-spacing: -0.04em;
+}
+
+.lab-head p:last-child {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--fb-muted);
+}
+
+.lab-section__head {
+  display: grid;
+  gap: 6px;
+  padding: 28px var(--fb-gutter) 16px;
+}
+
+.lab-section__head p:last-child {
+  margin: 0;
+  max-width: 70ch;
+  font-size: 14px;
+}
+
+.lab-section > .fb-grid {
+  margin: 0 var(--fb-gutter) 28px;
+}
+
+.lab-probes {
+  --fb-columns: 4;
+}
+
+.lab-probe {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  /* The grid draws the right and bottom hairlines. */
+  border-top: 0;
+  border-left: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lab-probe:hover {
+  background: var(--fb-surface);
+}
+
+.lab-probe h3 {
+  font-size: 14.5px;
+}
+
+.lab-probe p {
+  margin: 0;
+  color: var(--fb-muted);
+  font-size: 13px;
+}
+
+.lab-settings {
+  --fb-columns: 4;
+  margin: 0;
+}
+
+.lab-setting {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  margin: 0;
+  min-inline-size: 0;
+  /* A fieldset's own border would double the grid's hairlines. */
+  border-top: 0;
+  border-left: 0;
+}
+
+.lab-setting legend {
+  float: left;
+  margin-bottom: 4px;
+}
+
+.lab-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.lab-option input {
+  accent-color: var(--fb-fg);
+}
+
+.lab-gallery {
+  --fb-columns: 3;
+}
+
+.lab-tile {
+  display: block;
+  padding: 12px;
+  border-top: 0;
+  border-left: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.lab-tile img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--fb-image-radius);
+}
+
+.lab-readout {
+  margin: 0;
+  padding: 16px var(--fb-gutter) 28px;
+  overflow-x: auto;
+  font-family: var(--fb-font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+/* Extra length so the toolbar collapses while scrolling. */
+.lab-filler {
+  height: 120vh;
+  border-top: 1px solid var(--fb-line);
+  background: repeating-linear-gradient(-45deg, var(--fb-surface) 0 12px, var(--fb-bg) 12px 24px);
+}
+
+@media (max-width: 720px) {
+  .lab-probes,
+  .lab-settings {
+    --fb-columns: 2;
+  }
+
+  .lab-gallery {
+    --fb-columns: 2;
+  }
+}
+
+/* Probes. Magenta so a tint is easy to tell apart from the page and the lightbox. */
+
+.lab-probe-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  width: 100%;
+  overflow: clip;
+}
+
+.lab-probe-fill {
+  display: grid;
+  place-items: center;
+  background: #ff00c8;
+  color: #fff;
+}
+
+html[data-lab-probe="translucent"] .lab-probe-fill {
+  background: rgb(255 0 200 / 0.45);
+}
+
+.lab-probe-fill--fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.lab-probe-fill--sticky {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+}
+
+.lab-probe-fill--scroll-y {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 100svh;
+}
+
+.lab-probe-page.lab-probe-fill > .lab-probe-label {
+  position: sticky;
+  top: 45svh;
+  align-self: start;
+}
+
+.lab-probe-label {
+  margin: 0;
+  padding: 8px 12px;
+  background: #000;
+  font-family: var(--fb-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* A stand-in for a site's own header, in yellow. */
+
+.lab-site-header {
+  top: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  height: 44px;
+  background: #ffd400;
+  color: #000;
+  font-family: var(--fb-font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+html[data-lab-header="sticky"] .lab-site-header {
+  position: sticky;
+}
+
+html[data-lab-header="fixed"] .lab-site-header {
+  position: fixed;
+  inset-inline: 0;
+}
+
+html[data-lab-header="fixed"] body {
+  padding-top: 44px;
+}
+
+html.lab-scroll-locked {
+  overflow: hidden;
+}
+
+/* Lightbox variants. These override the runtime's zero-specificity rules. */
+
+html[data-lab-container="absolute"] [data-lightbox-overlay] [data-lightbox-container] {
+  position: absolute;
+  top: var(--lab-scroll-y, 0px);
+  left: 0;
+}
+
+html[data-lab-backdrop="translucent"] [data-lightbox-overlay] [data-lightbox-backdrop] {
+  background: color-mix(in srgb, var(--background, #111) 55%, transparent);
+}
+
+html[data-lab-blur="on"] {
+  --lightbox-backdrop-filter: blur(24px) saturate(1.5);
+}
+
+/* Hidden meters for the readout. Absolute, never fixed, so they cannot tint anything. */
+
+.lab-meter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.lab-meter i {
+  position: absolute;
+  top: 0;
+  width: 1px;
+}
+
+.lab-meter [data-unit="svh"] {
+  height: 100svh;
+}
+
+.lab-meter [data-unit="lvh"] {
+  height: 100lvh;
+}
+
+.lab-meter [data-unit="dvh"] {
+  height: 100dvh;
+}
+
+.lab-meter [data-unit="safe"] {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sheet lab</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/fixtures/sheet-lab.ts"></script>
+  </head>
+  <body>
+    <main class="lab-page">
+      <header class="lab-head">
+        <p class="fb-label">Sheet lab</p>
+        <h1>Scroll to dismiss, scroll for info</h1>
+        <p>
+          A prototype in plain HTML and CSS: every slide is a vertical scroll-snap sheet with three
+          resting points. Pull the photo down to dismiss it, push it up to reveal the info panel.
+          The browser's own scroll physics move it, and scroll-driven animations fade the backdrop
+          and fit the photo, so none of it waits on JavaScript.
+        </p>
+      </header>
+
+      <section class="lab-section">
+        <div class="lab-section__head">
+          <p class="fb-label">1 · Settings</p>
+          <p class="fb-muted">Each change reloads the page with the setting in the URL.</p>
+        </div>
+        <form class="fb-grid lab-settings" data-lab-settings></form>
+      </section>
+
+      <section class="lab-section">
+        <div class="lab-section__head">
+          <p class="fb-label">2 · Gallery</p>
+          <p class="fb-muted">
+            Tap a photo. Swipe sideways between photos, down to dismiss, up for the info panel. On a
+            desktop, scroll with a trackpad or press I.
+          </p>
+        </div>
+        <div class="fb-grid lab-gallery" data-lab-gallery></div>
+      </section>
+
+      <section class="lab-section">
+        <div class="lab-section__head">
+          <p class="fb-label">3 · Readout</p>
+          <p class="fb-muted">Copy this when reporting a result.</p>
+        </div>
+        <pre class="lab-readout" data-lab-readout></pre>
+      </section>
+    </main>
+  </body>
+</html>

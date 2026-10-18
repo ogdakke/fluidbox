@@ -12,6 +12,11 @@ main.fb-shell {
   border-bottom: 1px solid var(--fb-line);
 }
 
+/* The copy's top-left mark sits on the shell's left edge. */
+.hero__copy::before {
+  --fb-mark-left: transparent;
+}
+
 .hero__copy {
   display: grid;
   align-content: center;
@@ -690,6 +695,11 @@ main.fb-shell {
   .hero__copy {
     border-right: 0;
     border-bottom: 1px solid var(--fb-line);
+  }
+  /* Stacked, the bottom-right mark sits on the shell's right edge. */
+  .hero__copy::after {
+    --fb-mark-right: transparent;
+    width: var(--fb-mark-half);
   }
   .framework-grid,
   .integrations {

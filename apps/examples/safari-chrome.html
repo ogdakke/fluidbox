@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" data-lab-viewport />
+    <title>Safari chrome lab</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script>
+      // Apply viewport-fit before first paint so Safari lays the page out with it from the start.
+      if (new URLSearchParams(location.search).get("fit") === "cover") {
+        document
+          .querySelector("[data-lab-viewport]")
+          .setAttribute("content", "width=device-width, initial-scale=1.0, viewport-fit=cover");
+      }
+    </script>
+    <script type="module" src="/fixtures/safari-chrome.ts"></script>
+  </head>
+  <body>
+    <main class="lab-page">
+      <header class="lab-head">
+        <p class="fb-label">Safari chrome lab</p>
+        <h1>Which layers tint the toolbar?</h1>
+        <p>
+          iOS 26 Safari colours its status bar and toolbar from fixed or sticky elements at the
+          viewport's edges. Open this page on an iPhone, scroll down so the toolbar shrinks, then
+          try each probe and the lightbox under each setting. Note whether the bars show the layer
+          behind them (see-through) or turn a solid colour (tinted).
+        </p>
+      </header>
+
+      <section class="lab-section">
+        <div class="lab-section__head">
+          <p class="fb-label">1 · Probes</p>
+          <p class="fb-muted">
+            A magenta layer, built four ways. Tap the layer to remove it. Nothing else on the page
+            is fixed or sticky unless you turn the header on below.
+          </p>
+        </div>
+        <div class="fb-grid lab-probes" data-lab-probes></div>
+      </section>
+
+      <section class="lab-section">
+        <div class="lab-section__head">
+          <p class="fb-label">2 · Lightbox settings</p>
+          <p class="fb-muted">Each change reloads the page with the setting in the URL.</p>
+        </div>
+        <form class="fb-grid lab-settings" data-lab-settings></form>
+      </section>
+
+      <section class="lab-section">
+        <div class="lab-section__head">
+          <p class="fb-label">3 · Gallery</p>
+          <p class="fb-muted">
+            Tap a photo. Pinch or double-tap to zoom, which adds the zoom viewport. Swipe down to
+            dismiss.
+          </p>
+        </div>
+        <div class="fb-grid lab-gallery" data-lab-gallery></div>
+      </section>
+
+      <section class="lab-section">
+        <div class="lab-section__head">
+          <p class="fb-label">4 · Readout</p>
+          <p class="fb-muted">Copy this when reporting a result.</p>
+        </div>
+        <pre class="lab-readout" data-lab-readout></pre>
+      </section>
+
+      <div class="lab-filler" aria-hidden="true"></div>
+    </main>
+  </body>
+</html>

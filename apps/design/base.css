@@ -78,7 +78,11 @@ samp {
   color: var(--fb-bg);
 }
 
-/* Cross marks. Any `.fb-crossed` box gets "+" marks on its top-left and bottom-right corners. */
+/* Cross marks. Any `.fb-crossed` box gets marks on its top-left and bottom-right
+   corners. A mark is four arms around the junction's pixel, so a junction on an
+   edge can drop the arm that would leave it by setting --fb-mark-<side> to
+   transparent. Positions are against the padding box, whose right and bottom
+   borders sit at 100%. */
 
 .fb-crossed {
   position: relative;
@@ -86,26 +90,36 @@ samp {
 
 .fb-crossed::before,
 .fb-crossed::after,
-.fb-cross {
+.fb-cross,
+.fb-grid > *::before,
+.fb-grid > *::after {
+  --fb-mark-mid: calc(var(--fb-cross-size) / 2 - 0.5px);
+  --fb-mark-half: calc(var(--fb-cross-size) / 2 + 0.5px);
   content: "";
   position: absolute;
   z-index: 1;
   width: var(--fb-cross-size);
   height: var(--fb-cross-size);
   background:
-    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 100% 1px no-repeat,
-    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 1px 100% no-repeat;
+    linear-gradient(var(--fb-mark-left, var(--fb-cross)) 0 0) 0 var(--fb-mark-mid) /
+      var(--fb-mark-half) 1px no-repeat,
+    linear-gradient(var(--fb-mark-right, var(--fb-cross)) 0 0) var(--fb-mark-mid) var(--fb-mark-mid)
+      / var(--fb-mark-half) 1px no-repeat,
+    linear-gradient(var(--fb-mark-up, var(--fb-cross)) 0 0) var(--fb-mark-mid) 0 / 1px
+      var(--fb-mark-half) no-repeat,
+    linear-gradient(var(--fb-mark-down, var(--fb-cross)) 0 0) var(--fb-mark-mid) var(--fb-mark-mid)
+      / 1px var(--fb-mark-half) no-repeat;
   pointer-events: none;
 }
 
 .fb-crossed::before {
-  top: calc(var(--fb-cross-size) / -2 - 0.5px);
-  left: calc(var(--fb-cross-size) / -2 - 0.5px);
+  top: calc(-1px - var(--fb-mark-mid));
+  left: calc(-1px - var(--fb-mark-mid));
 }
 
 .fb-crossed::after {
-  right: calc(var(--fb-cross-size) / -2 - 0.5px);
-  bottom: calc(var(--fb-cross-size) / -2 - 0.5px);
+  top: calc(100% - var(--fb-mark-mid));
+  left: calc(100% - var(--fb-mark-mid));
 }
 
 /* Layout */
@@ -159,11 +173,16 @@ samp {
   color: var(--fb-muted);
 }
 
-/* Cell grid: hairlines between cells, crosses at every junction. */
+/* Cell grid: hairlines between cells, a cross mark at every junction. */
+
+/* Set on the grid itself so the mark rules below can query it. */
+:where(.fb-grid) {
+  --fb-columns: 3;
+}
 
 .fb-grid {
   display: grid;
-  grid-template-columns: repeat(var(--fb-columns, 3), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--fb-columns), minmax(0, 1fr));
   border-top: 1px solid var(--fb-line);
   border-left: 1px solid var(--fb-line);
 }
@@ -175,18 +194,150 @@ samp {
   border-bottom: 1px solid var(--fb-line);
 }
 
+/* Each cell marks its bottom-right junction. */
 .fb-grid > *::after {
-  content: "";
-  position: absolute;
-  z-index: 1;
-  right: calc(var(--fb-cross-size) / -2 - 0.5px);
-  bottom: calc(var(--fb-cross-size) / -2 - 0.5px);
-  width: var(--fb-cross-size);
-  height: var(--fb-cross-size);
-  background:
-    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 100% 1px no-repeat,
-    linear-gradient(var(--fb-cross), var(--fb-cross)) center / 1px 100% no-repeat;
-  pointer-events: none;
+  top: calc(100% - var(--fb-mark-mid));
+  left: calc(100% - var(--fb-mark-mid));
+}
+
+/* The grid's top and left edges have no cell above or to the left to carry
+   their marks, so a first-row or first-column cell carries one there. */
+.fb-grid > *::before {
+  display: none;
+  left: calc(-1px - var(--fb-mark-mid));
+}
+
+/* The cells inherit --fb-columns, so a style query can tell which cells sit on
+   an edge: a cross inside, a T on an edge, nothing on a corner. Without style
+   queries every cell keeps a full cross. */
+@container style(--fb-columns: 1) {
+  .fb-grid > *::after {
+    --fb-mark-right: transparent;
+    width: var(--fb-mark-half);
+  }
+  .fb-grid > :last-child::after {
+    display: none;
+  }
+  .fb-grid > :not(:last-child)::before {
+    --fb-mark-left: transparent;
+    display: block;
+    top: calc(100% - var(--fb-mark-mid));
+  }
+}
+@container style(--fb-columns: 2) {
+  .fb-grid > :nth-child(2n)::after {
+    --fb-mark-right: transparent;
+    width: var(--fb-mark-half);
+  }
+  .fb-grid > :nth-last-child(-n + 2)::after {
+    --fb-mark-down: transparent;
+    height: var(--fb-mark-half);
+  }
+  .fb-grid > :is(:nth-child(2n):nth-last-child(-n + 2), :last-child)::after {
+    display: none;
+  }
+  .fb-grid > :nth-child(n + 2):nth-child(-n + 2)::before {
+    --fb-mark-up: transparent;
+    display: block;
+    top: calc(-1px - var(--fb-mark-mid));
+  }
+  .fb-grid > :nth-child(2n + 1):not(:nth-last-child(-n + 2))::before {
+    --fb-mark-left: transparent;
+    display: block;
+    top: calc(100% - var(--fb-mark-mid));
+  }
+}
+@container style(--fb-columns: 3) {
+  .fb-grid > :nth-child(3n)::after {
+    --fb-mark-right: transparent;
+    width: var(--fb-mark-half);
+  }
+  .fb-grid > :nth-last-child(-n + 3)::after {
+    --fb-mark-down: transparent;
+    height: var(--fb-mark-half);
+  }
+  .fb-grid > :is(:nth-child(3n):nth-last-child(-n + 3), :last-child)::after {
+    display: none;
+  }
+  .fb-grid > :nth-child(n + 2):nth-child(-n + 3)::before {
+    --fb-mark-up: transparent;
+    display: block;
+    top: calc(-1px - var(--fb-mark-mid));
+  }
+  .fb-grid > :nth-child(3n + 1):not(:nth-last-child(-n + 3))::before {
+    --fb-mark-left: transparent;
+    display: block;
+    top: calc(100% - var(--fb-mark-mid));
+  }
+}
+@container style(--fb-columns: 4) {
+  .fb-grid > :nth-child(4n)::after {
+    --fb-mark-right: transparent;
+    width: var(--fb-mark-half);
+  }
+  .fb-grid > :nth-last-child(-n + 4)::after {
+    --fb-mark-down: transparent;
+    height: var(--fb-mark-half);
+  }
+  .fb-grid > :is(:nth-child(4n):nth-last-child(-n + 4), :last-child)::after {
+    display: none;
+  }
+  .fb-grid > :nth-child(n + 2):nth-child(-n + 4)::before {
+    --fb-mark-up: transparent;
+    display: block;
+    top: calc(-1px - var(--fb-mark-mid));
+  }
+  .fb-grid > :nth-child(4n + 1):not(:nth-last-child(-n + 4))::before {
+    --fb-mark-left: transparent;
+    display: block;
+    top: calc(100% - var(--fb-mark-mid));
+  }
+}
+@container style(--fb-columns: 5) {
+  .fb-grid > :nth-child(5n)::after {
+    --fb-mark-right: transparent;
+    width: var(--fb-mark-half);
+  }
+  .fb-grid > :nth-last-child(-n + 5)::after {
+    --fb-mark-down: transparent;
+    height: var(--fb-mark-half);
+  }
+  .fb-grid > :is(:nth-child(5n):nth-last-child(-n + 5), :last-child)::after {
+    display: none;
+  }
+  .fb-grid > :nth-child(n + 2):nth-child(-n + 5)::before {
+    --fb-mark-up: transparent;
+    display: block;
+    top: calc(-1px - var(--fb-mark-mid));
+  }
+  .fb-grid > :nth-child(5n + 1):not(:nth-last-child(-n + 5))::before {
+    --fb-mark-left: transparent;
+    display: block;
+    top: calc(100% - var(--fb-mark-mid));
+  }
+}
+@container style(--fb-columns: 6) {
+  .fb-grid > :nth-child(6n)::after {
+    --fb-mark-right: transparent;
+    width: var(--fb-mark-half);
+  }
+  .fb-grid > :nth-last-child(-n + 6)::after {
+    --fb-mark-down: transparent;
+    height: var(--fb-mark-half);
+  }
+  .fb-grid > :is(:nth-child(6n):nth-last-child(-n + 6), :last-child)::after {
+    display: none;
+  }
+  .fb-grid > :nth-child(n + 2):nth-child(-n + 6)::before {
+    --fb-mark-up: transparent;
+    display: block;
+    top: calc(-1px - var(--fb-mark-mid));
+  }
+  .fb-grid > :nth-child(6n + 1):not(:nth-last-child(-n + 6))::before {
+    --fb-mark-left: transparent;
+    display: block;
+    top: calc(100% - var(--fb-mark-mid));
+  }
 }
 
 .fb-cell {

@@ -1,0 +1,392 @@
+/* Sheet lab. Page layout comes from the Safari chrome lab; tokens from @ogdakke/fluidbox-design. */
+
+/* The overlay is an absolute page-height layer with the container placed
+   absolute at the page's scroll position, like React Aria's sheet. Nothing is
+   sticky or fixed: iOS 26 Safari takes a sticky layer at the screen's edge for
+   chrome and tints its bar with a colour from inside it. */
+.sl-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  width: 100%;
+  /* Keeps the strip's reach under the bars from growing the page. */
+  overflow: clip;
+  /* The active sheet names this timeline; the backdrop, outside the sheet, reads it. */
+  timeline-scope: --sl-sheet;
+  /* No fade in or out: the backdrop follows the sheet's scroll, so opening
+     and dismissing are the photo travelling, nothing on a timer. */
+}
+
+.sl-overlay[hidden] {
+  display: none;
+}
+
+/* Only when a short dismiss distance lands with the photo still in view. */
+.sl-overlay[data-state="closing"] {
+  opacity: 0;
+  transition: opacity 120ms ease;
+  pointer-events: none;
+}
+
+.sl-container {
+  /* Its top is the page's scroll position, set on open. */
+  position: absolute;
+  left: 0;
+  width: 100%;
+  /* The window's height, set on open like the package does; 100svh leaves the
+     page showing under a collapsed toolbar. */
+  height: var(--sl-h, 100svh);
+  /* Only sideways: the backdrop and sheets reach under the browser's bars. */
+  overflow-x: clip;
+  isolation: isolate;
+}
+
+/* As in the package and Devon Govett's fix: the backdrop covers the whole page
+   from the overlay, outside the container, so Safari never sees a
+   coloured layer pinned to the screen's edges. */
+.sl-backdrop {
+  position: absolute;
+  inset: 0;
+  background: #0b0b0c;
+  animation: sl-backdrop linear both;
+  animation-timeline: --sl-sheet;
+  animation-range: 0px var(--sl-d);
+}
+
+html[data-lab-backdrop="blur"] .sl-backdrop {
+  background: rgb(11 11 12 / 0.55);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+}
+
+@keyframes sl-backdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Reaches under the bars by --sl-r at both ends, like the zoom viewport: a
+   scroller clips to its box, and the panel should paint under the toolbar. */
+.sl-strip {
+  position: absolute;
+  inset: calc(-1 * var(--sl-r, 0px)) 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.sl-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.sl-slide {
+  flex: 0 0 100%;
+  height: 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+/* One sheet per slide: dismiss spacer, photo stage, info panel. */
+.sl-sheet {
+  position: relative;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  outline: none;
+}
+
+.sl-sheet::-webkit-scrollbar {
+  display: none;
+}
+
+.sl-slide[data-active] .sl-sheet {
+  scroll-timeline: --sl-sheet block;
+}
+
+/* Snap markers for the dismissed and photo positions. The panel snaps itself. */
+.sl-snap {
+  position: absolute;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  scroll-snap-align: start;
+  pointer-events: none;
+}
+
+.sl-snap--dismiss {
+  top: 0;
+}
+
+.sl-snap--photo {
+  top: var(--sl-d);
+}
+
+.sl-spacer {
+  height: calc(var(--sl-d) + var(--sl-r, 0px));
+}
+
+/* Like iOS Photos: no scaling. The stage holds only while the panel crosses
+   the empty space under the photo, then scrolls up with the panel. A
+   translate that cancels the scroll holds it, not sticky: Safari samples
+   sticky layers at the screen's edges for its bars. */
+.sl-stage {
+  position: relative;
+  height: var(--sl-h, 100svh);
+  animation: sl-push linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: var(--sl-d) calc(var(--sl-d) + var(--sl-hold-range));
+}
+
+@keyframes sl-push {
+  from {
+    translate: none;
+  }
+  to {
+    translate: 0 var(--sl-hold);
+  }
+}
+
+.sl-figure {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  animation: sl-pull linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: 0px var(--sl-d);
+}
+
+@keyframes sl-pull {
+  from {
+    scale: 0.88;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+.sl-figure img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.sl-panel-wrap {
+  position: relative;
+  z-index: 1;
+  /* Clips the panel's slide-in, so the translate never adds to the scroll range. */
+  overflow: clip;
+  scroll-snap-align: end;
+}
+
+/* Overscroll padding: panel colour behind the sheet where the panel rests, so a
+   rubber band past the end shows it rather than the backdrop. Not a shadow
+   below the panel: WebKit clips a scroller's paint to its scroll range, so a
+   hard pull opened a dark sliver. Shown only at the info position, where the
+   panel covers it. */
+.sl-slide {
+  position: relative;
+}
+
+.sl-underlay {
+  position: absolute;
+  inset: auto 0 calc(-1 * var(--sl-r, 0px));
+  /* Clear of the panel's rounded top corners. */
+  height: calc(var(--sl-p) + var(--sl-r, 0px) - 24px);
+  background: var(--fb-bg);
+  pointer-events: none;
+  opacity: 0;
+  animation: sl-underlay linear both;
+  animation-timeline: --sl-sheet;
+  animation-range: var(--sl-d) calc(var(--sl-d) + var(--sl-p));
+}
+
+html[data-lab-overscroll="off"] .sl-underlay {
+  display: none;
+}
+
+@keyframes sl-underlay {
+  0%,
+  99% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.sl-panel {
+  display: grid;
+  gap: 14px;
+  min-height: var(--sl-panel-min, 0px);
+  /* The bottom padding sits under the toolbar, so the toolbar shows the panel. */
+  padding: 10px var(--fb-gutter) calc(28px + env(safe-area-inset-bottom) + var(--sl-r, 0px));
+  border-radius: 18px 18px 0 0;
+  --sl-pane: var(--fb-bg);
+  background: var(--sl-pane);
+  color: var(--fb-fg);
+  /* Inset: the wrapper clips at the panel's top, so an outer line was cut off along the corners. */
+  box-shadow: inset 0 1px 0 var(--fb-line);
+  /* Resting on the photo, the panel waits below the bars' reach, so the toolbar
+     never shows its white. It catches up over the push into the info position. */
+  animation: sl-raise linear both;
+  animation-timeline: scroll(nearest block);
+  animation-range: var(--sl-d) calc(var(--sl-d) + var(--sl-p));
+}
+
+@keyframes sl-raise {
+  from {
+    translate: 0 var(--sl-r, 0px);
+  }
+  to {
+    translate: none;
+  }
+}
+
+/* Overscroll padding off: the panel floats as a pane with the backdrop all
+   round it, and rests a gap above the window's bottom edge, so nothing of its
+   colour reaches the toolbar. The wrapper's bottom padding is the gap plus the
+   reach, so the sheet still ends at the scroller's edge under the bars. */
+html[data-lab-overscroll="off"] .sl-panel-wrap {
+  /* 12px is enough: with no sticky layer, Safari leaves its bar alone however
+     close the pane comes. */
+  --sl-gap: max(12px, env(safe-area-inset-bottom));
+  padding: 0 12px calc(var(--sl-gap) + var(--sl-r, 0px));
+  /* The slide-in stays inside that padding, so the clip can go and the pane's
+     shadow shows. */
+  overflow: visible;
+}
+
+html[data-lab-overscroll="off"] .sl-panel {
+  max-width: 640px;
+  margin-inline: auto;
+  width: 100%;
+  padding-bottom: 22px;
+  border-radius: 24px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.35);
+}
+
+html[data-lab-panel="tall"] .sl-panel {
+  --sl-panel-min: 55svh;
+}
+
+.sl-grabber {
+  justify-self: center;
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--fb-line);
+}
+
+.sl-panel h2 {
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.sl-panel p {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--fb-muted);
+  font-size: 14px;
+}
+
+.sl-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.sl-meta div {
+  display: grid;
+  gap: 2px;
+}
+
+.sl-meta dt {
+  font-family: var(--fb-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fb-muted);
+}
+
+.sl-meta dd {
+  margin: 0;
+}
+
+.sl-close {
+  /* Gone well before the dismiss lands. */
+  animation: sl-backdrop linear both;
+  animation-timeline: --sl-sheet;
+  animation-range: calc(var(--sl-d) * 0.75) var(--sl-d);
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+/* Each coloured layer gets its own loud colour, so the colour Safari gives its
+   bar names the layer it sampled. Only layers that already paint, so the test
+   adds nothing new for Safari to find. */
+html[data-lab-debug="on"] .sl-panel {
+  --sl-pane: #ff0000;
+}
+
+html[data-lab-debug="on"][data-lab-overscroll="off"] .sl-panel {
+  box-shadow: 0 12px 40px #00ff00;
+}
+
+html[data-lab-debug="on"] .sl-underlay {
+  background: #ff8800;
+}
+
+html[data-lab-debug="on"] .sl-close {
+  background: #0000ff;
+}
+
+html[data-lab-debug="on"] .sl-backdrop {
+  background: #ff00ff;
+}
+
+/* Without scroll-driven animations the sheet still scrolls and snaps; it only stops easing the backdrop and photo. */
+@supports not (animation-timeline: scroll()) {
+  .sl-backdrop,
+  .sl-close,
+  .sl-underlay,
+  .sl-panel,
+  .sl-stage,
+  .sl-figure {
+    animation: none;
+  }
+
+  /* Nothing to cancel the scroll with, so sticky it is. */
+  .sl-stage {
+    position: sticky;
+    top: var(--sl-r, 0px);
+  }
+}
