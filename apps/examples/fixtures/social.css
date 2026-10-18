@@ -1,6 +1,7 @@
 /* Social viewers. Page layout comes from the Safari chrome lab; tokens from @ogdakke/fluidbox-design.
-   Everything inside the viewer is consumer CSS against today's package: the
-   stage is made room for by resizing the slide strip, which is not an API. */
+   Inside the viewer: --lightbox-stage-* insets make room around the photo,
+   --lightbox-media-* attach a panel to it, and data-lightbox-chrome fades the
+   floating layers in after the opening flight and out when a dismiss starts. */
 
 .byline {
   display: flex;
@@ -61,6 +62,7 @@
 .tw-grid img {
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 16 / 10;
   object-fit: cover;
 }
@@ -69,20 +71,16 @@
   max-height: 480px;
 }
 
-/* Twitter viewer. The stage is the dialog less the sidebar and the action row. */
+/* Twitter viewer. The stage is the dialog less the sidebar and the action row;
+   the photo, zoom, arrows and close button all keep to it. */
 [data-lightbox-dialog]:has(.tw-layer) {
   --tw-aside: 360px;
   --tw-bar: 56px;
-  --lightbox-content-height: calc(var(--lightbox-height, 100svh) - var(--tw-bar));
+  --lightbox-stage-right: var(--tw-aside);
+  --lightbox-stage-bottom: var(--tw-bar);
 }
 [data-lightbox-dialog]:has(.tw-layer[data-aside="closed"]) {
   --tw-aside: 0px;
-}
-[data-lightbox-dialog]:has(.tw-layer) [data-lightbox-slides] {
-  width: calc(100% - var(--tw-aside));
-}
-[data-lightbox-dialog]:has(.tw-layer) :is([data-lightbox-close], [data-lightbox-next]) {
-  right: calc(var(--tw-aside) + 16px);
 }
 .tw-aside {
   position: absolute;
@@ -208,30 +206,59 @@
   object-fit: cover;
 }
 
-/* Instagram viewer. Shrinking the strip by the panel's width centres the
-   photo-plus-panel card; the panel's place and height come from the photo's
-   size, which the fixture computes itself. */
-[data-lightbox-dialog]:has(.ig-panel) {
+/* Instagram viewer: a fixed card, centred, of a 4:5 photo box and a 400px
+   panel. Every photo letterboxes inside the box and the next one slides in
+   within it; the arrows and close button belong to the screen. */
+[data-lightbox-dialog]:has(.ig-layer) {
   --ig-panel: 400px;
-  --ig-margin: 48px;
-  --lightbox-content-height: calc(var(--lightbox-height, 100svh) - var(--ig-margin) * 2);
+  --ig-margin: 24px;
+  --ig-height: calc(var(--lightbox-height, 100svh) - 2 * var(--ig-margin));
+  /* Whole pixels, or the strip lands on a subpixel and the next photo shows a sliver. */
+  --ig-box: round(down, min(var(--ig-height) * 0.8, 100vw - var(--ig-panel) - 160px), 1px);
+  --ig-left: round(down, (100vw - var(--ig-box) - var(--ig-panel)) / 2, 1px);
+  --lightbox-stage-top: var(--ig-margin);
+  --lightbox-stage-bottom: var(--ig-margin);
+  --lightbox-stage-left: var(--ig-left);
+  --lightbox-stage-right: calc(var(--ig-left) + var(--ig-panel));
 }
-[data-lightbox-dialog]:has(.ig-panel) [data-lightbox-slides] {
-  width: calc(100% - var(--ig-panel));
-  padding-top: var(--ig-margin);
+[data-lightbox-dialog]:has(.ig-layer) [data-lightbox-previous] {
+  left: 16px;
+}
+[data-lightbox-dialog]:has(.ig-layer) [data-lightbox-next] {
+  right: 16px;
+}
+[data-lightbox-dialog]:has(.ig-layer) [data-lightbox-close] {
+  top: 16px;
+  right: 16px;
+}
+/* The photo box, so a letterboxed photo still reads as part of the card. */
+.ig-layer {
+  position: absolute;
+  top: var(--ig-margin);
+  left: var(--ig-left);
+  width: var(--ig-box);
+  height: var(--ig-height);
+  z-index: -1;
+  border-radius: 6px 0 0 6px;
+  background: var(--fb-surface);
+}
+.ig-panel ul {
+  align-content: start;
+  overflow-y: auto;
 }
 .ig-panel {
   position: absolute;
-  top: calc(50% - var(--ig-photo-height) / 2);
-  left: calc((100% - var(--ig-panel)) / 2 + var(--ig-photo-width) / 2);
+  top: var(--ig-margin);
+  left: calc(var(--ig-left) + var(--ig-box));
   z-index: 6;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   gap: 14px;
   width: var(--ig-panel);
-  height: var(--ig-photo-height);
+  height: var(--ig-height);
   padding: 16px;
   overflow: hidden;
+  border-radius: 0 6px 6px 0;
   background: var(--fb-bg);
   color: var(--fb-fg);
 }
@@ -244,9 +271,10 @@
 }
 
 @media (width < 900px) {
-  [data-lightbox-dialog]:has(.ig-panel) {
+  [data-lightbox-dialog]:has(.ig-layer) {
     --ig-panel: 0px;
     --ig-margin: 0px;
+    --ig-box: 100vw;
   }
   .ig-panel {
     display: none;

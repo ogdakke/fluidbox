@@ -149,6 +149,8 @@ export class DomViewerDriver<
   #closeTargetPicture: HTMLElement | null = null;
   #closeDuration = 0;
   #closeOriginObserver: ResizeObserver | undefined;
+  #mediaObserver: ResizeObserver | undefined;
+  #observedMedia: HTMLElement | undefined;
   #closeRetargetFrame = 0;
   #closeRetargetSettleFrame = 0;
   #suppressClick = false;
@@ -500,6 +502,11 @@ export class DomViewerDriver<
       );
       this.#portal.dialog.dataset.galleryControlsRevealing = "";
     }
+    this.#portal.dialog.style.setProperty(
+      "--lightbox-chrome-reveal-delay",
+      `${controlsRevealDelay}ms`,
+    );
+    this.#portal.dialog.dataset.chromeRevealing = "";
     if (this.#portal.dialog.hasAttribute("data-filmstrip")) {
       this.#portal.dialog.style.setProperty(
         "--lightbox-filmstrip-reveal-delay",
@@ -520,6 +527,7 @@ export class DomViewerDriver<
     await Promise.all([
       this.#waitForFilmstripReveal(context.signal),
       this.#waitForGalleryControlsReveal(context.signal),
+      this.#waitForChromeReveal(context.signal),
       this.#waitForAnimation(controlsReveal, context.signal),
     ]);
     if (context.signal.aborted) return;
@@ -532,6 +540,8 @@ export class DomViewerDriver<
     this.#portal.dialog.style.removeProperty("--lightbox-gallery-controls-reveal-delay");
     delete this.#portal.dialog.dataset.filmstripRevealing;
     this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
+    delete this.#portal.dialog.dataset.chromeRevealing;
+    this.#portal.dialog.style.removeProperty("--lightbox-chrome-reveal-delay");
     this.#focusUnlessInside();
   }
 
@@ -723,6 +733,9 @@ export class DomViewerDriver<
     this.#preparedFlight = undefined;
     this.#endWheelHandoff();
     this.#zoom?.destroy();
+    this.#mediaObserver?.disconnect();
+    this.#mediaObserver = undefined;
+    this.#observedMedia = undefined;
     this.#discardPreparation();
     this.#thumbnailOverlays.destroy();
     this.#cancelAnimations(false);
@@ -746,7 +759,31 @@ export class DomViewerDriver<
     const label = media.type === "image" ? media.alt : media.title;
     this.#portal.dialog.setAttribute("aria-label", label || "Media viewer");
     this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
+    this.#trackMedia();
   }
+
+  // The active photo's drawn size, for consumer layers attached to it. Offset
+  // sizes leave out flight, drag and zoom transforms; the photo is centred in
+  // the stage, so its place follows from the stage insets.
+  #trackMedia() {
+    const media = this.#media;
+    if (media !== this.#observedMedia) {
+      const view = this.#portal.overlay.ownerDocument.defaultView;
+      if (!view?.ResizeObserver) return;
+      this.#mediaObserver ??= new view.ResizeObserver(this.#publishMedia);
+      if (this.#observedMedia) this.#mediaObserver.unobserve(this.#observedMedia);
+      this.#observedMedia = media;
+      this.#mediaObserver.observe(media);
+    }
+    this.#publishMedia();
+  }
+
+  #publishMedia = () => {
+    const media = this.#observedMedia;
+    if (!media?.isConnected || !media.offsetWidth) return;
+    this.#portal.dialog.style.setProperty("--lightbox-media-width", `${media.offsetWidth}px`);
+    this.#portal.dialog.style.setProperty("--lightbox-media-height", `${media.offsetHeight}px`);
+  };
 
   /**
    * The session hides the origin's image while its item is open. A crossfading
@@ -942,6 +979,17 @@ export class DomViewerDriver<
     await this.#waitForAnimation(animation, signal);
   }
 
+  async #waitForChromeReveal(signal: AbortSignal) {
+    const chrome = this.#portal.dialog.querySelector<HTMLElement>("[data-lightbox-chrome]");
+    const animation = chrome
+      ?.getAnimations()
+      .find(
+        (candidate) =>
+          (candidate as CSSAnimation).animationName === "lightbox-gallery-controls-appear",
+      );
+    await this.#waitForAnimation(animation, signal);
+  }
+
   async #waitForAnimation(animation: Animation | undefined, signal: AbortSignal) {
     if (!animation) return;
     await new Promise<void>((resolve) => {
@@ -1112,7 +1160,14 @@ export class DomViewerDriver<
       !(this.#media instanceof HTMLImageElement)
     )
       return null;
-    this.#dragGesture.cancel();
+    // A pinch can land mid-dismiss; drop the drag whole, or the strip stays
+    // frozen and the dialog keeps its dragging state.
+    if (this.#dragGesture.active) {
+      this.#dragGesture.cancel();
+      this.#preparedFlight = undefined;
+      this.#clearMotionStyles();
+      this.#strip?.resume();
+    }
     this.#cancelAnimations(true);
     const interrupted = this.#takeInterruptedPose();
     if (interrupted) this.#applyMediaPose(this.#frame, this.#media, interrupted);
@@ -1474,7 +1529,7 @@ export class DomViewerDriver<
     this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
     if (
       state.wheelTarget &&
-      state.wheelPhase === "past-open" &&
+      state.wheelPhase !== "tracking" &&
       Math.abs(dragDistance(state)) < 0.1
     ) {
       this.#dragGesture.finish();
@@ -1632,6 +1687,8 @@ export class DomViewerDriver<
       this.#portal.dialog.style.removeProperty("--lightbox-gallery-controls-reveal-delay");
       delete this.#portal.dialog.dataset.filmstripRevealing;
       this.#portal.dialog.style.removeProperty("--lightbox-filmstrip-reveal-delay");
+      delete this.#portal.dialog.dataset.chromeRevealing;
+      this.#portal.dialog.style.removeProperty("--lightbox-chrome-reveal-delay");
     }
   }
 

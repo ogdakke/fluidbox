@@ -1,5 +1,5 @@
 import { mountSite } from "../src/site";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { LightboxItem } from "@ogdakke/fluidbox";
 import { Lightbox, useLightboxState } from "@ogdakke/fluidbox/react";
@@ -73,7 +73,7 @@ function Grid({ post }: { post: Post }) {
   return (
     <div className="tw-grid" data-count={post.items.length}>
       {post.items.map((item) => (
-        <Lightbox.Trigger key={item.id} items={post.items} item={item} asChild>
+        <Lightbox.Trigger key={item.id} item={item} asChild>
           <button
             type="button"
             aria-label={`Open ${item.media.type === "image" && item.media.alt}`}
@@ -113,7 +113,7 @@ function TwitterViewer() {
     <Lightbox.Portal>
       <div className="tw-layer" data-aside={aside ? "open" : "closed"}>
         {active && (
-          <div className="tw-mobile">
+          <div className="tw-mobile" data-lightbox-chrome>
             <Byline post={active} />
             <p>{active.text}</p>
             <div className="tw-pills" role="toolbar" aria-label="Post actions">
@@ -124,18 +124,28 @@ function TwitterViewer() {
             </div>
           </div>
         )}
-        <input className="tw-reply" aria-label="Reply" placeholder="Post your reply" />
-        <div className="tw-actions" role="toolbar" aria-label="Post actions">
+        <input
+          className="tw-reply"
+          data-lightbox-chrome
+          aria-label="Reply"
+          placeholder="Post your reply"
+        />
+        <div className="tw-actions" data-lightbox-chrome role="toolbar" aria-label="Post actions">
           <button type="button">Reply 12</button>
           <button type="button">Repost 4</button>
           <button type="button">Like 210</button>
           <button type="button">Share</button>
         </div>
-        <button type="button" className="tw-toggle" onClick={() => setAside((open) => !open)}>
+        <button
+          type="button"
+          className="tw-toggle"
+          data-lightbox-chrome
+          onClick={() => setAside((open) => !open)}
+        >
           {aside ? "Hide replies" : "Show replies"}
         </button>
         {aside && active && (
-          <aside className="tw-aside" aria-label="Post and replies">
+          <aside className="tw-aside" data-lightbox-chrome aria-label="Post and replies">
             <Byline post={active} />
             <p>{active.text}</p>
             <ul>
@@ -155,45 +165,15 @@ function TwitterViewer() {
   );
 }
 
-const panelWidth = 400;
-const margin = 48;
-
-/**
- * Instagram's panel is attached to the photo, so it needs the photo's drawn
- * size. The package doesn't expose it; this repeats the package's fit (fill
- * the stage, keep the aspect) and has to stay in step with it by hand.
- */
-function useFittedPhoto(item: LightboxItem | undefined) {
-  const [viewport, setViewport] = useState({ width: innerWidth, height: innerHeight });
-  useEffect(() => {
-    const resize = () => setViewport({ width: innerWidth, height: innerHeight });
-    addEventListener("resize", resize);
-    return () => removeEventListener("resize", resize);
-  }, []);
-  if (!item || item.media.type !== "image") return null;
-  const stageWidth = viewport.width - panelWidth;
-  const stageHeight = viewport.height - margin * 2;
-  const scale = Math.min(stageWidth / item.media.width, stageHeight / item.media.height);
-  return { width: item.media.width * scale, height: item.media.height * scale };
-}
-
 function InstagramViewer() {
   const active = useActivePost(grams);
-  const activeId = useLightboxState((state) => state.activeId);
-  const photo = useFittedPhoto(active?.items.find((item) => item.id === activeId));
   return (
     <Lightbox.Portal>
-      {active && photo && (
-        <aside
-          className="ig-panel"
-          aria-label="Post"
-          style={
-            {
-              "--ig-photo-width": `${photo.width}px`,
-              "--ig-photo-height": `${photo.height}px`,
-            } as React.CSSProperties
-          }
-        >
+      {/* Always rendered: the stage insets hang off it, and the opening flight
+          measures its landing before the active post is known. */}
+      <div className="ig-layer" data-lightbox-chrome />
+      {active && (
+        <aside className="ig-panel" data-lightbox-chrome aria-label="Post">
           <Byline post={active} />
           <p>{active.text}</p>
           <ul>
@@ -265,17 +245,12 @@ function App() {
       <Section
         index={2}
         title="Instagram"
-        note="The photo and a 400px panel form one card, centred, with the arrows outside it. The panel takes the photo's height."
+        note="A fixed card: a 4:5 photo box and a full-height 400px panel, centred, with the arrows and close button out on the screen. Each photo letterboxes inside the box, and swiping slides the next one in within it."
       >
         <Lightbox.Root items={grams.flatMap((gram) => gram.items)}>
           <div className="ig-grid">
             {grams.map((gram) => (
-              <Lightbox.Trigger
-                key={gram.id}
-                items={grams.flatMap((other) => other.items)}
-                item={gram.items[0]}
-                asChild
-              >
+              <Lightbox.Trigger key={gram.id} item={gram.items[0]} asChild>
                 <button type="button" aria-label={`Open ${gram.author}`}>
                   <img data-lightbox-origin src={gram.items[0].thumbnail?.src} alt="" />
                 </button>
@@ -292,42 +267,37 @@ function App() {
       >
         <ol className="findings">
           <li>
-            <strong>Works, through internals.</strong> Resizing the slide strip and overriding
-            --lightbox-content-height makes room for the sidebar and the action row, and the opening
-            flight lands in the narrower stage because it measures the drawn photo. Neither is an
-            API, and the arrows and close button had to be moved off the sidebar by hand. Stage
-            frame.
+            <strong>Room around the photo: fixed.</strong> --lightbox-stage-top, -right, -bottom and
+            -left inset the stage. The photo fits and centres inside it, the opening and closing
+            flights land in it, and the arrows and close button sit against it. The fixture no
+            longer touches the slide strip or --lightbox-content-height.
           </li>
           <li>
-            <strong>Consumer layers ignore the flights.</strong> The sidebar and action row appear
-            at full opacity on the first frame of the opening flight, and stay opaque over the page
-            while the photo flies home. The built-in controls get a reveal and a fade; portal
-            content gets nothing to hook onto. Needs open and close phases, and dismiss progress, in
-            CSS.
+            <strong>Layers and the flights: fixed.</strong> Anything marked data-lightbox-chrome
+            stays hidden through the opening flight, fades in with the built-in controls, and fades
+            out as soon as a dismiss starts, by drag or by close. A cancelled drag brings it back.
           </li>
           <li>
-            <strong>Zoom ignores the stage.</strong> Zooming fills the slide's full height, under
-            the action row. The strip's width clips it sideways only because the strip itself was
-            narrowed. Stage frame: zoom clips to and centres on the stage.
+            <strong>Zoom and the stage: fixed.</strong> Zoom pans, bounds and centres inside the
+            stage, so it no longer fills under the action row or the sidebar.
           </li>
           <li>
-            <strong>Instagram's panel needs the package's fit math.</strong> The panel takes the
-            photo's height and sits against its edge only because the fixture repeats the fit (fill
-            the stage, keep the aspect) from the item's size. Any change to the package's fit, or a
-            renderer that draws differently, breaks it. Media frame: the drawn rect as variables.
+            <strong>Instagram's card: fixed.</strong> Instagram keeps one card size and letterboxes
+            every photo in it, so the stage insets alone make the box, and the slide strip, clipped
+            to the stage, swipes the next photo in within it. --lightbox-media-width and -height
+            remain for panels that hug the photo instead.
           </li>
           <li>
-            <strong>Instagram's panel doesn't swipe.</strong> The panel lives in the overlay and
-            follows the active item, so mid-swipe it hangs over empty space and jumps when the slide
-            settles. It belongs to the slide, moving with the photo. Slide layer plus the media
-            frame.
+            <strong>Insets must exist before the opening: open.</strong> The opening flight measures
+            its landing before the viewer renders anything for the active item, so insets keyed to
+            content that only appears with it land the flight in the wrong place. Here an
+            always-rendered layer carries them; the package could re-measure, or say so.
           </li>
           <li>
-            <strong>X's phone viewer is half there.</strong> The post, pills and reply field along
-            the bottom are plain overlay markup and work today. Swiping up does what it always does,
-            and nothing rises: the sheet, with the photo shrinking to fit above it and the stack
-            becoming the sheet's first rows, is the sheet plan. The reply field has to stay above
-            the sheet, so overlay content needs to layer over it.
+            <strong>X's phone viewer is half there: open.</strong> The post, pills and reply field
+            along the bottom work as overlay markup. Swiping up does what it always does, and
+            nothing rises: the sheet, with the photo shrinking to fit above it, is the sheet plan.
+            The reply field has to stay above the sheet, so overlay content needs to layer over it.
           </li>
         </ol>
       </Section>

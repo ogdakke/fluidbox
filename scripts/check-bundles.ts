@@ -23,7 +23,7 @@ const initialGzipLimits: Record<Entry, number> = {
   vue: 1_500,
   angular: 1_500,
 };
-const cssGzipLimit = 5_000;
+const cssGzipLimit = 5_300;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 40_100,
   elements: 26_850,

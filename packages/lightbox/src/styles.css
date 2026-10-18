@@ -1,3 +1,25 @@
+/* Stage insets; registered so zoom reads them as pixels. */
+@property --lightbox-stage-top {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --lightbox-stage-right {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --lightbox-stage-bottom {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+@property --lightbox-stage-left {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 :root {
   --layer-lightbox: 7;
   --layer-lightbox-flight: 8;
@@ -498,7 +520,9 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 /* Every dialog fills the viewport. A dialog that shrinks to its media would
    clip the opening and closing flights to the media's column. */
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-dialog] {
-  --lightbox-content-height: var(--lightbox-height, 100svh);
+  --lightbox-content-height: calc(
+    var(--lightbox-height, 100svh) - var(--lightbox-stage-top) - var(--lightbox-stage-bottom)
+  );
   min-width: 0;
   min-height: 0;
   width: 100%;
@@ -509,7 +533,10 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-gallery][data-filmstrip] {
   --lightbox-filmstrip-space: calc(84px + env(safe-area-inset-bottom, 0px));
-  --lightbox-content-height: calc(var(--lightbox-height, 100svh) - var(--lightbox-filmstrip-space));
+  --lightbox-content-height: calc(
+    var(--lightbox-height, 100svh) - var(--lightbox-filmstrip-space) - var(--lightbox-stage-top) -
+      var(--lightbox-stage-bottom)
+  );
   position: relative;
 }
 /* Optional space between slides (--lightbox-slide-gap, 0 by default). Each
@@ -517,8 +544,11 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
    the dialog, which clips it. */
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-slides] {
   display: flex;
-  width: calc(100% + var(--lightbox-slide-gap, 0px));
-  margin-inline: calc(var(--lightbox-slide-gap, 0px) / -2);
+  width: calc(
+    100% - var(--lightbox-stage-left) - var(--lightbox-stage-right) + var(--lightbox-slide-gap, 0px)
+  );
+  margin-inline: calc(var(--lightbox-stage-left) - var(--lightbox-slide-gap, 0px) / 2)
+    calc(var(--lightbox-stage-right) - var(--lightbox-slide-gap, 0px) / 2);
   height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
@@ -541,6 +571,7 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   /* Media inside sizes against the slide with cqw units. */
   container-type: inline-size;
   padding-inline: calc(var(--lightbox-slide-gap, 0px) / 2);
+  padding-block-start: var(--lightbox-stage-top);
   display: grid;
   place-items: center;
   grid-template-rows: var(--lightbox-content-height);
@@ -826,8 +857,8 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog]:is([data-lightbox-gallery], [data-lightbox-headless])
   [data-lightbox-close] {
-  top: 16px;
-  right: 16px;
+  top: calc(var(--lightbox-stage-top) + 16px);
+  right: calc(var(--lightbox-stage-right) + 16px);
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-lightbox-headless]:not([data-lightbox-gallery])
@@ -846,7 +877,10 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   :is([data-lightbox-previous], [data-lightbox-next]) {
   position: absolute;
   z-index: 6;
-  top: 50%;
+  top: calc(
+    var(--lightbox-stage-top) + (100% - var(--lightbox-stage-top) - var(--lightbox-stage-bottom)) /
+      2
+  );
   display: grid;
   place-items: center;
   width: 44px;
@@ -864,11 +898,11 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-previous] {
-  left: 16px;
+  left: calc(var(--lightbox-stage-left) + 16px);
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-next] {
-  right: 16px;
+  right: calc(var(--lightbox-stage-right) + 16px);
 }
 
 :where([data-lightbox-overlay], [data-lightbox-flight])
@@ -893,14 +927,39 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 }
 :where([data-lightbox-overlay], [data-lightbox-flight])
   [data-lightbox-dialog][data-dismissing]
-  :is([data-lightbox-previous], [data-lightbox-next], [data-lightbox-close]) {
+  :is(
+    [data-lightbox-previous],
+    [data-lightbox-next],
+    [data-lightbox-close],
+    [data-lightbox-chrome]
+  ) {
   opacity: 0;
   pointer-events: none;
 }
+/* Consumer layers marked data-lightbox-chrome reveal and dismiss with the controls. */
+:where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-chrome] {
+  transition: opacity 180ms linear;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-opening]
+  [data-lightbox-chrome] {
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+:where([data-lightbox-overlay], [data-lightbox-flight])
+  [data-lightbox-dialog][data-opening][data-chrome-revealing]
+  [data-lightbox-chrome] {
+  animation: lightbox-gallery-controls-appear 180ms linear
+    var(--lightbox-chrome-reveal-delay, 210ms) both;
+}
 @media (prefers-reduced-motion: reduce) {
   :where([data-lightbox-overlay], [data-lightbox-flight])
-    [data-lightbox-dialog][data-lightbox-gallery]
-    :is([data-lightbox-previous], [data-lightbox-next], [data-lightbox-close]) {
+    :is(
+      [data-lightbox-dialog][data-lightbox-gallery]
+        :is([data-lightbox-previous], [data-lightbox-next], [data-lightbox-close]),
+      [data-lightbox-chrome]
+    ) {
     transition-duration: 0ms;
     animation-duration: 0ms;
     animation-delay: 0ms;
@@ -949,9 +1008,15 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
 :where([data-lightbox-overlay], [data-lightbox-flight]) [data-lightbox-zoom-viewport] {
   --lightbox-zoom-reach: var(--lightbox-zoom-bleed, var(--lightbox-zoom-chrome, 0px));
 
+  --lightbox-zoom-reach-start: var(--lightbox-zoom-reach-top, var(--lightbox-zoom-reach));
+  --lightbox-zoom-reach-end: var(--lightbox-zoom-reach-bottom, var(--lightbox-zoom-reach));
+
   position: absolute;
-  inset: calc(-1 * var(--lightbox-zoom-reach)) 0;
-  padding-block: var(--lightbox-zoom-reach);
+  inset: calc(var(--lightbox-zoom-stage-top, 0px) - var(--lightbox-zoom-reach-start))
+    var(--lightbox-zoom-stage-right, 0px)
+    calc(var(--lightbox-zoom-stage-bottom, 0px) - var(--lightbox-zoom-reach-end))
+    var(--lightbox-zoom-stage-left, 0px);
+  padding-block: var(--lightbox-zoom-reach-start) var(--lightbox-zoom-reach-end);
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;

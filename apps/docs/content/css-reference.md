@@ -29,6 +29,7 @@ The public styling surface: part selectors, state hooks, theme inputs, and the v
 | `[data-lightbox-item-content]`                                              | Arbitrary gallery item                                           |
 | `[data-lightbox-close]`, `[data-lightbox-previous]`, `[data-lightbox-next]` | Default controls                                                 |
 | `[data-lightbox-icon]`                                                      | SVG icon inside a default control                                |
+| `[data-lightbox-chrome]`                                                    | Your own floating layer in the portal; see Stage and chrome      |
 | `[data-lightbox-filmstrip]`                                                 | Filmstrip root                                                   |
 | `[data-lightbox-filmstrip-scroll]`                                          | Filmstrip scroller                                               |
 | `[data-lightbox-filmstrip-item]`                                            | Filmstrip option                                                 |
@@ -64,6 +65,21 @@ While zoomed, the image can pan under the browser's own bars. On touch screens t
 
 Closed previews read `--lightbox-preview-width`, `--lightbox-preview-height`, and `--lightbox-preview-aspect`.
 
+## Stage and chrome
+
+The stage is the part of the dialog the photo fits into. By default it is the whole dialog. Set `--lightbox-stage-top`, `--lightbox-stage-right`, `--lightbox-stage-bottom`, and `--lightbox-stage-left` on the dialog to make room for a sidebar, an action row, or margins. The photo fits and centres in the stage, opening and closing flights land there, zoom pans and centres inside it, and the default arrows and close button sit against its edges. The insets are registered lengths, so you can transition them.
+
+```css
+[data-lightbox-dialog]:has(.replies) {
+  --lightbox-stage-right: 360px;
+  --lightbox-stage-bottom: 56px;
+}
+```
+
+Mark your own floating layers in `[data-lightbox-portal]` with `data-lightbox-chrome`, such as a sidebar, an action row, or a caption. They behave like the default controls: hidden during the opening flight, revealed as it lands, and faded out when a dismiss starts by drag, Escape, or the close button. A cancelled drag brings them back. If you set your own `transition` on a chrome layer, include `opacity`.
+
+To attach something to the photo, read `--lightbox-media-width` and `--lightbox-media-height` on the dialog. Together with the stage insets they place the photo: it is centred in the stage.
+
 ## Runtime-owned variables
 
 Read these to synchronize your own effects. Do not set them; inline values or Web Animations control the active pose.
@@ -76,7 +92,8 @@ Read these to synchronize your own effects. Do not set them; inline values or We
 | `--lightbox-frame-transform`, `--lightbox-frame-radius`         | Frame                         | Crop pose transform and radius.                                |
 | `--lightbox-media-transform`                                    | Media                         | Media pose, also updated by zoom.                              |
 | `--lightbox-backdrop-opacity`, `--lightbox-close-opacity`       | Backdrop, close               | Opacity during interactive dismissal.                          |
-| `--lightbox-item-width`, `--lightbox-item-height`               | Frame                         | Item size constrained to the viewport.                         |
+| `--lightbox-item-width`, `--lightbox-item-height`               | Frame                         | Item size constrained to the stage.                            |
+| `--lightbox-media-width`, `--lightbox-media-height`             | Dialog                        | The active item's drawn size, without flight or zoom.          |
 | `--lightbox-zoom-canvas-width`, `--lightbox-zoom-canvas-height` | Zoom canvas                   | Geometry while zoomed.                                         |
 
 Authored transition layers can supply `--lightbox-transition-layer-opacity` and `--lightbox-transition-content-opacity`, which the runtime copies when it moves content to the body.

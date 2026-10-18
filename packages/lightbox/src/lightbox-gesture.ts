@@ -266,6 +266,15 @@ export class LightboxGestureController {
         WHEEL_SPRING_DAMPING,
       );
     }
+    // Snap before the phase checks: a spring that settles a hair short of open
+    // would otherwise stay "settling" with the loop stopped, stuck mid-drag.
+    const settled =
+      Math.abs(state.targetY - state.y) <= WHEEL_SETTLE_POSITION &&
+      Math.abs(state.springVelocityY) <= WHEEL_SETTLE_VELOCITY;
+    if (settled) {
+      state.y = state.targetY;
+      state.springVelocityY = 0;
+    }
     let distance = state.wheelOffset + state.y * state.wheelDirection;
     if (state.wheelPhase !== "tracking") {
       const returnProgress = Math.max(
@@ -285,13 +294,6 @@ export class LightboxGestureController {
       distance = 0;
     }
     const waitingForRelease = !released;
-    const settled =
-      Math.abs(state.targetY - state.y) <= WHEEL_SETTLE_POSITION &&
-      Math.abs(state.springVelocityY) <= WHEEL_SETTLE_VELOCITY;
-    if (settled) {
-      state.y = state.targetY;
-      state.springVelocityY = 0;
-    }
     this.#onUpdate(state);
     if (this.#state !== state) return;
     if (state.wheelCommit && distance >= wheelDismissDistance) {

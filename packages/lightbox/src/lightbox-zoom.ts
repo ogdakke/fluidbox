@@ -88,7 +88,15 @@ export class LightboxZoom {
   #controller = new AbortController();
   #image: HTMLElement | null = null;
   #pose = fit();
-  #geometry = { left: 0, top: 0, width: 0, height: 0, viewportWidth: 0, viewportHeight: 0 };
+  #geometry = {
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    stage: { top: 0, right: 0, bottom: 0, left: 0 },
+    viewportWidth: 0,
+    viewportHeight: 0,
+  };
   #animation: Animation | null = null;
   #frame = 0;
   #idle: ReturnType<typeof setTimeout> | undefined;
@@ -153,8 +161,9 @@ export class LightboxZoom {
     const viewport = this.#viewport;
     const image = this.#image;
     if (!viewport || !image || !this.#placeholder) return;
-    this.#pose.x = this.#nativeOrigin.x - viewport.scrollLeft - this.#geometry.left;
-    this.#pose.y = this.#nativeOrigin.y - viewport.scrollTop - this.#geometry.top;
+    const g = this.#geometry;
+    this.#pose.x = this.#nativeOrigin.x - viewport.scrollLeft - (g.left - g.stage.left);
+    this.#pose.y = this.#nativeOrigin.y - viewport.scrollTop - (g.top - g.stage.top);
     this.#placeholder.replaceWith(image);
     viewport.remove();
     this.#viewport = null;
@@ -183,6 +192,12 @@ export class LightboxZoom {
     const canvas = document.createElement("div");
     canvas.dataset.lightboxZoomCanvas = "";
     viewport.style.setProperty("--lightbox-zoom-chrome", `${chromeReach()}px`);
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      viewport.style.setProperty(`--lightbox-zoom-stage-${side}`, `${g.stage[side]}px`);
+    }
+    // The bleed reaches under the browser's bars, never under a stage inset.
+    if (g.stage.top) viewport.style.setProperty("--lightbox-zoom-reach-top", "0px");
+    if (g.stage.bottom) viewport.style.setProperty("--lightbox-zoom-reach-bottom", "0px");
     canvas.style.setProperty("--lightbox-zoom-canvas-width", `${canvasWidth}px`);
     canvas.style.setProperty("--lightbox-zoom-canvas-height", `${canvasHeight}px`);
     const anchor = document.createElement("div");
@@ -207,8 +222,8 @@ export class LightboxZoom {
     this.#viewport = viewport;
     this.#placeholder = placeholder;
     viewport.scrollTo({
-      left: x - g.left - this.#pose.x,
-      top: y - g.top - this.#pose.y,
+      left: x - (g.left - g.stage.left) - this.#pose.x,
+      top: y - (g.top - g.stage.top) - this.#pose.y,
       behavior: "instant",
     });
   }
@@ -280,17 +295,39 @@ export class LightboxZoom {
     const matrix = new DOMMatrix(getComputedStyle(view.image).transform);
     const rect = view.frame.getBoundingClientRect();
     this.#pose = { scale: matrix.a, x: matrix.e, y: matrix.f };
+    const stage = this.#stageInsets();
     this.#geometry = {
       left: rect.left,
       top: rect.top,
       width: view.image.offsetWidth,
       height: view.image.offsetHeight,
-      viewportWidth: innerWidth,
-      viewportHeight: innerHeight,
+      stage,
+      viewportWidth: innerWidth - stage.left - stage.right,
+      viewportHeight: innerHeight - stage.top - stage.bottom,
     };
     this.#panPadding = matchMedia("(hover: hover) and (pointer: fine)").matches ? 96 : 40;
     this.#rawScale = rawZoom(this.#pose.scale, this.#options.config().max);
     return true;
+  }
+
+  // Zoom pans and centres inside the stage, the window less the dialog's
+  // registered --lightbox-stage-* insets.
+  #stageInsets() {
+    const dialog = this.#root.querySelector("[data-lightbox-dialog]");
+    const style = dialog ? getComputedStyle(dialog) : null;
+    const inset = (side: string) =>
+      Math.max(0, parseFloat(style?.getPropertyValue(`--lightbox-stage-${side}`) ?? "") || 0);
+    return {
+      top: inset("top"),
+      right: inset("right"),
+      bottom: inset("bottom"),
+      left: inset("left"),
+    };
+  }
+
+  #stageCenter(): Point {
+    const g = this.#geometry;
+    return { x: g.stage.left + g.viewportWidth / 2, y: g.stage.top + g.viewportHeight / 2 };
   }
 
   #paint() {
@@ -306,7 +343,14 @@ export class LightboxZoom {
 
   #bounded(pose: Pose, rubber: boolean): Pose {
     const g = this.#geometry;
-    const constrain = (value: number, base: number, size: number, viewport: number) => {
+    const constrain = (
+      value: number,
+      frame: number,
+      size: number,
+      viewport: number,
+      stage: number,
+    ) => {
+      const base = frame - stage;
       const scaled = size * pose.scale;
       const extent = Math.max(viewport, scaled + (pose.scale > 1 ? this.#panPadding * 2 : 0));
       const origin = (extent - scaled) / 2;
@@ -316,8 +360,8 @@ export class LightboxZoom {
     };
     return {
       ...pose,
-      x: constrain(pose.x, g.left, g.width, g.viewportWidth),
-      y: constrain(pose.y, g.top, g.height, g.viewportHeight),
+      x: constrain(pose.x, g.left, g.width, g.viewportWidth, g.stage.left),
+      y: constrain(pose.y, g.top, g.height, g.viewportHeight, g.stage.top),
     };
   }
 
@@ -425,7 +469,7 @@ export class LightboxZoom {
     this.#source = null;
     this.#touch = null;
     const scale = Math.max(1, Math.min(this.#options.config().max, this.#pose.scale));
-    const center = { x: innerWidth / 2, y: innerHeight / 2 };
+    const center = this.#stageCenter();
     const target = scale === 1 ? fit() : this.#bounded(this.#around(scale, center), false);
     if (
       Math.abs(target.scale - this.#pose.scale) > 0.0001 ||
@@ -646,9 +690,7 @@ export class LightboxZoom {
     if (!this.#acquire()) return;
     const scale = Math.max(1, Math.min(this.#options.config().max, this.#pose.scale * factor));
     this.#animate(
-      scale === 1
-        ? fit()
-        : this.#bounded(this.#around(scale, { x: innerWidth / 2, y: innerHeight / 2 }), false),
+      scale === 1 ? fit() : this.#bounded(this.#around(scale, this.#stageCenter()), false),
     );
   }
   reset() {

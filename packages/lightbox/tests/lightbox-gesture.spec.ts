@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   boundDismissOffset,
   boundDismissVelocity,
@@ -6,6 +6,8 @@ import {
   dismissRadiusProgress,
   dismissReturnValue,
   dragDistance,
+  LightboxGestureController,
+  type LightboxDragStart,
   type LightboxDragState,
 } from "../src/lightbox-gesture";
 
@@ -82,5 +84,59 @@ describe("dismiss bounds", () => {
     expect(firstFrame).toBeGreaterThan(0);
     expect(firstFrame).toBeLessThan(60);
     expect(dismissCloseValue(0, 5_000, 0, 480, 480, 720)).toBe(5_000);
+  });
+});
+
+describe("wheel dismiss", () => {
+  test("always comes to rest open once a cancelled scroll settles", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+    vi.stubGlobal("requestAnimationFrame", (step: FrameRequestCallback) =>
+      setTimeout(() => step(performance.now()), 16),
+    );
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
+    try {
+      // Small trackpad steps, as [delta, ms until the next]. These used to settle
+      // at the open position still "settling", with the frame loop stopped and
+      // the dialog stuck dragging.
+      for (const steps of [
+        [
+          [-0.4, 80],
+          [-1.5, 4],
+          [-1.3, 42],
+        ],
+        [
+          [2.3, 112],
+          [0.7, 52],
+        ],
+        [
+          [-40, 32],
+          [12, 32],
+        ],
+      ]) {
+        let painted: LightboxDragState | undefined;
+        const gesture = new LightboxGestureController(
+          (state) => (painted = state),
+          () => {},
+        );
+        gesture.begin({
+          wheelTarget: {} as DOMMatrix,
+          wheelDirection: 1,
+          wheelOffset: 0,
+          wheelSnapOffset: 0,
+          time: performance.now(),
+        } as LightboxDragStart);
+        for (const [delta, wait] of steps) {
+          gesture.moveWheel(delta!);
+          vi.advanceTimersByTime(wait!);
+        }
+        vi.advanceTimersByTime(5_000);
+        expect(vi.getTimerCount()).toBe(0);
+        expect(painted?.wheelPhase).toBe("past-open");
+        expect(Math.abs(dragDistance(painted!))).toBeLessThan(0.1);
+      }
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 });
