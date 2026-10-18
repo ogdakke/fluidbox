@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { markdownPages } from "./markdown";
 
 /**
@@ -23,8 +23,24 @@ function packageSource(command: "build" | "serve") {
   ];
 }
 
+/**
+ * Watch the package source as a folder. Vite watches files outside the app
+ * one by one, and a file replaced on disk (an editor's atomic save, a git
+ * checkout or stash) drops its watch, so the page would keep that file's old
+ * code until the server restarts.
+ */
+function watchPackageSource(): Plugin {
+  return {
+    name: "watch-package-source",
+    apply: "serve",
+    configureServer(server) {
+      server.watcher.add(resolve(import.meta.dirname, "../../packages/lightbox/src"));
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
-  plugins: [markdownPages()],
+  plugins: [markdownPages(), watchPackageSource()],
   resolve: { alias: packageSource(command) },
   // Share the example site's generated artwork and map snapshot for live demos.
   publicDir: resolve(import.meta.dirname, "../examples/public"),
