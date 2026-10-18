@@ -1,4 +1,4 @@
-import { mountChrome } from "../src/design/chrome";
+import { mountSite } from "../src/site";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { LightboxItem } from "@ogdakke/fluidbox";
@@ -6,7 +6,7 @@ import { Lightbox } from "@ogdakke/fluidbox/react";
 import { alternateRuntimeSource, runtimeSource } from "./source";
 import "./react-examples.css";
 
-mountChrome("fixtures", {
+mountSite("fixtures", {
   fixture: "React binding · composed parts, shared origins, and source replacement",
 });
 

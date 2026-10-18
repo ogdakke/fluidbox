@@ -1,9 +1,9 @@
-import { mountChrome } from "../src/design/chrome";
+import { mountSite } from "../src/site";
 import { arraySource, createLightbox } from "@ogdakke/fluidbox";
 import type { LightboxController, LightboxItem, LightboxRenderer } from "@ogdakke/fluidbox";
 import "./headless.css";
 
-mountChrome("fixtures", {
+mountSite("fixtures", {
   fixture: "Headless runtime · custom renderers, a protected viewer, and a secondary viewer",
 });
 

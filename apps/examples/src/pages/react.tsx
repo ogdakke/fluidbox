@@ -1,12 +1,12 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { mountChrome } from "../design/chrome";
+import { mountSite } from "../site";
 import "./pages.css";
 import { artSrc, scenes } from "../art";
 import { PhotoLibrary, type LibraryImage } from "../demos/photo-library";
 import { mount as mountCards } from "../demos/react";
 
-mountChrome("react");
+mountSite("react");
 const cardsRoot = document.querySelector<HTMLElement>("#react-root")!;
 mountCards(cardsRoot);
 cardsRoot.removeAttribute("aria-busy");

@@ -1,9 +1,9 @@
-import { mountChrome } from "../src/design/chrome";
+import { mountSite } from "../src/site";
 import type { AppGallery, AppLightbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import "./site.css";
 
-mountChrome("fixtures", {
+mountSite("fixtures", {
   fixture: "Collapsed gallery · three visible tiles and a +8 teaser for the rest",
 });
 

@@ -1,7 +1,7 @@
 import "@ogdakke/fluidbox/elements";
-import { mountChrome } from "../design/chrome";
+import { mountSite } from "../site";
 import "./pages.css";
 import { mountElements } from "../demos/elements";
 
-mountChrome("overview");
+mountSite("overview");
 mountElements(document.querySelector("#mosaic")!);

@@ -111,6 +111,8 @@ bun run format:check
 
 Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the showcase in `apps/examples`, which puts custom elements, the indexed source, the headless runtime, and the React, Solid, Vue, and Angular bindings on one page. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
 
+The documentation site lives in `apps/docs`. Run `bun run docs`, or `bun run docs:share` to expose it through portless as `docs.fluidbox`. Both sites share the design tokens and chrome in `apps/design`.
+
 The [public API contract](docs/PUBLIC_API.md) defines the headless source, controller, renderer,
 origin, and thumbnail-overlay target. The [roadmap to 1.0](docs/ROADMAP.md) tracks its runtime and
 framework implementation, CDN adapters, styling work, and release gates.

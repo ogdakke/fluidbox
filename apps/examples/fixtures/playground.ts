@@ -1,9 +1,9 @@
-import { mountChrome } from "../src/design/chrome";
+import { mountSite } from "../src/site";
 import type { AppGallery, LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import "./playground.css";
 
-mountChrome("fixtures", {
+mountSite("fixtures", {
   fixture: "Playground · the original two-image gallery and a 100,000-item indexed source",
 });
 

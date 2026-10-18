@@ -1,6 +1,6 @@
 import { arraySource } from "@ogdakke/fluidbox";
 import type { LightboxItem, LightboxSource } from "@ogdakke/fluidbox";
-import { scenes, type Scene } from "./art-scenes";
+import { scenes, type Scene } from "@ogdakke/fluidbox-design/art-scenes";
 
 export { scenes };
 export type { Scene };

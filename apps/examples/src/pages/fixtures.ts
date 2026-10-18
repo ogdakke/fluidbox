@@ -1,4 +1,4 @@
-import { mountChrome } from "../design/chrome";
+import { mountSite } from "../site";
 import "./pages.css";
 
-mountChrome("fixtures");
+mountSite("fixtures");

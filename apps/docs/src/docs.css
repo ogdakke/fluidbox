@@ -1,0 +1,371 @@
+/* Docs layout and prose. Tokens and chrome come from @ogdakke/fluidbox-design. */
+
+.docs {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 220px;
+  min-height: calc(100vh - var(--fb-header-height));
+}
+
+/* Sidebar */
+
+.docs-nav {
+  border-right: 1px solid var(--fb-line);
+}
+
+.docs-nav__menu {
+  position: sticky;
+  top: var(--fb-header-height);
+  max-height: calc(100vh - var(--fb-header-height));
+  overflow-y: auto;
+  padding: 28px 0 40px;
+}
+
+.docs-nav__menu > summary {
+  display: none;
+}
+
+.docs-nav .fb-label {
+  padding: 18px var(--fb-gutter) 8px;
+}
+
+.docs-nav .fb-label:first-child {
+  padding-top: 0;
+}
+
+.docs-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-nav a {
+  display: block;
+  padding: 5px var(--fb-gutter);
+  border-left: 2px solid transparent;
+  color: var(--fb-muted);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.docs-nav a:hover {
+  background: var(--fb-surface);
+  color: var(--fb-fg);
+}
+
+.docs-nav a[aria-current="page"] {
+  border-left-color: var(--fb-fg);
+  background: var(--fb-surface);
+  color: var(--fb-fg);
+}
+
+/* On this page */
+
+.docs-toc {
+  position: sticky;
+  top: var(--fb-header-height);
+  align-self: start;
+  max-height: calc(100vh - var(--fb-header-height));
+  overflow-y: auto;
+  padding: 28px 20px 40px;
+  border-left: 1px solid var(--fb-line);
+}
+
+.docs-toc ol {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-toc a {
+  display: block;
+  padding: 3px 0;
+  color: var(--fb-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.docs-toc a:hover {
+  color: var(--fb-fg);
+}
+
+.docs-toc__3 a {
+  padding-left: 12px;
+}
+
+/* Content */
+
+.docs-content {
+  min-width: 0;
+}
+
+.prose {
+  max-width: 760px;
+  padding: 40px clamp(20px, 4vw, 56px) 56px;
+}
+
+.prose > .fb-label:first-child {
+  margin-bottom: 14px;
+}
+
+.prose h1 {
+  margin-bottom: 18px;
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.prose h1 + p {
+  color: var(--fb-muted);
+  font-size: 17px;
+}
+
+.prose h2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 48px 0 14px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.prose h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--fb-line);
+}
+
+.prose h3 {
+  margin: 32px 0 10px;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+
+.prose :is(h2, h3) {
+  scroll-margin-top: calc(var(--fb-header-height) + 16px);
+}
+
+.doc-anchor {
+  order: 2;
+  color: var(--fb-faint);
+  font-family: var(--fb-font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.prose h3 .doc-anchor {
+  margin-left: 8px;
+}
+
+.prose :is(h2, h3):hover .doc-anchor,
+.doc-anchor:focus-visible {
+  opacity: 1;
+}
+
+.prose p,
+.prose li {
+  color: var(--fb-fg);
+}
+
+.prose :is(ul, ol) {
+  padding-left: 20px;
+}
+
+.prose li + li {
+  margin-top: 4px;
+}
+
+.prose li::marker {
+  color: var(--fb-faint);
+}
+
+.prose blockquote {
+  position: relative;
+  margin: 20px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--fb-line);
+  border-left: 2px solid var(--fb-fg);
+  background: var(--fb-surface);
+}
+
+.prose blockquote p {
+  margin: 0;
+  color: var(--fb-muted);
+}
+
+.prose hr {
+  height: 1px;
+  margin: 40px 0;
+  border: 0;
+  background: var(--fb-line);
+}
+
+/* Code */
+
+.doc-code {
+  position: relative;
+  margin: 18px 0;
+  border: 1px solid var(--fb-line);
+}
+
+.doc-code__lang {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--fb-line);
+  border-left: 1px solid var(--fb-line);
+  background: var(--fb-bg);
+  color: var(--fb-faint);
+  font-family: var(--fb-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.doc-code pre.highlights {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  /* The highlighter writes an inline background; the docs use their own surface. */
+  background: var(--fb-surface) !important;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+/* Tables */
+
+.doc-table {
+  margin: 18px 0;
+  overflow-x: auto;
+  border: 1px solid var(--fb-line);
+}
+
+.doc-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.doc-table :is(th, td) {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--fb-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.doc-table :is(th, td) + :is(th, td) {
+  border-left: 1px solid var(--fb-line);
+}
+
+.doc-table th {
+  background: var(--fb-surface);
+  color: var(--fb-muted);
+  font-family: var(--fb-font-mono);
+  font-size: 11px;
+  font-weight: 450;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Live demos */
+
+[data-demo] {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--fb-line);
+}
+
+.doc-demo-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doc-demo-gallery::after {
+  content: "";
+  flex: 999 1 0;
+}
+
+.doc-demo-gallery app-lightbox {
+  flex: var(--ratio) 1 calc(var(--ratio) * 120px);
+}
+
+.doc-demo-gallery [slot="trigger"] {
+  overflow: hidden;
+  border-radius: var(--fb-image-radius);
+}
+
+.doc-demo-gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: var(--ratio);
+}
+
+/* Previous / next */
+
+.docs-pager {
+  --fb-columns: 2;
+  margin: 0 clamp(20px, 4vw, 56px) 56px;
+  max-width: calc(760px - 2 * clamp(20px, 4vw, 56px));
+}
+
+.docs-pager a {
+  display: grid;
+  gap: 4px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.docs-pager a:hover {
+  background: var(--fb-surface);
+}
+
+.docs-pager__next {
+  text-align: right;
+}
+
+@media (max-width: 1100px) {
+  .docs {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .docs-toc {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .docs {
+    grid-template-columns: 1fr;
+  }
+  .docs-nav {
+    border-right: 0;
+    border-bottom: 1px solid var(--fb-line);
+  }
+  .docs-nav__menu {
+    position: static;
+    max-height: none;
+    padding: 0;
+  }
+  .docs-nav__menu > summary {
+    display: block;
+    padding: 12px var(--fb-gutter);
+    cursor: pointer;
+    list-style: none;
+  }
+  .docs-nav__menu[open] > summary {
+    border-bottom: 1px solid var(--fb-line);
+  }
+  .docs-nav__menu nav {
+    padding: 16px 0 20px;
+  }
+}

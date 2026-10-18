@@ -1,6 +1,6 @@
-import { mountChrome } from "../design/chrome";
+import { mountSite } from "../site";
 import "./pages.css";
 import { mountHeadless } from "../demos/headless";
 
-mountChrome("headless");
+mountSite("headless");
 mountHeadless(document.querySelector("#headless-grid")!);

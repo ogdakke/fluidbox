@@ -2,26 +2,16 @@
 import "@ogdakke/fluidbox/styles.css";
 import "./index.css";
 
-export type PageKey =
-  | "overview"
-  | "elements"
-  | "headless"
-  | "react"
-  | "solid"
-  | "vue"
-  | "angular"
-  | "fixtures";
+export type NavLink = { readonly href: string; readonly label: string; readonly key?: string };
 
-export const pages: { key: PageKey; href: string; label: string }[] = [
-  { key: "overview", href: "/", label: "Overview" },
-  { key: "elements", href: "/elements/", label: "Elements" },
-  { key: "headless", href: "/headless/", label: "Headless" },
-  { key: "react", href: "/react/", label: "React" },
-  { key: "solid", href: "/solid/", label: "Solid" },
-  { key: "vue", href: "/vue/", label: "Vue" },
-  { key: "angular", href: "/angular/", label: "Angular" },
-  { key: "fixtures", href: "/fixtures/", label: "Fixtures" },
-];
+export type ChromeOptions = {
+  readonly links: readonly NavLink[];
+  /** Key of the current page's nav link. */
+  readonly active?: string;
+  readonly footer?: readonly NavLink[];
+  /** Fixture pages pass a one-line description; their header scrolls away. */
+  readonly fixture?: string;
+};
 
 const storageKey = "fluidbox-theme";
 
@@ -49,8 +39,11 @@ function currentTheme(): "light" | "dark" {
 
 const sun = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
 
-/** Insert the shared header and footer. Fixtures pass a note naming their scenario. */
-export function mountChrome(active: PageKey, options: { fixture?: string } = {}): void {
+const link = (item: NavLink, active?: string) =>
+  `<a href="${item.href}"${item.key !== undefined && item.key === active ? ' aria-current="page"' : ""}>${item.label}</a>`;
+
+/** Insert the shared header and footer. */
+export function mountChrome(options: ChromeOptions): void {
   const saved = readTheme();
   if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
 
@@ -61,12 +54,7 @@ export function mountChrome(active: PageKey, options: { fixture?: string } = {})
     <div class="fb-shell fb-header__inner">
       <a class="fb-brand" href="/"><span class="fb-brand__mark" aria-hidden="true"></span><span>Fluidbox</span></a>
       <nav class="fb-nav" aria-label="Pages">
-        ${pages
-          .map(
-            (page) =>
-              `<a href="${page.href}"${page.key === active ? ' aria-current="page"' : ""}>${page.label}</a>`,
-          )
-          .join("")}
+        ${options.links.map((item) => link(item, options.active)).join("")}
       </nav>
       <button type="button" class="fb-theme-toggle" aria-label="Toggle color theme">${sun}</button>
     </div>`;
@@ -90,9 +78,7 @@ export function mountChrome(active: PageKey, options: { fixture?: string } = {})
   footer.innerHTML = `
     <div class="fb-shell fb-pad fb-footer__inner">
       <span>@ogdakke/fluidbox</span>
-      <nav aria-label="Footer">
-        <a href="/fixtures/">Fixtures</a><span>/</span><a href="/elements/">Elements</a><span>/</span><a href="/react/">React</a>
-      </nav>
+      <nav aria-label="Footer">${(options.footer ?? []).map((item) => link(item)).join("<span>/</span>")}</nav>
     </div>`;
   document.body.append(footer);
 }

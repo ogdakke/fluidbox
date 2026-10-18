@@ -1,11 +1,11 @@
-import { mountChrome } from "../src/design/chrome";
+import { mountSite } from "../src/site";
 import { createApp, h, shallowRef } from "vue";
 import { FluidboxGallery } from "@ogdakke/fluidbox/vue";
 import type { AppGallery } from "@ogdakke/fluidbox";
 import { alternateSource, source } from "./source";
 import "./frameworks.css";
 
-mountChrome("fixtures", { fixture: "Vue binding · indexed gallery with source replacement" });
+mountSite("fixtures", { fixture: "Vue binding · indexed gallery with source replacement" });
 
 createApp({
   setup() {

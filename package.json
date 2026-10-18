@@ -27,7 +27,10 @@
     "inspect:video": "bun run scripts/inspect-video.ts",
     "inspect:failures": "bun run scripts/inspect-failures.ts",
     "dev:share": "portless fluidbox --lan --tailscale bun run dev",
-    "preview:share": "bun run build:examples && portless fluidbox-prod --lan --tailscale bun run --cwd apps/examples preview"
+    "preview:share": "bun run build:examples && portless fluidbox-prod --lan --tailscale bun run --cwd apps/examples preview",
+    "docs": "bun run build && bun run --cwd apps/docs dev",
+    "docs:share": "portless docs.fluidbox --lan --tailscale bun run docs",
+    "build:docs": "bun run build && bun run --cwd apps/docs build"
   },
   "devDependencies": {
     "@angular/common": "^22",

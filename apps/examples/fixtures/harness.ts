@@ -1,4 +1,4 @@
-import { mountChrome } from "../src/design/chrome";
+import { mountSite } from "../src/site";
 import type {
   AppGallery,
   LightboxItem,
@@ -8,7 +8,7 @@ import type {
 import "@ogdakke/fluidbox/elements";
 import "./site.css";
 
-mountChrome("fixtures", {
+mountSite("fixtures", {
   fixture:
     "Harness · query flags: count, virtual, shadow, no-filmstrip, iframe, iframes, pictures, hide-close-button",
 });

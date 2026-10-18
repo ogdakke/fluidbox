@@ -2,7 +2,7 @@
 // Output is deterministic, so regenerating only changes files when this script changes.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { scenes, type Scene } from "../src/art-scenes";
+import { scenes, type Scene } from "@ogdakke/fluidbox-design/art-scenes";
 
 function random(seed: number) {
   let state = seed >>> 0;

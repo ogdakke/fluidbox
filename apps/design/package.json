@@ -1,0 +1,14 @@
+{
+  "name": "@ogdakke/fluidbox-design",
+  "private": true,
+  "description": "Shared tokens, base components, and site chrome for the Fluidbox example and docs sites.",
+  "type": "module",
+  "exports": {
+    "./index.css": "./index.css",
+    "./chrome": "./chrome.ts",
+    "./art-scenes": "./art-scenes.ts"
+  },
+  "peerDependencies": {
+    "@ogdakke/fluidbox": "workspace:*"
+  }
+}

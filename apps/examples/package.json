@@ -14,6 +14,7 @@
     "@angular/core": "^22",
     "@angular/platform-browser": "^22",
     "@ogdakke/fluidbox": "workspace:*",
+    "@ogdakke/fluidbox-design": "workspace:*",
     "@tanstack/react-virtual": "^3.14.13",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
