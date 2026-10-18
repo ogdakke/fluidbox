@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studio map</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font:
+          16px system-ui,
+          sans-serif;
+      }
+      body {
+        overflow: hidden;
+        background: #e5ebde;
+      }
+      .map {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: url("/map-preview.svg") center / cover;
+      }
+      .panel {
+        position: absolute;
+        left: 1rem;
+        bottom: 1rem;
+        padding: 0.8rem 1rem;
+        border-radius: 0.8rem;
+        background: #fffdf9;
+        box-shadow: 0 8px 24px #25375433;
+      }
+      .panel strong,
+      .panel span {
+        display: block;
+      }
+      .panel span {
+        color: #596270;
+        font-size: 0.8rem;
+      }
+      button {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.6rem 0.8rem;
+        border: 0;
+        border-radius: 0.6rem;
+        background: #253754;
+        color: white;
+        font: inherit;
+        cursor: pointer;
+      }
+      .map[data-shifted] {
+        background-position: 60% center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="map" id="map">
+      <button type="button" id="pan">Pan map</button>
+      <div class="panel">
+        <strong>The studio</strong><span id="status">Click Pan map to move the view</span>
+      </div>
+    </div>
+    <script>
+      document.querySelector("#pan").addEventListener("click", () => {
+        const map = document.querySelector("#map");
+        const shifted = map.toggleAttribute("data-shifted");
+        document.querySelector("#status").textContent = shifted
+          ? "Map panned east"
+          : "Map returned to center";
+      });
+    </script>
+  </body>
+</html>

@@ -33,37 +33,25 @@
         "vue": "^3.5.0",
       },
     },
-    "examples/frameworks": {
-      "name": "@ogdakke/fluidbox-example-frameworks",
+    "apps/examples": {
+      "name": "@ogdakke/fluidbox-examples",
       "dependencies": {
         "@angular/common": "^22",
         "@angular/compiler": "^22",
         "@angular/core": "^22",
         "@angular/platform-browser": "^22",
         "@ogdakke/fluidbox": "workspace:*",
-        "react": "^19",
-        "react-dom": "^19",
+        "@tanstack/react-virtual": "^3.14.13",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
         "rxjs": "^7",
         "solid-js": "^1.9.0",
         "vue": "^3.5.0",
       },
       "devDependencies": {
-        "@vitejs/plugin-react": "^6",
-        "vite": "^8",
-        "vite-plugin-solid": "^2",
-      },
-    },
-    "examples/vanilla": {
-      "name": "@ogdakke/fluidbox-example-vanilla",
-      "dependencies": {
-        "@ogdakke/fluidbox": "workspace:*",
-        "@tanstack/react-virtual": "^3.14.13",
-        "react": "^19.3.0",
-        "react-dom": "^19.3.0",
-      },
-      "devDependencies": {
         "@vitejs/plugin-react": "^6.1.1",
         "vite": "^8.1.3",
+        "vite-plugin-solid": "^2",
       },
     },
     "packages/lightbox": {
@@ -154,9 +142,7 @@
 
     "@ogdakke/fluidbox": ["@ogdakke/fluidbox@workspace:packages/lightbox"],
 
-    "@ogdakke/fluidbox-example-frameworks": ["@ogdakke/fluidbox-example-frameworks@workspace:examples/frameworks"],
-
-    "@ogdakke/fluidbox-example-vanilla": ["@ogdakke/fluidbox-example-vanilla@workspace:examples/vanilla"],
+    "@ogdakke/fluidbox-examples": ["@ogdakke/fluidbox-examples@workspace:apps/examples"],
 
     "@oxc-project/types": ["@oxc-project/types@0.151.0", "", {}, "sha512-J1yXrIlNDZVzE3ada310xeAw7nH8yCAyLPuUIsjKatFPmfn5bS1oW+cM+QsGOtVWd5nhSpbwZWx/rue+r5Z+PA=="],
 

@@ -65,11 +65,11 @@ async function sampleIndexedOpening(page: Page, gallerySelector: string, index: 
 
 test("indexed image origin opens from its mounted thumbnail", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/");
+  await page.goto("/playground.html");
   const trigger = page.locator("#virtual-gallery .virtual-card").first();
   await trigger.scrollIntoViewIfNeeded();
   await trigger.locator("img").evaluate((image: HTMLImageElement) => image.decode());
-  const origin = await trigger.boundingBox();
+  const origin = await trigger.locator("img").boundingBox();
   expect(origin).not.toBeNull();
   const motion = await sampleIndexedOpening(page, "#virtual-gallery", 0);
   await testInfo.attach("indexed-origin-opening-geometry", {
@@ -97,11 +97,54 @@ test("indexed image origin opens from its mounted thumbnail", async ({ page }, t
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
 });
 
+test("indexed image closes to its thumbnail without including the caption", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/playground.html");
+  const card = page.locator("#virtual-gallery .virtual-card").nth(6);
+  await card.scrollIntoViewIfNeeded();
+  await card.locator("img").evaluate((image: HTMLImageElement) => image.decode());
+  await card.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const landing = await page.evaluate(async () => {
+    const card = document.querySelectorAll<HTMLElement>("#virtual-gallery .virtual-card")[6]!;
+    const thumbnail = card.querySelector("img")!.getBoundingClientRect();
+    const button = card.getBoundingClientRect();
+    document.querySelector<HTMLElement>("[data-lightbox-close]")!.click();
+    let frame: HTMLElement | null = null;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      frame = document.querySelector<HTMLElement>("[data-lightbox-flight] [data-lightbox-frame]");
+      if (frame?.getAnimations().length) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    if (!frame?.getAnimations().length) throw new Error("Close flight did not start");
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      const duration = Number(animation.effect?.getTiming().duration) || 0;
+      animation.currentTime = Math.max(0, duration - 1);
+    }
+    return {
+      thumbnail: { width: thumbnail.width, height: thumbnail.height },
+      button: { width: button.width, height: button.height },
+      flight: {
+        width: frame.getBoundingClientRect().width,
+        height: frame.getBoundingClientRect().height,
+      },
+    };
+  });
+  expect(landing.button.height - landing.thumbnail.height).toBeGreaterThan(20);
+  expect(landing.flight.width).toBeCloseTo(landing.thumbnail.width, 0);
+  expect(landing.flight.height).toBeCloseTo(landing.thumbnail.height, 0);
+});
+
 test("indexed close keeps the live image painted until its flight clone decodes", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/");
+  await page.goto("/playground.html");
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
     "data-lightbox-state",
@@ -566,8 +609,9 @@ test("direct React transition matches its reference frames", async ({ page }, te
     "open",
   );
   await page.keyboard.press("Escape");
-  await page.evaluate(async () => {
-    await Promise.resolve();
+  await expect(page.locator("[data-lightbox-flight]")).toHaveCSS("visibility", "visible");
+  await expect(origin.locator("img")).toHaveCSS("visibility", "hidden");
+  await page.evaluate(() => {
     for (const animation of document.getAnimations()) {
       animation.pause();
       const duration = Number(animation.effect?.getComputedTiming().duration);
@@ -773,7 +817,9 @@ test("direct close flight retargets after viewport resize", async ({ page }, tes
   });
   await expect(page.locator("[data-lightbox-flight]")).toHaveCount(1);
   await expect(
-    page.locator('[data-lightbox-slide][aria-hidden="false"] [data-lightbox-flight-source-hidden]'),
+    page.locator(
+      '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-media][data-lightbox-flight-source-hidden]',
+    ),
   ).toHaveCount(1);
 
   await page.setViewportSize({ width: 740, height: 680 });
@@ -835,6 +881,125 @@ test("square image is prepainted before its close flight hides the source", asyn
   expect(handoff).toEqual({ flightMounted: true, cloned: true, sourceHidden: false });
   await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
   await expect(origin.locator("img")).not.toHaveAttribute("data-lightbox-thumbnail-hidden", "");
+});
+
+test("close-flight handoff hides every painted layer of the source frame", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  await page.evaluate(() => {
+    const decode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "decode")!.value as (
+      this: HTMLImageElement,
+    ) => Promise<void>;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    Object.assign(window, { __releaseFlightHandoff: release });
+    HTMLImageElement.prototype.decode = function () {
+      if (!this.isConnected || this.closest("[data-lightbox-flight]"))
+        return gate.then(() => decode.call(this));
+      return decode.call(this);
+    };
+  });
+  const sourceFrame = page.locator(
+    '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+  );
+  if (testInfo.project.use.isMobile) {
+    const bounds = await sourceFrame.boundingBox();
+    const x = bounds!.x + bounds!.width / 2;
+    const y = bounds!.y + bounds!.height / 2;
+    await sourceFrame.dispatchEvent("pointerdown", {
+      pointerId: 8,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: x,
+      clientY: y,
+    });
+    await sourceFrame.dispatchEvent("pointermove", {
+      pointerId: 8,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: x,
+      clientY: y + 140,
+    });
+    await sourceFrame.dispatchEvent("pointerup", {
+      pointerId: 8,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: x,
+      clientY: y + 140,
+    });
+  } else {
+    await sourceFrame.dispatchEvent("wheel", { deltaY: -24, bubbles: true, cancelable: true });
+    await sourceFrame.dispatchEvent("wheel", { deltaY: -400, bubbles: true, cancelable: true });
+  }
+  const flight = page.locator("[data-lightbox-flight]");
+  await expect(flight).toHaveCount(1);
+  await expect(flight).toHaveCSS("visibility", "hidden");
+  await expect(sourceFrame).not.toHaveAttribute("data-lightbox-flight-source-hidden", "");
+  await expect(sourceFrame.locator("[data-lightbox-slide-placeholder]")).toHaveCount(1);
+
+  await page.evaluate(() => {
+    (window as unknown as { __releaseFlightHandoff(): void }).__releaseFlightHandoff();
+  });
+  await expect(sourceFrame).toHaveAttribute("data-lightbox-flight-source-hidden", "");
+  await expect(sourceFrame).toHaveCSS("opacity", "0");
+  await expect(flight).toHaveCSS("visibility", "visible");
+  await expect(sourceFrame.locator("[data-lightbox-slide-preview]")).toHaveAttribute(
+    "data-lightbox-image-ready",
+    "",
+  );
+});
+
+test("opening crop transforms the fallback and media together", async ({ page }) => {
+  await page.goto("/headless.html");
+  const transforms = await page.evaluate(() => {
+    const dispose = window.headlessViewer.prepare({ id: "one" });
+    const frame = document.querySelector<HTMLElement>(
+      '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+    )!;
+    const media = frame.querySelector<HTMLElement>("[data-lightbox-media]")!;
+    const fallback = frame.querySelector<HTMLElement>("[data-lightbox-slide-placeholder]")!;
+    const result = {
+      media: getComputedStyle(media).transform,
+      fallback: getComputedStyle(fallback).transform,
+    };
+    dispose();
+    return result;
+  });
+  expect(transforms.media).not.toBe("none");
+  expect(transforms.fallback).toBe(transforms.media);
+
+  const midFlight = await page.evaluate(async () => {
+    void window.headlessViewer.open({ id: "one" });
+    for (let frame = 0; frame < 8; frame++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (
+        document.querySelector("[data-lightbox-dialog][data-opening]") &&
+        document.getAnimations().length
+      )
+        break;
+    }
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      animation.currentTime = 150;
+    }
+    const frame = document.querySelector<HTMLElement>(
+      '[data-lightbox-slide][aria-hidden="false"] [data-lightbox-frame]',
+    )!;
+    return {
+      media: getComputedStyle(frame.querySelector("[data-lightbox-media]")!).transform,
+      fallback: getComputedStyle(frame.querySelector("[data-lightbox-slide-placeholder]")!)
+        .transform,
+    };
+  });
+  expect(midFlight.fallback).toBe(midFlight.media);
 });
 
 test("nested visual target takes precedence over its preview box", async ({ page }) => {

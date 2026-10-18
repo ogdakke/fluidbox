@@ -37,7 +37,7 @@ const bind = useFluidboxGallery(() => source);
 </app-gallery>;
 ```
 
-Solid TypeScript apps need an `app-gallery` entry in `JSX.IntrinsicElements`; [the Solid example](../examples/frameworks/solid.tsx) shows the declaration. `useFluidboxElements()` registers standalone markup.
+Solid TypeScript apps need an `app-gallery` entry in `JSX.IntrinsicElements`; [the Solid example](../apps/examples/src/demos/solid.tsx) shows the declaration. `useFluidboxElements()` registers standalone markup.
 
 ## Vue
 
@@ -87,4 +87,4 @@ The Angular entry exports a function rather than a decorated directive. Its tsdo
 
 ## Verify the examples
 
-Run `bun run build:frameworks`, then `bun run --cwd examples/frameworks dev`. Open `/react.html`, `/solid.html`, `/vue.html`, and `/angular.html`. Playwright opens each gallery, navigates to the second item, closes it, changes the indexed source, and opens it again in the configured browser projects.
+Run `bun run build`, then `bun run --cwd apps/examples dev`. Open `/react.html`, `/solid.html`, `/vue.html`, and `/angular.html`. Playwright opens each gallery, navigates to the second item, closes it, changes the indexed source, and opens it again in the configured browser projects.

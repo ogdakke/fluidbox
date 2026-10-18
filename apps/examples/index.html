@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0c0c0e" />
+    <title>Fluidbox — examples</title>
+    <link rel="icon" href="/art/dune.svg" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <nav class="topbar" aria-label="Sections">
+      <a class="brand" href="#top">fluidbox</a>
+      <div class="topbar__links">
+        <a href="#elements">Elements</a>
+        <a href="#indexed">Indexed</a>
+        <a href="#headless">Headless</a>
+        <a href="#react">React</a>
+        <a href="#frameworks">Solid · Vue · Angular</a>
+        <a href="#fixtures">Fixtures</a>
+      </div>
+    </nav>
+
+    <main id="top">
+      <header class="hero">
+        <p class="kicker">@ogdakke/fluidbox</p>
+        <h1>A lightbox that feels like it’s made of something.</h1>
+        <p class="lede">
+          Images fly out of their thumbnails and land back where they came from. Pinch, wheel, and
+          double-tap zoom, swipe between slides, drag down to dismiss. Use the custom elements, the
+          headless runtime, or a framework binding — every demo on this page uses the same runtime.
+        </p>
+        <ul class="hints" aria-label="Controls">
+          <li><kbd>←</kbd><kbd>→</kbd> or swipe to move</li>
+          <li><kbd>Pinch</kbd> <kbd>Wheel</kbd> or double-tap to zoom</li>
+          <li><kbd>Esc</kbd> or drag down to close</li>
+        </ul>
+      </header>
+
+      <section id="elements" class="section" aria-labelledby="elements-title">
+        <div class="section__head">
+          <p class="kicker"><span>01</span> Custom elements</p>
+          <h2 id="elements-title">Plain markup, any aspect ratio</h2>
+          <p>
+            <code>&lt;app-gallery&gt;</code> collects every <code>&lt;app-lightbox&gt;</code> inside
+            it. Portrait, square, and panorama images keep their shape in flight. The filmstrip is
+            one more element.
+          </p>
+        </div>
+        <app-gallery id="mosaic" class="mosaic" aria-label="Landscape gallery">
+          <app-filmstrip></app-filmstrip>
+        </app-gallery>
+        <details class="code">
+          <summary>Markup</summary>
+          <pre><code>&lt;script type="module"&gt;
+  import "@ogdakke/fluidbox/elements";
+  import "@ogdakke/fluidbox/styles.css";
+&lt;/script&gt;
+
+&lt;app-gallery aria-label="Landscapes"&gt;
+  &lt;app-lightbox item-id="dune"&gt;
+    &lt;button slot="trigger" type="button"&gt;
+      &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
+    &lt;/button&gt;
+    &lt;template slot="content"&gt;
+      &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
+    &lt;/template&gt;
+    &lt;span slot="caption"&gt;Dune at golden hour&lt;/span&gt;
+  &lt;/app-lightbox&gt;
+  &lt;!-- …more items --&gt;
+  &lt;app-filmstrip&gt;&lt;/app-filmstrip&gt;
+&lt;/app-gallery&gt;</code></pre>
+        </details>
+      </section>
+
+      <section id="indexed" class="section" aria-labelledby="indexed-title">
+        <div class="section__head">
+          <p class="kicker"><span>02</span> Indexed source</p>
+          <h2 id="indexed-title">100,000 items, 12 thumbnails in the DOM</h2>
+          <p>
+            A <code>LightboxSource</code> describes the collection by index. The page renders only
+            the cards it shows; an origin adapter tells the viewer where each one is. Jump anywhere
+            and keep swiping.
+          </p>
+        </div>
+        <div class="stage">
+          <form id="jump-form" class="jump">
+            <label for="jump-index">Open item</label>
+            <input
+              id="jump-index"
+              name="index"
+              type="number"
+              min="1"
+              max="100000"
+              value="50000"
+              inputmode="numeric"
+            />
+            <button type="submit" class="button">Open</button>
+            <output id="jump-window" class="jump__window"></output>
+          </form>
+          <app-gallery id="virtual-gallery" class="virtual-grid" aria-label="Indexed gallery">
+            <app-filmstrip></app-filmstrip>
+          </app-gallery>
+        </div>
+        <details class="code">
+          <summary>Source and origins</summary>
+          <pre><code>gallery.source = {
+  count: 100_000,
+  getItem: (index) =&gt; ({ id: String(index), media: { type: "image", src, width, height } }),
+  getIndex: (id) =&gt; Number(id),
+};
+gallery.origins = {
+  getOrigin: (id) =&gt; {
+    const trigger = mountedCards.get(id);
+    return trigger ? { trigger, visual: trigger.querySelector("img") } : null;
+  },
+};
+gallery.open({ index: 49_999 });</code></pre>
+        </details>
+      </section>
+
+      <section id="headless" class="section" aria-labelledby="headless-title">
+        <div class="section__head">
+          <p class="kicker"><span>03</span> Headless runtime</p>
+          <h2 id="headless-title">Bring your own controls</h2>
+          <p>
+            <code>createLightbox()</code> needs no custom elements. You own the thumbnails, and a
+            portal renderer mounts whatever chrome you want — here a caption bar with a counter.
+          </p>
+        </div>
+        <div id="headless-grid" class="headless-grid"></div>
+        <details class="code">
+          <summary>Controller</summary>
+          <pre><code>import { arraySource, createLightbox } from "@ogdakke/fluidbox";
+
+const viewer = createLightbox({
+  source: arraySource(photos),
+  origins: { getOrigin: (id) =&gt; ({ trigger, visual: trigger.querySelector("img") }) },
+  portal: {
+    mount({ target, controller, signal }) {
+      const bar = renderCaptionBar(controller);
+      const dispose = controller.subscribe((state) =&gt; bar.update(state));
+      target.append(bar.element);
+      return () =&gt; { dispose(); bar.element.remove(); };
+    },
+  },
+});
+thumbnail.addEventListener("click", () =&gt; viewer.open({ id }));</code></pre>
+        </details>
+      </section>
+
+      <section id="react" class="section" aria-labelledby="react-title">
+        <div class="section__head">
+          <p class="kicker"><span>04</span> React</p>
+          <h2 id="react-title">Any element can be the origin</h2>
+          <p>
+            <code>@ogdakke/fluidbox/react</code> composes the runtime from parts. The image can sit
+            inside a richer card, a static preview can open a live iframe, and one trigger can stand
+            in for a whole album.
+          </p>
+        </div>
+        <div id="react-root" class="react-grid" aria-busy="true"></div>
+        <details class="code">
+          <summary>Composition</summary>
+          <pre><code>import { Lightbox } from "@ogdakke/fluidbox/react";
+
+&lt;Lightbox.Root items={photos}&gt;
+  &lt;Lightbox.Trigger item={photos[0]} items={photos} asChild&gt;
+    {({ item }) =&gt; (
+      &lt;button type="button"&gt;
+        &lt;img src={item?.thumbnail?.src} alt="" data-lightbox-origin /&gt;
+        &lt;Lightbox.ThumbnailOverlay&gt;+{photos.length - 1}&lt;/Lightbox.ThumbnailOverlay&gt;
+      &lt;/button&gt;
+    )}
+  &lt;/Lightbox.Trigger&gt;
+  &lt;Lightbox.Portal&gt;
+    &lt;Lightbox.Previous /&gt; &lt;Lightbox.Next /&gt; &lt;Lightbox.Close /&gt;
+    &lt;Lightbox.Filmstrip /&gt;
+  &lt;/Lightbox.Portal&gt;
+&lt;/Lightbox.Root&gt;</code></pre>
+        </details>
+      </section>
+
+      <section id="frameworks" class="section" aria-labelledby="frameworks-title">
+        <div class="section__head">
+          <p class="kicker"><span>05</span> Solid · Vue · Angular</p>
+          <h2 id="frameworks-title">Same gallery, three bindings</h2>
+          <p>
+            Each binding writes a source to an <code>&lt;app-gallery&gt;</code> and keeps it in
+            sync. Switch the source and the next open uses the new collection.
+          </p>
+        </div>
+        <div class="framework-grid">
+          <div id="solid-root" class="framework-slot" aria-busy="true"></div>
+          <div id="vue-root" class="framework-slot" aria-busy="true"></div>
+          <div id="angular-root" class="framework-slot" aria-busy="true"></div>
+        </div>
+      </section>
+
+      <section id="fixtures" class="section" aria-labelledby="fixtures-title">
+        <div class="section__head">
+          <p class="kicker"><span>06</span> Test fixtures</p>
+          <h2 id="fixtures-title">Pages the browser tests drive</h2>
+          <p>Bare pages with one scenario each. Useful for reproducing a bug in isolation.</p>
+        </div>
+        <ul class="fixtures">
+          <li>
+            <a href="/photo-library.html">Photo library</a>
+            <span>10,000 photos in a TanStack Virtual grid with date headers</span>
+          </li>
+          <li>
+            <a href="/harness.html?count=30">Harness</a>
+            <span
+              >Query flags: <code>count</code>, <code>virtual</code>, <code>shadow</code>,
+              <code>no-filmstrip</code>, <code>iframe</code>, <code>pictures</code></span
+            >
+          </li>
+          <li>
+            <a href="/harness.html?virtual&amp;count=100000">Harness, virtual</a>
+            <span>100,000 indexed items without host styling</span>
+          </li>
+          <li>
+            <a href="/collapsed.html">Collapsed gallery</a>
+            <span>Three visible tiles, a “+8” teaser standing in for the rest</span>
+          </li>
+          <li>
+            <a href="/headless.html">Headless</a>
+            <span>Custom renderers, a protected viewer, and a secondary viewer</span>
+          </li>
+          <li>
+            <a href="/playground.html">Playground</a>
+            <span>The original two-image DOM gallery and indexed source</span>
+          </li>
+          <li>
+            <a href="/react.html">React</a> · <a href="/solid.html">Solid</a> ·
+            <a href="/vue.html">Vue</a> · <a href="/angular.html">Angular</a>
+            <span>Single-framework binding pages</span>
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>fluidbox</span>
+      <span>Artwork is generated SVG — zoom in as far as you like.</span>
+    </footer>
+  </body>
+</html>

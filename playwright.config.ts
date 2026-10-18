@@ -26,18 +26,10 @@ export default defineConfig({
     { name: "iphone-15-pro", use: { ...devices["iPhone 15 Pro"] } },
     { name: "ipad-pro-11", use: { ...devices["iPad Pro 11"] } },
   ],
-  webServer: [
-    {
-      command: "bun run --cwd examples/vanilla dev --port 4173 --strictPort",
-      url: `${baseURL}/harness.html`,
-      reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
-    },
-    {
-      command: "bun run --cwd examples/frameworks dev --port 4174 --strictPort",
-      url: "http://127.0.0.1:4174/react.html",
-      reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
-    },
-  ],
+  webServer: {
+    command: "bun run --cwd apps/examples dev --port 4173 --strictPort",
+    url: `${baseURL}/harness.html`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 30_000,
+  },
 });

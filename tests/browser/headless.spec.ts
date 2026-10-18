@@ -56,6 +56,33 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   await expect(page.locator('[data-photo-id="two"]')).toHaveAttribute("aria-expanded", "false");
 });
 
+test("clicking the empty gallery slide closes the lightbox", async ({ page }, testInfo) => {
+  await page.goto("/headless.html");
+  await page.locator('[data-photo-id="one"]').click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+
+  const slide = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+  const frame = slide.locator("[data-lightbox-frame]");
+  const slideBounds = await slide.boundingBox();
+  const frameBounds = await frame.boundingBox();
+  expect(slideBounds).not.toBeNull();
+  expect(frameBounds).not.toBeNull();
+  const x = slideBounds!.x + 12;
+  const y = slideBounds!.y + 12;
+  expect(
+    x < frameBounds!.x ||
+      x > frameBounds!.x + frameBounds!.width ||
+      y < frameBounds!.y ||
+      y > frameBounds!.y + frameBounds!.height,
+  ).toBe(true);
+  if (testInfo.project.use.isMobile) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
 test("plain runtime contains focus and applies the established gallery keyboard policy", async ({
   page,
 }) => {
@@ -388,6 +415,63 @@ test("plain runtime keeps the preview painted until the full image can replace i
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
   await expect(dialog).toHaveAttribute("data-lightbox-state", "open");
   await expect(media).toHaveAttribute("src", "/photo-square.svg");
+});
+
+test("adjacent slides paint their placeholder while responsive images are pending", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/pending-slide-*.svg", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await route.abort();
+  });
+  await page.goto("/headless.html");
+  const placeholder =
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="teal"/></svg>',
+    );
+  await page.evaluate(async (src) => {
+    await window.headlessViewer.setSource({
+      count: 2,
+      getItem(index) {
+        return {
+          id: `pending-${index}`,
+          placeholder: { src },
+          preview: { src: `/pending-slide-preview-${index}.svg` },
+          media: {
+            type: "image",
+            src: `/pending-slide-full-${index}.svg`,
+            alt: `Pending image ${index}`,
+            width: 800,
+            height: 800,
+          },
+        };
+      },
+      getIndex(id) {
+        return id === "pending-0" ? 0 : id === "pending-1" ? 1 : null;
+      },
+    });
+    await window.headlessViewer.open({ index: 0 });
+  }, placeholder);
+  const neighbor = page.locator("[data-lightbox-slide] [data-lightbox-media]").nth(1);
+  await expect(neighbor).toHaveAttribute("loading", "eager");
+  if (testInfo.project.name === "iphone-15-pro") {
+    await page.evaluate(() => window.headlessViewer.goTo({ index: 1 }));
+  } else {
+    const strip = page.locator("[data-lightbox-slides]");
+    const bounds = (await strip.boundingBox())!;
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.wheel(bounds.width, 0);
+  }
+  const active = page.locator('[data-lightbox-slide][aria-hidden="false"]');
+  await expect(active.locator("[data-lightbox-media]")).toHaveAttribute("alt", "Pending image 1");
+  const fallback = active.locator("[data-lightbox-slide-placeholder]");
+  await expect(fallback).toHaveAttribute("src", placeholder);
+  await expect
+    .poll(() => fallback.evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBe(8);
+  await expect(active.locator("[data-lightbox-media]")).toHaveCSS("visibility", "hidden");
 });
 
 test("plain runtime retains the last decoded origin when its next source is pending", async ({
@@ -814,6 +898,7 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     window.headlessViewer.registerThumbnailOverlay("one", {
       behavior: "travel",
       element: host,
+      frameLayer: host,
       renderer: {
         mount({ target, item, signal }) {
           const badge = document.createElement("strong");
@@ -849,7 +934,13 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
       travelPhase: travel.dataset.lightboxPhase,
       travelProgress: Number(getComputedStyle(travel).getPropertyValue("--lightbox-progress")),
       travelTransform: getComputedStyle(travel).transform,
+      frameRect: document
+        .querySelector<HTMLElement>("[data-lightbox-frame]")!
+        .getBoundingClientRect()
+        .toJSON(),
+      travelRect: travel.getBoundingClientRect().toJSON(),
       text: travel.textContent,
+      layerInFrame: host.parentElement?.hasAttribute("data-lightbox-frame"),
       controlsDelay: getComputedStyle(travel).getPropertyValue("--lightbox-controls-reveal-delay"),
       hasControlsReveal: document
         .getAnimations()
@@ -865,7 +956,12 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
   expect(opening.hostProgress).toBeLessThan(1);
   expect(opening.travelProgress).toBeCloseTo(opening.hostProgress, 2);
   expect(opening.travelTransform).not.toBe("none");
+  expect(opening.travelRect.x).toBeCloseTo(opening.frameRect.x, 0);
+  expect(opening.travelRect.y).toBeCloseTo(opening.frameRect.y, 0);
+  expect(opening.travelRect.width).toBeCloseTo(opening.frameRect.width, 0);
+  expect(opening.travelRect.height).toBeCloseTo(opening.frameRect.height, 0);
   expect(opening.text).toBe("Traveling one");
+  expect(opening.layerInFrame).toBe(true);
   expect(opening.controlsDelay).toMatch(/ms$/);
   expect(opening.hasControlsReveal).toBe(true);
 
@@ -905,6 +1001,29 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
   );
 
   await page.evaluate(() => void window.headlessViewer.close());
+  await page.locator("[data-lightbox-flight]").waitFor();
+  const closing = await page.evaluate(async () => {
+    for (const animation of document.getAnimations()) {
+      animation.pause();
+      animation.currentTime = 120;
+    }
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const frame = document.querySelector<HTMLElement>(
+      "[data-lightbox-flight] [data-lightbox-frame]",
+    )!;
+    const travel = document.querySelector<HTMLElement>("[data-lightbox-transition-content]")!;
+    return {
+      frameRect: frame.getBoundingClientRect().toJSON(),
+      travelRect: travel.getBoundingClientRect().toJSON(),
+      layerInFlight: frame.contains(document.querySelector("[data-test-thumbnail-overlay]")),
+    };
+  });
+  expect(closing.layerInFlight).toBe(true);
+  expect(closing.travelRect.x).toBeCloseTo(closing.frameRect.x, 0);
+  expect(closing.travelRect.y).toBeCloseTo(closing.frameRect.y, 0);
+  expect(closing.travelRect.width).toBeCloseTo(closing.frameRect.width, 0);
+  expect(closing.travelRect.height).toBeCloseTo(closing.frameRect.height, 0);
+  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
   await expect(page.locator("[data-lightbox-overlay]")).toHaveCount(0);
   await expect(page.locator("[data-lightbox-transition-content]")).toHaveCount(0);
   const host = page.locator("[data-test-thumbnail-overlay]");
@@ -912,6 +1031,87 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
   await expect(host).toHaveCSS("--lightbox-progress", "1");
   await expect(host).toHaveAttribute("data-renderer-aborted", "");
   await expect(host).toHaveAttribute("data-renderer-disposed", "");
+  await expect(page.locator('[data-photo-id="one"] [data-test-thumbnail-overlay]')).toHaveCount(1);
+});
+
+test("an open overlay stays parked while another slide is selected", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    const host = document.createElement("span");
+    host.dataset.testParkedLayer = "";
+    document.querySelector('[data-photo-id="one"]')!.append(host);
+    const registration = {
+      behavior: "travel" as const,
+      element: host,
+      frameLayer: host,
+      renderer: {
+        mount({ target }: { target: HTMLElement }) {
+          host.dataset.mounts = String(Number(host.dataset.mounts ?? 0) + 1);
+          target.textContent = "Overlay";
+        },
+      },
+    };
+    window.headlessViewer.registerThumbnailOverlay("one", registration);
+    window.headlessViewer.registerThumbnailOverlay("two", registration);
+    await window.headlessViewer.open({ id: "one" });
+    await window.headlessViewer.goTo({ id: "two" });
+  });
+  const parked = await page.evaluate(() => {
+    const layer = document.querySelector<HTMLElement>("[data-test-parked-layer]")!;
+    return {
+      slide: [...document.querySelectorAll("[data-lightbox-slide]")].indexOf(
+        layer.closest("[data-lightbox-slide]")!,
+      ),
+      mounts: layer.dataset.mounts,
+      selected: window.headlessViewer.state.activeId,
+    };
+  });
+  expect(parked).toEqual({ slide: 0, mounts: "1", selected: "two" });
+  await page.evaluate(() => window.headlessViewer.close());
+  await expect(page.locator('[data-photo-id="one"] [data-test-parked-layer]')).toHaveCount(1);
+});
+
+test("native gallery scrolling is never corrected by the runtime", async ({ page }) => {
+  await page.goto("/headless.html");
+  await page.evaluate(async () => {
+    await window.headlessViewer.setSource({
+      count: 6,
+      getItem(index) {
+        return {
+          id: `slide-${index}`,
+          media: {
+            type: "image",
+            src: "/photo-square.svg",
+            alt: `Slide ${index}`,
+            width: 800,
+            height: 800,
+          },
+        };
+      },
+      getIndex(id) {
+        const index = Number(String(id).replace("slide-", ""));
+        return Number.isInteger(index) && index >= 0 && index < 6 ? index : null;
+      },
+    });
+    await window.headlessViewer.open({ index: 0 });
+  });
+  const offsets = await page
+    .locator("[data-lightbox-slides]")
+    .evaluate(async (strip: HTMLElement) => {
+      // Disable CSS snapping only to reveal any competing JS scroll correction.
+      strip.style.scrollSnapType = "none";
+      strip.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: 24 }));
+      strip.scrollTo({ left: strip.clientWidth * 3 + 24, behavior: "instant" });
+      await new Promise<void>((resolve) => setTimeout(resolve, 220));
+      strip.dispatchEvent(new Event("scrollend"));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const whileOwned = strip.scrollLeft - strip.clientWidth * 3;
+      strip.scrollTo({ left: strip.clientWidth * 3 + 35, behavior: "instant" });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      return [whileOwned, strip.scrollLeft - strip.clientWidth * 3];
+    });
+  expect(offsets[0]).toBeCloseTo(24, 0);
+  expect(offsets[1]).toBeCloseTo(35, 0);
 });
 
 test("plain runtime keeps a 100k source bounded without custom elements", async ({ page }) => {

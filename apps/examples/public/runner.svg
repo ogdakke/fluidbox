@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" role="img" aria-label="Coral running shoe illustration">
+  <rect width="1000" height="700" fill="#f7dfd7"/>
+  <circle cx="799" cy="113" r="158" fill="#f3c9bd"/>
+  <circle cx="133" cy="650" r="182" fill="#f3c9bd"/>
+  <ellipse cx="510" cy="563" rx="381" ry="42" fill="#c5887d" opacity=".25"/>
+  <path d="M131 423c48 5 89-12 133-67l99-126c27-36 65-43 94-22l125 86c38 26 78 49 123 58l143 28c49 10 78 40 78 83v40c0 40-32 69-72 69H205c-72 0-112-33-112-76 0-35 10-76 38-73Z" fill="#c85144"/>
+  <path d="M135 438c61 9 104-9 149-66l88-110c20-24 46-26 68-11l117 79c53 36 101 61 153 69l120 19c28 4 53 17 70 38H96c4-9 17-17 39-18Z" fill="#e9755e"/>
+  <path d="M96 466h804v40c0 38-32 66-72 66H205c-73 0-112-32-112-74 0-9 1-20 3-32Z" fill="#fffaf1"/>
+  <path d="M155 526h691" stroke="#d7cdc4" stroke-width="14" stroke-linecap="round"/>
+  <path d="m363 305 132 44m-163-6 137 46m-166-8 127 46" stroke="#fff4df" stroke-width="20" stroke-linecap="round"/>
+  <path d="M694 398c30-37 72-42 124-23" fill="none" stroke="#a93e38" stroke-width="23" stroke-linecap="round"/>
+  <path d="M126 424c-4-30 2-58 15-82 28 4 55 9 74 23" fill="#b8463d"/>
+</svg>

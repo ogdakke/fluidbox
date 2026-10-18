@@ -1,5 +1,89 @@
 import { expect, test } from "@playwright/test";
 
+test("custom gallery exposes controller readiness and cancels a disconnected waiter", async ({
+  page,
+}) => {
+  await page.goto("/harness.html");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  const result = await page.evaluate(async () => {
+    const existing = document.querySelector<import("@ogdakke/fluidbox").AppGallery>("app-gallery")!;
+    const controller = await existing.whenReady();
+    const pending = document.createElement("app-gallery") as import("@ogdakke/fluidbox").AppGallery;
+    document.body.append(pending);
+    const cancelled = pending.whenReady().catch((error: DOMException) => error.name);
+    pending.remove();
+    return { count: controller.state.count, cancelled: await cancelled };
+  });
+  expect(result).toEqual({ count: 3, cancelled: "AbortError" });
+});
+
+test("dynamic preview child changes do not rebuild the gallery during a swipe", async ({
+  page,
+}) => {
+  await page.goto("/harness.html");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  const calls = await page.evaluate(async () => {
+    const gallery = document.querySelector<import("@ogdakke/fluidbox").AppGallery>("app-gallery")!;
+    const controller = await gallery.whenReady();
+    const original = controller.setSource.bind(controller);
+    let refreshes = 0;
+    controller.setSource = (source) => {
+      refreshes++;
+      return original(source);
+    };
+    const preview = gallery.querySelector<import("@ogdakke/fluidbox").AppLightbox>("app-lightbox")!;
+    preview.dataset.lightboxDynamicPreview = "";
+    const layer = document.createElement("span");
+    preview.append(layer);
+    layer.remove();
+    preview.trigger.querySelector("img")!.alt = "Updated preview";
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    const dynamic = refreshes;
+    gallery.querySelectorAll("app-lightbox")[1]!.querySelector("img")!.alt = "Updated source";
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    return { dynamic, source: refreshes };
+  });
+  expect(calls.dynamic).toBe(0);
+  expect(calls.source).toBeGreaterThan(0);
+});
+
+test("declarative items carry placeholder images into neighboring slides", async ({ page }) => {
+  await page.goto("/harness.html");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  const placeholder =
+    "data:image/svg+xml," +
+    encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>');
+  await page.evaluate((src) => {
+    document.querySelectorAll("app-lightbox")[1]!.setAttribute("placeholder-src", src);
+  }, placeholder);
+  await page.locator("app-lightbox").first().click();
+  await expect(
+    page.locator("[data-lightbox-slide] [data-lightbox-slide-placeholder]").nth(0),
+  ).toHaveAttribute("src", placeholder);
+});
+
+test("a gallery trigger can open another item without a close control", async ({ page }) => {
+  await page.goto("/harness.html?hide-close-button");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  await page.evaluate(() => {
+    const gallery = document.querySelector<import("@ogdakke/fluidbox").AppGallery>("app-gallery")!;
+    const items = gallery.querySelectorAll<import("@ogdakke/fluidbox").AppLightbox>("app-lightbox");
+    items[0]!.openItemId = items[1]!.itemId;
+  });
+  await page.locator("app-lightbox").first().click();
+  await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(
+    "aria-label",
+    "Item 2 of 3",
+  );
+  await expect(page.locator("[data-lightbox-dialog] [data-lightbox-close]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+});
+
 test("viewer selectors stay isolated and honor stylesheet order", async ({ page }) => {
   await page.goto("/harness.html?no-filmstrip");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
@@ -26,7 +110,9 @@ test("viewer selectors stay isolated and honor stylesheet order", async ({ page 
   await page.locator("app-lightbox").first().click();
   const overlay = page.locator("[data-lightbox-overlay]");
   const close = overlay.locator("[data-lightbox-close]").first();
-  await expect(overlay).toHaveCSS("position", "fixed");
+  await expect(overlay).toHaveCSS("position", "absolute");
+  await expect(overlay.locator("[data-lightbox-container]")).toHaveCSS("position", "sticky");
+  await expect(overlay.locator("[data-lightbox-backdrop]")).toHaveCSS("position", "absolute");
   await expect(overlay.locator("[data-lightbox-backdrop]")).toHaveCSS(
     "background-color",
     "rgb(12, 34, 56)",
@@ -38,8 +124,45 @@ test("viewer selectors stay isolated and honor stylesheet order", async ({ page 
   await expect(close).toHaveCSS("width", "41px");
 });
 
+test("backdrop covers the document while the viewer stays in the viewport", async ({ page }) => {
+  await page.goto("/harness.html?no-filmstrip");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  await page.evaluate(() => {
+    const before = document.createElement("div");
+    before.style.height = "1200px";
+    document.body.prepend(before);
+    const after = document.createElement("div");
+    after.style.height = "1800px";
+    document.body.append(after);
+  });
+  await page.locator("app-lightbox").first().click();
+  await expect(page.locator("[data-lightbox-overlay]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  const geometry = await page.evaluate(() => {
+    const backdrop = document.querySelector<HTMLElement>("[data-lightbox-backdrop]")!;
+    const container = document.querySelector<HTMLElement>("[data-lightbox-container]")!;
+    const backdropBounds = backdrop.getBoundingClientRect();
+    return {
+      scrollY: window.scrollY,
+      pageHeight: document.documentElement.scrollHeight,
+      backdropHeight: backdropBounds.height,
+      backdropTop: backdropBounds.top,
+      backdropBottom: backdropBounds.bottom,
+      containerTop: container.getBoundingClientRect().top,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(geometry.scrollY).toBeGreaterThan(0);
+  expect(geometry.backdropHeight).toBeGreaterThanOrEqual(geometry.pageHeight - 1);
+  expect(geometry.backdropTop).toBeLessThanOrEqual(0);
+  expect(geometry.backdropBottom).toBeGreaterThanOrEqual(geometry.viewportHeight);
+  expect(Math.abs(geometry.containerTop)).toBeLessThanOrEqual(1);
+});
+
 test("playground opens both the DOM gallery and indexed source", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/playground.html");
   await expect(page.getByRole("heading", { name: "Open, swipe, zoom, explore." })).toBeVisible();
   await page.locator(".photo-grid app-lightbox").first().click();
   await expect(page.locator('[data-lightbox-slide][aria-hidden="false"]')).toHaveAttribute(

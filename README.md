@@ -92,7 +92,7 @@ void gallery.open({ index: 0 });
 
 ## Development
 
-This repository uses Bun. The package lives in `packages/lightbox`. The vanilla and framework examples use its built exports.
+This repository uses Bun. The package lives in `packages/lightbox`. The showcase and test fixtures in `apps/examples` use its built exports.
 
 ```sh
 bun install
@@ -109,7 +109,7 @@ bun run lint:all
 bun run format:check
 ```
 
-The vanilla playground includes a small gallery and an indexed gallery with 100,000 items. Run `bun run --cwd examples/frameworks dev` to open the React, Solid, Vue, and Angular pages. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
+Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the showcase in `apps/examples`, which puts custom elements, the indexed source, the headless runtime, and the React, Solid, Vue, and Angular bindings on one page. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
 
 The [public API contract](docs/PUBLIC_API.md) defines the headless source, controller, renderer,
 origin, and thumbnail-overlay target. The [roadmap to 1.0](docs/ROADMAP.md) tracks its runtime and

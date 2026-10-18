@@ -16,8 +16,8 @@
   "include": [
     "packages/**/*.ts",
     "packages/**/*.tsx",
-    "examples/**/*.ts",
-    "examples/**/*.tsx",
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
     "tests/**/*.ts",
     "playwright.config.ts",
     "types.d.ts",

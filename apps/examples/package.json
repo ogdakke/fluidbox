@@ -1,0 +1,29 @@
+{
+  "name": "@ogdakke/fluidbox-examples",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "art": "bun run scripts/generate-art.ts"
+  },
+  "dependencies": {
+    "@angular/common": "^22",
+    "@angular/compiler": "^22",
+    "@angular/core": "^22",
+    "@angular/platform-browser": "^22",
+    "@ogdakke/fluidbox": "workspace:*",
+    "@tanstack/react-virtual": "^3.14.13",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "rxjs": "^7",
+    "solid-js": "^1.9.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.1.3",
+    "vite-plugin-solid": "^2"
+  }
+}
