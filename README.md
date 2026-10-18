@@ -109,7 +109,7 @@ bun run lint:all
 bun run format:check
 ```
 
-Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the showcase in `apps/examples`, which puts custom elements, the indexed source, the headless runtime, and the React, Solid, Vue, and Angular bindings on one page. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
+Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the example site in `apps/examples`: an overview plus a page each for custom elements, the headless runtime, React, Solid, Vue, and Angular, and an index of test fixtures. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
 
 The documentation site lives in `apps/docs`. Run `bun run docs`, or `bun run docs:share` to expose it through portless as `docs.fluidbox`. Both sites share the design tokens and chrome in `apps/design`.
 
