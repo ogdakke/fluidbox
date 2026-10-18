@@ -359,3 +359,35 @@ test("slides stay aligned and images fit their slide on a fractional width", asy
     expect(geometry.frame[1]!).toBeLessThanOrEqual(geometry.slide[1]! + 0.5);
   }
 });
+
+test("an opening never reloads a picture that is already on screen", async ({ page }) => {
+  const trigger = await prepareCase(page, "cover");
+  // The card's image is the full image. Writing its source again makes Safari
+  // decode it a second time and paint an empty frame in between.
+  await page.evaluate(() => {
+    const log: string[] = [];
+    (window as unknown as { imageWrites: string[] }).imageWrites = log;
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const target = record.target as Element;
+        if (target.matches("[data-lightbox-media]") && record.attributeName)
+          log.push(`${record.attributeName}=${target.getAttribute(record.attributeName)}`);
+      }
+    }).observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["src", "srcset", "sizes"],
+    });
+  });
+  await trigger.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await page.waitForTimeout(400);
+  const writes = await page.evaluate(
+    () => (window as unknown as { imageWrites: string[] }).imageWrites,
+  );
+  // The slide is built with the card's decoded image; nothing replaces it.
+  expect(writes).toEqual([]);
+});

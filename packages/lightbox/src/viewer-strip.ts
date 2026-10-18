@@ -513,19 +513,25 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.error.hidden = true;
     if (item.media.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
       const current = slide.image.getAttribute("src");
-      const full = item.media.src;
-      const alreadyFull =
-        current &&
-        new URL(current, this.#ownerDocument.baseURI).href ===
-          new URL(full, this.#ownerDocument.baseURI).href;
-      if (!current || alreadyFull) {
+      if (!current) {
+        // Nothing paints yet, so the full image can stream straight in.
         this.#applyImage(index, slide);
+      } else if (this.#painted(slide.image) && this.#showsFull(slide.image, item)) {
+        // The preview is the full image. Rewriting the same source would make
+        // Safari decode it again and paint nothing in between.
+        slide.fullApplied = true;
+        slide.image.loading = "eager";
+        slide.image.fetchPriority = index === this.#index ? "high" : "low";
       } else {
         const controller = new AbortController();
-        const loader = new this.#ownerDocument.defaultView!.Image();
+        // Decode the exact candidate the slide will pick before it swaps, so the
+        // preview stays on screen until the sharper picture can paint at once.
+        const loader = this.#stage(item, slide);
         slide.controller = controller;
-        loader.src = item.media.src;
-        const abort = () => (loader.src = "");
+        const abort = () => {
+          loader.removeAttribute("srcset");
+          loader.src = "";
+        };
         controller.signal.addEventListener("abort", abort, { once: true });
         void loader
           .decode()
@@ -621,12 +627,9 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     slide.fullApplied = true;
     // The full image decodes off the main thread. An image that already paints
     // a preview keeps it until the new source is ready; only an empty one hides.
-    const painted =
-      slide.image.dataset.lightboxImagePending === undefined &&
-      slide.image.complete &&
-      slide.image.naturalWidth > 0;
-    slide.image.decoding = "async";
-    if (!painted) slide.image.dataset.lightboxImagePending = "";
+    // A staged source is already decoded and swaps in on the next frame.
+    slide.image.decoding = slide.decoded ? "sync" : "async";
+    if (!this.#painted(slide.image)) slide.image.dataset.lightboxImagePending = "";
     for (const source of slide.picture.querySelectorAll("source")) source.remove();
     for (const resource of item.media.sources ?? []) {
       const source = this.#ownerDocument.createElement("source");
@@ -636,9 +639,7 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
       if (resource.type) source.type = resource.type;
       slide.picture.insertBefore(source, slide.image);
     }
-    slide.image.srcset = resourceSet(item.media);
-    if (item.media.sizes) slide.image.sizes = item.media.sizes;
-    else slide.image.removeAttribute("sizes");
+    this.#writeSet(slide.image, item.media, slide);
     // Neighboring images must begin loading before native scrolling exposes them.
     slide.image.loading = "eager";
     slide.image.fetchPriority = index === this.#index ? "high" : "low";
@@ -646,6 +647,58 @@ export class ViewerStrip<TItem extends LightboxItem = LightboxItem> {
     void this.#revealImage(slide, version);
     slide.decoded = false;
     slide.error.hidden = true;
+  }
+
+  #painted(image: HTMLImageElement) {
+    return (
+      image.dataset.lightboxImagePending === undefined && image.complete && image.naturalWidth > 0
+    );
+  }
+
+  /** Whether the image already shows the one candidate the full media resolves to. */
+  #showsFull(image: HTMLImageElement, item: TItem) {
+    if (item.media.type !== "image") return false;
+    if (item.media.sources?.length || resourceSet(item.media)) return false;
+    const base = this.#ownerDocument.baseURI;
+    return new URL(image.currentSrc || image.src, base).href === new URL(item.media.src, base).href;
+  }
+
+  #writeSet(
+    image: HTMLImageElement | HTMLSourceElement,
+    resource: {
+      readonly srcset?: string;
+      readonly candidates?: readonly LightboxImageCandidate[];
+      readonly sizes?: string;
+    },
+    slide: ViewerSlide,
+  ) {
+    const set = resourceSet(resource);
+    if (set) image.srcset = set;
+    else image.removeAttribute("srcset");
+    const sizes = resource.sizes;
+    if (!sizes) image.removeAttribute("sizes");
+    else if (image.isConnected || !/\bauto\b/.test(sizes)) image.sizes = sizes;
+    // A detached copy has no layout for `sizes="auto"`; give it the slide's width.
+    else image.sizes = `${Math.max(1, slide.frame.offsetWidth)}px`;
+  }
+
+  /** A detached copy of the slide's picture that loads the same candidate. */
+  #stage(item: TItem, slide: ViewerSlide) {
+    const picture = this.#ownerDocument.createElement("picture");
+    const image = this.#ownerDocument.createElement("img");
+    if (item.media.type === "image") {
+      for (const resource of item.media.sources ?? []) {
+        const source = this.#ownerDocument.createElement("source");
+        this.#writeSet(source, resource, slide);
+        if (resource.media) source.media = resource.media;
+        if (resource.type) source.type = resource.type;
+        picture.append(source);
+      }
+      this.#writeSet(image, item.media, slide);
+      image.src = item.media.src;
+    }
+    picture.append(image);
+    return image;
   }
 
   #loadPreview(item: TItem, slide: ViewerSlide) {
