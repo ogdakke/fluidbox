@@ -139,6 +139,16 @@ app-lightbox[data-lightbox-state="closed"] [data-lightbox-video-actions] {
   animation: lightbox-video-actions-appear 120ms ease-out both;
 }
 
+[data-lightbox-transition-host] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--lightbox-transition-host-height, 100%);
+  overflow: clip;
+  pointer-events: none;
+}
+
 [data-lightbox-transition-content] {
   --lightbox-progress: 1;
 

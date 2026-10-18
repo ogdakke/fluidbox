@@ -137,8 +137,15 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
         target.setAttribute("aria-hidden", "true");
         this.#publish(target, phase, progress);
         const controller = new AbortController();
+        // The target lives in document coordinates. Its host clips it to the
+        // page so a growing target never widens the page, which mobile Safari
+        // answers by zooming the whole page out.
+        const host = this.#document.createElement("div");
+        host.dataset.lightboxTransitionHost = "";
+        host.setAttribute("aria-hidden", "true");
+        host.append(target);
         this.#position(target, frame);
-        this.#document.body.append(target);
+        this.#document.body.append(host);
         const dispose = registration.renderer.mount({
           item,
           index,
@@ -166,8 +173,9 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
         frame.append(active.frameLayer);
       this.#position(active.target, frame);
       // A close flight is appended to the body after the opening created this
-      // target. Move the target after it so the content stays above the image.
-      if (active.target.nextElementSibling) this.#document.body.append(active.target);
+      // target. Move the target's host after it so the content stays above the image.
+      const host = active.target.parentElement;
+      if (host?.nextElementSibling) this.#document.body.append(host);
     }
     this.set(phase, progress);
   }
@@ -337,6 +345,10 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     const transform = new DOMMatrix(transformValue === "none" ? undefined : transformValue);
     const box = { width: frame.offsetWidth, height: frame.offsetHeight };
     this.#boxes.set(target, box);
+    target.parentElement?.style.setProperty(
+      "--lightbox-transition-host-height",
+      `${this.#document.documentElement.scrollHeight}px`,
+    );
     this.#placeTarget(target, targetStyle(transform, box));
     target.style.setProperty(
       "--lightbox-transition-left",
@@ -355,7 +367,7 @@ export class ThumbnailOverlayRuntime<TItem extends LightboxItem> {
     active.target?.style.removeProperty("--lightbox-controls-reveal-delay");
     active.controller?.abort();
     active.dispose?.();
-    active.target?.remove();
+    (active.target?.parentElement ?? active.target)?.remove();
     for (const animation of active.layerAnimations) animation.cancel();
     if (active.frameLayer && active.marker?.isConnected) {
       delete active.frameLayer.dataset.lightboxTravelLayer;

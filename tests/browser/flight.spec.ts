@@ -287,6 +287,42 @@ test("a close after an idle moment still animates", async ({ page }) => {
   await expect(dialog).toHaveCount(0);
 });
 
+test("a travelling badge never widens the page", async ({ page }) => {
+  // On a phone the card is nearly as wide as the screen, so the growing badge
+  // layer passes the right edge. A wider page makes mobile Safari zoom it out.
+  await page.setViewportSize({ width: 393, height: 852 });
+  const trigger = await prepareCase(page, "badge");
+  await page.evaluate(() => {
+    const state = window as unknown as { widest: number; rest: number };
+    state.rest = state.widest = document.documentElement.scrollWidth;
+    const measure = () => {
+      state.widest = Math.max(state.widest, document.documentElement.scrollWidth);
+    };
+    new MutationObserver(measure).observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+    const tick = () => {
+      measure();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await trigger.click();
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveAttribute(
+    "data-lightbox-state",
+    "open",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-lightbox-dialog]")).toHaveCount(0);
+  const { widest, rest } = await page.evaluate(() => {
+    const { widest, rest } = window as unknown as { widest: number; rest: number };
+    return { widest, rest };
+  });
+  expect(widest).toBe(rest);
+});
+
 test("a travelling badge lands exactly on the card's badge", async ({ page }) => {
   const trigger = await prepareCase(page, "badge");
   const card = (await page.locator('[data-flight-case="badge"] .flight-badge').boundingBox())!;
