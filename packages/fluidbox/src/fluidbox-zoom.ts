@@ -26,6 +26,13 @@ const fit = (): Pose => ({ scale: 1, x: 0, y: 0 });
 const point = (touch: Touch): Point => ({ x: touch.clientX, y: touch.clientY });
 const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+/**
+ * What moves into the zoom viewport and back: an image's <picture>, if it has
+ * one. Taking an <img> out of its <picture>, or back in, makes the browser pick
+ * its source again and reload it, and Safari paints nothing until it has.
+ */
+const carrier = (image: HTMLElement) =>
+  image.parentElement instanceof HTMLPictureElement ? image.parentElement : image;
 const transform = (pose: Pose) => `translate(${pose.x}px, ${pose.y}px) scale(${pose.scale})`;
 const resist = (value: number, min: number, max: number, range: number) =>
   value < min
@@ -155,7 +162,7 @@ export class FluidboxZoom {
     const g = this.#geometry;
     this.#pose.x = this.#nativeOrigin.x - viewport.scrollLeft - (g.left - g.stage.left);
     this.#pose.y = this.#nativeOrigin.y - viewport.scrollTop - (g.top - g.stage.top);
-    this.#placeholder.replaceWith(image);
+    this.#placeholder.replaceWith(carrier(image));
     viewport.remove();
     this.#viewport = null;
     this.#placeholder = null;
@@ -208,8 +215,9 @@ export class FluidboxZoom {
     placeholder.dataset.fluidboxZoomPlaceholder = "";
     placeholder.style.setProperty("--fluidbox-zoom-placeholder-width", `${g.width}px`);
     placeholder.style.setProperty("--fluidbox-zoom-placeholder-height", `${g.height}px`);
-    image.replaceWith(placeholder);
-    anchor.append(image);
+    const moved = carrier(image);
+    moved.replaceWith(placeholder);
+    anchor.append(moved);
     canvas.append(anchor);
     viewport.append(canvas);
     // A sibling of the dialog, so the container sizes it and the

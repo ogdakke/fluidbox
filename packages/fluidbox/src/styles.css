@@ -988,7 +988,11 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-zoom-anchor]
-  > :is([data-fluidbox-media], [data-fluidbox-content]) {
+  > :is([data-fluidbox-media], [data-fluidbox-content]),
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-zoom-anchor]
+  > [data-fluidbox-picture]
+  > [data-fluidbox-media] {
   width: var(--fluidbox-zoom-item-width);
   height: var(--fluidbox-zoom-item-height);
 }
