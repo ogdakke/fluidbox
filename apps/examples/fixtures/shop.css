@@ -1,0 +1,770 @@
+/* Shop product page. Page layout comes from the Safari chrome lab; tokens from @ogdakke/fluidbox-design.
+   The structure follows Shop's product page on a phone and on a wide screen;
+   the look stays ours: monochrome, hairlines, square controls, with the
+   highlight colour standing in for Shop's purple.
+   Inside the viewer: a media query on the gallery picks a black viewer on a
+   phone and a white one on a wide screen, the stage insets make room for the
+   thumbnail rail, and the dots sit under the photo from --fluidbox-media-height. */
+
+.shop-icon {
+  display: block;
+  flex: none;
+}
+
+.shop-icon-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--fb-line);
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  cursor: pointer;
+  transition: border-color 120ms ease-out;
+}
+.shop-icon-button:hover {
+  border-color: var(--fb-fg);
+}
+.shop-icon-button[aria-pressed="true"] {
+  color: var(--fb-highlight);
+}
+
+/* Page. A phone stacks the seller, the carousel and the details; a wide screen
+   puts the gallery on the left and the seller and details in a column beside it. */
+
+.shop-page {
+  display: grid;
+  gap: 16px;
+  padding: 16px 0 112px;
+  border-bottom: 1px solid var(--fb-line);
+}
+
+.shop-seller-row,
+.shop-info {
+  padding-inline: var(--fb-gutter);
+}
+
+.shop-seller {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.shop-seller .avatar {
+  border-radius: 50%;
+}
+.shop-seller__name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.shop-seller__name strong {
+  font-weight: 500;
+}
+.shop-seller__name .fb-muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.shop-seller__name .shop-icon {
+  color: var(--fb-fg);
+}
+.shop-seller .shop-icon-button {
+  border-color: transparent;
+}
+
+/* Gallery. The viewer copies these from the trigger as it opens. */
+.shop-gallery {
+  --fluidbox-background: var(--fb-bg);
+  --fluidbox-color: var(--fb-fg);
+  --fluidbox-control-background: var(--fb-bg);
+  position: relative;
+  min-width: 0;
+}
+
+.shop-stage {
+  position: relative;
+}
+
+.shop-carousel {
+  display: flex;
+  gap: 8px;
+  padding-inline: var(--fb-gutter);
+  scroll-padding-inline: var(--fb-gutter);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.shop-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.shop-slide {
+  flex: 0 0 calc(100% - 28px);
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--fb-image-radius);
+  background: var(--fb-surface-2);
+  cursor: zoom-in;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.shop-slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A photo over its ThumbHash. The placeholder is the box's background and the
+   image fades in over it. While the viewer has the photo, the package hides the
+   image, and the placeholder goes with it so the card's slot stays empty. */
+.shop-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-position: center;
+  background-size: cover;
+}
+.shop-photo:has(> img[data-fluidbox-thumbnail-hidden]) {
+  background-image: none !important;
+}
+.shop-photo > img {
+  opacity: 0;
+  transition: opacity 280ms ease-out;
+}
+.shop-photo > img[data-loaded] {
+  opacity: 1;
+}
+
+.shop-arrow {
+  position: absolute;
+  top: 50%;
+  display: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    opacity 150ms linear,
+    border-color 120ms ease-out;
+}
+.shop-arrow:hover {
+  border-color: var(--fb-fg);
+}
+.shop-arrow:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+.shop-arrow[data-side="previous"] {
+  left: 12px;
+}
+.shop-arrow[data-side="next"] {
+  right: 12px;
+}
+
+.shop-thumbs {
+  display: none;
+}
+
+.shop-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--fb-line);
+  border-radius: 2px;
+  background: var(--fb-surface-2);
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    opacity 120ms linear,
+    outline-color 120ms linear;
+  outline: 1px solid transparent;
+  outline-offset: 2px;
+}
+.shop-thumb:hover {
+  opacity: 1;
+}
+.shop-thumb[aria-current="true"] {
+  outline-color: var(--fb-fg);
+  opacity: 1;
+}
+.shop-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Details. */
+
+.shop-info {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  min-width: 0;
+}
+.shop-info p {
+  margin: 0;
+}
+
+.shop-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.shop-title h1 {
+  flex: 1;
+  font-size: 19px;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+.shop-title__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.shop-price {
+  margin-top: -6px !important;
+  font-size: 20px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.shop-note {
+  margin-top: -14px !important;
+  color: var(--fb-muted);
+  font-size: 13px;
+}
+.shop-note strong {
+  color: var(--fb-fg);
+  font-weight: 500;
+}
+
+.shop-choice {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.shop-choice legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-size: 13px;
+}
+.shop-choice legend strong,
+.shop-quantity strong {
+  font-weight: 500;
+}
+.shop-choice__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.shop-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-bg);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+.shop-chip:hover {
+  border-color: var(--fb-fg);
+}
+.shop-chip:has(input:checked) {
+  border-color: var(--fb-fg);
+  box-shadow: inset 0 0 0 1px var(--fb-fg);
+  font-weight: 500;
+}
+.shop-chip:has(input:focus-visible) {
+  outline: 1px solid var(--fb-fg);
+  outline-offset: 2px;
+}
+.shop-chip input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.shop-quantity {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.shop-stepper {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  border: 1px solid var(--fb-line-strong);
+}
+.shop-stepper button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.shop-stepper button:hover:not(:disabled) {
+  background: var(--fb-surface-2);
+}
+.shop-stepper button:disabled {
+  color: var(--fb-faint);
+  cursor: default;
+}
+.shop-stepper output {
+  min-width: 32px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.shop-buy {
+  display: grid;
+  gap: 8px;
+}
+.shop-buy .fb-button,
+.shop-wide {
+  width: 100%;
+  height: 44px;
+}
+.shop-add {
+  border-color: var(--fb-highlight);
+  background: var(--fb-highlight);
+  color: var(--fb-invert-fg);
+}
+.shop-add:hover {
+  border-color: var(--fb-highlight);
+  background: var(--fb-highlight);
+  opacity: 0.88;
+}
+
+.shop-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.shop-pair .fb-button {
+  width: 100%;
+}
+.shop-pair--quiet {
+  display: none;
+}
+.shop-pair--quiet .fb-button {
+  border-color: transparent;
+}
+.shop-pair--quiet .fb-button[aria-pressed="true"] {
+  color: var(--fb-highlight);
+}
+
+.shop-section {
+  border-top: 1px solid var(--fb-line);
+}
+.shop-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.shop-section > summary::-webkit-details-marker {
+  display: none;
+}
+.shop-section > summary .shop-icon {
+  transition: transform 160ms var(--fb-ease);
+}
+.shop-section[open] > summary .shop-icon {
+  transform: rotate(180deg);
+}
+.shop-section > :not(summary) + * {
+  margin-top: 12px;
+}
+.shop-section > :last-child {
+  margin-bottom: 16px;
+}
+
+.shop-description {
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.shop-description:not([data-more]) {
+  max-height: 6.4em;
+  overflow: hidden;
+  mask-image: linear-gradient(black 45%, transparent);
+}
+.shop-description strong {
+  font-weight: 500;
+}
+
+.shop-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  list-style: none;
+}
+.shop-facts li {
+  display: flex;
+  gap: 10px;
+  line-height: 1.35;
+}
+.shop-facts strong {
+  font-weight: 500;
+}
+.shop-facts small {
+  display: block;
+  font-size: 12px;
+}
+
+/* Shop's floating bars. They float clear of the screen's edges, so iOS
+   Safari doesn't tint its bars from them. */
+
+.shop-tabbar {
+  position: fixed;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  left: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+.shop-tabbar > *,
+.shop-tabbar a {
+  pointer-events: auto;
+}
+.shop-round,
+.shop-tabbar__tabs {
+  height: 52px;
+  border: 1px solid var(--fb-line-strong);
+  background: color-mix(in srgb, var(--fb-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  color: var(--fb-fg);
+}
+.shop-round {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 52px;
+}
+.shop-round--cart {
+  border-color: var(--fb-highlight);
+  background: var(--fb-highlight);
+  color: var(--fb-invert-fg);
+}
+.shop-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--fb-highlight);
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  font-family: var(--fb-font-mono);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.shop-tabbar__tabs {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-around;
+  max-width: 240px;
+}
+.shop-tabbar__tabs a {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--fb-muted);
+}
+.shop-tabbar__tabs a[aria-current="page"] {
+  color: var(--fb-fg);
+}
+
+.shop-search {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 4;
+  display: none;
+  width: min(380px, calc(100% - 48px));
+  height: 48px;
+  border: 1px solid var(--fb-line-strong);
+  background: color-mix(in srgb, var(--fb-bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  transform: translateX(-50%);
+}
+.shop-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  font-size: 14px;
+  outline: none;
+}
+.shop-search button {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--fb-line);
+  background: none;
+  cursor: pointer;
+}
+.shop-search:focus-within {
+  border-color: var(--fb-fg);
+}
+
+.shop-findings .findings {
+  display: grid;
+  gap: 10px;
+  max-width: 80ch;
+  margin: 0 var(--fb-gutter) 40px;
+  padding-left: 1.2em;
+}
+
+/* A wide screen: the gallery beside the details, thumbnails beside the photo. */
+
+@media (min-width: 900px) {
+  .shop-page {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    grid-template-areas:
+      "gallery seller"
+      "gallery info";
+    grid-template-rows: auto 1fr;
+    column-gap: 40px;
+    row-gap: 18px;
+    padding: 32px var(--fb-gutter) 104px;
+  }
+  .shop-seller-row,
+  .shop-info {
+    padding-inline: 0;
+  }
+  .shop-seller-row {
+    grid-area: seller;
+  }
+  .shop-info {
+    grid-area: info;
+  }
+  .shop-gallery {
+    grid-area: gallery;
+    position: sticky;
+    top: calc(var(--fb-header-height) + 24px);
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    align-items: center;
+    align-self: start;
+    gap: 16px;
+  }
+  .shop-thumbs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .shop-carousel {
+    gap: 0;
+    padding-inline: 0;
+    scroll-padding-inline: 0;
+    border-radius: var(--fb-image-radius);
+  }
+  .shop-slide {
+    flex-basis: 100%;
+  }
+  .shop-arrow {
+    display: grid;
+  }
+  .shop-title h1 {
+    font-size: 22px;
+  }
+  .shop-title__actions {
+    display: none;
+  }
+  .shop-pair--quiet {
+    display: grid;
+  }
+  .shop-tabbar {
+    display: none;
+  }
+  .shop-search {
+    display: flex;
+  }
+}
+
+/* A phone: Shop's black viewer. The viewer copies these from the trigger. */
+@media (max-width: 899px) {
+  .shop-gallery {
+    --fluidbox-background: #000;
+    --fluidbox-color: #fff;
+    --fluidbox-control-background: rgb(255 255 255 / 0.14);
+    --fluidbox-focus-color: #fff;
+  }
+  /* Room for the tab bar at the end of the page. */
+  .shop-findings {
+    padding-bottom: 88px;
+  }
+}
+
+/* The viewer. `.shop-viewer` is an empty marker in the viewer's layer. */
+
+[data-fluidbox-dialog]:has(.shop-viewer) .shop-dots {
+  position: absolute;
+  top: min(
+    calc(50% + var(--fluidbox-media-height, 100vw) / 2 + 22px),
+    calc(100% - env(safe-area-inset-bottom, 0px) - 40px)
+  );
+  left: 50%;
+  display: none;
+  width: calc(5 * 12px);
+  overflow: hidden;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.shop-dots__track {
+  display: flex;
+  transform: translateX(calc(var(--shop-dots-start) * -12px));
+  transition: transform 220ms var(--fb-ease);
+}
+.shop-dot {
+  flex: none;
+  width: 12px;
+  height: 8px;
+  background: radial-gradient(circle at center, var(--fluidbox-color, #fff) 3px, transparent 3.5px);
+  opacity: 0.38;
+  transition:
+    opacity 180ms linear,
+    transform 220ms var(--fb-ease);
+}
+.shop-dot[data-active] {
+  opacity: 1;
+}
+.shop-dot[data-size="small"] {
+  transform: scale(0.6);
+}
+.shop-dot[data-size="hidden"] {
+  transform: scale(0);
+}
+
+@media (min-width: 900px) {
+  /* No side insets: those narrow the slide strip, and the slides should
+     cross the whole window. The filmstrip's band along the bottom is the
+     room the arrows sit in. */
+  [data-fluidbox-dialog]:has(.shop-viewer) {
+    --fluidbox-stage-top: 32px;
+    --fluidbox-slide-gap: 48px;
+    --fluidbox-filmstrip-item-size: 56px;
+    --fluidbox-filmstrip-gap: 10px;
+    --fluidbox-filmstrip-item-radius: 2px;
+  }
+  /* Thumbnails as on the page: a hairline, and a ring on the one on show. */
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-filmstrip-item] {
+    border: 1px solid var(--fb-line);
+    outline: 1px solid transparent;
+    outline-offset: 2px;
+    margin: 4px;
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-filmstrip-item][aria-selected="true"] {
+    outline-color: var(--fb-fg);
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-frame] {
+    border-radius: var(--fb-image-radius);
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer):not([data-zoomed]) [data-fluidbox-media] {
+    cursor: zoom-in;
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-close] {
+    top: 24px;
+    right: 24px;
+  }
+  /* Shop keeps its arrows together in the bottom-right corner, under the photo. */
+  [data-fluidbox-dialog]:has(.shop-viewer) :is([data-fluidbox-previous], [data-fluidbox-next]) {
+    top: auto;
+    bottom: 22px;
+    left: auto;
+    width: 36px;
+    height: 36px;
+    transform: none;
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-previous] {
+    right: calc(24px + 36px + 8px);
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-next] {
+    right: 24px;
+  }
+}
+
+@media (max-width: 899px) {
+  [data-fluidbox-dialog]:has(.shop-viewer) :is([data-fluidbox-previous], [data-fluidbox-next]) {
+    display: none;
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer) .shop-dots {
+    display: block;
+  }
+  /* Close sits at the top left, translucent on the black. */
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-close] {
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: auto;
+    left: 12px;
+    border-color: rgb(255 255 255 / 0.22);
+    background: rgb(255 255 255 / 0.14);
+    color: #fff;
+  }
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-close]:hover {
+    border-color: rgb(255 255 255 / 0.5);
+    background: rgb(255 255 255 / 0.22);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-dots__track,
+  .shop-dot,
+  .shop-photo > img,
+  .shop-section > summary .shop-icon {
+    transition: none;
+  }
+  .shop-carousel {
+    scroll-behavior: auto;
+  }
+}

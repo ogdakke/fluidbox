@@ -51,12 +51,30 @@ function highlightedSource(): Plugin {
   };
 }
 
+/**
+ * `?delay=1500` on any request holds the response back that long, so a
+ * fixture can show what loading looks like. Capped at ten seconds.
+ */
+function delayedResponses(): Plugin {
+  const hold = (request: { url?: string }, _response: unknown, next: () => void) => {
+    const ms = Number(new URL(request.url ?? "/", "http://host").searchParams.get("delay"));
+    if (ms > 0) setTimeout(next, Math.min(ms, 10_000));
+    else next();
+  };
+  return {
+    name: "delayed-responses",
+    configureServer: (server) => void server.middlewares.use(hold),
+    configurePreviewServer: (server) => void server.middlewares.use(hold),
+  };
+}
+
 export default defineConfig(({ command }) => ({
   plugins: [
-    react({ include: [/(photo-library|social)\.tsx$/, /patterns\/react\/.*\.tsx$/] }),
+    react({ include: [/(photo-library|social|shop)\.tsx$/, /patterns\/react\/.*\.tsx$/] }),
     solid({ include: [/patterns\/solid\/.*\.tsx$/] }),
     vue(),
     highlightedSource(),
+    delayedResponses(),
     highlightHtml(),
     watchPackageSource(),
   ],

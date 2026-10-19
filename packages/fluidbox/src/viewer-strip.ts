@@ -196,14 +196,23 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     this.element.scrollTo({ left: (index - this.#base) * this.#width, behavior: "smooth" });
     return new Promise<void>((resolve) => {
-      this.#selection = {
-        index,
-        resolve,
-        timeout: setTimeout(() => {
-          this.#jump(index);
-          this.#resolveSelection();
-        }, 600),
+      // The fallback lands the slide only once the smooth scroll has stalled.
+      // Safari takes well over half a second to cross a wide viewport, and
+      // jumping while it still glides snaps the last stretch into place.
+      const started = performance.now();
+      let last = this.element.scrollLeft;
+      const check = () => {
+        const left = this.element.scrollLeft;
+        const moving = Math.abs(left - last) > 1;
+        last = left;
+        if (moving && performance.now() - started < 2000 && this.#selection) {
+          this.#selection.timeout = setTimeout(check, 120);
+          return;
+        }
+        this.#jump(index);
+        this.#resolveSelection();
       };
+      this.#selection = { index, resolve, timeout: setTimeout(check, 600) };
     });
   }
 
