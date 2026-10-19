@@ -143,6 +143,21 @@ export class FilmstripRuntime {
     return true;
   }
 
+  /**
+   * Read the strip's CSS again, as once the viewer is in the document: a
+   * strip built before then could not see its axis or its sizes.
+   */
+  measure() {
+    const vertical = this.#vertical;
+    const step = this.#step;
+    const extent = this.#viewportWidth;
+    this.#readGeometry();
+    if (vertical === this.#vertical && step === this.#step && extent === this.#viewportWidth)
+      return;
+    this.#publishWindow(this.#index, true);
+    if (this.#mode !== "user") this.#center(this.#index);
+  }
+
   scrollTo(index: number, smooth: boolean) {
     this.#publishWindow(index);
     this.#center(index, smooth);

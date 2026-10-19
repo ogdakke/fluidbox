@@ -43,6 +43,10 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
             current = next;
             build();
           },
+          // Its axis comes from CSS, which the viewer can read only once it is
+          // in the document. Read it before the opening is measured, so a
+          // column doesn't start as a row and shrink the photo it flies to.
+          attach: () => session?.measure(),
           relabel: build,
           destroy() {
             unsubscribe();

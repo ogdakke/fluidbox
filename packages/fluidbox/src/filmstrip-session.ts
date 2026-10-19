@@ -173,6 +173,11 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     this.#runtime.mount();
   }
 
+  /** Lay the strip out again from its CSS, now that the viewer is in the document. */
+  measure() {
+    this.#runtime.measure();
+  }
+
   sync(index: number) {
     const previous = this.#index;
     this.#index = index;

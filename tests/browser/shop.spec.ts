@@ -55,6 +55,32 @@ test.describe("shop fixture, wide screen", () => {
     await expect.poll(() => shownSlide(page)).toBe(3);
   });
 
+  test("the column is a column from the first opening frame, so the flight lands true", async ({
+    page,
+  }) => {
+    await load(page);
+    await page.evaluate(() => {
+      const seen: string[] = [];
+      Object.assign(window, { __orientations: seen });
+      new MutationObserver(() => {
+        const status = document
+          .querySelector("[data-fluidbox-dialog]")
+          ?.getAttribute("data-fluidbox-status");
+        const orientation = document
+          .querySelector("[data-fluidbox-filmstrip-scroll]")
+          ?.getAttribute("aria-orientation");
+        if (status === "opening") seen.push(orientation ?? "none");
+      }).observe(document.body, { subtree: true, attributes: true, childList: true });
+    });
+    await page.locator(".shop-slide").first().click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    const seen = await page.evaluate(
+      () => (window as unknown as { __orientations: string[] }).__orientations,
+    );
+    expect(seen.length).toBeGreaterThan(0);
+    expect(new Set(seen)).toEqual(new Set(["vertical"]));
+  });
+
   test("a vertical wheel scrolls the column, and up and down step through it", async ({ page }) => {
     await load(page);
     await page.locator(".shop-slide").first().click();
