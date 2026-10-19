@@ -1,5 +1,6 @@
 import { mountSite } from "../src/site";
 import "../src/pages/pages.css";
+import "@ogdakke/fluidbox/filmstrip.css";
 import "./binding-live.css";
 import type { LiveFramework, MountLive } from "./binding-live/shared";
 

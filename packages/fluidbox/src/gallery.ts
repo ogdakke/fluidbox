@@ -232,7 +232,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** The fluidbox behind the gallery, once it is ready. A rebuild replaces it. */
-  get fluidbox() {
+  get fluidbox(): Fluidbox | null {
     return this.#fluidbox;
   }
 
@@ -258,7 +258,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** Items to use instead of the `<fluidbox-item>` children. */
-  get items() {
+  get items(): FluidboxItems | null {
     return this.#items;
   }
 
@@ -275,7 +275,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** Origins for items that have no trigger in the gallery. */
-  get origins() {
+  get origins(): FluidboxOriginAdapter | undefined {
     return this.#origins;
   }
 
@@ -284,7 +284,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** Renderers of `custom` items, by name. Read when a slide mounts. */
-  get renderers() {
+  get renderers(): Readonly<Record<string, FluidboxRenderer<any>>> {
     return this.#renderers;
   }
 
@@ -294,7 +294,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** Your own controls and captions, instead of a `<template slot="viewer">` or the defaults. */
-  get viewer() {
+  get viewer(): FluidboxViewerRenderer<any> | undefined {
     return this.#viewer;
   }
 
@@ -305,7 +305,7 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#queueUpdate();
   }
 
-  get labels() {
+  get labels(): Partial<FluidboxLabels> | undefined {
     return this.#labels;
   }
 
@@ -333,7 +333,7 @@ export class FluidboxGalleryElement extends HTMLElement {
     };
   }
 
-  async open(target?: FluidboxTarget, options?: FluidboxCommandOptions) {
+  async open(target?: FluidboxTarget, options?: FluidboxCommandOptions): Promise<boolean> {
     return (await this.#ready()).open(target, options);
   }
 
@@ -354,15 +354,15 @@ export class FluidboxGalleryElement extends HTMLElement {
     };
   }
 
-  async close(options?: FluidboxCommandOptions) {
+  async close(options?: FluidboxCommandOptions): Promise<boolean> {
     return (await this.#ready()).close(options);
   }
 
-  async next(options?: FluidboxCommandOptions) {
+  async next(options?: FluidboxCommandOptions): Promise<boolean> {
     return (await this.#ready()).next(options);
   }
 
-  async previous(options?: FluidboxCommandOptions) {
+  async previous(options?: FluidboxCommandOptions): Promise<boolean> {
     return (await this.#ready()).previous(options);
   }
 

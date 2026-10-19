@@ -9,7 +9,7 @@ description: What fluidbox is, which entry point to use for your stack, and wher
 
 Fluidbox is a lightbox for photos, video, iframes and your own content. The picture flies out of its thumbnail, follows your finger, zooms with a pinch or a double-tap, and flies back to the thumbnail it came from when it closes.
 
-It ships as one package, `@ogdakke/fluidbox`. One runtime does the gestures, flights, zoom and the body-level viewer; each entry point is a thin layer over it.
+It ships as one package, `@ogdakke/fluidbox`. One runtime does the gestures, flights, zoom and the body-level viewer. Each entry point is a thin layer over it.
 
 ## Entry points
 

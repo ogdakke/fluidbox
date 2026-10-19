@@ -58,6 +58,8 @@ interface PendingCommand {
   resolve(result: SessionCommandResult): void;
   reject(error: unknown): void;
   settled: boolean;
+  /** A scrub's move, which leaves the trigger out of view until a move ends it. */
+  scrub?: boolean;
   restore?: () => void;
   removeExternalAbort?: () => void;
 }
@@ -361,7 +363,8 @@ export class ViewerSession<
     const key = `${this.#state.status === "open" ? "select" : "open"}:${idOf(item)}`;
     const repeated = this.#samePending(key, options.signal);
     if (repeated) {
-      if (options.scrub === false) {
+      // A plain move that repeats a pending scrub ends it, so it brings the trigger into view.
+      if (!options.scrub && this.#pending?.scrub) {
         return repeated.then((result) => {
           if (result.status === "completed" && this.#state.activeId === idOf(item)) {
             this.#requestReveal(idOf(item), index, "selection");
@@ -384,7 +387,7 @@ export class ViewerSession<
     const enteringOpening = this.#state.status !== "opening";
     const changed = this.#state.activeIndex !== index || opening;
     if (!changed && this.#state.status === "open") {
-      if (options.scrub === false) {
+      if (!options.scrub) {
         this.#requestReveal(idOf(item), index, "selection");
       }
       return Promise.resolve(completed(false));
@@ -394,6 +397,7 @@ export class ViewerSession<
     const operation = this.#begin(key, options.signal, () =>
       this.#restoreState(previousState, reason),
     );
+    operation.scrub = options.scrub;
     this.#abortReveal();
     this.#publish(opening ? "opening" : this.#state.status, index, index);
     if (opening && enteringOpening) this.#emit({ type: "status-change", status: "opening" });

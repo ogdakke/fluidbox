@@ -332,7 +332,9 @@ export abstract class FluidboxControlDirective implements OnInit, AfterContentIn
   readonly #root = injectRoot("A fluidbox control");
   readonly #element = inject<ElementRef<HTMLButtonElement>>(ElementRef);
   readonly #renderer = inject(Renderer2);
-  readonly isDisabled = computed(() => fluidboxControls[this.control].disabled(this.#root.state()));
+  readonly isDisabled: Signal<boolean> = computed(() =>
+    fluidboxControls[this.control].disabled(this.#root.state()),
+  );
   #unlisten: (() => void) | undefined;
 
   ngOnInit(): void {

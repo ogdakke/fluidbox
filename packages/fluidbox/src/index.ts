@@ -1,5 +1,6 @@
+/** The plain JavaScript API: `createFluidbox`, `createItemList`, the event classes and every type. Safe to import on the server, with no side effects. */
 export { createFluidbox } from "./create-fluidbox";
-export { idOf, itemLabel } from "./items";
+export { createItemList, idOf, itemLabel } from "./items";
 export { FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxToggleEvent } from "./public-api";
 
 export type {
@@ -15,6 +16,7 @@ export type {
   FluidboxItem,
   FluidboxItemBase,
   FluidboxItemList,
+  FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOptions,

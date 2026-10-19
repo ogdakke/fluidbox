@@ -1164,7 +1164,7 @@ test("the filmstrip option docks thumbnails that navigate the viewer", async ({ 
   const dialog = page.locator("[data-fluidbox-dialog]");
   // The strip is viewer content: it mounts in the viewer's layer.
   await expect(
-    dialog.locator("[data-fluidbox-portal] > [data-fluidbox-filmstrip-dock]"),
+    dialog.locator("[data-fluidbox-addons] > [data-fluidbox-filmstrip-dock]"),
   ).toHaveCount(1);
   const items = page.locator("[data-fluidbox-filmstrip-item]");
   await expect(items.first()).toBeVisible();

@@ -7,7 +7,8 @@
     "./index.css": "./index.css",
     "./chrome": "./chrome.ts",
     "./art-scenes": "./art-scenes.ts",
-    "./highlight": "./highlight.ts"
+    "./highlight": "./highlight.ts",
+    "./icons": "./icons.ts"
   },
   "dependencies": {
     "@pierre/highlights": "^0.1.3"

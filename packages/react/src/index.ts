@@ -1,3 +1,4 @@
+/** The React binding: the `Fluidbox` parts and the `useFluidbox` and `useFluidboxSheet` hooks. */
 import {
   Children,
   cloneElement,
@@ -97,6 +98,7 @@ export type {
   FluidboxItem,
   FluidboxItemChangeEvent,
   FluidboxItemList,
+  FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOrigin,

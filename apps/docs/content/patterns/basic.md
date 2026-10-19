@@ -7,7 +7,7 @@ description: A trigger per photo, with Previous, Next and Close in the viewer.
 
 # Gallery
 
-One viewer for a set of items, and a trigger for each. A trigger is any element; usually a button holding the thumbnail. When the viewer closes, it flies back to the trigger of the item it shows and focus returns there.
+One viewer for a set of items, and a trigger for each. A trigger can be any element, usually a button holding the thumbnail. When the viewer closes, it flies back to the trigger of the item it shows and focus returns there.
 
 <!-- pattern: basic -->
 

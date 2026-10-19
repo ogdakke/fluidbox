@@ -42,6 +42,7 @@ export function hasAddon(name: keyof Addons): boolean {
   return !!registry()[name];
 }
 
+/** The add-ons that load from their own entry. */
 export type FluidboxAddonName = "sheet" | "filmstrip";
 
 /**

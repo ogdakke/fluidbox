@@ -216,7 +216,10 @@
   position: absolute;
   top: 0;
   right: 0;
-  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--fb-line);
   border-left: 1px solid var(--fb-line);
   background: var(--fb-bg);
@@ -229,12 +232,18 @@
 
 .doc-code pre.highlights {
   margin: 0;
-  padding: 16px 18px;
+  /* Room above the code for the language label and the copy button. */
+  padding: 34px 18px 16px;
   overflow-x: auto;
   /* The highlighter writes an inline background; the docs use their own surface. */
   background: var(--fb-surface) !important;
   font-size: 12.5px;
   line-height: 1.7;
+}
+
+/* The copy button takes the corner; the language label sits beside it. */
+.doc-code:has(> .fb-copy) > .doc-code__lang {
+  right: 74px;
 }
 
 /* Tables */
@@ -376,7 +385,7 @@
   margin: 22px 0;
 }
 
-.doc-tabs__list {
+:is(.doc-tabs__list, .doc-install__list) {
   display: flex;
   overflow-x: auto;
   border: 1px solid var(--fb-line);
@@ -384,7 +393,10 @@
   scrollbar-width: none;
 }
 
-.doc-tabs__list [role="tab"] {
+:is(.doc-tabs__list, .doc-install__list) [role="tab"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   flex: 0 0 auto;
   padding: 9px 14px;
   border: 0;
@@ -399,19 +411,46 @@
   cursor: pointer;
 }
 
-.doc-tabs__list [role="tab"]:hover {
+:is(.doc-tabs__list, .doc-install__list) [role="tab"]:hover {
   color: var(--fb-fg);
 }
 
-.doc-tabs__list [role="tab"][aria-selected="true"] {
+:is(.doc-tabs__list, .doc-install__list) [role="tab"][aria-selected="true"] {
   border-bottom-color: var(--fb-fg);
   background: var(--fb-surface);
   color: var(--fb-fg);
 }
 
-.doc-tabs__list [role="tab"]:focus-visible {
+:is(.doc-tabs__list, .doc-install__list) [role="tab"]:focus-visible {
   outline: 2px solid var(--fb-fg);
   outline-offset: -2px;
+}
+
+/* Install commands: a tab per package manager, the command on one line. */
+.doc-install {
+  margin: 18px 0;
+}
+
+.doc-install__list [role="tab"] {
+  text-transform: none;
+}
+
+.doc-install [role="tabpanel"] > .doc-code {
+  margin: 0;
+}
+
+.doc-install .doc-code__lang {
+  display: none;
+}
+
+.doc-install .doc-code pre.highlights {
+  padding: 12px calc(74px + 18px) 12px 18px;
+}
+
+.doc-install .fb-copy {
+  bottom: 0;
+  height: auto;
+  border-bottom: 0;
 }
 
 .doc-live {
@@ -436,54 +475,19 @@
   border-top: 0;
 }
 
-/* Landing page */
+/* Landing page: the example site's, with the install command in its hero. */
 
-.landing-demo {
-  display: grid;
-  align-content: center;
-  padding: clamp(20px, 3vw, 40px) var(--fb-gutter);
-}
-
-.landing-install {
-  justify-self: start;
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--fb-line);
-  background: var(--fb-surface);
-  font-family: var(--fb-font-mono);
-  font-size: 13px;
-}
-
-.landing-tabs {
-  margin: 0 var(--fb-gutter) 40px;
-}
-
-.landing-tabs .doc-tabs {
+.landing .hero__copy > .doc-install {
+  width: min(100%, 460px);
   margin: 0;
 }
 
-.landing .section > .landing-features,
-.landing .section > .landing-links {
+.landing .roadmap-teaser {
   --fb-columns: 3;
-  margin: 0 var(--fb-gutter) 40px;
-}
-
-.landing .section > .landing-links {
-  --fb-columns: 2;
 }
 
 @media (max-width: 900px) {
-  .landing .hero {
-    grid-template-columns: 1fr;
-  }
-
-  .landing .hero__copy {
-    border-right: 0;
-    border-bottom: 1px solid var(--fb-line);
-  }
-
-  .landing .section > .landing-features,
-  .landing .section > .landing-links {
+  .landing .roadmap-teaser {
     --fb-columns: 1;
   }
 }

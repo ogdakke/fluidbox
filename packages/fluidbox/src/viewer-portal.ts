@@ -7,6 +7,8 @@ export interface ViewerPortalElements {
   readonly media: HTMLImageElement;
   readonly status: HTMLSpanElement;
   readonly portalTarget: HTMLDivElement;
+  /** Where add-ons put what floats over the slides, apart from the content drawn into the layer. */
+  readonly addons: HTMLDivElement;
 }
 
 function required<TElement extends Element>(root: ParentNode, selector: string): TElement {
@@ -35,6 +37,7 @@ export function createViewerPortal(
         <div data-fluidbox-frame><img data-fluidbox-media part="image" /></div>
         <span data-fluidbox-announcer role="status" aria-live="polite" aria-atomic="true"></span>
         <div data-fluidbox-portal></div>
+        <div data-fluidbox-addons></div>
       </div>
     </div>
   `;
@@ -48,6 +51,7 @@ export function createViewerPortal(
     media: required(overlay, "[data-fluidbox-media]"),
     status: required(overlay, "[data-fluidbox-announcer]"),
     portalTarget: required(overlay, "[data-fluidbox-portal]"),
+    addons: required(overlay, "[data-fluidbox-addons]"),
   };
 }
 

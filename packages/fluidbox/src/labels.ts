@@ -22,6 +22,7 @@ export interface FluidboxLabels {
   readonly retry: string;
 }
 
+/** The labels the viewer uses for any you don't pass. */
 export const defaultLabels: FluidboxLabels = Object.freeze({
   viewer: "Media viewer",
   close: "Close",
@@ -37,6 +38,7 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   retry: "Retry",
 });
 
+/** Your labels over the defaults. */
 export function resolveLabels(labels: Partial<FluidboxLabels> | undefined): FluidboxLabels {
   return labels ? Object.freeze({ ...defaultLabels, ...labels }) : defaultLabels;
 }

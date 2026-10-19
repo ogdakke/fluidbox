@@ -20,6 +20,7 @@ import { album, countText, coverAlt, customViewerText, type MountLive } from "./
           >
         </span>
       </button>
+      <ng-container fluidboxFilmstrip />
       @if (viewer()) {
         <ng-template fluidboxViewer>
           <p class="live-viewer" data-test="custom-viewer">{{ customViewerText }}</p>

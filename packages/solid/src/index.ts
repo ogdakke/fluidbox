@@ -1,3 +1,4 @@
+/** The Solid binding: the `Fluidbox` parts and the `useFluidbox` and `useFluidboxSheet` primitives. */
 import {
   children as resolveChildren,
   createComponent,
@@ -88,6 +89,7 @@ export type {
   FluidboxItem,
   FluidboxItemChangeEvent,
   FluidboxItemList,
+  FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOrigin,

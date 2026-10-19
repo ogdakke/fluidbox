@@ -5,6 +5,7 @@ import {
   type FluidboxEventMap,
 } from "./public-api";
 
+/** The six event names, for bindings that forward them as props, emits or outputs. */
 export const fluidboxEventTypes = [
   "beforetoggle",
   "toggle",

@@ -1,5 +1,7 @@
-// Importing this entry turns on the `filmstrip` option of createFluidbox and the
-// bindings' Filmstrip part.
+/**
+ * The filmstrip add-on. Importing it turns on the `filmstrip` option and the
+ * bindings' `Filmstrip` part. Its stylesheet is `@ogdakke/fluidbox/filmstrip.css`.
+ */
 import { registerAddon } from "./addons";
 import { createFilmstrip } from "./filmstrip-extension";
 

@@ -11,7 +11,7 @@ export class FluidboxFilmstripElement extends HTMLElement {
     this.hidden = true;
   }
 
-  get render() {
+  get render(): FluidboxRenderer<any> | undefined {
     return this.#render;
   }
 
@@ -40,7 +40,7 @@ export class FluidboxSheetElement extends HTMLElement {
       this.dispatchEvent(new Event("fluidbox-addon-change", { bubbles: true }));
   }
 
-  get render() {
+  get render(): FluidboxRenderer<any> | undefined {
     return this.#render;
   }
 

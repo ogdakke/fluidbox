@@ -1,3 +1,4 @@
+import "@ogdakke/fluidbox/filmstrip";
 import {
   createFluidbox,
   type FluidboxImageItem,
@@ -6,7 +7,7 @@ import {
 import { album, countText, coverAlt, customViewerText, type MountLive } from "./shared";
 
 export const mount: MountLive = (root) => {
-  const fluidbox = createFluidbox({ items: album });
+  const fluidbox = createFluidbox({ items: album, filmstrip: true });
 
   const button = document.createElement("button");
   button.type = "button";
@@ -33,8 +34,8 @@ export const mount: MountLive = (root) => {
     text.dataset.test = "custom-viewer";
     text.textContent = customViewerText;
     target.append(text);
-    // The layer is yours: take out what you put in.
-    return () => text.remove();
+    // The layer is yours, so clearing it all is fine: the filmstrip lives beside it.
+    return () => target.replaceChildren();
   };
 
   return {

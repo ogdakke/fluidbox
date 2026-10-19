@@ -2,6 +2,8 @@
 import "@ogdakke/fluidbox/styles.css";
 import "@ogdakke/fluidbox/filmstrip.css";
 import "./index.css";
+import { mountCopyButtons } from "./copy";
+import { uiIcon } from "./icons";
 
 export type NavLink = { readonly href: string; readonly label: string; readonly key?: string };
 
@@ -38,8 +40,6 @@ function currentTheme(): "light" | "dark" {
   return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-const sun = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
-
 const link = (item: NavLink, active?: string) =>
   `<a href="${item.href}"${item.key !== undefined && item.key === active ? ' aria-current="page"' : ""}>${item.label}</a>`;
 
@@ -57,7 +57,7 @@ export function mountChrome(options: ChromeOptions): void {
       <nav class="fb-nav" aria-label="Pages">
         ${options.links.map((item) => link(item, options.active)).join("")}
       </nav>
-      <button type="button" class="fb-theme-toggle" aria-label="Toggle color theme">${sun}</button>
+      <button type="button" class="fb-theme-toggle" aria-label="Toggle color theme">${uiIcon("sun", 15)}</button>
     </div>`;
   header.querySelector("button")!.addEventListener("click", () => {
     const next = currentTheme() === "dark" ? "light" : "dark";
@@ -82,4 +82,5 @@ export function mountChrome(options: ChromeOptions): void {
       <nav aria-label="Footer">${(options.footer ?? []).map((item) => link(item)).join("<span>/</span>")}</nav>
     </div>`;
   document.body.append(footer);
+  mountCopyButtons();
 }

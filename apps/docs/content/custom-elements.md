@@ -7,7 +7,7 @@ description: The fluidbox custom elements, with every element, attribute, proper
 
 # Custom elements
 
-`@ogdakke/fluidbox/elements` registers `<fluidbox-gallery>`, `<fluidbox-item>`, `<fluidbox-filmstrip>` and `<fluidbox-sheet>`. You write the gallery as markup; the gallery reads it into items and owns one fluidbox for them. No framework is needed, and the elements work inside any framework that renders plain HTML.
+`@ogdakke/fluidbox/elements` registers `<fluidbox-gallery>`, `<fluidbox-item>`, `<fluidbox-filmstrip>` and `<fluidbox-sheet>`. You write the gallery as markup. The gallery reads it into items and owns one fluidbox for them. The elements need no framework, and work inside any framework that renders plain HTML.
 
 ## Install
 
@@ -91,7 +91,7 @@ The template's root element becomes a flat item, attribute for attribute:
 | `<iframe src>`                          | `iframe`  | `src`, `width` and `height` (required), `title`, `allow`, `referrerpolicy` and `sandbox`.                                                         |
 | anything else                           | `custom`  | The template is cloned into the slide. `width` and `height` on the root set its size; without them, the trigger image's size.                     |
 
-A `<video>` reads its boolean attributes as HTML does: present is on. So write `controls` and `playsinline` on it, as you would on the page. See [Media types](./media.md) for what each type does in the viewer.
+The gallery reads the boolean attributes of a `<video>` as HTML does, so an attribute that is present is on. Write `controls` and `playsinline` on it, as you would on the page. See [Media types](./media.md) for what each type does in the viewer.
 
 | Property  | Type                  | What it is                              |
 | --------- | --------------------- | --------------------------------------- |
@@ -149,7 +149,7 @@ gallery.subscribe((state) => console.log(state.status, state.index));
 await gallery.open("fjord");
 ```
 
-The listeners are typed through the gallery's event map. The event classes, `FluidboxItemChangeEvent`, `FluidboxSheetEvent` and `FluidboxToggleEvent`, are exported from `@ogdakke/fluidbox`.
+The listeners are typed through the gallery's event map. `@ogdakke/fluidbox` exports the event classes, `FluidboxItemChangeEvent`, `FluidboxSheetEvent` and `FluidboxToggleEvent`.
 
 ## Markers
 
@@ -166,7 +166,7 @@ Each trigger also gets `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `ar
 
 ## Viewer content
 
-The viewer's layer is filled by the first of these that exists:
+The gallery fills the viewer's layer with the first of these that exists:
 
 1. the `viewer` property, a renderer called with `{ target, fluidbox, signal }`, as the [`viewer` option](./javascript.md#viewer-content);
 2. a `<template slot="viewer">` that is a direct child of the gallery, cloned into the viewer, where `<fluidbox-controls>` expands to the default buttons;
@@ -184,7 +184,7 @@ The viewer's layer is filled by the first of these that exists:
 
 ## Filmstrip and sheet
 
-A `<fluidbox-filmstrip>` child turns the filmstrip on, and a `<fluidbox-sheet>` child the sheet. The gallery loads their add-on code itself, so you don't import `@ogdakke/fluidbox/filmstrip` or `/sheet`; each still needs its stylesheet, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
+A `<fluidbox-filmstrip>` child turns the filmstrip on, and a `<fluidbox-sheet>` child the sheet. The gallery loads their add-on code itself, so you don't import `@ogdakke/fluidbox/filmstrip` or `/sheet`. Each still needs its stylesheet, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
 
 | `<fluidbox-sheet>` attribute | What it does                                                                           |
 | ---------------------------- | -------------------------------------------------------------------------------------- |
@@ -216,10 +216,10 @@ strip.render = ({ index, target }) => {
 
 ## Notes
 
-**Markup changes are picked up.** The gallery watches its children. Adding or removing items, or changing an item's `item-id`, `returns`, `placeholder`, `aria-label` or `slot`, re-reads the items on the next microtask; an open viewer stays on the same item id if it is still there. Inside a trigger, the content is yours: swapping its picture, as an album cover does, changes nothing in the gallery, and its thumbnail is read when the item is. A `<template slot="content">` is read when the items are re-read.
+**Markup changes are picked up.** The gallery watches its children. Adding or removing items, or changing an item's `item-id`, `returns`, `placeholder`, `aria-label` or `slot`, re-reads the items on the next microtask. An open viewer stays on the same item id if it is still there. The content inside a trigger is yours. Swapping its picture, as an album cover does, changes nothing in the gallery. The gallery reads the trigger's thumbnail when it reads the item, and reads a `<template slot="content">` when it re-reads the items.
 
 **Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step` or `zoom-max`, adding or removing a `<fluidbox-filmstrip>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
 
-**Focus.** After a close whose trigger is gone, the gallery focuses itself (it gets `tabindex="-1"` unless it has one), so focus doesn't fall to the page.
+**Focus.** After a close whose trigger is gone, the gallery focuses itself, so focus doesn't fall to the page. For that it sets `tabindex="-1"` on itself, unless it already has one.
 
 **Removing the gallery** from the document destroys its viewer.

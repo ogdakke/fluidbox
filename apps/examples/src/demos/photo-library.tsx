@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
-import type {
-  FluidboxItemChangeEvent,
-  FluidboxImageItem,
-  FluidboxItemList,
-  FluidboxOriginAdapter,
-  FluidboxRevealContext,
+import {
+  createItemList,
+  type FluidboxItemChangeEvent,
+  type FluidboxImageItem,
+  type FluidboxOriginAdapter,
+  type FluidboxRevealContext,
 } from "@ogdakke/fluidbox";
 import "./photo-library.css";
 
@@ -113,20 +113,15 @@ export function PhotoLibrary({
   const [lastViewed, setLastViewed] = useState<number | null>(null);
   const pendingResizeAnchor = useRef<number | null>(null);
   const { rows, photoToRow } = useMemo(() => makeRows(count, columns), [count, columns]);
-  const items = useMemo<FluidboxItemList<PhotoItem>>(() => {
-    return {
-      count,
-      get(index) {
-        return photoAt(index, images);
-      },
-      indexOf(id) {
-        const index = Number(id.slice("synthetic-photo-".length));
-        return Number.isInteger(index) && index >= 0 && index < count && photoId(index) === id
-          ? index
-          : -1;
-      },
-    };
-  }, [count, images]);
+  const items = useMemo(
+    () =>
+      createItemList({
+        count,
+        item: (index) => photoAt(index, images),
+        index: (id) => Number(id.slice("synthetic-photo-".length)),
+      }),
+    [count, images],
+  );
   const originAdapter = useMemo<FluidboxOriginAdapter<PhotoItem>>(
     () => ({
       getOrigin(id) {

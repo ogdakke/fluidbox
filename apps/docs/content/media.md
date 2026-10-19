@@ -9,7 +9,7 @@ description: Every item type (img, video, iframe, custom) with all their fields,
 
 An item is one of four types: `"img"`, `"video"`, `"iframe"` or `"custom"`. They share one slide strip, one set of gestures and the same flights. Their fields are the attributes of the element the viewer draws, by DOM property name, so `srcset`, `poster` and `referrerPolicy` mean what they mean on `<img>`, `<video>` and `<iframe>`.
 
-Every type needs `width` and `height` in pixels: the viewer uses their ratio to size the slide before anything loads.
+Every type needs `width` and `height` in pixels. The viewer uses their ratio to size the slide before anything loads.
 
 Every type can also have:
 
@@ -133,7 +133,7 @@ The iframe gets `loading="lazy"` and `allowfullscreen`. An embedded page paints 
 | Field    | Type       | What it does                                           |
 | -------- | ---------- | ------------------------------------------------------ |
 | `type`   | `"custom"` | Required.                                              |
-| `id`     | `string`   | Required: custom content has no `src` to fall back on. |
+| `id`     | `string`   | Required. Custom content has no `src` to fall back on. |
 | `render` | `string`   | Required. The key of a renderer in `renderers`.        |
 | `title`  | `string`   | Required. The content's accessible name.               |
 | `width`  | `number`   | Required. The width the content is laid out at.        |
@@ -141,7 +141,7 @@ The iframe gets `loading="lazy"` and `allowfullscreen`. An embedded page paints 
 
 ### Renderers
 
-A renderer is a function. It gets `{ item, index, target, signal }`: draw into `target`, the slide's element. You may return a function that releases your own resources, such as timers or listeners; the viewer empties `target` itself afterwards. `signal` aborts at the same moment.
+A renderer is a function. It gets `{ item, index, target, signal }` and draws into `target`, the slide's element. You may return a function that releases your own resources, such as timers or listeners. The viewer empties `target` itself afterwards. `signal` aborts at the same moment.
 
 ```ts
 import { createFluidbox, type FluidboxRenderer } from "@ogdakke/fluidbox";
@@ -161,7 +161,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-The same renderer shape fills filmstrip thumbnails, the sheet and travelling overlays. The framework roots take `renderers` as framework components, keyed the same way, and they keep your app's context. Where a binding needs a wrapper (React does), it is marked `data-fluidbox-mount` and has `display: contents`, so your component's element still sizes to the slide as plain content does. An item whose renderer is missing throws a `TypeError` when its slide loads.
+The same renderer shape fills filmstrip thumbnails, the sheet and travelling overlays. The framework roots take `renderers` as framework components, keyed the same way, and they keep your app's context. When a binding needs a wrapper, as React does, the wrapper has `data-fluidbox-mount` and `display: contents`, so your component's element still sizes to the slide as plain content does. An item whose renderer is missing throws a `TypeError` when its slide loads.
 
 A custom slide mounts when it comes within one slide of the current one, and its cleanup runs when it moves further away. Keep state you need in your app, not in the mounted nodes. Clicks on buttons, links and fields inside custom content never count as zoom taps.
 
@@ -182,7 +182,7 @@ The filmstrip tries the `thumbnail`, then the full image or the video's poster, 
 
 ## Fields of your own
 
-Items are yours: add any field, and the viewer hands your object back in every state, event and callback. Type them by extending an item type, and the type flows through:
+Items are your own objects. Add any field, and the viewer hands your object back in every state, event and callback. Type them by extending an item type, and the type flows through:
 
 ```ts
 import { createFluidbox, type FluidboxImageItem } from "@ogdakke/fluidbox";
@@ -205,4 +205,4 @@ createFluidbox<Photo>({
 });
 ```
 
-Content in the viewer fades in and out with the controls; see [Styling](./styling.md#your-own-controls). [Headless controls](./patterns/headless.md) builds a caption bar in every framework.
+Content in the viewer fades in and out with the controls. See [Styling](./styling.md#your-own-controls). [Headless controls](./patterns/headless.md) builds a caption bar in every framework.

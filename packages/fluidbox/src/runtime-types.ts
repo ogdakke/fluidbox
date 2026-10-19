@@ -124,6 +124,12 @@ export interface FluidboxZoomOptions {
 export interface FluidboxExtensionContext<TItem extends FluidboxItem = FluidboxItem> {
   /** The viewer dialog. Extensions add their own elements and attributes to it. */
   readonly dialog: HTMLElement;
+  /**
+   * Beside the viewer's layer, for what floats over the slides, as a
+   * filmstrip. A redraw of the layer never touches it. Mark what goes in it
+   * data-fluidbox-chrome to reveal and hide with the layer.
+   */
+  readonly layer: HTMLElement;
   readonly controller: SessionController<TItem>;
   readonly source: FluidboxSource<TItem>;
   readonly labels: FluidboxLabels;

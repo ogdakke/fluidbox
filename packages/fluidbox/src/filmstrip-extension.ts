@@ -14,7 +14,7 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
   return {
     handle: null,
     extension: {
-      mount({ dialog, controller, source, labels }) {
+      mount({ dialog, layer, controller, source, labels }) {
         let current: FluidboxSource<FluidboxItem> = source;
         let session: FilmstripSession<FluidboxItem> | undefined;
         const build = () => {
@@ -29,7 +29,7 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
             requestedIndex ?? activeIndex ?? 0,
             { renderItem, labels },
           );
-          (dialog.querySelector("[data-fluidbox-portal]") ?? dialog).append(session.dock);
+          layer.append(session.dock);
           session.mount();
         };
         build();

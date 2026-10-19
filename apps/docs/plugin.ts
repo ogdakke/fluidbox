@@ -1,10 +1,13 @@
 // Builds the docs from content/**/*.md: one route per page under /docs/, framework tabs for
 // every pattern (code from apps/examples/src/patterns), prerendered HTML for each route, and
-// plain Markdown copies plus llms.txt for agents.
+// plain Markdown copies plus llms.txt for agents. The API reference's code is read from the
+// package source (see api-source.ts).
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, posix, relative } from "node:path";
 import MarkdownIt from "markdown-it";
+import { apiSources, checkApiCoverage, expandApi, isApiSource } from "./api-source";
 import { highlight } from "../design/highlight";
+import { frameworkIcon } from "../design/icons";
 import type { Plugin, ViteDevServer } from "vite";
 import { exampleRegions } from "../examples/src/patterns/regions";
 import { frameworks, type Framework } from "./src/frameworks";
@@ -47,6 +50,36 @@ function frontmatter(source: string): [Record<string, string>, string] {
 
 const codeBlock = (code: string, lang: string, label = lang || "text") =>
   `<div class="doc-code"><span class="doc-code__lang">${label}</span>${highlight(code, lang)}</div>`;
+
+/** The package managers an install command is shown for, in tab order. */
+const packageManagers = [
+  { key: "npm", add: "npm install" },
+  { key: "pnpm", add: "pnpm add" },
+  { key: "yarn", add: "yarn add" },
+  { key: "bun", add: "bun add" },
+] as const;
+
+/** A one-line `npm install …` as tabs, one per package manager; anything else is null. */
+export function installTabs(code: string, lang = "bash"): string | null {
+  const match = /^npm install ([^\n]+?)\s*$/.exec(code);
+  if (!match || !["bash", "sh", "shell"].includes(lang)) return null;
+  const packages = match[1]!;
+  const tabs = packageManagers
+    .map(
+      ({ key }, index) =>
+        `<button type="button" role="tab" data-package-manager="${key}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}">${key}</button>`,
+    )
+    .join("");
+  const panels = packageManagers
+    .map(
+      ({ key, add }, index) =>
+        `<div role="tabpanel" data-package-manager="${key}"${index === 0 ? "" : " hidden"}>${codeBlock(`${add} ${packages}`, "bash", "shell")}</div>`,
+    )
+    .join("");
+  return `<div class="doc-install"><div class="doc-install__list" role="tablist" aria-label="Package manager">${tabs}</div>${panels}</div>`;
+}
+
+const INSTALL_DIRECTIVE = /<!--\s*install:\s*([^>]+?)\s*-->/g;
 
 /**
  * Shared example data reads as a local module (shown in the patterns overview); the tests'
@@ -126,7 +159,7 @@ export function patternTabs(pattern: string): string {
   const tabs = frameworks
     .map(
       ({ key, label }, index) =>
-        `<button type="button" role="tab" data-framework="${key}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}">${label}</button>`,
+        `<button type="button" role="tab" data-framework="${key}" aria-selected="${index === 0}" tabindex="${index === 0 ? 0 : -1}">${frameworkIcon(key)}${label}</button>`,
     )
     .join("");
   const panels = frameworks
@@ -166,7 +199,12 @@ const PATTERN_DIRECTIVE = /<!--\s*pattern:\s*([\w-]+)\s*-->/g;
 
 function createRenderer() {
   const md = new MarkdownIt({ html: true, linkify: true });
-  md.options.highlight = (code, lang) => codeBlock(code, lang);
+  // A fence renders as its frame alone; markdown-it would wrap it in a second <pre>.
+  md.renderer.rules.fence = (tokens, idx) => {
+    const { content, info } = tokens[idx]!;
+    const lang = info.trim().split(/\s+/)[0] ?? "";
+    return installTabs(content.replace(/\n$/, ""), lang) ?? codeBlock(content, lang);
+  };
   const defaultLinkOpen =
     md.renderer.rules.link_open ??
     ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
@@ -186,7 +224,8 @@ function createRenderer() {
 }
 
 function renderPage(md: MarkdownIt, slug: string, source: string): DocPage {
-  const [data, body] = frontmatter(source);
+  const [data, written] = frontmatter(source);
+  const body = expandApi(written, slug);
   const tokens = md.parse(body, { slug });
   const headings: DocHeading[] = [];
   let title = data.title ?? slug;
@@ -254,7 +293,7 @@ function contentFiles(directory = contentDir): string[] {
 export function loadPages(): DocPage[] {
   checkExampleData(readFileSync(join(contentDir, "patterns/index.md"), "utf8"));
   const md = createRenderer();
-  return contentFiles()
+  const pages = contentFiles()
     .map((file) =>
       renderPage(
         md,
@@ -268,6 +307,7 @@ export function loadPages(): DocPage[] {
         a.order - b.order ||
         a.title.localeCompare(b.title),
     );
+  return pages;
 }
 
 const meta = ({ html: _html, markdown: _markdown, ...rest }: DocPage): DocMeta => rest;
@@ -316,7 +356,7 @@ export function prerender(shell: string, pages: DocPage[], path: string): string
   const index = pages.findIndex((page) => page.path === path);
   const page = pages[index];
   if (!page) return shell;
-  const title = page.slug === "index" ? "Fluidbox docs" : `${page.title} — Fluidbox docs`;
+  const title = page.slug === "index" ? "Fluidbox docs" : `${page.title} · Fluidbox docs`;
   return shell
     .replace(/<title>[^<]*<\/title>/, `<title>${escapeHtml(title)}</title>`)
     .replace(
@@ -339,7 +379,7 @@ export function prerender(shell: string, pages: DocPage[], path: string): string
 /** The docs shell with a not-found message, served for unknown routes. */
 function notFound(shell: string, pages: DocPage[]): string {
   return shell
-    .replace(/<title>[^<]*<\/title>/, "<title>Not found — Fluidbox docs</title>")
+    .replace(/<title>[^<]*<\/title>/, "<title>Not found · Fluidbox docs</title>")
     .replace(
       '<nav id="docs-nav"></nav>',
       `<nav id="docs-nav">${renderNav(pages.map(meta), "")}</nav>`,
@@ -354,7 +394,20 @@ const PAGES_ID = "virtual:docs-pages";
 const PAGE_PREFIX = "virtual:docs-page/";
 
 export function docsPlugin(): Plugin {
-  let pages = loadPages();
+  let pages: DocPage[] = [];
+  /** Why the docs don't match the source: fails a build, and shows in dev until fixed. */
+  let problem: string | null = null;
+  const refresh = () => {
+    try {
+      const loaded = loadPages();
+      checkApiCoverage(loaded);
+      pages = loaded;
+      problem = null;
+    } catch (error) {
+      problem = String(error);
+    }
+  };
+  refresh();
   let server: ViteDevServer | undefined;
   let outDir = "dist";
 
@@ -368,6 +421,7 @@ export function docsPlugin(): Plugin {
     name: "fluidbox-docs",
     configResolved(config) {
       outDir = config.build.outDir;
+      if (config.command === "build" && problem) throw new Error(problem);
     },
     resolveId(id) {
       if (id === PAGES_ID || id.startsWith(PAGE_PREFIX)) return `\0${id}`;
@@ -389,15 +443,29 @@ export function docsPlugin(): Plugin {
     },
     configureServer(dev) {
       server = dev;
-      dev.watcher.add([contentDir, patternsDir]);
+      dev.watcher.add([contentDir, patternsDir, ...apiSources]);
+      // Drift shows as the error overlay, and the last good pages stay up, until
+      // the docs and the source agree again.
+      const showProblem = () => {
+        if (!problem) return;
+        dev.config.logger.error(problem);
+        dev.ws.send({ type: "error", err: { message: problem, stack: "" } });
+      };
+      showProblem();
+      dev.ws.on("connection", showProblem);
       const reload = (file: string) => {
-        if (!file.startsWith(contentDir) && !file.startsWith(patternsDir)) return;
-        pages = loadPages();
+        const api = isApiSource(file);
+        if (!file.startsWith(contentDir) && !file.startsWith(patternsDir) && !api) return;
+        refresh();
+        if (problem) {
+          showProblem();
+          return;
+        }
         for (const module of dev.moduleGraph.idToModuleMap.values()) {
           if (module.id?.startsWith("\0virtual:docs-page"))
             dev.moduleGraph.invalidateModule(module);
         }
-        if (file.startsWith(contentDir)) dev.ws.send({ type: "full-reload" });
+        if (file.startsWith(contentDir) || api) dev.ws.send({ type: "full-reload" });
       };
       dev.watcher.on("change", reload);
       dev.watcher.on("add", reload);
@@ -426,7 +494,12 @@ export function docsPlugin(): Plugin {
       order: "post",
       handler(html, context) {
         // The landing page shows pattern tabs too.
-        html = html.replace(PATTERN_DIRECTIVE, (_, pattern: string) => patternTabs(pattern));
+        html = html
+          .replace(PATTERN_DIRECTIVE, (_, pattern: string) => patternTabs(pattern))
+          .replace(
+            INSTALL_DIRECTIVE,
+            (_, packages: string) => installTabs(`npm install ${packages}`)!,
+          );
         if (!server || !context.path.startsWith("/docs/")) return html;
         const path = new URL(context.originalUrl ?? "/docs/", "http://docs").pathname;
         return prerender(html, pages, path.endsWith("/") ? path : `${path}/`);

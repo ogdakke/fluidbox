@@ -133,7 +133,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   /** When the sheet comes to rest at another stop. */
   @Output() readonly sheetChange = new EventEmitter<FluidboxSheetEvent>();
 
-  /** Stands in for the viewer, so parts can bind before it exists. */
+  /** @internal Stands in for the viewer, so parts can bind before it exists. */
   readonly deferred: DeferredFluidbox<TItem> = createDeferredFluidbox<TItem>([]);
   readonly #state = signal(this.deferred.fluidbox.state);
   readonly #list = signal(this.deferred.fluidbox.items);
@@ -259,12 +259,12 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     return this.fluidbox.preload(target);
   }
 
-  /** For parts: called when the state or the items change. */
+  /** @internal For parts: called when the state or the items change. */
   watch(listener: () => void): () => void {
     return this.deferred.subscribe(listener);
   }
 
-  /** For parts: plug a viewer, filmstrip or sheet into the viewer. */
+  /** @internal For parts: plug a viewer, filmstrip or sheet into the viewer. */
   connect<K extends keyof Parts<TItem>>(kind: K, part: NonNullable<Parts<TItem>[K]>): () => void {
     this.#parts[kind] = part;
     this.schedule();
@@ -276,7 +276,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 
   /**
-   * Make the viewer after the current change detection pass, once every part
+   * @internal Make the viewer after the current change detection pass, once every part
    * inside has connected; after that, hand it what changed.
    */
   schedule(): void {

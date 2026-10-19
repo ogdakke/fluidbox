@@ -1,7 +1,9 @@
-/* The filmstrip. It is viewer content like your own: it mounts in the
-   viewer's layer, reveals and dismisses with the rest of it, and floats over
-   the slides. By default it runs along the bottom and keeps the photo clear
-   of itself; move [data-fluidbox-filmstrip-dock] anywhere with your own CSS,
+/* The filmstrip's layout and variables. */
+
+/* The filmstrip. It is viewer content like your own: it mounts beside the
+   viewer's layer, in [data-fluidbox-addons], reveals and dismisses with it
+   as data-fluidbox-chrome, and floats over the slides. By default it runs
+   along the bottom and keeps the photo clear of itself; move [data-fluidbox-filmstrip-dock] anywhere with your own CSS,
    and set --fluidbox-filmstrip-axis: y on the dialog to run it as a column.
    :where() keeps every rule here at zero specificity, so yours win. */
 :where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {

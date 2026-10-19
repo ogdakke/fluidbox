@@ -7,7 +7,7 @@ description: Nine common lightbox setups, each live and in every framework.
 
 # Patterns
 
-Each pattern is a small, complete example. Pick your framework in any tab; every page remembers the choice. The live example above the code is the code.
+Each pattern is a small, complete example. Pick your framework in any tab, and every page remembers the choice. The live example above the code runs that code.
 
 | Pattern                                   | Shows                                                         |
 | ----------------------------------------- | ------------------------------------------------------------- |
@@ -23,7 +23,7 @@ Each pattern is a small, complete example. Pick your framework in any tab; every
 
 ## The example data
 
-The examples import their items from `./data`. Each item is a plain object; this is that module, with the longer lists cut short:
+The examples import their items from `./data`. Each item is a plain object. Here is that module, with the longer lists cut short:
 
 ```ts
 import type { FluidboxImageItem, FluidboxItem } from "@ogdakke/fluidbox";
@@ -124,4 +124,4 @@ export const thumbnailSrc = (item: FluidboxItem) =>
   (item.type === "video" ? item.poster : item.type === "img" ? item.src : "");
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app (see [Getting started](../getting-started.md)). The class names (`pattern-grid`, `pattern-thumb`, …) are the examples' own styling; use yours.
+Import `@ogdakke/fluidbox/styles.css` once in your app (see [Getting started](../getting-started.md)). The class names (`pattern-grid`, `pattern-thumb`, …) belong to the examples. Use your own.

@@ -6,6 +6,7 @@ import { loaders, pages } from "virtual:docs-pages";
 import "./docs.css";
 import { mountDemos } from "./demos";
 import { renderArticle, renderNav, renderToc } from "./render";
+import { mountPackageManagers } from "./package-managers";
 import { mountTabs, unmountTabs } from "./tabs";
 import { siteLinks } from "./site";
 
@@ -26,7 +27,7 @@ async function render(path: string, hash: string) {
   nav.innerHTML = renderNav(pages, page?.path ?? "");
   if (!page) {
     unmountTabs();
-    document.title = "Not found — Fluidbox docs";
+    document.title = "Not found · Fluidbox docs";
     content.innerHTML = `<article class="prose"><p class="fb-label">404</p><h1>Page not found</h1><p>Try the <a href="/docs/">introduction</a>.</p></article>`;
     toc.replaceChildren();
     return;
@@ -34,7 +35,7 @@ async function render(path: string, hash: string) {
   const html = (await loaders[page.path]!()).default;
   if (id !== renderId) return;
   unmountTabs();
-  document.title = page.slug === "index" ? "Fluidbox docs" : `${page.title} — Fluidbox docs`;
+  document.title = page.slug === "index" ? "Fluidbox docs" : `${page.title} · Fluidbox docs`;
   content.innerHTML = renderArticle(page, html, pages[index - 1], pages[index + 1]);
   toc.innerHTML = renderToc(page.headings);
   show(hash);
@@ -43,6 +44,7 @@ async function render(path: string, hash: string) {
 function show(hash: string) {
   mountDemos(content);
   mountTabs(content);
+  mountPackageManagers(content);
   if (hash) document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView();
   else window.scrollTo(0, 0);
 }
@@ -67,6 +69,7 @@ if (content.childElementCount) {
   const hash = location.hash;
   mountDemos(content);
   mountTabs(content);
+  mountPackageManagers(content);
   if (hash) document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView();
 } else {
   void render(location.pathname, location.hash);

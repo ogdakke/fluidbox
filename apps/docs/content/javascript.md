@@ -7,7 +7,7 @@ description: The plain JavaScript API of fluidbox, with createFluidbox, the flui
 
 # JavaScript
 
-The package root, `@ogdakke/fluidbox`, runs the viewer without a framework or custom elements. `createFluidbox()` makes a fluidbox: one viewer at the end of `<body>`, with the state, commands and events that drive it. `fluidbox.bind()` makes an element open it.
+The package root, `@ogdakke/fluidbox`, runs the viewer without a framework or custom elements. `createFluidbox()` makes a fluidbox, which is one viewer at the end of `<body>` plus the state, commands and events that drive it. `fluidbox.bind()` makes an element open it.
 
 ## Install
 
@@ -20,7 +20,7 @@ import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. The filmstrip and the sheet are add-ons: see [Add-ons](#add-ons).
+Import `@ogdakke/fluidbox/styles.css` once in your app. The filmstrip and the sheet are add-ons, covered in [Add-ons](#add-ons).
 
 ## A gallery
 
@@ -55,7 +55,7 @@ document.querySelectorAll<HTMLButtonElement>(".gallery button").forEach((button,
 });
 ```
 
-The viewer has Previous, Next and Close buttons until you draw your own with `viewer`; then pass `controls: true`, or a list such as `["close"]`, to keep some. The same gallery, live, in every framework:
+The viewer has Previous, Next and Close buttons until you draw your own with `viewer`. To keep some of them next to yours, pass `controls: true` or a list such as `["close"]`. The same gallery, live, in every framework:
 
 <!-- pattern: basic -->
 
@@ -75,7 +75,7 @@ Returns a `Fluidbox`. Only `items` is required.
 | `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and `sheet.css`.                                                           |
 | `origins`   | `FluidboxOriginAdapter<TItem>`                            |                                       | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
 
-To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip` or `sheet`, call `update`; the open viewer stays open. To change the items, call `setItems`. `renderers` is looked up by name each time a custom slide mounts, and `origins` on each use.
+To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip` or `sheet`, call `update`. The open viewer stays open. To change the items, call `setItems`. The fluidbox looks up `renderers` by name each time a custom slide mounts, and reads `origins` on each use.
 
 ## The fluidbox
 
@@ -96,7 +96,7 @@ To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip` or `sheet`, call `
 | `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                   |
 | `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.        |
 
-A target is an item, its index or its id; an item object is matched by its id, so a copy of it works too. The fluidbox is an `EventTarget`; its events are below.
+A target is an item, its index or its id. The fluidbox matches an item object by its id, so a copy of it works too. The fluidbox is an `EventTarget`, with the events listed below.
 
 ### update
 
@@ -110,15 +110,15 @@ coarse.addEventListener("change", () => {
 fluidbox.update({ labels: { close: "Sulje", previous: "Edellinen", next: "Seuraava" } });
 ```
 
-Labels and zoom apply in place. A change of `controls`, `viewer` or the labels draws the viewer's layer again, and a change of `filmstrip` or `sheet` mounts that add-on again. Options objects are compared member by member, functions by identity, so keep `viewer` and the `render` functions the same from one call to the next.
+Labels and zoom apply in place. A change of `controls`, `viewer` or the labels draws the viewer's layer again, and a change of `filmstrip` or `sheet` mounts that add-on again. `update` compares options objects member by member and functions by identity, so pass the same `viewer` and `render` functions from one call to the next.
 
 ### Commands
 
-A target, `FluidboxTarget`, is an index or an id: `open(2)` or `open("photo-fjord")`. `options` is `{ signal?: AbortSignal, scrub?: boolean }`. `scrub: true` is for a move that follows a continuous input, as your own scrubber or a dragged row of dots: the slide jumps to the item rather than glide, and the page isn't scrolled to its trigger until you end with a move with `scrub: false`.
+A target, `FluidboxTarget`, is an item, its index or its id: `open(photo)`, `open(2)` or `open("photo-fjord")`. `options` is `{ signal?: AbortSignal, scrub?: boolean }`. Use `scrub: true` for a move that follows a continuous input, such as your own scrubber or a dragged row of dots. The slide jumps to the item instead of gliding. The fluidbox doesn't scroll the page to the item's trigger until the next move without `scrub`, which ends the scrub.
 
-Each command returns a promise that settles when the motion has: `open` once the viewer is open, `close` once it is closed, `next` once the slide has moved. It resolves `true` when the command happened, and `false` when it didn't: a listener prevented it, a later command took over, its signal aborted, or there was nothing to do, as `next()` on the last item or `close()` while closed.
+Each command returns a promise that settles when the motion has: `open` once the viewer is open, `close` once it is closed, `next` once the slide has moved. It resolves `true` when the command happened. It resolves `false` when a listener prevented it, a later command took over, its signal aborted, or there was nothing to do, as with `next()` on the last item or `close()` while closed.
 
-An unknown id or an index out of range rejects with a `RangeError`, and `preload` throws one. After `destroy()`, the commands resolve `false`, so a part still holding the old fluidbox does nothing; `setItems`, `preload`, `bind`, `bindOverlay` and `subscribe` throw an `InvalidStateError` `DOMException`.
+An unknown id or an index out of range rejects with a `RangeError`, and `preload` throws one. After `destroy()`, the commands resolve `false`, so a part of your app still holding the old fluidbox does nothing. `setItems`, `preload`, `bind`, `bindOverlay` and `subscribe` throw an `InvalidStateError` `DOMException`.
 
 ### State
 
@@ -134,7 +134,7 @@ interface FluidboxState<TItem> {
 }
 ```
 
-`id`, `index` and `item` are the item the viewer shows, or is on its way to while a move runs, and `null` while closed. `item` is your own object, the one you passed in. `subscribe` sees status and selection changes, not motion: per-frame motion is in CSS variables (see [Styling](./styling.md)).
+`id`, `index` and `item` are the item the viewer shows, or is on its way to while a move runs, and `null` while closed. `item` is your own object, the one you passed in. `subscribe` sees status and selection changes. It doesn't see motion, which runs frame by frame in CSS variables. [Styling](./styling.md) lists them.
 
 ### Events
 
@@ -160,7 +160,7 @@ Listen with `addEventListener`. The events are typed, so `event.reason` and `eve
 | `"wheel"`    | A wheel or trackpad scroll that dismisses the viewer.                              |
 | `"items"`    | `setItems`, when the new list moved the viewer to another item.                    |
 
-The before-events fire for every command that would do something, whether it comes from a key, a gesture or your code; `close()` while closed or `next()` on the last item fires nothing. For an open, the order is `beforetoggle`, `toggle`, `itemchange`, then after the flight `settle`, and the promise resolves.
+The before-events fire for every command that would do something, whether it comes from a key, a gesture or your code. `close()` while closed or `next()` on the last item fires nothing. An open fires `beforetoggle`, `toggle` and `itemchange`, then `settle` after the flight. Then the promise resolves.
 
 ```ts
 fluidbox.addEventListener("beforeitemchange", (event) => {
@@ -173,7 +173,7 @@ fluidbox.addEventListener("settle", ({ id }) => {
 
 ## Triggers
 
-`fluidbox.bind(element, target, options?)` makes an element a trigger. It registers the element as the origin of its item, so the flight starts and lands on it; starts loading the item on pointer down; and opens on click, unless the click was prevented. It adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to the element. Use an element that can take focus, such as a `<button>`. It returns a function that unbinds.
+`fluidbox.bind(element, target, options?)` makes an element a trigger. It registers the element as its item's origin, so the flight starts and lands there. It starts loading the item on pointer down, and opens the viewer on click unless a listener prevented the click. It adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to the element. Use an element that can take focus, such as a `<button>`. It returns a function that unbinds.
 
 | Option            | Type                                   | What it does                                                                                                                    |
 | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -181,11 +181,11 @@ fluidbox.addEventListener("settle", ({ id }) => {
 | `returns`         | `FluidboxTarget<TItem>[]`              | More items that close back onto the trigger. See [One trigger for several items](#one-trigger-for-several-items).               |
 | `onPreviewChange` | `(item: TItem, index: number) => void` | Called before the closing flight measures the trigger, with the item it lands on. Show that item on the trigger, synchronously. |
 
-The flight uses the trigger's first image, or an element inside it marked `data-fluidbox-origin`; see [Which element the flight uses](./items-and-origins.md#which-element-the-flight-uses).
+The flight uses the trigger's first image, or an element inside it marked `data-fluidbox-origin`. [Which element the flight uses](./items-and-origins.md#which-element-the-flight-uses) has the rules.
 
 ### One trigger for several items
 
-List more items in `returns`, and one element stands for all of them, as an album cover does. The target opens; it and every item of `returns` close back onto the element. `returns` may hold the whole album, the target included. After a close, a click opens the item the trigger last showed, so the flight starts from the picture on it:
+List more items in `returns`, and one element stands for all of them, as an album cover does. The viewer opens on the target, and the target and every item in `returns` close back onto the element. `returns` may hold the whole album, the target included. After a close, a click opens the item the trigger last showed, so the flight starts from the picture on it:
 
 ```ts
 fluidbox.bind(cover, album[0], {
@@ -202,7 +202,7 @@ Bindings follow `setItems`. An id that leaves the list stops being the trigger's
 
 ## Thumbnail overlays
 
-A badge, a play icon or a count on a thumbnail can follow the flight. `fluidbox.bindOverlay(element, target, options?)` makes an element inside a trigger a thumbnail overlay: it gets `--fluidbox-closed`, from `1` at the thumbnail to `0` fully open, and `data-fluidbox-phase`, as the viewer opens and closes. Without `travel`, it stays on the page.
+A badge, a play icon or a count on a thumbnail can follow the flight. `fluidbox.bindOverlay(element, target, options?)` makes an element inside a trigger a thumbnail overlay. As the viewer opens and closes, the element gets `--fluidbox-closed`, from `1` at the thumbnail to `0` fully open, and `data-fluidbox-phase`. Without `travel`, it stays on the page.
 
 | Option       | Type                                 | What it does                                                                                                           |
 | ------------ | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -226,7 +226,7 @@ fluidbox.bindOverlay(badge, "clip", {
 });
 ```
 
-The travelling content and the `frameLayer` scale with the flying frame, so their boxes always match it, and their direct children scale back so they keep the size they had on the thumbnail. A child scales back around the edge it sits against (left, right, top or bottom) or around its centre, so a corner badge stays in its corner and a centred label stays centred. Size children by their content, not by a percentage of the box: a child stretched to the box's width is stretched to the full-size frame. While the flight starts, the page shows a still copy of the `frameLayer` (marked `data-fluidbox-ghost`) in the thumbnail.
+The travelling content and the `frameLayer` scale with the flying frame, so their boxes match it. Their direct children scale back, so they keep the size they had on the thumbnail. A child scales back around the edge it sits against (left, right, top or bottom) or around its centre, so a corner badge stays in its corner and a centred label stays centred. Size children by their content. A child stretched to the box's width ends up as wide as the full-size frame. While the flight starts, the page shows a still copy of the `frameLayer`, marked `data-fluidbox-ghost`, in the thumbnail.
 
 The renderer gets `{ item, index, target, signal }`, like any [renderer](./media.md#custom). See [Styling](./styling.md#thumbnail-overlays) for the CSS hooks.
 
@@ -234,13 +234,13 @@ The renderer gets `{ item, index, target, signal }`, like any [renderer](./media
 
 The viewer's layer is yours to fill. The `viewer` option draws into it when the fluidbox is made, and again after an `update` that changes the layer:
 
-| Context field | What it is                                                       |
-| ------------- | ---------------------------------------------------------------- |
-| `target`      | The viewer's layer, `[data-fluidbox-portal]`.                    |
-| `fluidbox`    | The fluidbox. Use it here: your own variable isn't assigned yet. |
-| `signal`      | Aborts when the fluidbox is destroyed, or the layer is redrawn.  |
+| Context field | What it is                                                             |
+| ------------- | ---------------------------------------------------------------------- |
+| `target`      | The viewer's layer, `[data-fluidbox-portal]`.                          |
+| `fluidbox`    | The fluidbox. Use it here, since your own variable isn't assigned yet. |
+| `signal`      | Aborts when the fluidbox is destroyed, or the layer is redrawn.        |
 
-Return a function to clean up, such as the one `subscribe` returns. Everything in the layer hides during the opening flight and fades out as a close or a drag starts, like the default controls. `controls` and `viewer` go together: the default buttons come first, then yours.
+Return a function to clean up, such as the one `subscribe` returns. Everything in the layer hides during the opening flight and fades out as a close or a drag starts, like the default controls. `controls` and `viewer` combine, with the default buttons first and yours after.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
@@ -259,7 +259,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-The default buttons carry `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`. Any button in the viewer with one of them runs that command and is disabled while it can do nothing, and it gets the default styling. Call `event.preventDefault()` in your own click listener to stop the command. [Headless controls](./patterns/headless.md) has a full caption bar in every framework.
+The default buttons carry `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`. Any button in the viewer with one of them runs that command, gets the default styling, and is disabled while the command can do nothing. Call `event.preventDefault()` in your own click listener to stop the command. [Headless controls](./patterns/headless.md) has a full caption bar in every framework.
 
 ## Add-ons
 

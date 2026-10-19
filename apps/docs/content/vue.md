@@ -7,7 +7,7 @@ description: The Vue binding for fluidbox, with every component, composable, pro
 
 # Vue
 
-`@ogdakke/fluidbox/vue` builds a gallery from components: `Fluidbox.Root` owns one viewer, `Fluidbox.Trigger` opens it, and the other parts add to the viewer. It needs Vue 3.3 or later.
+`@ogdakke/fluidbox/vue` builds a gallery from components. `Fluidbox.Root` owns one viewer, `Fluidbox.Trigger` opens it, and the other parts add to the viewer. It needs Vue 3.3 or later.
 
 ## Install
 
@@ -99,9 +99,9 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 
 The events are the fluidbox's own; see [Events](./javascript.md#events) for their fields and reasons. `event.item` is your own object, of the type of `items`.
 
-Root makes one viewer when it mounts and keeps it until it unmounts. Changing `zoom` or `labels`, or adding or removing a `Viewer`, `Filmstrip` or `Sheet`, or changing the sheet's `snap-points` or `dismiss`, applies to that viewer in place, through `fluidbox.update()`, without closing it. They are compared by value, so an inline `:zoom="{ step: 3 }"` changes nothing on each render. A filmstrip or a sheet that changes is drawn again; a sheet that goes or comes back starts at rest. `items` changes go through `setItems`, and `origins`, `renderers` and the event listeners are read when used.
+Root makes one viewer when it mounts and keeps it until it unmounts. Changing `zoom` or `labels`, or adding or removing a `Viewer`, `Filmstrip` or `Sheet`, or changing the sheet's `snap-points` or `dismiss`, applies to that viewer in place, through `fluidbox.update()`, without closing it. Root compares these by value, so an inline `:zoom="{ step: 3 }"` changes nothing on each render. A filmstrip or a sheet that changes is drawn again. A sheet that goes or comes back starts at rest. `items` changes go through `setItems`. Root reads `origins`, `renderers` and the event listeners when it uses them.
 
-The default slot gets the `useFluidbox()` object: the state and the commands. Use it to drive the viewer from the same template:
+The default slot gets the `useFluidbox()` object, with the state and the commands. Use it to drive the viewer from the same template:
 
 ```vue
 <Fluidbox.Root v-slot="{ status, index, count, open }" :items="photos">
@@ -121,7 +121,7 @@ The default slot gets the `useFluidbox()` object: the state and the commands. Us
 
 An item's id is its `id`, else its `src`. Other attributes and listeners go to the button, or to the child with `as-child`. The rendered button gets `type="button"` unless you set `type`.
 
-The default slot gets `{ item, index, status }` (`FluidboxTriggerPreview`): the item the trigger shows. That is the item the viewer is on while it is open, then the last one it showed, so an album cover reopens on it. `item` is `null` when the trigger's items have left the list.
+The default slot gets `{ item, index, status }` (`FluidboxTriggerPreview`), which describes the item the trigger shows. While the viewer is open, that is the item it is on. After it closes, it is the last one it showed, so an album cover reopens on it. `item` is `null` when the trigger's items have left the list.
 
 The trigger adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to its element, and starts loading the item on pointer down.
 
@@ -135,7 +135,7 @@ It must be inside a `Trigger`, and registers for that trigger's `item` and `retu
 
 ### `Fluidbox.FrameLayer`
 
-No props. Inside a travelling `ThumbnailOverlay`, it renders a `<span data-fluidbox-frame-layer>` with its slot and attributes. For the flight, that element itself moves into the flying frame, with a copy left on the card, and goes back after: use it for what should fly as one piece, such as a border or a frame drawn around the photo. In the overlay's live copy in the frame it renders nothing, so it never shows twice.
+No props. Inside a travelling `ThumbnailOverlay`, it renders a `<span data-fluidbox-frame-layer>` with its slot and attributes. For the flight, that element itself moves into the flying frame, with a copy left on the card, and goes back after. Use it for what should fly as one piece, such as a border or a frame drawn around the photo. In the overlay's live copy in the frame it renders nothing, so it never shows twice.
 
 ```vue
 <Fluidbox.Trigger v-slot="{ item }" :item="album[0]" :returns="album">
@@ -157,7 +157,7 @@ With an empty slot each shows the default icon and an `aria-label` from `labels`
 
 ### `Fluidbox.Filmstrip`
 
-No props. Being there turns the filmstrip on. Without a slot, each thumbnail is the item's `thumbnail`, else its image. With a default slot, it renders into each thumbnail button and gets `{ item, index }` (`FluidboxItemContext`). The strip marks the selected button `data-fluidbox-selected`, so your thumbnail tracks nothing itself:
+No props. Rendering it turns the filmstrip on. Without a slot, each thumbnail is the item's `thumbnail`, else its image. With a default slot, it renders into each thumbnail button and gets `{ item, index }` (`FluidboxItemContext`). The strip marks the selected button `data-fluidbox-selected`, so your thumbnail tracks nothing itself:
 
 ```vue
 <Fluidbox.Filmstrip v-slot="{ index }">
@@ -172,7 +172,7 @@ No props. Being there turns the filmstrip on. Without a slot, each thumbnail is 
 | `snap-points` | `readonly FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
 | `dismiss`     | `"flight" \| "scroll" \| "none"`    | `"flight"`           | What a swipe down on the photo does with the sheet down. |
 
-Being there turns the sheet on. The runtime makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`, and the part's own attributes (`class`, `style`, `data-*`, `aria-*`) go on that section. Its default slot is the section's content for the active item, and gets `{ item, index }` (`FluidboxItemContext`). To read or move the sheet, listen for `@sheetchange` on Root, use a `SheetStop`, or call `useFluidboxSheet()` in a component inside Root: its `stop` is where the sheet rests, 0 at rest and then one per snap point, and `set(stop)` moves it. Import `@ogdakke/fluidbox/sheet.css` once. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
+Rendering it turns the sheet on. The runtime makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`, and the part's own attributes (`class`, `style`, `data-*`, `aria-*`) go on that section. Its default slot is the section's content for the active item, and gets `{ item, index }` (`FluidboxItemContext`). To read or move the sheet, listen for `@sheetchange` on Root, use a `SheetStop`, or call `useFluidboxSheet()` in a component inside Root. Its `stop` is where the sheet rests, 0 at rest and then one per snap point, and `set(stop)` moves it. Import `@ogdakke/fluidbox/sheet.css` once. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
 
 ```vue
 <Fluidbox.Root :items="photos" @sheetchange="stop = $event.stop">
@@ -184,7 +184,7 @@ Being there turns the sheet on. The runtime makes the sheet, a `<section data-fl
 </Fluidbox.Root>
 ```
 
-`Fluidbox.SheetStop` takes a required `stop` and renders a `<button data-fluidbox-sheet-stop>` that moves the sheet there, or back to 0 when it is there, and keeps `aria-expanded` in step. It works in the viewer: in a `Viewer`, or in the sheet.
+`Fluidbox.SheetStop` takes a required `stop` and renders a `<button data-fluidbox-sheet-stop>` that moves the sheet there, or back to 0 when it is there, and keeps `aria-expanded` in step. It works anywhere in the viewer, in a `Viewer` or in the sheet.
 
 ## Composables
 
@@ -209,7 +209,7 @@ const atEnd = useFluidbox((state) => !state.hasNext);
 </template>
 ```
 
-Read the object's fields where you use them, as `fluidbox.index`: destructuring it in `<script setup>` takes the values once. The commands are the fluidbox's: each resolves `true` once it happened and `false` when it didn't, as when an event listener prevented it. Commands made before the viewer exists wait for it, and run once Root has mounted. A target is the item, its index or its id: `open(photo)`, `open(2)` or `open("photo-fjord")`. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go.
+Read the object's fields where you use them, as `fluidbox.index`. Destructuring it in `<script setup>` reads the values once. The commands are the fluidbox's own. Each resolves `true` once it happened and `false` when it didn't, as when an event listener prevented it. Commands made before the viewer exists wait for it, and run once Root has mounted. A target is the item, its index or its id: `open(photo)`, `open(2)` or `open("photo-fjord")`. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go.
 
 ### Types
 
@@ -231,12 +231,12 @@ The entry exports the parts' types (`FluidboxApi`, `FluidboxCommands`, `Fluidbox
 
 ## Vue notes
 
-**Reactive items.** `items` can be a plain, `ref` or `reactive` array. Assigning a new array and changing a reactive array in place (`push`, `splice`, replacing an element) both replace the items; an array of the same objects, as an inline `:items="[product]"`, changes nothing. An open viewer stays on the same item id if the new items still have it. `useFluidbox().setItems` replaces them too, until `items` changes.
+**Reactive items.** `items` can be a plain, `ref` or `reactive` array. Assigning a new array and changing a reactive array in place (`push`, `splice`, replacing an element) both replace the items. An array of the same objects, as an inline `:items="[product]"`, changes nothing. An open viewer stays on the same item id if the new items still have it. `useFluidbox().setItems` replaces them too, until `items` changes.
 
 **Provide and inject reach custom content.** Renderers, viewer content, travelling overlays and the filmstrip and sheet content render through `Teleport` from inside `Fluidbox.Root`, so they see what is provided around it, as the [Custom content](./patterns/renderers.md) example does with a theme.
 
 **`as-child`.** The trigger clones its one slot child and merges your attributes and listeners onto it. A component child works if its root is an element. Your `@click` runs before the open; `event.preventDefault()` stops it. Use an element that can take focus, such as a `<button>` or `<a href>`.
 
-**Server rendering.** The components render their markup on the server; the viewer is created in `onMounted`.
+**Server rendering.** The components render their markup on the server; Root creates the viewer in `onMounted`.
 
 **Previews update before the close flight.** When the viewer closes on a different item of a multi-item trigger, the trigger patches its DOM synchronously so the flight lands on the right picture. The trigger finds its image when it registers, so keep the `<img>` mounted and change its `src`; don't swap in a new element.

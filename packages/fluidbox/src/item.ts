@@ -80,7 +80,7 @@ export type FluidboxPreviewChangeEvent = CustomEvent<{
  * changes inside a trigger as changes to its items.
  */
 export class FluidboxItemElement extends HTMLElement {
-  get itemId() {
+  get itemId(): string {
     const id = this.getAttribute("item-id")?.trim();
     if (!id) throw new TypeError("<fluidbox-item> requires a non-empty item-id attribute.");
     return id;
@@ -106,12 +106,14 @@ export class FluidboxItemElement extends HTMLElement {
     return slotted(this, "trigger", HTMLElement);
   }
 
+  /** @internal The gallery reads the content through `compile`. */
   get contentTemplate(): HTMLTemplateElement {
     const template = slotted(this, "content", HTMLTemplateElement);
     if (!template) throw new TypeError('<fluidbox-item> requires a <template slot="content">.');
     return template;
   }
 
+  /** @internal Called by the gallery to read the item. */
   compile(): DeclarativeFluidboxDefinition {
     const id = this.itemId;
     const trigger = this.trigger;

@@ -1,3 +1,5 @@
+/* The sheet's layout and variables. */
+
 /* Sheet extension. Import with @ogdakke/fluidbox/sheet. The photos and the sheet
    share one native scroller with a snap point per stop, so the browser moves
    both; animations on its scroll timeline do the rest.

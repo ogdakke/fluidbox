@@ -1,5 +1,7 @@
-// Importing this entry turns on the `sheet` option of createFluidbox and the
-// bindings' Sheet part. Its stylesheet is `@ogdakke/fluidbox/sheet.css`.
+/**
+ * The sheet add-on. Importing it turns on the `sheet` option and the bindings'
+ * `Sheet` part. Its stylesheet is `@ogdakke/fluidbox/sheet.css`.
+ */
 import { registerAddon } from "./addons";
 import { createSheet } from "./sheet";
 

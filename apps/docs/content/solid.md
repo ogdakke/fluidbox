@@ -20,7 +20,7 @@ import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/solid
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. `Fluidbox.Filmstrip` and `Fluidbox.Sheet` turn their add-ons on themselves; each needs its stylesheet too, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
+Import `@ogdakke/fluidbox/styles.css` once in your app. `Fluidbox.Filmstrip` and `Fluidbox.Sheet` turn their add-ons on by themselves. Each also needs its stylesheet, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 
@@ -115,7 +115,7 @@ All parts are properties of the `Fluidbox` object.
 | `children` | `JSX.Element \| (preview: Accessor<{ item, index, status }>) => JSX.Element` |            | Content, or a function of the preview that follows the viewer.                           |
 | ...        | attributes and event handlers                                                |            | Passed to the element. A button gets `type="button"`.                                    |
 
-The preview accessor returns `FluidboxTriggerPreview<TItem>`: `item: TItem | null`, `index: number | null` and `status`. `item` is the item the trigger shows: the one the viewer is on while it is open (if it is `item` or one of `returns`), then the last one it showed. It is `null` when the trigger's items have left the list.
+The preview accessor returns `FluidboxTriggerPreview<TItem>`: `item: TItem | null`, `index: number | null` and `status`. `item` is the item the trigger shows. While the viewer is open on `item` or one of `returns`, that is the item the viewer is on. Otherwise it is the last one the trigger showed. It is `null` when the trigger's items have left the list.
 
 ```tsx
 <Fluidbox.Trigger item={album[0]} returns={album}>
@@ -132,11 +132,11 @@ The trigger adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-exp
 | `travel` | `boolean`       | `false` | Fly with the photo. Without it, the overlay stays on the page and gets `--fluidbox-closed`. |
 | ...      | span attributes |         | Including `ref`.                                                                            |
 
-It must be inside a `Fluidbox.Trigger`, and registers for that trigger's `item` and `returns`. It gets `data-fluidbox-phase` as the viewer opens and closes. With `travel`, the children render again, live, in the flying frame, under the same context.
+It must be inside a `Fluidbox.Trigger`, and registers for that trigger's `item` and `returns`. It gets `data-fluidbox-phase` as the viewer opens and closes. With `travel`, its children also render live in the flying frame, under the same context.
 
 ### `Fluidbox.FrameLayer`
 
-It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbox-frame-layer>` with its children and span attributes. For the flight the element itself moves into the flying frame and scales with it, as a scrim or a border does, then goes back; the frame's live copy of the overlay leaves it out, so it never shows twice.
+It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbox-frame-layer>` with its children and span attributes. On each flight, the element itself moves into the flying frame, scales with it, and then goes back. Use it for a scrim or a border. The frame's live copy of the overlay leaves it out, so it never shows twice.
 
 ```tsx
 <Fluidbox.ThumbnailOverlay travel class="badge">
@@ -146,11 +146,11 @@ It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbo
 
 ### `Fluidbox.Viewer` and `Fluidbox.Controls`
 
-`Fluidbox.Viewer` takes only `children` and renders them into the viewer's layer while the viewer exists. While a `Viewer` is mounted the viewer has no default controls: put `Fluidbox.Controls`, or `Previous`, `Next` and `Close`, where you want them. `Fluidbox.Controls` takes no props.
+`Fluidbox.Viewer` takes only `children` and renders them into the viewer's layer while the viewer exists. While a `Viewer` is mounted, the viewer has no default controls. Put `Fluidbox.Controls`, or `Previous`, `Next` and `Close`, where you want them. `Fluidbox.Controls` takes no props.
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
-Each takes button attributes. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of the gallery, `Close` while the viewer is closed. Pass `disabled` to override it. Your `onClick` runs first; `event.preventDefault()` stops the command.
+Each takes button attributes. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of the gallery, `Close` while the viewer is closed. Pass `disabled` to override it. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
 
 ### `Fluidbox.Filmstrip`
 
@@ -169,7 +169,7 @@ The strip marks the selected button `data-fluidbox-selected`, so your thumbnail 
 | `children`   | `(active: { item, index }) => JSX.Element` |                      | The content for the active item. It renders again when the active item changes.  |
 | ...          | section attributes                         |                      | `class`, `style`, `data-*`, `aria-*` and the rest go on the sheet's `<section>`. |
 
-The sheet is a `<section data-fluidbox-sheet>` the runtime makes, named by `labels.sheet`; the content renders straight into it, with the `Sheet`'s attributes, and no wrapper of its own. `active` is a `FluidboxItemContext<TItem>`, as a `Filmstrip` thumbnail's is. `Fluidbox.SheetStop` takes `stop: number` and button attributes; it is a button with `data-fluidbox-sheet-stop`, which works anywhere in the viewer. Pressed at its own stop, it lowers the sheet to 0.
+The runtime makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`. The content renders straight into it with no wrapper of its own, and the section gets the `Sheet`'s attributes. `active` is a `FluidboxItemContext<TItem>`, as a `Filmstrip` thumbnail's is. `Fluidbox.SheetStop` takes `stop: number` and button attributes. It is a button with `data-fluidbox-sheet-stop`, which works anywhere in the viewer. Pressed at its own stop, it lowers the sheet to 0.
 
 ## Hooks
 
@@ -181,7 +181,7 @@ Call them in a component inside `Fluidbox.Root`, including the content of `Viewe
 | `useFluidbox(selector)` | `Accessor<T>`                                                            | A memo of the part of `FluidboxState` the selector picks.                                                                                      |
 | `useFluidboxSheet()`    | `FluidboxSheetApi`: `{ stop: Accessor<number>, set(stop, { animate }) }` | The stop the sheet rests at, following `sheetchange`, and a command to move it. Needs a `Fluidbox.Sheet`.                                      |
 
-The state fields of `useFluidbox()` are reactive getters, as Solid props are: read them in JSX or an effect, and don't destructure them. `open` takes the item, its id or its index. Commands return a `Promise<boolean>`: `true` once the command happened, `false` when it was prevented or superseded. A command made before the viewer exists waits for it. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go.
+The state fields of `useFluidbox()` are reactive getters, like Solid props. Read them in JSX or an effect, and don't destructure them. `open` takes the item, its id or its index. Commands return a `Promise<boolean>` that resolves `true` once the command happened, and `false` when it was prevented or superseded. A command made before the viewer exists waits for it. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go.
 
 ```tsx
 import { useFluidbox } from "@ogdakke/fluidbox/solid";
@@ -196,7 +196,7 @@ function Counter() {
 }
 ```
 
-For a typed item, pass it: `useFluidbox<Photo>()`, or annotate the selector, `useFluidbox((state: FluidboxState<Photo>) => state.item)`.
+For a typed item, write `useFluidbox<Photo>()`, or annotate the selector: `useFluidbox((state: FluidboxState<Photo>) => state.item)`.
 
 ### Types
 
@@ -218,7 +218,7 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 
 ## Solid notes
 
-**Options apply live.** `Root` makes its viewer once, in the browser. A change to `labels` or `zoom`, a `Filmstrip` or `Sheet` mounted or unmounted, or a change to the sheet's `snapPoints` or `dismiss` goes to `fluidbox.update()`: an open viewer stays open, and only the filmstrip or sheet whose options changed is drawn again. A `Viewer` mounted or unmounted swaps the viewer's controls in place. `origins`, `renderers` and the event props are read when used.
+**Options apply live.** `Root` makes its viewer once, in the browser. A change to `labels` or `zoom` goes to `fluidbox.update()`. So does mounting or unmounting a `Filmstrip` or `Sheet`, and changing the sheet's `snapPoints` or `dismiss`. An open viewer stays open, and only the filmstrip or sheet whose options changed draws again. Mounting or unmounting a `Viewer` swaps the viewer's controls in place. The binding reads `origins`, `renderers` and the event props when it uses them.
 
 **Reactive items.** `items` is tracked: pass a signal's value (`items={photos()}`) and set a new array to change the gallery. An open viewer stays on the same item id if the new items still have it. `useFluidbox().setItems` does the same from inside.
 
@@ -226,8 +226,8 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 
 **`as` instead of `asChild`.** The trigger renders its own element through `Dynamic`. Pass `as="a"` (with `href`) or a component. A component must forward `ref` and the event props (`onClick`, `onPointerDown`, `onPointerUp`, `onPointerCancel`) to a DOM element.
 
-**Event handlers.** `onClick` and the pointer handlers may be a function or Solid's `[handler, data]` form. They run before the trigger's own, so `event.preventDefault()` in `onClick` stops the open. Native `on:click` listeners are not composed with the trigger's.
+**Event handlers.** `onClick` and the pointer handlers may be a function or Solid's `[handler, data]` form. They run before the trigger's own, so `event.preventDefault()` in `onClick` stops the open. The trigger doesn't compose native `on:click` listeners with its own.
 
-**Server rendering.** The parts render their markup on the server; the viewer is created in an effect in the browser.
+**Server rendering.** The parts render their markup on the server, and `Root` creates the viewer in an effect in the browser.
 
-**Previews update before the close flight.** When the viewer closes on a different item of a multi-item trigger, the preview accessor updates synchronously so the flight lands on the right picture. The trigger finds its image when it registers, so keep the `<img>` mounted and change its `src`; don't swap in a new element.
+**Previews update before the close flight.** When the viewer closes on a different item of a multi-item trigger, the preview accessor updates synchronously so the flight lands on the right picture. The trigger finds its image when it registers, so keep the `<img>` mounted and change its `src` instead of swapping in a new element.

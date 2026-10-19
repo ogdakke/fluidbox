@@ -48,6 +48,7 @@ export const mount: MountLive = (root) => {
                 ];
               },
             } as never),
+            createComponent(Fluidbox.Filmstrip, {}),
             createComponent(Show as Component<{ when: boolean; children: JSX.Element }>, {
               get when() {
                 return viewer();

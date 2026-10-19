@@ -1,8 +1,8 @@
 # @ogdakke/fluidbox
 
-A lightbox for the web. The picture flies out of its thumbnail, follows your finger, zooms with a pinch or a double-tap, and flies back to the thumbnail it came from when it closes. One runtime does the gestures, flights, zoom and the body-level viewer; custom elements, a plain JavaScript API, and bindings for React, Solid, Vue and Angular are thin layers over it.
+A lightbox for the web. The picture flies out of its thumbnail, follows your finger, zooms with a pinch or a double-tap, and flies back to the thumbnail it came from when it closes. One runtime handles the gestures, flights, zoom and the body-level viewer. The custom elements, the plain JavaScript API and the React, Solid, Vue and Angular bindings are thin layers over it.
 
-The documentation lives in [`apps/docs/content`](apps/docs/content/index.md), and is served by the docs site in `apps/docs`.
+The documentation lives in [`apps/docs/content`](apps/docs/content/index.md), and the docs site in `apps/docs` serves it.
 
 ## Custom elements
 
@@ -62,9 +62,9 @@ Items are plain objects whose fields are the attributes of the element the viewe
 
 ## Frameworks
 
-The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue` and `/angular`. The framework packages are optional peers: install `@ogdakke/fluidbox` alongside the one your app already uses. Every binding has the same parts (`Root`, `Trigger`, `Viewer`, `Controls`, `Filmstrip`, `Sheet`, ...) and the same patterns. See the [patterns](apps/docs/content/patterns/index.md).
+The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue` and `/angular`. The framework packages are optional peers, so install `@ogdakke/fluidbox` alongside the one your app already uses. Every binding has the same parts (`Root`, `Trigger`, `Viewer`, `Controls`, `Filmstrip`, `Sheet`, ...) and the same patterns. See the [patterns](apps/docs/content/patterns/index.md).
 
-The package root is safe to import on the server. `@ogdakke/fluidbox/elements` defines the elements on import, so it is browser only: in a server-rendered app, `await import("@ogdakke/fluidbox/elements")` after hydration.
+The package root is safe to import on the server. `@ogdakke/fluidbox/elements` defines the elements on import, so it is browser only. In a server-rendered app, `await import("@ogdakke/fluidbox/elements")` after hydration.
 
 ## Development
 
@@ -85,7 +85,7 @@ bun run lint:all
 bun run format:check
 ```
 
-Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the example site in `apps/examples`: an overview, a page of the nine patterns for each entry point, and an index of test fixtures. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
+Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the example site in `apps/examples`. It has an overview, a page of the nine patterns for each entry point, and an index of test fixtures. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
 
 The documentation site lives in `apps/docs`. Run `bun run docs`, or `bun run docs:share` to expose it through portless as `docs.fluidbox`. Both sites share the design tokens and chrome in `apps/design`.
 

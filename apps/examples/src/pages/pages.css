@@ -182,7 +182,13 @@ main.fb-shell {
   font-size: 15px;
 }
 
-.integration h3 span {
+.integration__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.integration h3 span:not(.integration__name) {
   color: var(--fb-faint);
   font-weight: 400;
 }

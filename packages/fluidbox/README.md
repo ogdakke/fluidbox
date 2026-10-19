@@ -1,6 +1,6 @@
 # @ogdakke/fluidbox
 
-A lightbox for photos, video, iframes and your own content: the picture flies out of its thumbnail, follows gestures, zooms, and lands back where it came from. One runtime, with custom elements, a plain JavaScript API, and React, Solid, Vue and Angular bindings.
+A lightbox for photos, video, iframes and your own content. The picture flies out of its thumbnail, follows gestures, zooms, and lands back where it came from. One runtime, with custom elements, a plain JavaScript API, and React, Solid, Vue and Angular bindings.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
@@ -20,4 +20,4 @@ fluidbox.bind(button, 0);
 | `@ogdakke/fluidbox/kit`        | The binding kit, for writing a framework binding.             |
 | `@ogdakke/fluidbox/styles.css` | The viewer's layout and default look.                         |
 
-The package is private while its API is being developed. The source repository has the documentation and working examples for every entry point.
+The package stays private while its API is in development. The source repository has the documentation and working examples for every entry point.

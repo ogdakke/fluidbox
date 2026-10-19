@@ -7,7 +7,7 @@ description: The two optional add-ons, the filmstrip and the sheet, with their i
 
 # Filmstrip and sheet
 
-Both are optional add-ons with their own entries, so their code loads only when you use them. Import the entry once, anywhere in the browser bundle, and turn the add-on on: the `filmstrip` and `sheet` options of `createFluidbox`, the `Filmstrip` and `Sheet` parts in each framework, or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
+Both are optional add-ons with their own entries, so their code loads only when you use them. Import the entry once, anywhere in the browser bundle. Then turn the add-on on with the `filmstrip` and `sheet` options of `createFluidbox`, the `Filmstrip` and `Sheet` parts in each framework, or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
@@ -34,7 +34,7 @@ The entries register the add-ons on import and are safe to import on the server.
 
 The filmstrip is a strip of thumbnails for a gallery of more than one item. A tap moves to that item, a drag or a wheel scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its styles are in `@ogdakke/fluidbox/filmstrip.css`.
 
-The strip is viewer content like your own. It mounts in the viewer's layer, `[data-fluidbox-portal]`, reveals and dismisses with the rest of that layer, and floats over the slides. `filmstrip.css` runs it along the bottom and keeps the photo above it by `--fluidbox-filmstrip-space`; your CSS on `[data-fluidbox-filmstrip-dock]` puts it anywhere else, over the photo or beside it. Set `--fluidbox-filmstrip-space: 0px` when the photo should run under it.
+The strip is viewer content like your own. It mounts beside the viewer's layer, in `[data-fluidbox-addons]`, so a redraw of the layer, or a viewer renderer that clears its `target`, leaves it be. It reveals and dismisses with the layer, as `data-fluidbox-chrome`, and floats over the slides. `filmstrip.css` runs it along the bottom and keeps the photo above it by `--fluidbox-filmstrip-space`. Your CSS on `[data-fluidbox-filmstrip-dock]` puts it anywhere else, over the photo or beside it. Set `--fluidbox-filmstrip-space: 0px` when the photo should run under it.
 
 `--fluidbox-filmstrip-axis: y` on the dialog runs it as a column, down the left unless you move it. The add-on reads the axis from CSS, so a media query can turn a phone's row into a wide screen's column. Its listbox carries `aria-orientation`, and a wheel turned either way scrolls it along.
 
@@ -52,7 +52,7 @@ The strip is viewer content like your own. It mounts in the viewer's layer, `[da
 | -------- | ------------------------- | ----------------------------------------------------------------- |
 | `render` | `FluidboxRenderer<TItem>` | Fill each thumbnail button yourself instead of the default image. |
 
-`render` gets `{ item, index, target, signal }`. `target` is the thumbnail `<button>`; `signal` aborts, and the function you return runs, when the button scrolls out of the rendered window. By default each button holds the item's `thumbnail`, else the full image or the video's poster.
+`render` gets `{ item, index, target, signal }`. `target` is the thumbnail `<button>`. When the button scrolls out of the rendered window, `signal` aborts and the function you return runs. By default each button holds the item's `thumbnail`, else the full image or the video's poster.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
@@ -68,9 +68,9 @@ const fluidbox = createFluidbox({
 });
 ```
 
-Each button is a `role="option"` in a listbox named by the `filmstripList` [label](./api.md#labels). It has `data-fluidbox-filmstrip-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name. The strip is a listbox: with a thumbnail focused, the arrow keys along it step through the items, Home and End go to the ends, and focus follows the selection. It is marked `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
+Each button is a `role="option"` in a listbox named by the `filmstripList` [label](./api.md#labels). It has `data-fluidbox-filmstrip-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name. With a thumbnail focused, the arrow keys along the strip step through the items, Home and End go to the ends, and focus follows the selection. The strip carries `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
 
-`render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Filmstrip` parts render through it: put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
+`render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Filmstrip` parts render through it. Put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
 
 <!-- pattern: filmstrip -->
 
@@ -78,7 +78,7 @@ On custom elements, a `<fluidbox-filmstrip>` child adds the strip. Set its `rend
 
 ## Sheet
 
-The sheet is a panel that rises from the bottom over the photo, for details, comments or a form. The photo and the sheet share one native scroller with a snap point per stop, so swipes, momentum and rubber-banding are the browser's own. When the sheet reaches the photo, it pushes the photo up, a gap ahead of it, as layout rather than an animation, so the photo keeps up with the fastest swipe. Import `@ogdakke/fluidbox/sheet.css` with it.
+The sheet is a panel that rises from the bottom over the photo, for details, comments or a form. The photo and the sheet share one native scroller with a snap point per stop, so swipes, momentum and rubber-banding are the browser's own. When the sheet reaches the photo, it pushes the photo up with a gap between them. The push is layout, with no animation, so the photo keeps up with the fastest swipe. Import `@ogdakke/fluidbox/sheet.css` with it.
 
 `sheet: true` turns it on with the defaults. An object, `FluidboxSheetOptions`, sets them:
 
@@ -90,7 +90,7 @@ The sheet is a panel that rises from the bottom over the photo, for details, com
 
 ### Stops
 
-Stop `0` is the sheet at rest: out of sight, or showing `--fluidbox-sheet-peek` of itself. Each snap point, a `FluidboxSheetSnapPoint`, adds a stop above it:
+Stop `0` is the sheet at rest, either out of sight or showing `--fluidbox-sheet-peek` of itself. Each snap point, a `FluidboxSheetSnapPoint`, adds a stop above it:
 
 - A number is pixels of sheet showing.
 - `"40%"` is a percentage of the viewer's height.
@@ -98,7 +98,7 @@ Stop `0` is the sheet at rest: out of sight, or showing `--fluidbox-sheet-peek` 
 
 A sheet is always tall enough for its highest pixel or percentage stop. No stop goes above `--fluidbox-sheet-top` from the top of the screen. Stops closer than 24 pixels count as one.
 
-`dismiss` decides a swipe down on the photo with the sheet at rest. `"flight"` closes the viewer with the usual flight home; a second flick down while the sheet is still lowering goes straight into it. `"scroll"` scrolls the photo off the bottom of the screen and closes, and the backdrop fades as it goes. `"none"` keeps the viewer open, as for a caption that always peeks.
+`dismiss` sets what a swipe down on the photo does while the sheet is at rest. `"flight"` closes the viewer with the usual flight home. A second flick down while the sheet is still lowering goes straight into it. `"scroll"` scrolls the photo off the bottom of the screen and closes, and the backdrop fades as it goes. `"none"` keeps the viewer open, as for a caption that always peeks.
 
 ### The sheet handle
 
@@ -109,7 +109,7 @@ With the sheet on, `fluidbox.sheet` is a `FluidboxSheet` that you drive and read
 | `stop`                | The stop the sheet rests at: `0`, then one per snap point.                                                                           |
 | `set(stop, options?)` | Move to a stop, clamped to the stops there are. `{ animate: false }` jumps. Ignored while the viewer isn't open or the sheet is off. |
 
-Each time the sheet comes to rest at another stop, the fluidbox fires `sheetchange`, a `FluidboxSheetEvent` with `stop` and `reason`: `"pointer"` for a swipe or a tap, `"wheel"` for a wheel or trackpad, `"keyboard"` for Escape or a key on a stop button, `"api"` for `set()` and for the return to rest as the viewer opens or closes.
+Each time the sheet comes to rest at another stop, the fluidbox fires `sheetchange`, a `FluidboxSheetEvent` with `stop` and `reason`. The reason is `"pointer"` for a swipe or a tap, `"wheel"` for a wheel or trackpad, `"keyboard"` for Escape or a key on a stop button, `"api"` for `set()` and for the return to rest as the viewer opens or closes.
 
 ```ts
 fluidbox.addEventListener("sheetchange", ({ stop, reason }) => {
@@ -117,13 +117,13 @@ fluidbox.addEventListener("sheetchange", ({ stop, reason }) => {
 });
 ```
 
-In the frameworks, `useFluidboxSheet()` returns `{ stop, set }`, with `stop` in the framework's reactive form, the root takes the event as `onSheetChange`, `@sheetchange` or `(sheetChange)`, and a `SheetStop` part is a button that moves the sheet to its `stop`. On custom elements, `gallery.sheet` is the handle and the gallery fires `sheetchange`.
+In the frameworks, `useFluidboxSheet()` returns `{ stop, set }`, with `stop` in the framework's reactive form. The root takes the event as `onSheetChange`, `@sheetchange` or `(sheetChange)`, and a `SheetStop` part is a button that moves the sheet to its `stop`. On custom elements, `gallery.sheet` is the handle and the gallery fires `sheetchange`.
 
 ### The sheet's content
 
-The sheet is a `<section data-fluidbox-sheet data-fluidbox-chrome>` that the runtime makes, named by the `sheet` [label](./api.md#labels). `render({ item, index, target, signal })` fills it for the item on show; `signal` aborts when the viewer moves to another item, the returned function runs, and the section is emptied before the next item's render. The framework `Sheet` parts render through it, so their children re-render with the app's state, and they put their own attributes on the section.
+The sheet is a `<section data-fluidbox-sheet data-fluidbox-chrome>` that the runtime makes, named by the `sheet` [label](./api.md#labels). `render({ item, index, target, signal })` fills it for the item on show. When the viewer moves to another item, `signal` aborts, the returned function runs, and the runtime empties the section before the next item's render. The framework `Sheet` parts render through it, so their children re-render with the app's state, and they put their own attributes on the section.
 
-`<fluidbox-sheet>` shows the active item's `<template slot="sheet">`, else its own `<template>`; set its `render` property to draw the sheet yourself. Its `snap-points` and `dismiss` attributes are the options: `<fluidbox-sheet snap-points="40% 90%" dismiss="scroll">`.
+`<fluidbox-sheet>` shows the active item's `<template slot="sheet">`, else its own `<template>`. Set its `render` property to draw the sheet yourself. Its `snap-points` and `dismiss` attributes are the options: `<fluidbox-sheet snap-points="40% 90%" dismiss="scroll">`.
 
 Put these inside the sheet element:
 
@@ -148,7 +148,7 @@ With the sheet raised, Escape and a tap above the sheet lower it instead of clos
 
 ### sheet.css
 
-`@ogdakke/fluidbox/sheet.css` holds the sheet's layout and its variables. Set them on `[data-fluidbox-dialog]`; the defaults have no weight, so any selector wins. The runtime reads the first five, so they can change in a media query.
+`@ogdakke/fluidbox/sheet.css` holds the sheet's layout and its variables. Set them on `[data-fluidbox-dialog]`. The defaults have no weight, so any selector wins. The runtime reads the first five, so they can change in a media query.
 
 | Variable                      | Default                                      | What it does                                                                                                             |
 | ----------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -165,7 +165,7 @@ With the sheet raised, Escape and a tap above the sheet lower it instead of clos
 | `--fluidbox-sheet-color`      | `CanvasText`                                 | The sheet's text colour.                                                                                                 |
 | `--fluidbox-sheet-fade`       | `1`                                          | How much the photo fades between the first and the top stop. `0` keeps it.                                               |
 
-As the sheet moves, these follow the scroll on the overlay, for your own effects:
+As the sheet moves, these variables on the overlay follow its scroll. Use them for your own effects:
 
 | Variable                    | Value                                                            |
 | --------------------------- | ---------------------------------------------------------------- |
@@ -189,4 +189,4 @@ The dialog gets `data-sheet` with the stop number, `data-sheet-raised` above sto
 }
 ```
 
-In a browser without scroll-driven animations, the sheet still scrolls, snaps and pushes the photo; with `fit`, the photo keeps its size behind it.
+In a browser without scroll-driven animations, the sheet still scrolls, snaps and pushes the photo. With `fit`, the photo keeps its size behind it.

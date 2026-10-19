@@ -56,6 +56,8 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     this.scroller = ownerDocument.createElement("div");
     this.track = ownerDocument.createElement("div");
     this.dock.dataset.fluidboxFilmstripDock = "";
+    // It reveals and hides with the viewer's layer, as your content does.
+    this.dock.dataset.fluidboxChrome = "";
     this.element.dataset.fluidboxFilmstrip = "";
     // Its touches, wheel and keys scrub the strip, not the viewer.
     this.element.dataset.fluidboxOwnsInput = "";

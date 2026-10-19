@@ -24,6 +24,7 @@ const command = (
     click ? (click.detail === 0 ? "keyboard" : "pointer") : "api",
   );
 
+/** Each default control's attribute, label, disabled rule and command. */
 export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxControl>> = {
   previous: {
     attribute: "data-fluidbox-previous",
@@ -45,6 +46,7 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
   },
 };
 
+/** The default controls, in the order they render. */
 export const controlNames: readonly FluidboxControlName[] = ["previous", "next", "close"];
 
 /** A default control button, with its icon, label and attribute. */

@@ -52,7 +52,7 @@ One viewer for the whole list, and a trigger for each thumbnail. Pick your frame
 
 <!-- pattern: basic -->
 
-The examples import `photos` from a local `./data` module, see [the example data](./patterns/index.md#the-example-data), and `itemLabel` (an item's `alt` or `title`) from `@ogdakke/fluidbox`. Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own; then the `controls` option, the `Controls` part or `<fluidbox-controls>` keeps them.
+The examples import `photos` from a local `./data` module, described in [the example data](./patterns/index.md#the-example-data). They import `itemLabel` from `@ogdakke/fluidbox`, which returns an item's `alt` or `title`. Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own. After that, the `controls` option, the `Controls` part or `<fluidbox-controls>` keeps them.
 
 ## Framework setup
 
@@ -85,9 +85,9 @@ Turning one on in `createFluidbox()` without its import throws an `Error` that n
 
 ## Server rendering
 
-The package root, `@ogdakke/fluidbox`, is safe to import on the server: it has no side effects and touches no browser globals until you call `createFluidbox()`. So are the add-on entries. The framework bindings create the viewer only in the browser, after mount, so they render on the server as plain markup.
+The package root, `@ogdakke/fluidbox`, is safe to import on the server. It has no side effects and touches no browser globals until you call `createFluidbox()`. The add-on entries are safe there too. The framework bindings create the viewer only in the browser, after mount, so they render on the server as plain markup.
 
-`@ogdakke/fluidbox/elements` defines the custom elements when it is imported, so it is browser only. In a server-rendered app, import it after hydration:
+Importing `@ogdakke/fluidbox/elements` defines the custom elements, so that entry is browser only. In a server-rendered app, import it after hydration:
 
 ```ts
 if (typeof customElements !== "undefined") await import("@ogdakke/fluidbox/elements");
@@ -95,6 +95,6 @@ if (typeof customElements !== "undefined") await import("@ogdakke/fluidbox/eleme
 
 ## Next
 
-- The [patterns](./patterns/index.md): nine common setups in every framework.
-- [Items and origins](./items-and-origins.md): large or virtualized lists, and where the flight lands.
-- [Styling](./styling.md): theme the viewer and add your own controls.
+- The [patterns](./patterns/index.md) show nine common setups in every framework.
+- [Items and origins](./items-and-origins.md) covers large or virtualized lists, and where the flight lands.
+- [Styling](./styling.md) shows how to theme the viewer and add your own controls.

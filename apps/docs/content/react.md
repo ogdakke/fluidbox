@@ -20,7 +20,7 @@ import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/react
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. The filmstrip and the sheet are parts of the binding: render `Fluidbox.Filmstrip` or `Fluidbox.Sheet` and they are on. Each needs its stylesheet too: `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`.
+Import `@ogdakke/fluidbox/styles.css` once in your app. The filmstrip and the sheet are parts of the binding. Rendering `Fluidbox.Filmstrip` or `Fluidbox.Sheet` turns it on. They also need their stylesheets, `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 
@@ -69,18 +69,18 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 
 All parts are properties of the `Fluidbox` object.
 
-| Part                                                   | Renders                         | Role                                                                                      |
-| ------------------------------------------------------ | ------------------------------- | ----------------------------------------------------------------------------------------- |
-| `Fluidbox.Root`                                        | nothing of its own              | Owns one viewer for its items. Every other part must be inside it.                        |
-| `Fluidbox.Trigger`                                     | a `<button>`, or its child      | Opens an item. Registers itself as the item's origin.                                     |
-| `Fluidbox.ThumbnailOverlay`                            | a `<span>`                      | A badge or caption on the thumbnail that fades or flies with the photo.                   |
-| `Fluidbox.FrameLayer`                                  | a `<span>`                      | Inside a travelling `ThumbnailOverlay`: moves into the flying frame and scales with it.   |
-| `Fluidbox.Viewer`                                      | its children, in the viewer     | Your controls and captions, in place of the default controls.                             |
-| `Fluidbox.Controls`                                    | three `<button>`s               | The default Previous, Next and Close, for a `Viewer` of your own.                         |
-| `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close` | a `<button>`                    | Run the command, with the default icon and label, and disable themselves when they can't. |
-| `Fluidbox.Filmstrip`                                   | its children, in each thumbnail | Turns the filmstrip on. A render child draws your own thumbnails.                         |
-| `Fluidbox.Sheet`                                       | its children, in the sheet      | Turns the sheet on and renders its content for the item on show.                          |
-| `Fluidbox.SheetStop`                                   | a `<button>`                    | Moves the sheet to a stop.                                                                |
+| Part                                                   | Renders                         | Role                                                                                         |
+| ------------------------------------------------------ | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `Fluidbox.Root`                                        | nothing of its own              | Owns one viewer for its items. Every other part must be inside it.                           |
+| `Fluidbox.Trigger`                                     | a `<button>`, or its child      | Opens an item. Registers itself as the item's origin.                                        |
+| `Fluidbox.ThumbnailOverlay`                            | a `<span>`                      | A badge or caption on the thumbnail that fades or flies with the photo.                      |
+| `Fluidbox.FrameLayer`                                  | a `<span>`                      | Goes inside a travelling `ThumbnailOverlay`. Moves into the flying frame and scales with it. |
+| `Fluidbox.Viewer`                                      | its children, in the viewer     | Your controls and captions, in place of the default controls.                                |
+| `Fluidbox.Controls`                                    | three `<button>`s               | The default Previous, Next and Close, for a `Viewer` of your own.                            |
+| `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close` | a `<button>`                    | Run the command, with the default icon and label, and disable themselves when they can't.    |
+| `Fluidbox.Filmstrip`                                   | its children, in each thumbnail | Turns the filmstrip on. A render child draws your own thumbnails.                            |
+| `Fluidbox.Sheet`                                       | its children, in the sheet      | Turns the sheet on and renders its content for the item on show.                             |
+| `Fluidbox.SheetStop`                                   | a `<button>`                    | Moves the sheet to a stop.                                                                   |
 
 ### `Fluidbox.Root`
 
@@ -99,9 +99,9 @@ All parts are properties of the `Fluidbox` object.
 | `onSheetChange`      | `(event: FluidboxSheetEvent) => void`                         |                       | When the sheet comes to rest at another stop. `stop` and `reason`.                               |
 | `children`           | `ReactNode`                                                   |                       | Your page content and the other parts.                                                           |
 
-`TItem` flows from `items` to the renderers and the events, and they get your own item objects back, with any fields you added.
+`TItem` flows from `items` to the renderers and the events. They get your own item objects back, with any fields you added.
 
-A change to `labels`, `zoom`, or the `Viewer`, `Filmstrip` and `Sheet` parts and their props changes the viewer in place, through `update`, even while it is open. The viewer is made once per mount of `Root`.
+A change to `labels`, `zoom`, or the `Viewer`, `Filmstrip` and `Sheet` parts and their props goes to the viewer through `update`, even while it is open. `Root` makes the viewer once per mount.
 
 ### `Fluidbox.Trigger`
 
@@ -113,7 +113,7 @@ A change to `labels`, `zoom`, or the `Viewer`, `Filmstrip` and `Sheet` parts and
 | `children` | `ReactNode \| (preview: FluidboxTriggerPreview) => ReactNode` |         | The trigger's content, or a function of the preview that follows the viewer.                                          |
 | ...        | button attributes                                             |         | Passed to the button, or to the child with `asChild`. The rendered button gets `type="button"` unless you set `type`. |
 
-An item's id is its `id`, else its `src`. The render function gets a `FluidboxTriggerPreview`: `item: TItem | null`, `index: number | null` and `status`. `item` is the item the trigger shows: the one the viewer is on while it is open, then the last one it showed, and the trigger opens on it again. It is `null` when the trigger's items have left the list.
+An item's id is its `id`, else its `src`. The render function gets a `FluidboxTriggerPreview`: `item: TItem | null`, `index: number | null` and `status`. `item` is the item the trigger shows. While the viewer is open, that is the item the viewer is on. After it closes, it is the last one the trigger showed, and the trigger opens on that item again. It is `null` when the trigger's items have left the list.
 
 The trigger adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to its element. It starts loading the item on pointer down, so the click opens without waiting.
 
@@ -124,11 +124,11 @@ The trigger adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-exp
 | `travel` | `boolean`       | `false` | Fly with the photo. Its children render live into the flying frame, with the app's context. |
 | ...      | span attributes |         | `ref` is forwarded.                                                                         |
 
-It gets `--fluidbox-closed` and `data-fluidbox-phase` as the viewer opens and closes, for the enclosing `Trigger`'s `item` and `returns`. Put it inside a `Trigger`; outside one it throws.
+It gets `--fluidbox-closed` and `data-fluidbox-phase` as the viewer opens and closes, for the enclosing `Trigger`'s `item` and `returns`. Put it inside a `Trigger`. Outside one, it throws.
 
 ### `Fluidbox.FrameLayer`
 
-Takes span attributes and forwards `ref`. It renders a `<span data-fluidbox-frame-layer>` inside a travelling `ThumbnailOverlay`, and for each flight that element itself moves into the flying frame, scales with it, and goes back after, as a scrim or a gradient does. The overlay's live copy in the frame leaves it out, so it never shows twice.
+Takes span attributes and forwards `ref`. It renders a `<span data-fluidbox-frame-layer>` inside a travelling `ThumbnailOverlay`. On each flight, that element itself moves into the flying frame, scales with it, and goes back after. Use it for a scrim or a gradient. The overlay's live copy in the frame leaves it out, so it never shows twice.
 
 ```tsx
 <Fluidbox.ThumbnailOverlay travel className="badge">
@@ -138,11 +138,11 @@ Takes span attributes and forwards `ref`. It renders a `<span data-fluidbox-fram
 
 ### `Fluidbox.Viewer` and `Fluidbox.Controls`
 
-`Fluidbox.Viewer` takes only `children`, and renders them into the viewer's layer for controls and captions. It renders nothing until the viewer exists. `Fluidbox.Controls` takes no props: it is `Previous`, `Next` and `Close`, for when you want the default buttons beside your own.
+`Fluidbox.Viewer` takes only `children`, and renders them into the viewer's layer for controls and captions. It renders nothing until the viewer exists. `Fluidbox.Controls` takes no props. It renders `Previous`, `Next` and `Close`, for when you want the default buttons beside your own.
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
-Each takes button attributes and forwards `ref`. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` defaults to the viewer's state: `Previous` and `Next` at the ends of the gallery, `Close` while the viewer is closed. Your `onClick` runs first; `event.preventDefault()` stops the command.
+Each takes button attributes and forwards `ref`. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` defaults to the viewer's state: `Previous` and `Next` at the ends of the gallery, `Close` while the viewer is closed. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
 
 ### `Fluidbox.Filmstrip`
 
@@ -161,7 +161,7 @@ The strip marks the selected button `data-fluidbox-selected`, so your thumbnails
 | `children`   | `(ctx: FluidboxItemContext<TItem>) => ReactNode`    |                      | The sheet's content for the item on show, `{ item, index }`.                                |
 | ...          | `className`, `style`, `id`, `aria-*`, `data-*`, ... |                      | Set on the viewer's `<section data-fluidbox-sheet>`, which is the sheet. No event handlers. |
 
-The viewer makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`, and the render child draws into it for the item on show, again when the item changes. Annotate the item type with `<Fluidbox.Sheet<Photo>>` when you need your own fields.
+The viewer makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`. The render child draws into it for the item on show, and draws again when the item changes. Annotate the item type with `<Fluidbox.Sheet<Photo>>` when you need your own fields.
 
 ```tsx
 <Fluidbox.Sheet snapPoints={["40%", "90%"]} className="details">
@@ -169,7 +169,7 @@ The viewer makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.s
 </Fluidbox.Sheet>
 ```
 
-`Fluidbox.SheetStop` takes `stop` and button attributes, and moves the sheet to that stop, or back to 0 when it is there. It is a button with `data-fluidbox-sheet-stop`, which works anywhere in the viewer.
+`Fluidbox.SheetStop` takes `stop` and button attributes, and moves the sheet to that stop, or back to 0 when the sheet is already there. It is a button with `data-fluidbox-sheet-stop`, which works anywhere in the viewer.
 
 ## Hooks
 
@@ -181,7 +181,7 @@ Call them in a component inside `Fluidbox.Root`.
 | `useFluidbox(selector)` | the selected value   | The part the selector picks. Re-renders only when that value changes (`Object.is`).                                                                                                  |
 | `useFluidboxSheet()`    | `FluidboxSheetApi`   | `{ stop, set }`: the stop the sheet rests at, following `sheetchange`, and `set(stop, { animate? })` to move it. `stop` is 0 without a sheet.                                        |
 
-Commands resolve `true` once they happened, and `false` when they were prevented or superseded. A command made before the viewer exists, as a deep link on mount does, waits for it and then runs. `open` takes the item, its id or its index; without one it opens the current item, else the first. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go.
+Commands resolve `true` once they happen, and `false` when they were prevented or superseded. A command you call before the viewer exists, such as a deep link on mount, waits for the viewer and then runs. `open` takes the item, its id or its index. Without one, it opens the current item, or the first if there is none. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go.
 
 ```tsx
 import { useFluidbox } from "@ogdakke/fluidbox/react";
@@ -218,18 +218,18 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 
 ## React notes
 
-**Props change the open viewer in place.** `labels`, `zoom`, and adding or removing `Fluidbox.Viewer`, `Fluidbox.Filmstrip` (or its render child) or `Fluidbox.Sheet`, or changing the sheet's `snapPoints` and `dismiss`, go to the viewer through `update` without closing it. They are compared by value, so inline objects and arrays are fine. `renderers`, `origins`, `labels.position` and the event props are read when used.
+**Props change the open viewer in place.** Changes to `labels` and `zoom` go to the viewer through `update` without closing it. So does adding or removing `Fluidbox.Viewer`, `Fluidbox.Filmstrip` or its render child, or `Fluidbox.Sheet`, and so does changing the sheet's `snapPoints` and `dismiss`. The binding compares these by value, so inline objects and arrays are fine. It reads `renderers`, `origins`, `labels.position` and the event props when it uses them.
 
 **Keep `items` stable.** A new `items` value replaces the items in the next layout effect. Keep the array in state, a module constant or `useMemo`, and replace it when the gallery changes. An open viewer stays on the same item id when the new items still have it.
 
-**Context reaches custom content.** Renderers, the `Viewer`, travelling overlays, and the filmstrip and sheet content render through React portals inside `Root`, so they read context from around `Root`, as the [Custom content](./patterns/renderers.md) example does with a theme.
+**Context reaches custom content.** Renderers, the `Viewer`, travelling overlays, and the filmstrip and sheet content render through React portals inside `Root`. They read context provided around `Root`, as the [Custom content](./patterns/renderers.md) example does with a theme.
 
 **`asChild`.** The trigger merges its props and handlers onto your element and composes your `ref` and your `onClick`, `onPointerDown`, `onPointerUp` and `onPointerCancel`. The child must be one element that renders a DOM node and accepts a `ref`. Use an element that can take focus, such as a `<button>` or `<a href>`.
 
 **Stopping an open.** Your `onClick` on the trigger runs before the open. Call `event.preventDefault()` to stop it, or cancel `onBeforeToggle`.
 
-**Server rendering and StrictMode.** The parts render their markup on the server; the viewer is created in a layout effect in the browser. Triggers bind during render to a stand-in, so they work before the viewer exists. `Root` works under `<StrictMode>`: the viewer is torn down and made again with the effects.
+**Server rendering and StrictMode.** The parts render their markup on the server, and `Root` creates the viewer in a layout effect in the browser. Triggers bind to a stand-in during render, so they work before the viewer exists. `Root` works under `<StrictMode>`. When StrictMode runs the effects again, `Root` tears the viewer down and makes it again.
 
-**Previews update before the close flight.** When the viewer closes on a different item of a multi-item trigger, the trigger re-renders synchronously (`flushSync`) so the flight lands on the right picture. The trigger finds its image when it registers, so keep the `<img>` mounted and change its `src`; don't swap in a new element.
+**Previews update before the close flight.** When the viewer closes on a different item of a multi-item trigger, the trigger re-renders synchronously (`flushSync`) so the flight lands on the right picture. The trigger finds its image when it registers, so keep the `<img>` mounted and change its `src` instead of swapping in a new element.
 
 **Bundle.** The filmstrip and sheet runtimes load when a `Fluidbox.Filmstrip` or `Fluidbox.Sheet` first renders, so they work without an import of their own and cost nothing until then.

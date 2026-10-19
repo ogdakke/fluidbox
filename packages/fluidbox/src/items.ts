@@ -1,7 +1,13 @@
-import type { FluidboxItem, FluidboxItemList, FluidboxItems, FluidboxTarget } from "./public-api";
+import type {
+  FluidboxItem,
+  FluidboxItemList,
+  FluidboxItemListOptions,
+  FluidboxItems,
+  FluidboxTarget,
+} from "./public-api";
 import type { FluidboxSource } from "./runtime-types";
 
-/** The id of an item: its own, else its src. */
+/** The id of an item: its own, else its src. Throws a TypeError when it has neither. */
 export function idOf(item: FluidboxItem): string {
   const id = item.id ?? ("src" in item ? item.src : undefined);
   if (typeof id !== "string" || !id.trim())
@@ -27,15 +33,67 @@ export function targetKeys(
   return [...new Set([target, ...returns].map(targetKey))];
 }
 
+function checkCount(count: number) {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new RangeError("A fluidbox item list's count must be a non-negative integer.");
+  }
+}
+
+function checkIndex(index: number, count: number) {
+  if (!Number.isInteger(index) || index < 0 || index >= count) {
+    throw new RangeError(`Fluidbox item index is out of range: ${index}`);
+  }
+}
+
+/**
+ * A lazy list that makes each item once and gives back the same object after,
+ * and checks the index it is given for an id.
+ */
+export function createItemList<TItem extends FluidboxItem>(
+  options: FluidboxItemListOptions<TItem>,
+): FluidboxItemList<TItem> {
+  const { count, item, index } = options;
+  checkCount(count);
+  const made = new Map<number, TItem>();
+  const indices = new Map<string, number>();
+  const get = (at: number) => {
+    checkIndex(at, count);
+    let found = made.get(at);
+    if (!found) {
+      found = item(at);
+      made.set(at, found);
+      indices.set(idOf(found), at);
+    }
+    return found;
+  };
+  const holds = (at: number, id: string) =>
+    Number.isInteger(at) && at >= 0 && at < count && idOf(get(at)) === id;
+  return Object.freeze({
+    count,
+    get,
+    indexOf(id: string) {
+      const known = indices.get(id);
+      if (known !== undefined) return known;
+      if (index) {
+        const guess = index(id);
+        return holds(guess, id) ? guess : -1;
+      }
+      // A scan reads ids without keeping every item it passes.
+      for (let at = 0; at < count; at++) {
+        if (idOf(made.get(at) ?? item(at)) === id) return at;
+      }
+      return -1;
+    },
+  });
+}
+
 /** A list over arrays and lazy lists alike. Arrays are checked for unique ids. */
 export function toList<TItem extends FluidboxItem>(
   items: FluidboxItems<TItem>,
 ): FluidboxItemList<TItem> {
   if (!Array.isArray(items)) {
     const list = items as FluidboxItemList<TItem>;
-    if (!Number.isInteger(list.count) || list.count < 0) {
-      throw new RangeError("A fluidbox item list's count must be a non-negative integer.");
-    }
+    checkCount(list.count);
     return list;
   }
   const snapshot: readonly TItem[] = [...(items as readonly TItem[])];
@@ -48,9 +106,7 @@ export function toList<TItem extends FluidboxItem>(
   return Object.freeze({
     count: snapshot.length,
     get(index: number) {
-      if (!Number.isInteger(index) || index < 0 || index >= snapshot.length) {
-        throw new RangeError(`Fluidbox item index is out of range: ${index}`);
-      }
+      checkIndex(index, snapshot.length);
       return snapshot[index]!;
     },
     indexOf: (id: string) => indices.get(id) ?? -1,
@@ -76,9 +132,7 @@ export function toSource<TItem extends FluidboxItem>(
   return Object.freeze({
     count: list.count,
     getItem: (index: number) => {
-      if (!Number.isInteger(index) || index < 0 || index >= list.count) {
-        throw new RangeError(`Fluidbox item index is out of range: ${index}`);
-      }
+      checkIndex(index, list.count);
       return list.get(index);
     },
     getIndex: (id: string) => indexIn(list, id),

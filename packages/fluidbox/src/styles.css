@@ -1,3 +1,5 @@
+/* The viewer's layout and default look. */
+
 /* Stage insets; registered so zoom reads them as pixels. */
 @property --fluidbox-stage-top {
   syntax: "<length>";
@@ -659,6 +661,11 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   ) {
   opacity: 0;
   pointer-events: none;
+}
+/* The add-ons' place beside the viewer's layer takes no box, so what they
+   put in it sits on the dialog as the layer's own content does. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-addons] {
+  display: contents;
 }
 /* Your portal content, and other layers marked data-fluidbox-chrome, reveal and
    dismiss with the controls. */

@@ -1,3 +1,4 @@
+/** The Vue binding: the `Fluidbox` components and the `useFluidbox` and `useFluidboxSheet` composables. */
 import {
   Comment,
   Teleport,
@@ -89,6 +90,7 @@ export type {
   FluidboxItem,
   FluidboxItemChangeEvent,
   FluidboxItemList,
+  FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOrigin,

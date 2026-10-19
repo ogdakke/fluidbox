@@ -1,3 +1,4 @@
+/** The custom elements, `<fluidbox-gallery>` and its children, defined on import. Browser only. */
 import "./item";
 import "./filmstrip";
 import { FluidboxGalleryElement } from "./gallery";

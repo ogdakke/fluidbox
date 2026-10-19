@@ -330,6 +330,7 @@ export class DomViewerDriver<
       this.#extensions.push(
         extension.mount({
           dialog: this.#portal.dialog,
+          layer: this.#portal.addons,
           controller,
           source: this.#source,
           labels: this.#labels,
@@ -1977,7 +1978,8 @@ export class DomViewerDriver<
       !this.#acceptsGestures() ||
       Math.abs(event.deltaY) <= Math.abs(event.deltaX) * 1.3 ||
       this.#eventUsesNativeInteraction(event, false) ||
-      (event.target instanceof Element && event.target.closest("[data-fluidbox-portal]"))
+      (event.target instanceof Element &&
+        event.target.closest("[data-fluidbox-portal], [data-fluidbox-addons]"))
     ) {
       return;
     }

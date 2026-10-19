@@ -7,7 +7,7 @@ description: Which browsers fluidbox supports, the platform features it relies o
 
 # Browser support
 
-Fluidbox targets current browsers and has one implementation of its gestures, flights and body-level viewer, with no legacy fallbacks.
+Fluidbox targets current browsers. Its gestures, flights and body-level viewer each have one implementation, with no legacy fallbacks.
 
 ## Supported browsers
 
@@ -18,7 +18,7 @@ Fluidbox targets current browsers and has one implementation of its gestures, fl
 | Safari, macOS and iOS    | The Safari of the current and previous OS major releases. |
 | Chrome, Android          | The current and previous stable major versions.           |
 
-Embedded web views, in-app browsers and Firefox ESR are not covered.
+The table doesn't cover embedded web views, in-app browsers or Firefox ESR.
 
 ## What the browser needs
 
@@ -32,7 +32,7 @@ The package root and the add-on entries touch no browser globals on import, so t
 
 ## Progressive features
 
-These are used where the browser has them, and the viewer works without them:
+The viewer uses these where the browser has them, and works without them:
 
 | Feature                                                   | Without it                                                                                                                                       |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |

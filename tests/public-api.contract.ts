@@ -2,6 +2,7 @@
 // the shapes a consumer writes. `tsc --noEmit` checks it; nothing runs it.
 import {
   createFluidbox,
+  createItemList,
   FluidboxItemChangeEvent,
   FluidboxSheetEvent,
   FluidboxToggleEvent,
@@ -139,7 +140,14 @@ const lazy: FluidboxItemList<Photo> = {
   indexOf: (id) => Number(id),
 };
 const unindexed: FluidboxItemList = { count: 1, get: () => photo };
-void unindexed;
+// The factory keeps the item type, and its list is a plain FluidboxItemList.
+const made: FluidboxItemList<Photo> = createItemList({
+  count: 1_000,
+  item: (index) => ({ ...photo, id: String(index), credit: "Generated" }),
+  index: Number,
+});
+const madeCredit: string = made.get(0).credit;
+void [unindexed, madeCredit];
 
 const note2: FluidboxRenderer = ({ item, index, target, signal }) => {
   target.textContent = `${item.type} ${index}`;
@@ -303,6 +311,7 @@ assert<
   Equal<
     RootValues,
     | "createFluidbox"
+    | "createItemList"
     | "idOf"
     | "itemLabel"
     | "FluidboxItemChangeEvent"

@@ -1,3 +1,4 @@
+/** The Angular binding: standalone `fluidbox*` directives and `FluidboxModule`. */
 import { NgModule } from "@angular/core";
 import { FluidboxFilmstripDirective } from "./filmstrip.js";
 import {
@@ -50,6 +51,7 @@ export type {
   FluidboxImageItem,
   FluidboxItem,
   FluidboxItemList,
+  FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOrigin,

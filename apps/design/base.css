@@ -488,6 +488,118 @@ kbd,
   background: var(--fb-surface) !important;
 }
 
+/* Copy buttons, which copy.ts puts on every code block. */
+
+.fb-code,
+.fb-copy-host {
+  position: relative;
+}
+
+.fb-copy {
+  --fb-copy-width: 74px;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: var(--fb-copy-width);
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--fb-line);
+  border-left: 1px solid var(--fb-line);
+  background: var(--fb-bg);
+  color: var(--fb-faint);
+  font-family: var(--fb-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.fb-copy:hover,
+.fb-copy[data-copied="true"] {
+  color: var(--fb-fg);
+}
+
+.fb-copy:focus-visible {
+  outline: 2px solid var(--fb-fg);
+  outline-offset: -2px;
+}
+
+/* A collapsed example shows only its label bar; the button comes with the code. */
+.fb-code:not([open]) > .fb-copy {
+  display: none;
+}
+
+.fb-code > .fb-copy {
+  height: 38px;
+  border-bottom: 0;
+}
+
+.fb-code > summary {
+  padding-right: calc(16px + 74px);
+}
+
+/* A bare block takes the button at its end, so a one-line command never runs under it. */
+.fb-copy-host {
+  display: flex;
+  align-items: stretch;
+}
+
+.fb-copy-host > pre {
+  flex: 1;
+  min-width: 0;
+}
+
+.fb-copy-host > .fb-copy {
+  position: static;
+  height: auto;
+  border-bottom: 0;
+}
+
+/* Interface icons, drawn from the sprite in /icons/ui.svg. */
+
+.fb-icon {
+  display: block;
+  flex: none;
+}
+
+/* Framework logos, which carry their own colours. React has one for each theme. */
+
+.fb-framework-icon {
+  display: inline-block;
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
+  vertical-align: -0.2em;
+}
+
+.fb-framework-icon--dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .fb-framework-icon--light {
+    display: none;
+  }
+  :root:not([data-theme="light"]) .fb-framework-icon--dark {
+    display: inline-block;
+  }
+}
+
+:root[data-theme="dark"] .fb-framework-icon--light {
+  display: none;
+}
+
+:root[data-theme="dark"] .fb-framework-icon--dark {
+  display: inline-block;
+}
+
 /* Images used as gallery thumbnails keep the shared image radius. */
 
 .fb-thumb {

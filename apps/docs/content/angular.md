@@ -66,7 +66,7 @@ export class Photos {
 }
 ```
 
-Without a `fluidboxViewer` template, the viewer has the default Previous, Next and Close buttons. With one, you place them: the control parts, or `fluidboxControls` for all three. The same gallery, live, in every framework:
+Without a `fluidboxViewer` template, the viewer has the default Previous, Next and Close buttons. With one, you place them yourself, with the control parts or with `fluidboxControls` for all three. The same gallery, live, in every framework:
 
 <!-- pattern: basic -->
 
@@ -108,7 +108,7 @@ Exported as `fluidbox`: `<div fluidboxRoot #fb="fluidbox">`.
 | `(settle)`           | `FluidboxItemChangeEvent<TItem>` | The viewer comes to rest on an item.                                                    |
 | `(sheetChange)`      | `FluidboxSheetEvent`             | The sheet comes to rest at another stop: `$event.stop` and `$event.reason`.             |
 
-The events are the plain API's: see [Events](./javascript.md#events) for their fields and reasons.
+The events are the plain API's. See [Events](./javascript.md#events) for their fields and reasons.
 
 | Member                            | Type                           | Purpose                                                                                                                                                       |
 | --------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -154,7 +154,7 @@ The directive adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-e
 | -------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
 | `travel` | `boolean` | `false` | Without it, the overlay stays on the page and gets `--fluidbox-closed`. With it, its content flies with the photo. |
 
-It belongs to the enclosing trigger's item and its `fluidboxReturns`, and throws outside a `fluidboxTrigger`. Write the bare attribute for `true`. Give the content as an `ng-template` child: the overlay renders it in place, and with `travel` renders it again into the flying frame, as a live view with DI and change detection, so a bound count or caption stays current in flight. Plain content (no template) works too, and flies as a still copy.
+It belongs to the enclosing trigger's item and its `fluidboxReturns`, and throws outside a `fluidboxTrigger`. Write the bare attribute for `true`. Give the content as an `ng-template` child. The overlay renders it in place, and with `travel` renders it again into the flying frame. That second copy is a live view with DI and change detection, so a bound count or caption stays current in flight. Plain content without a template works too, and flies as a still copy.
 
 ```html
 <span fluidboxThumbnailOverlay travel class="badge">
@@ -165,7 +165,7 @@ It belongs to the enclosing trigger's item and its `fluidboxReturns`, and throws
 </span>
 ```
 
-`fluidboxFrameLayer` marks an element `data-fluidbox-frame-layer`, on the overlay or inside its template. With `travel`, that element itself moves into the flying frame for the flight, scaled with the photo, and goes back after, while a still copy holds its place on the card. So it is left out of the live copy: there it renders with `display: none`, and the scrim never shows twice. See [Thumbnail overlays](./javascript.md#thumbnail-overlays) for what an overlay gets as the viewer moves.
+`fluidboxFrameLayer` marks an element `data-fluidbox-frame-layer`, on the overlay or inside its template. With `travel`, that element itself moves into the flying frame for the flight, scaled with the photo, and goes back after, while a still copy holds its place on the card. In the live copy it renders with `display: none`, so the scrim never shows twice. See [Thumbnail overlays](./javascript.md#thumbnail-overlays) for what an overlay gets as the viewer moves.
 
 ### `fluidboxViewer` and `fluidboxControls`
 
@@ -173,7 +173,7 @@ It belongs to the enclosing trigger's item and its `fluidboxReturns`, and throws
 
 ### `fluidboxPrevious`, `fluidboxNext`, `fluidboxClose`
 
-On a `<button>`. A button that is empty after content init (bound text counts as content) gets the default icon and an `aria-label` from `labels`, and every button gets `type="button"` unless it has a `type`. The button is disabled by the viewer's state: Previous and Next at the ends of the gallery, Close while the viewer is closed.
+On a `<button>`. A button that is empty after content init (bound text counts as content) gets the default icon and an `aria-label` from `labels`, and every button gets `type="button"` unless it has a `type`. The viewer's state disables the button: Previous and Next at the ends of the gallery, Close while the viewer is closed.
 
 | Input      | Type      | Purpose                                        |
 | ---------- | --------- | ---------------------------------------------- |
@@ -255,9 +255,9 @@ The entry exports `FluidboxApi`, `FluidboxSheetApi`, `FluidboxItemContext` (the 
 
 ## Angular notes
 
-**When the viewer exists.** The root makes the viewer once, right after the first change detection pass, once every part inside has rendered; with a filmstrip or sheet, once its add-on has loaded. It lives as long as the root. Commands made before then wait for it and run once it exists.
+**When the viewer exists.** The root makes the viewer once, right after the first change detection pass, once every part inside has rendered. With a filmstrip or sheet, it also waits for that add-on to load. It lives as long as the root. Commands made before then wait for it and run once it exists.
 
-**Options apply in place.** New `labels` or `zoom`, and a `fluidboxViewer`, `fluidboxFilmstrip` or `fluidboxSheet` coming, going or changing its inputs, go to the viewer through `fluidbox.update()`, so an open viewer stays open. Each part hands over a renderer that stays the same for its life, so only what changed is drawn again. `origins`, `renderers` and the outputs are read when used. New `items` go through `setItems`, and an open viewer stays on the same item id if the new list still has it.
+**Options apply in place.** The root passes new `labels` or `zoom` to the viewer through `fluidbox.update()`, so an open viewer stays open. The same goes for a `fluidboxViewer`, `fluidboxFilmstrip` or `fluidboxSheet` that comes, goes or changes its inputs. Each part hands over a renderer that stays the same for its life, so only what changed is drawn again. The root reads `origins`, `renderers` and the outputs when it uses them. New `items` go through `setItems`, and an open viewer stays on the same item id if the new list still has it.
 
 **Change detection.** The viewer listens to pointer and key events outside the Angular zone, so gestures and animation never trigger change detection. Outputs, state updates and template mounts come back into the zone. `state`, `preview` and the inject functions are signals, so `OnPush` components and zoneless apps update without extra work.
 

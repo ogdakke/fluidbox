@@ -2,10 +2,6 @@ import type { FluidboxLabels } from "./labels";
 
 export type { FluidboxLabels } from "./labels";
 
-// Items. Every field is the HTML attribute of the element the viewer draws, by
-// its DOM property name, so `srcset`, `sizes`, `poster` and `referrerPolicy`
-// mean what they mean on `<img>`, `<video>` and `<iframe>`.
-
 /** What every item can carry besides its media. */
 export interface FluidboxItemBase {
   /** Stable identity across item updates. Defaults to `src`. Unique in a list. */
@@ -49,7 +45,7 @@ export interface FluidboxImageItem extends FluidboxItemBase {
   readonly sources?: readonly FluidboxPictureSource[];
 }
 
-/** A `<video>`. `controls` and `playsInline` default to true. */
+/** A `<video>`. */
 export interface FluidboxVideoItem extends FluidboxItemBase {
   readonly type: "video";
   readonly src: string;
@@ -62,7 +58,9 @@ export interface FluidboxVideoItem extends FluidboxItemBase {
   readonly autoplay?: boolean;
   readonly loop?: boolean;
   readonly muted?: boolean;
+  /** @default true */
   readonly playsInline?: boolean;
+  /** @default true */
   readonly controls?: boolean;
   /** @default "metadata" */
   readonly preload?: "none" | "metadata" | "auto";
@@ -92,6 +90,13 @@ export interface FluidboxCustomItem extends FluidboxItemBase {
   readonly height: number;
 }
 
+/**
+ * One piece of media. Every field is the HTML attribute of the element the viewer
+ * draws, by its DOM property name, so `srcset`, `sizes`, `poster` and
+ * `referrerPolicy` mean what they mean on `<img>`, `<video>` and `<iframe>`.
+ * Extend a type to add fields of your own. They come back in every callback,
+ * event and state.
+ */
 export type FluidboxItem =
   | FluidboxImageItem
   | FluidboxVideoItem
@@ -100,12 +105,30 @@ export type FluidboxItem =
 
 /** A list read on demand, for long or generated galleries. */
 export interface FluidboxItemList<TItem extends FluidboxItem = FluidboxItem> {
+  /** A non-negative integer. */
   readonly count: number;
+  /** The item at an index, synchronously. Return the same object each time. */
   get(index: number): TItem;
   /** The index of the item with this id, or -1. Without it, ids are found by scanning. */
   indexOf?(id: string): number;
 }
 
+/** What `createItemList` makes a list from. */
+export interface FluidboxItemListOptions<TItem extends FluidboxItem = FluidboxItem> {
+  readonly count: number;
+  /** Makes the item at an index. The list calls it once per index and keeps the item. */
+  readonly item: (index: number) => TItem;
+  /**
+   * Where an id is, as a guess the list checks: an index out of range, or one whose
+   * item has another id, counts as not found. Without it, the list scans.
+   */
+  readonly index?: (id: string) => number;
+}
+
+/**
+ * An array, which the fluidbox copies and checks for empty and duplicate ids, or
+ * a lazy list it reads on demand and doesn't check.
+ */
 export type FluidboxItems<TItem extends FluidboxItem = FluidboxItem> =
   | readonly TItem[]
   | FluidboxItemList<TItem>;
@@ -124,7 +147,11 @@ export interface FluidboxRenderContext<TItem extends FluidboxItem = FluidboxItem
   readonly signal: AbortSignal;
 }
 
-/** Draws into `target`. May return a function that releases what it made. */
+/**
+ * Draws into `target`: a custom slide (`renderers`), a filmstrip thumbnail, the
+ * sheet, or a travelling thumbnail overlay. Return a function to release your own
+ * resources, such as timers.
+ */
 export type FluidboxRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxRenderContext<TItem>,
 ) => void | (() => void);
@@ -137,7 +164,11 @@ export interface FluidboxViewerContext<TItem extends FluidboxItem = FluidboxItem
   readonly signal: AbortSignal;
 }
 
-/** Draws your controls and captions into the viewer, once. */
+/**
+ * Draws your controls and captions into the viewer. It runs when the fluidbox is
+ * made, and again after an `update` that redraws the viewer's layer. The function
+ * it returns, and its `signal`, end each run.
+ */
 export type FluidboxViewerRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxViewerContext<TItem>,
 ) => void | (() => void);
@@ -175,6 +206,7 @@ export interface FluidboxOriginAdapter<TItem extends FluidboxItem = FluidboxItem
 
 export type FluidboxStatus = "closed" | "opening" | "open" | "closing";
 
+/** A frozen snapshot. */
 export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly status: FluidboxStatus;
   /** The item the viewer shows or is going to, or null while closed. */
@@ -186,7 +218,14 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly hasNext: boolean;
 }
 
-/** What made something happen. "items" is a change of the item list. */
+/**
+ * What made something happen. "api" is your code or a default control, "trigger"
+ * a click on a trigger, and "keyboard" the arrow keys, Escape, or a page-scrolling
+ * key that closes the viewer. "pointer" is a swipe or scroll through the slides, a
+ * drag to dismiss or a tap on the backdrop, and "wheel" a wheel or trackpad scroll
+ * that dismisses. "items" is a move made by `setItems`. A move from the filmstrip
+ * has the reason of its input.
+ */
 export type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items";
 
 export type FluidboxToggleState = "open" | "closed";
@@ -238,7 +277,11 @@ export class FluidboxItemChangeEvent<TItem extends FluidboxItem = FluidboxItem> 
   }
 }
 
-/** Fired when the sheet comes to rest at another stop. */
+/**
+ * Fired when the sheet comes to rest at another stop. A swipe or a scroll of the
+ * sheet has the reason "pointer", a wheel "wheel", Escape or a key on a stop
+ * button "keyboard", and `sheet.set` or the viewer opening and closing "api".
+ */
 export class FluidboxSheetEvent extends Event {
   /** The stop the sheet rests at: 0 at rest, then one per snap point. */
   readonly stop: number;
@@ -251,12 +294,25 @@ export class FluidboxSheetEvent extends Event {
   }
 }
 
+/**
+ * The events a fluidbox and `<fluidbox-gallery>` fire. The before-events fire
+ * synchronously for every command that would do something, from a key, a gesture
+ * or your code. `preventDefault()` cancels the command, and its promise resolves
+ * false. An open fires `beforetoggle`, `toggle`, `itemchange`, and `settle` after
+ * the flight.
+ */
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
+  /** Before the viewer opens or closes. Cancelable. */
   beforetoggle: FluidboxToggleEvent;
+  /** The opening or closing motion starts. */
   toggle: FluidboxToggleEvent;
+  /** Before the open viewer moves to another item. Cancelable. */
   beforeitemchange: FluidboxItemChangeEvent<TItem>;
+  /** The viewer moves to an item, the one it opens on included. */
   itemchange: FluidboxItemChangeEvent<TItem>;
+  /** The viewer comes to rest on an item. */
   settle: FluidboxItemChangeEvent<TItem>;
+  /** The sheet comes to rest at another stop. */
   sheetchange: FluidboxSheetEvent;
 }
 
@@ -310,13 +366,19 @@ export interface FluidboxFilmstripOptions<TItem extends FluidboxItem = FluidboxI
 
 export type FluidboxControlName = "previous" | "next" | "close";
 
+/** Every option but `items`, `renderers` and `origins` can change later through `update`. */
 export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly items: FluidboxItems<TItem>;
-  /** Your strings for the viewer. */
+  /** Your strings for the viewer, over the defaults. */
   readonly labels?: Partial<FluidboxLabels>;
-  /** Pinch, double-tap, wheel and keyboard zoom of images. `false` turns it off. */
+  /**
+   * Pinch, double-tap, wheel and keyboard zoom of images. `step` is the scale of a
+   * double-click or double-tap, and `max` the largest scale for pinch, wheel and
+   * keyboard. The `+` and `-` keys zoom by 1.5. `false` turns zoom off.
+   * @default { step: 2, max: 4 }
+   */
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
-  /** Draw `custom` items, by the name in their `render`. */
+  /** Draw `custom` items, by the name in their `render`. Read when a slide mounts. */
   readonly renderers?: Readonly<Record<string, FluidboxRenderer<TItem>>>;
   /** Draw your own controls and captions into the viewer. */
   readonly viewer?: FluidboxViewerRenderer<TItem>;
@@ -325,11 +387,17 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    * @default true without a `viewer`, else false
    */
   readonly controls?: boolean | readonly FluidboxControlName[];
-  /** A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"`. */
+  /**
+   * A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"` and its
+   * stylesheet. Without the import, it throws an Error that names it.
+   */
   readonly filmstrip?: boolean | FluidboxFilmstripOptions<TItem>;
-  /** A sheet over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and its stylesheet. */
+  /**
+   * A sheet over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and its
+   * stylesheet. Without the import, it throws an Error that names it.
+   */
   readonly sheet?: boolean | FluidboxSheetOptions<TItem>;
-  /** Find origins the viewer can't see, as in a virtualized grid. */
+  /** Find origins the viewer can't see, as in a virtualized grid. Read on each use. */
   readonly origins?: FluidboxOriginAdapter<TItem>;
 }
 
@@ -344,11 +412,13 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
 };
 
 export interface FluidboxCommandOptions {
+  /** Aborting it stops the command, which resolves false. */
   readonly signal?: AbortSignal;
   /**
    * A move that follows a continuous input, as a thumbnail strip being
    * scrubbed: the slide jumps rather than glides, and the page is not
-   * scrolled to the item's trigger. End the scrub with `scrub: false`.
+   * scrolled to the item's trigger. The next move without it ends the scrub
+   * and brings the trigger into view.
    */
   readonly scrub?: boolean;
 }
@@ -379,33 +449,54 @@ export interface FluidboxOverlayOptions<TItem extends FluidboxItem = FluidboxIte
   readonly frameLayer?: HTMLElement;
 }
 
+/**
+ * Commands resolve true once they happened and their motion settled, and false
+ * when they were prevented, superseded by a later command, aborted, or had
+ * nothing to do. An unknown id or an index out of range rejects with a
+ * RangeError.
+ */
 export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends EventTarget {
   readonly state: FluidboxState<TItem>;
+  /** The items it was made with, or the last `setItems`, as a list. */
   readonly items: FluidboxItemList<TItem>;
   /** The sheet, when the `sheet` option is on. */
   readonly sheet: FluidboxSheet | null;
   /**
-   * Open the viewer on an item, or move to it while open. Without a target, the
-   * current item, else the first. Resolves true once it happened, false when it
-   * was prevented, superseded or aborted. Rejects with a RangeError for an
-   * unknown target.
+   * Open the viewer on an item, or move to it while open. Without a target, it
+   * opens the current item, or the first if there is none.
    */
   open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean>;
   close(options?: FluidboxCommandOptions): Promise<boolean>;
   next(options?: FluidboxCommandOptions): Promise<boolean>;
   previous(options?: FluidboxCommandOptions): Promise<boolean>;
   /**
-   * Change options without closing the viewer: labels and zoom apply in place,
-   * and the viewer's layer, the filmstrip and the sheet are drawn again.
+   * Change options without closing the viewer. Labels and zoom apply in place, so
+   * a zoomed photo zooms out when zoom turns off. A change of `controls`, `viewer`
+   * or the labels redraws the viewer's layer, and a change of `filmstrip` or
+   * `sheet` mounts that add-on again, with the sheet at rest. It compares option
+   * objects member by member and functions by identity, so a fresh object with the
+   * same members changes nothing. Turning an add-on on without its import
+   * throws.
    */
   update(options: FluidboxUpdateOptions<TItem>): void;
-  /** Replace the items. An open viewer stays on the same id when it is still there. */
+  /**
+   * Replace the items. An open viewer stays on the same id, else on the item now at
+   * its index, or the last. It closes when the list is empty.
+   */
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
-  /** Start loading an item a press is likely to open. Call the result to let go. */
+  /**
+   * Start loading an item a press is likely to open, while closed. Call the result
+   * to drop the work. Throws a RangeError for an unknown target.
+   */
   preload(target: FluidboxTarget<TItem>): () => void;
   /**
-   * Make an element open the viewer on an item. The item, and any in
-   * `returns`, close back onto it. Returns a function that unbinds.
+   * Make an element a trigger that opens the viewer on an item. The item, and any
+   * in `returns`, close back onto it. It sets `data-fluidbox-trigger`,
+   * `aria-haspopup="dialog"` and `aria-expanded` on the element, preloads on a
+   * primary-button `pointerdown`, and drops that work 250 ms after the pointer
+   * lifts without a click. A click opens the item the trigger shows, its target or
+   * the item of `returns` it last closed onto, unless the click was prevented.
+   * Returns a function that unbinds.
    */
   bind(
     element: HTMLElement,
@@ -422,8 +513,16 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
     target: FluidboxTarget<TItem>,
     options?: FluidboxOverlayOptions<TItem>,
   ): () => void;
+  /**
+   * Call `listener` after every state change, not on every animation frame.
+   * Returns a function that unsubscribes.
+   */
   subscribe(listener: (state: FluidboxState<TItem>) => void): () => void;
-  /** Remove the viewer and release every binding. */
+  /**
+   * Close at once, remove the viewer and release every binding. Calling it again
+   * does nothing. After it, commands resolve false, and `setItems`, `preload`,
+   * `bind`, `bindOverlay` and `subscribe` throw an InvalidStateError.
+   */
   destroy(): void;
 
   addEventListener<K extends keyof FluidboxEventMap<TItem>>(
