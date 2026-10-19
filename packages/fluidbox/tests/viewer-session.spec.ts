@@ -175,11 +175,7 @@ describe("ViewerSession", () => {
       "status-change:open",
       "selection-settle:two",
     ]);
-    expect(revealOrigin).toHaveBeenCalledWith(
-      "two",
-      1,
-      expect.objectContaining({ reason: "open" }),
-    );
+    expect(revealOrigin).toHaveBeenCalledWith("two", 1, expect.objectContaining({ phase: "open" }));
   });
 
   it("shares repeated pending commands and supersedes incompatible work", async () => {
@@ -268,7 +264,7 @@ describe("ViewerSession", () => {
     const firstVisual = { isConnected: true } as HTMLElement;
     const secondVisual = { isConnected: true } as HTMLElement;
     let dispose = () => {};
-    const prepareClose = vi.fn((item: FluidboxItem) => {
+    const onPreviewChange = vi.fn((item: FluidboxItem) => {
       thumbnail.src = item.type === "img" ? item.src : "";
       dispose();
       session.registerOrigin(["one", "two"], {
@@ -281,7 +277,7 @@ describe("ViewerSession", () => {
       trigger,
       visual: firstVisual,
       thumbnail,
-      prepareClose,
+      onPreviewChange,
     });
     const opening = session.open({ id: "one" });
     driver.steps[0]!.resolve();
@@ -293,7 +289,7 @@ describe("ViewerSession", () => {
     driver.steps[2]!.resolve();
     await closing;
 
-    expect(prepareClose).toHaveBeenCalledWith(items[1], 1);
+    expect(onPreviewChange).toHaveBeenCalledWith(items[1], 1);
     expect(thumbnail.src).toBe("/two.jpg");
     expect(driver.closeOrigins[0]?.visual).toBe(secondVisual);
   });

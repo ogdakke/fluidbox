@@ -1,7 +1,8 @@
 <!-- #region example -->
 <script setup lang="ts">
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 </script>
 
 <template>
@@ -14,7 +15,7 @@ import { label, photos } from "../shared";
         class="pattern-thumb"
         data-test="trigger"
       >
-        <img :src="photo.src" :alt="label(photo)" />
+        <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
     <!-- Your own controls and caption, in place of the default ones. -->
@@ -29,7 +30,7 @@ import { label, photos } from "../shared";
           Previous
         </button>
         <span v-if="fluidbox.item && fluidbox.index !== null">
-          <strong data-test="title">{{ label(fluidbox.item) }}</strong>
+          <strong data-test="title">{{ itemLabel(fluidbox.item) }}</strong>
           <small data-test="counter">{{ fluidbox.index + 1 }} / {{ fluidbox.count }}</small>
         </span>
         <button

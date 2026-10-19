@@ -120,7 +120,7 @@
   pointer-events: none;
 }
 
-.flight-badge-host[data-fluidbox-phase]:not([data-fluidbox-phase="preview"]) {
+.flight-badge-host[data-fluidbox-phase]:not([data-fluidbox-phase="idle"]) {
   visibility: hidden;
 }
 

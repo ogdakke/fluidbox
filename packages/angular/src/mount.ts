@@ -2,6 +2,7 @@ import {
   PLATFORM_ID,
   inject,
   reflectComponentType,
+  type Injector,
   type NgZone,
   type TemplateRef,
   type Type,
@@ -9,7 +10,10 @@ import {
 } from "@angular/core";
 import type { FluidboxItem } from "@ogdakke/fluidbox";
 
-/** The context of an item template: `let-item let-index="index"`. */
+/**
+ * What the sheet's and the filmstrip's templates get: `{ item, index }`, with
+ * the item also as `$implicit`, so `let-item let-index="index"`.
+ */
 export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {
   $implicit: TItem;
   item: TItem;
@@ -34,7 +38,7 @@ export function injectIsBrowser(): boolean {
  * change detection, then move its nodes into a runtime target. Angular always
  * inserts a container's views before its anchor, so a view whose nodes moved
  * away never gets in the way of the next one. Destroying the view takes its
- * nodes out of the target again.
+ * nodes out of the target again. An `injector` adds providers for the view.
  */
 export function mountTemplate<C>(
   zone: NgZone,
@@ -42,9 +46,10 @@ export function mountTemplate<C>(
   template: TemplateRef<C>,
   context: C,
   target: Element,
+  injector?: Injector,
 ): () => void {
   return zone.run(() => {
-    const view = container.createEmbeddedView(template, context);
+    const view = container.createEmbeddedView(template, context, { injector });
     view.detectChanges();
     target.append(...(view.rootNodes as Node[]));
     return () => zone.run(() => view.destroy());

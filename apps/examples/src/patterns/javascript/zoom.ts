@@ -1,6 +1,6 @@
 // #region example
-import { createFluidbox, type FluidboxOptions } from "@ogdakke/fluidbox";
-import { label, photos } from "../shared";
+import { createFluidbox, itemLabel, type FluidboxOptions } from "@ogdakke/fluidbox";
+import { photos } from "../shared";
 
 function gallery(root: HTMLElement, zoom: FluidboxOptions["zoom"]) {
   const fluidbox = createFluidbox({ items: photos, zoom });
@@ -11,7 +11,7 @@ function gallery(root: HTMLElement, zoom: FluidboxOptions["zoom"]) {
     button.type = "button";
     button.className = "pattern-thumb";
     button.dataset.test = "trigger";
-    button.append(Object.assign(new Image(), { src: photo.src, alt: label(photo) }));
+    button.append(Object.assign(new Image(), { src: photo.src, alt: itemLabel(photo) }));
     grid.append(button);
     fluidbox.bind(button, index);
   });

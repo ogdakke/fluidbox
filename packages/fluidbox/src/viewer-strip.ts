@@ -236,6 +236,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#align(this.#index);
   }
 
+  /** Show the labels again after they changed in place. */
+  relabel() {
+    this.element.setAttribute("aria-label", this.#labels.slides);
+    for (const [index, slide] of this.#slides) {
+      slide.element.setAttribute("aria-label", this.#labels.position(index, this.#source.count));
+      const retry = slide.error.querySelector("button");
+      if (retry) retry.textContent = this.#labels.retry;
+      slide.error.firstChild!.textContent = `${this.#labels.error} `;
+    }
+  }
+
   #makeSlide(index: number) {
     const item = this.#source.getItem(index);
     const element = this.#ownerDocument.createElement("div");

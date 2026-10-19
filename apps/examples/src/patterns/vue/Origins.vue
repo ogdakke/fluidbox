@@ -1,7 +1,8 @@
 <!-- #region example -->
 <script setup lang="ts">
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
-import { label, product, strip } from "../shared";
+import { product, strip } from "../shared";
 </script>
 
 <template>
@@ -9,7 +10,7 @@ import { label, product, strip } from "../shared";
   <Fluidbox.Root :items="[product]">
     <Fluidbox.Trigger :item="product" class="pattern-card" data-test="product">
       <span data-fluidbox-origin>
-        <img :src="product.src" :alt="label(product)" />
+        <img :src="product.src" :alt="itemLabel(product)" />
       </span>
       <span><strong>Coral runner</strong><br />€120</span>
     </Fluidbox.Trigger>
@@ -25,7 +26,7 @@ import { label, product, strip } from "../shared";
         class="pattern-thumb"
         data-test="trigger"
       >
-        <img :src="photo.src" :alt="label(photo)" />
+        <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
   </Fluidbox.Root>

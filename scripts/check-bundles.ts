@@ -33,39 +33,39 @@ const isAddon = (chunk: { facadeModuleId?: string | null } | undefined) =>
   !!chunk?.facadeModuleId && /[/\\](sheet|filmstrip)(-entry)?\.[jt]s$/.test(chunk.facadeModuleId);
 
 const initialGzipLimits: Record<Entry, number> = {
-  root: 27_800,
-  elements: 31_400,
-  react: 31_500,
-  solid: 35_500,
-  vue: 31_500,
-  angular: 32_100,
+  root: 28_800,
+  elements: 32_500,
+  react: 33_100,
+  solid: 36_300,
+  vue: 32_900,
+  angular: 33_100,
   filmstrip: 3_300,
-  sheet: 7_000,
-  kit: 2_500,
+  sheet: 7_400,
+  kit: 2_600,
 };
 const cssGzipLimit = 5_600;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 36_800,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
-  elements: 35_500,
-  react: 35_900,
-  solid: 39_900,
-  vue: 35_900,
-  angular: 36_500,
+  elements: 36_600,
+  react: 37_500,
+  solid: 40_700,
+  vue: 37_300,
+  angular: 37_500,
   filmstrip: 3_300,
-  sheet: 7_000,
-  kit: 2_500,
+  sheet: 7_400,
+  kit: 2_600,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 42_200,
-  elements: 40_900,
-  react: 41_200,
-  solid: 45_200,
-  vue: 41_200,
-  angular: 41_800,
+  elements: 42_000,
+  react: 42_900,
+  solid: 46_100,
+  vue: 42_700,
+  angular: 42_900,
   filmstrip: 8_750,
-  sheet: 9_650,
-  kit: 7_900,
+  sheet: 10_550,
+  kit: 8_000,
 };
 
 type Chunk = Extract<

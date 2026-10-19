@@ -22,7 +22,7 @@ test("custom gallery exposes fluidbox readiness and cancels a disconnected waite
   expect(result).toEqual({ count: 3, cancelled: "AbortError" });
 });
 
-test("dynamic preview child changes do not rebuild the gallery during a swipe", async ({
+test("changes inside a trigger don't re-read the items; changes to an item do", async ({
   page,
 }) => {
   await page.goto("/harness.html");
@@ -43,17 +43,18 @@ test("dynamic preview child changes do not rebuild the gallery during a swipe", 
       gallery.querySelector<import("@ogdakke/fluidbox/elements").FluidboxItemElement>(
         "fluidbox-item",
       )!;
-    preview.dataset.fluidboxDynamicPreview = "";
+    // An album cover swapping its picture, as a close flight lands on another item.
+    const image = preview.trigger!.querySelector("img")!;
+    image.src = "/art/canyon.svg";
+    image.alt = "Updated preview";
     const layer = document.createElement("span");
-    preview.append(layer);
+    preview.trigger!.append(layer);
     layer.remove();
-    preview.trigger!.querySelector("img")!.alt = "Updated preview";
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
     const dynamic = refreshes;
-    // A thumbnail change changes the item; an alt on the trigger alone would not.
-    gallery.querySelectorAll("fluidbox-item")[1]!.querySelector("img")!.src = "/art/canyon.svg";
+    gallery.querySelectorAll("fluidbox-item")[1]!.setAttribute("aria-label", "Second photo");
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
@@ -146,7 +147,7 @@ test("backdrop covers the document while the viewer stays in the viewport", asyn
   });
   await page.locator("fluidbox-item").first().click();
   await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   const geometry = await page.evaluate(() => {
@@ -252,7 +253,7 @@ test("gallery controls reveal with the backdrop and arrow selection does not fad
   const close = dialog.locator("[data-fluidbox-close]");
   await expect(next).toHaveCSS("pointer-events", "none");
   await expect(close).toHaveCSS("pointer-events", "none");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   await expect(next).toHaveCSS("pointer-events", "auto");
   await expect(close).toHaveCSS("pointer-events", "auto");
 
@@ -295,7 +296,7 @@ test("settled gallery frame matches its visual baseline", async ({ page }) => {
   await page.goto("/harness.html");
   await page.locator("fluidbox-item").first().click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   await page
     .locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')
     .evaluate((image: HTMLImageElement) => image.decode());
@@ -525,4 +526,33 @@ test("animated navigation crosses the slide window boundary", async ({ page, bro
     );
   }
   expect(await page.locator("[data-fluidbox-slide]").count()).toBeLessThan(40);
+});
+
+test("gallery options change on the open viewer without a rebuild", async ({ page }) => {
+  await page.goto("/harness.html");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  await page.locator("fluidbox-item").first().click();
+  await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+    "data-fluidbox-status",
+    "open",
+  );
+  await page.evaluate(() => {
+    const gallery = document.querySelector("fluidbox-gallery")!;
+    Object.assign(window, { __fluidbox: gallery.fluidbox });
+    gallery.labels = { close: "Sulje" };
+    gallery.toggleAttribute("nozoom", true);
+  });
+  await expect(page.locator("[data-fluidbox-portal] [data-fluidbox-close]")).toHaveAttribute(
+    "aria-label",
+    "Sulje",
+  );
+  const result = await page.evaluate(() => {
+    const gallery = document.querySelector("fluidbox-gallery")!;
+    return {
+      status: gallery.state.status,
+      same: gallery.fluidbox === (window as unknown as { __fluidbox: unknown }).__fluidbox,
+      overlays: document.querySelectorAll("[data-fluidbox-overlay]").length,
+    };
+  });
+  expect(result).toEqual({ status: "open", same: true, overlays: 1 });
 });

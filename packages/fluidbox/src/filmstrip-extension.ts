@@ -1,49 +1,15 @@
 import type { Addon } from "./addons";
 import { FilmstripSession, type FilmstripSessionOptions } from "./filmstrip-session";
-import type {
-  FluidboxFilmstrip,
-  FluidboxFilmstripOptions,
-  FluidboxFilmstripSlot,
-  FluidboxItem as PublicItem,
-} from "./public-api";
+import type { FluidboxFilmstripOptions, FluidboxItem as PublicItem } from "./public-api";
 import type { FluidboxItem, FluidboxSource } from "./runtime-types";
 
-export type {
-  FluidboxFilmstrip,
-  FluidboxFilmstripOptions,
-  FluidboxFilmstripSlot,
-} from "./public-api";
+export type { FluidboxFilmstripOptions } from "./public-api";
 
 /** A scrubbable thumbnail strip along the bottom of the viewer, for more than one item. */
-export function createFilmstrip(
-  options: FluidboxFilmstripOptions<PublicItem>,
-): Addon<FluidboxFilmstrip<PublicItem>> {
-  const listeners = new Set<() => void>();
-  let slots: readonly FluidboxFilmstripSlot<PublicItem>[] = [];
-  const setSlots = (next: readonly FluidboxFilmstripSlot<PublicItem>[]) => {
-    slots = next;
-    for (const listener of listeners) listener();
-  };
-  const render = options.render;
-  const renderItem: FilmstripSessionOptions<FluidboxItem>["renderItem"] = render
-    ? render
-    : options.slots
-      ? ({ item, index, target }) => {
-          const slot = { item, index, target };
-          setSlots([...slots, slot].sort((a, b) => a.index - b.index));
-          return () => setSlots(slots.filter((candidate) => candidate !== slot));
-        }
-      : undefined;
+export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): Addon<null> {
+  const renderItem: FilmstripSessionOptions<FluidboxItem>["renderItem"] = options.render;
   return {
-    handle: {
-      get slots() {
-        return slots;
-      },
-      subscribe(listener) {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
-      },
-    },
+    handle: null,
     extension: {
       mount({ dialog, controller, source, labels }) {
         let current: FluidboxSource<FluidboxItem> = source;
@@ -76,6 +42,7 @@ export function createFilmstrip(
             current = next;
             build();
           },
+          relabel: build,
           destroy() {
             unsubscribe();
             session?.destroy();

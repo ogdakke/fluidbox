@@ -1,16 +1,16 @@
 /** @jsxImportSource solid-js */
 // #region example
 import { For } from "solid-js";
+import { itemLabel, type FluidboxImageItem } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/solid";
-import type { FluidboxImageItem } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/sheet.css";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 function Details(props: { photo: FluidboxImageItem }) {
   const sheet = useFluidboxSheet();
   return (
-    <div class="pattern-sheet">
-      <h3 data-test="sheet-title">{label(props.photo)}</h3>
+    <>
+      <h3 data-test="sheet-title">{itemLabel(props.photo)}</h3>
       <p>
         Stop <output data-test="stop">{sheet.stop()}</output>
       </p>
@@ -18,7 +18,7 @@ function Details(props: { photo: FluidboxImageItem }) {
         Expand
       </button>
       <input data-test="field" placeholder="Add a note" aria-label="Note" />
-    </div>
+    </>
   );
 }
 
@@ -29,13 +29,13 @@ export function Sheet() {
         <For each={photos}>
           {(photo) => (
             <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
-              <img src={photo.src} alt={label(photo)} />
+              <img src={photo.src} alt={itemLabel(photo)} />
             </Fluidbox.Trigger>
           )}
         </For>
       </div>
-      {/* The sheet's content, for the active item. */}
-      <Fluidbox.Sheet<FluidboxImageItem> snapPoints={["40%", "90%"]}>
+      {/* The sheet's content, for the active item. Its attributes go on the sheet itself. */}
+      <Fluidbox.Sheet<FluidboxImageItem> snapPoints={["40%", "90%"]} class="pattern-sheet">
         {({ item }) => <Details photo={item} />}
       </Fluidbox.Sheet>
       <Fluidbox.Viewer>

@@ -7,7 +7,12 @@ import type {
 } from "./runtime-types";
 import type { Addon } from "./addons";
 import { chromeReach } from "./chrome-reach";
-import type { FluidboxItem as PublicItem, FluidboxSheet, FluidboxSheetOptions } from "./public-api";
+import type {
+  FluidboxItem as PublicItem,
+  FluidboxReason,
+  FluidboxSheet,
+  FluidboxSheetOptions,
+} from "./public-api";
 import { PhotoRoom } from "./photo-room";
 
 export type { FluidboxSheet, FluidboxSheetOptions, FluidboxSheetSnapPoint } from "./public-api";
@@ -81,41 +86,32 @@ const px = (value: number) => `${value}px`;
  * momentum and rubber-banding are native, and scroll-driven animations fit the
  * photo into the room above it.
  */
-export function createSheet(options: FluidboxSheetOptions<PublicItem>): Addon<FluidboxSheet> {
-  const listeners = new Set<(stop: number) => void>();
+export function createSheet(
+  options: FluidboxSheetOptions<PublicItem>,
+  onChange: (stop: number, reason: FluidboxReason) => void,
+): Addon<FluidboxSheet> {
   let stop = 0;
   let instance: SheetRuntime | undefined;
-  const notify = () => {
-    for (const listener of listeners) listener(stop);
-  };
-  const announce = (next: number) => {
+  const announce = (next: number, reason: FluidboxReason) => {
     if (next === stop) return;
     stop = next;
-    notify();
+    onChange(stop, reason);
   };
   return {
     handle: {
       get stop() {
         return stop;
       },
-      get slot() {
-        return instance?.slot ?? null;
-      },
       set(next, setOptions) {
-        instance?.set(next, setOptions?.animate ?? true);
-      },
-      subscribe(listener) {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
+        instance?.set(next, setOptions?.animate ?? true, "api");
       },
     },
     extension: {
       mount(context) {
         instance = new SheetRuntime(context, options, announce, () => {
           instance = undefined;
-          notify();
+          announce(0, "api");
         });
-        notify();
         return instance;
       },
     },
@@ -131,8 +127,12 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   readonly #context: FluidboxExtensionContext<FluidboxItem>;
   readonly #options: FluidboxSheetOptions<PublicItem>;
   readonly #dismiss: FluidboxSheetDismiss;
-  readonly #announce: (stop: number) => void;
+  readonly #announce: (stop: number, reason: FluidboxReason) => void;
+  /** What moved the sheet last: a native scroll is the pointer's unless a command said otherwise. */
+  #reason: FluidboxReason = "pointer";
   readonly #onDestroy: () => void;
+  /** The name the runtime last gave the section. */
+  #label: string;
   readonly #lifetime = new AbortController();
   readonly #room: PhotoRoom;
   readonly #timeline: AnimationTimeline | undefined;
@@ -149,7 +149,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   readonly #unsubscribe: FluidboxDispose;
   #strip: HTMLElement | null = null;
   #source: FluidboxSource<FluidboxItem>;
-  #owned: HTMLElement | undefined;
+  readonly #owned: HTMLElement;
   #rendered: { index: number; controller: AbortController; dispose?: FluidboxDispose } | undefined;
   #stop = 0;
   /** Scroll offsets of the stops, rest first. */
@@ -182,7 +182,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   constructor(
     context: FluidboxExtensionContext<FluidboxItem>,
     options: FluidboxSheetOptions<PublicItem>,
-    announce: (stop: number) => void,
+    announce: (stop: number, reason: FluidboxReason) => void,
     onDestroy: () => void,
   ) {
     this.#context = context;
@@ -222,13 +222,12 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     this.#overlay.dataset.fluidboxSheetOverlay = "";
     this.#overlay.dataset.sheetDismiss = this.#dismiss;
     this.#dialog.dataset.sheet = "0";
-    if (options.render) {
-      this.#owned = document.createElement("section");
-      this.#owned.dataset.fluidboxSheet = "";
-      this.#owned.dataset.fluidboxChrome = "";
-      this.#owned.setAttribute("aria-label", context.labels.sheet);
-      this.slot.append(this.#owned);
-    }
+    this.#owned = document.createElement("section");
+    this.#owned.dataset.fluidboxSheet = "";
+    this.#owned.dataset.fluidboxChrome = "";
+    this.#label = context.labels.sheet;
+    this.#owned.setAttribute("aria-label", this.#label);
+    this.slot.append(this.#owned);
 
     const view = document.defaultView!;
     const Timeline = (view as unknown as { ScrollTimeline?: ScrollTimelineConstructor })
@@ -328,10 +327,14 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
       // Triggers rendered with the viewer's content arrive after the sheet attached.
       if (state.status === "open") this.#syncTriggers();
     });
+    // A sheet added by update() on an open viewer has no state change to wait for.
+    const { requestedIndex, activeIndex } = context.controller.state;
+    const index = requestedIndex ?? activeIndex;
+    if (index !== null) this.#renderItem(index);
   }
 
   get #element() {
-    return this.slot.querySelector<HTMLElement>("[data-fluidbox-sheet]");
+    return this.#owned;
   }
 
   get #enabled() {
@@ -355,6 +358,15 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
 
   // Extension hooks.
 
+  relabel() {
+    // A name the page gave the section itself stays.
+    const label = this.#context.labels.sheet;
+    if (this.#owned.getAttribute("aria-label") === this.#label) {
+      this.#owned.setAttribute("aria-label", label);
+    }
+    this.#label = label;
+  }
+
   setSource(source: FluidboxSource<FluidboxItem>) {
     if (source === this.#source) return;
     this.#source = source;
@@ -366,6 +378,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     this.#layout = "";
     this.#measure();
     this.#scroller.scrollTop = this.#rest;
+    this.#reason = "api";
     this.#setStop(0);
   }
 
@@ -384,12 +397,13 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     if (!this.#open || !this.#enabled) return false;
     if (this.#holding) return true;
     if (this.#dismiss === "flight" && deltaY < 0 && !this.#raised) return false;
+    this.#reason = "wheel";
     return "native" as const;
   }
 
   keydown(event: KeyboardEvent) {
     if (event.key !== "Escape" || !this.#raised || !this.#open) return false;
-    this.set(0, true);
+    this.set(0, true, "keyboard");
     return true;
   }
 
@@ -476,8 +490,9 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
 
   // Public control.
 
-  set(stop: number, animate: boolean) {
+  set(stop: number, animate: boolean, reason: FluidboxReason) {
     if (!this.#open || !this.#enabled) return;
+    this.#reason = reason;
     if (stop < this.#stop) this.#dropKeyboard();
     this.#measure();
     this.#scrollTo(stop, animate);
@@ -941,10 +956,9 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     if (stop === this.#stop && this.#dialog.dataset.sheet === String(stop)) return;
     this.#stop = stop;
     this.#dialog.dataset.sheet = String(stop);
-    this.#announce(stop);
-    this.#dialog.dispatchEvent(
-      new CustomEvent("fluidbox-sheet-change", { detail: { stop }, bubbles: true }),
-    );
+    const reason = this.#reason;
+    this.#reason = "pointer";
+    this.#announce(stop, reason);
   }
 
   #syncTriggers(stop = this.#stop) {
@@ -973,6 +987,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     this.#keyboard = 0;
     this.#overlay.style.removeProperty("--fluidbox-sheet-keyboard");
     this.#room.forget();
+    this.#reason = "api";
     if (this.#stop !== 0) this.#setStop(0);
   }
 
@@ -1092,7 +1107,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
         this.#returnFocus = trigger;
         this.#focusOnSettle = true;
       }
-      this.set(next, true);
+      this.set(next, true, event.detail === 0 ? "keyboard" : "pointer");
       return;
     }
     // A tap above a raised sheet lowers it rather than closing the viewer.
@@ -1103,7 +1118,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     ) {
       event.preventDefault();
       event.stopPropagation();
-      this.set(0, true);
+      this.set(0, true, "pointer");
     }
   };
 }

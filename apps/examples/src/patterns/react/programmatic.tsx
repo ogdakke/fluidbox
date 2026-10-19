@@ -1,7 +1,8 @@
 // #region example
 import { useRef, useState, type RefObject } from "react";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 function Toolbar({ lock }: { lock: RefObject<HTMLInputElement | null> }) {
   const open = useFluidbox(({ open }) => open);
@@ -45,7 +46,7 @@ export function Programmatic() {
             className="pattern-thumb"
             data-test="trigger"
           >
-            <img src={photo.src} alt={label(photo)} />
+            <img src={photo.src} alt={itemLabel(photo)} />
           </Fluidbox.Trigger>
         ))}
       </div>

@@ -1,7 +1,8 @@
 // #region example
 import { Component } from "@angular/core";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule, injectFluidbox } from "@ogdakke/fluidbox/angular";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 /** Your own controls and caption. In the viewer, it injects the fluidbox of the root. */
 @Component({
@@ -34,7 +35,7 @@ import { label, photos } from "../shared";
 })
 export class Caption {
   readonly fluidbox = injectFluidbox();
-  readonly title = injectFluidbox(({ item }) => (item ? label(item) : ""));
+  readonly title = injectFluidbox(({ item }) => (item ? itemLabel(item) : ""));
 }
 
 @Component({
@@ -57,6 +58,6 @@ export class Caption {
 })
 export class Headless {
   readonly photos = photos;
-  readonly label = label;
+  readonly label = itemLabel;
 }
 // #endregion example

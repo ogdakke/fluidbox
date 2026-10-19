@@ -1,11 +1,12 @@
 import type { Accessor, JSX, ValidComponent } from "solid-js";
 import type {
-  FluidboxChangeEvent,
   FluidboxCommandOptions,
   FluidboxItem,
+  FluidboxItemChangeEvent,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOriginAdapter,
+  FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
   FluidboxState,
   FluidboxTarget,
@@ -30,30 +31,26 @@ export type FluidboxSolidRenderer<TItem extends FluidboxItem = FluidboxItem> = (
 export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   /** The gallery's items: an array or a lazy list. Tracked: pass a new one to change the gallery. */
   readonly items: FluidboxItems<TItem>;
-  /** Your strings for the viewer. Changing it rebuilds the viewer. */
+  /** Your strings for the viewer. Changes apply to an open viewer. */
   readonly labels?: Partial<FluidboxLabels>;
-  /** Pinch, double-tap, wheel and keyboard zoom of images. `false` turns it off. */
+  /** Pinch, double-tap, wheel and keyboard zoom of images. `false` turns it off. Changes apply to an open viewer. */
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
   /** Render `custom` items, by the name in their `render`. */
   readonly renderers?: Readonly<Record<string, FluidboxSolidRenderer<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
-  readonly origins?: FluidboxOriginAdapter;
+  readonly origins?: FluidboxOriginAdapter<TItem>;
   /** Before the viewer opens or closes. `event.preventDefault()` cancels a command. */
   readonly onBeforeToggle?: (event: FluidboxToggleEvent) => void;
   /** As the viewer starts to open or close. */
   readonly onToggle?: (event: FluidboxToggleEvent) => void;
   /** Before the viewer moves to another item. `event.preventDefault()` keeps it still. */
-  readonly onBeforeItemChange?: (event: FluidboxChangeEvent<TItem>) => void;
+  readonly onBeforeItemChange?: (event: FluidboxItemChangeEvent<TItem>) => void;
   /** When the active item changes, opening included. */
-  readonly onItemChange?: (event: FluidboxChangeEvent<TItem>) => void;
+  readonly onItemChange?: (event: FluidboxItemChangeEvent<TItem>) => void;
   /** When the active item comes to rest. */
-  readonly onSettle?: (event: FluidboxChangeEvent<TItem>) => void;
-  readonly children?: JSX.Element;
-}
-
-export interface FluidboxItemProps {
-  /** The item id that the Trigger and ThumbnailOverlay inside default to. */
-  readonly id: string;
+  readonly onSettle?: (event: FluidboxItemChangeEvent<TItem>) => void;
+  /** When the sheet comes to rest at another stop. */
+  readonly onSheetChange?: (event: FluidboxSheetEvent) => void;
   readonly children?: JSX.Element;
 }
 
@@ -63,10 +60,10 @@ export type FluidboxTriggerProps<TItem extends FluidboxItem = FluidboxItem> = Om
 > & {
   /** The element or component to render instead of a button. It must forward `ref` and events. */
   readonly as?: ValidComponent;
-  /** The item to open: the item, its id or its index. Defaults to the first of `items`, then the enclosing Item. */
-  readonly item?: TItem | FluidboxTarget;
-  /** Every item that may return to this trigger on close, as for an album cover. */
-  readonly items?: readonly (TItem | FluidboxTarget)[];
+  /** The item to open: the item, its id or its index. */
+  readonly item: FluidboxTarget<TItem>;
+  /** More items that close back onto this trigger, as for an album cover. */
+  readonly returns?: readonly FluidboxTarget<TItem>[];
   readonly ref?: HTMLElement | ((element: HTMLElement) => void);
   /** Content, or a function of the preview, which follows the viewer while it is open. */
   readonly children?:
@@ -89,9 +86,11 @@ export interface FluidboxSheetStopProps extends JSX.ButtonHTMLAttributes<HTMLBut
 }
 
 export interface FluidboxThumbnailOverlayProps extends JSX.HTMLAttributes<HTMLSpanElement> {
-  /** Fly with the photo: the children render again in the flying frame. */
+  /** Fly with the photo: the children render again, live, in the flying frame. */
   readonly travel?: boolean;
 }
+
+export interface FluidboxFrameLayerProps extends JSX.HTMLAttributes<HTMLSpanElement> {}
 
 export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
@@ -103,7 +102,11 @@ export interface FluidboxFilmstripProps<TItem extends FluidboxItem = FluidboxIte
   readonly children?: (thumb: FluidboxItemContext<TItem>) => JSX.Element;
 }
 
-export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem> {
+/** Attributes for the sheet's `<section data-fluidbox-sheet>`, and its content. */
+export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem> extends Omit<
+  JSX.HTMLAttributes<HTMLElement>,
+  "children"
+> {
   /**
    * The stops above the resting one, lowest first.
    * @default ["60%", "content"]
@@ -111,8 +114,8 @@ export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
   /** What a swipe down on the photo does with the sheet down. @default "flight" */
   readonly dismiss?: "flight" | "scroll" | "none";
-  /** The sheet's content for the active item, or a function of it. */
-  readonly children?: JSX.Element | ((active: FluidboxItemContext<TItem>) => JSX.Element);
+  /** Renders the sheet's content for the active item. */
+  readonly children?: (active: FluidboxItemContext<TItem>) => JSX.Element;
 }
 
 /**
@@ -122,15 +125,17 @@ export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem> {
 export interface FluidboxApi<
   TItem extends FluidboxItem = FluidboxItem,
 > extends FluidboxState<TItem> {
-  open(target?: FluidboxTarget, options?: FluidboxCommandOptions): Promise<boolean>;
+  open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean>;
   close(options?: FluidboxCommandOptions): Promise<boolean>;
   next(options?: FluidboxCommandOptions): Promise<boolean>;
   previous(options?: FluidboxCommandOptions): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
+  /** Start loading an item a press is likely to open. Call the result to let go. */
+  preload(target: FluidboxTarget<TItem>): () => void;
 }
 
 export interface FluidboxSheetApi {
-  /** The stop the sheet rests at: 0 at rest, then one per snap point. */
+  /** The stop the sheet rests at: 0 at rest, then one per snap point. Follows `sheetchange`. */
   readonly stop: Accessor<number>;
   /** Move the sheet to a stop. Ignored while the viewer is not open. */
   set(stop: number, options?: { readonly animate?: boolean }): void;
@@ -138,7 +143,6 @@ export interface FluidboxSheetApi {
 
 export interface FluidboxSolidParts {
   Root: <TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>) => JSX.Element;
-  Item: (props: FluidboxItemProps) => JSX.Element;
   Trigger: <TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>) => JSX.Element;
   Viewer: (props: FluidboxViewerProps) => JSX.Element;
   Controls: () => JSX.Element;
@@ -149,4 +153,5 @@ export interface FluidboxSolidParts {
   Sheet: <TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>) => JSX.Element;
   SheetStop: (props: FluidboxSheetStopProps) => JSX.Element;
   ThumbnailOverlay: (props: FluidboxThumbnailOverlayProps) => JSX.Element;
+  FrameLayer: (props: FluidboxFrameLayerProps) => JSX.Element;
 }

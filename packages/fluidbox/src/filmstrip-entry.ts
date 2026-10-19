@@ -5,8 +5,4 @@ import { createFilmstrip } from "./filmstrip-extension";
 
 registerAddon("filmstrip", createFilmstrip);
 
-export type {
-  FluidboxFilmstrip,
-  FluidboxFilmstripOptions,
-  FluidboxFilmstripSlot,
-} from "./public-api";
+export type { FluidboxFilmstripOptions } from "./public-api";

@@ -1,8 +1,9 @@
 <!-- #region example -->
 <script setup lang="ts">
 import { defineComponent, h, inject, provide, type InjectionKey } from "vue";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox, type FluidboxVueRenderer } from "@ogdakke/fluidbox/vue";
-import { label, media, theme, thumbnailSrc } from "../shared";
+import { media, theme, thumbnailSrc } from "../shared";
 
 // Provided here, injected by any component below, such as the note renderer.
 const ThemeKey: InjectionKey<string> = Symbol("theme");
@@ -27,7 +28,7 @@ const renderers: Record<string, FluidboxVueRenderer> = { note: () => h(Note) };
         class="pattern-thumb"
         data-test="trigger"
       >
-        <img :src="thumbnailSrc(item)" :alt="label(item)" />
+        <img :src="thumbnailSrc(item)" :alt="itemLabel(item)" />
       </Fluidbox.Trigger>
     </div>
   </Fluidbox.Root>

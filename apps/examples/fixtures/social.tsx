@@ -1,7 +1,7 @@
 import { mountSite } from "../src/site";
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { FluidboxImageItem } from "@ogdakke/fluidbox";
+import { idOf, type FluidboxImageItem } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import { tallScenes } from "@ogdakke/fluidbox-design/art-scenes";
 import { artItem, scenes } from "../src/art";
@@ -191,10 +191,10 @@ function Grid({ post }: { post: Post }) {
           <button type="button" aria-label={`Open ${item.alt}`}>
             <img
               data-fluidbox-origin
-              src={item.thumbnail?.src}
+              src={item.src}
               alt=""
-              width={item.thumbnail?.width}
-              height={item.thumbnail?.height}
+              width={item.width}
+              height={item.height}
             />
           </button>
         </Fluidbox.Trigger>
@@ -364,26 +364,31 @@ function XViewer() {
 
 /** In the sheet's slot, which scrolls with the photo: the replies, and the composer at the end. */
 function XReplies() {
-  const active = useActivePost(tweets);
   return (
     <Fluidbox.Sheet
       snapPoints={["62%", "100%"]}
       className="x-sheet"
-      role="region"
       data-fluidbox-chrome
       aria-label="Replies"
     >
-      <div data-fluidbox-sheet-handle />
-      <header className="x-sheet__head">
-        <strong>Replies</strong>
-        <span className="x-muted">{active && compact(active.stats.replies)}</span>
-      </header>
-      <ul className="x-replies" data-fluidbox-sheet-scroll>
-        {active?.replies.map((reply) => (
-          <ReplyRow key={reply.by.handle} reply={reply} />
-        ))}
-      </ul>
-      <Composer me={me} />
+      {({ item }) => {
+        const active = postOf(tweets, idOf(item));
+        return (
+          <>
+            <div data-fluidbox-sheet-handle />
+            <header className="x-sheet__head">
+              <strong>Replies</strong>
+              <span className="x-muted">{active && compact(active.stats.replies)}</span>
+            </header>
+            <ul className="x-replies" data-fluidbox-sheet-scroll>
+              {active?.replies.map((reply) => (
+                <ReplyRow key={reply.by.handle} reply={reply} />
+              ))}
+            </ul>
+            <Composer me={me} />
+          </>
+        );
+      }}
     </Fluidbox.Sheet>
   );
 }
@@ -509,23 +514,29 @@ function InstagramViewer() {
         snapPoints={["55%", "content"]}
         dismiss="scroll"
         className="ig-sheet"
-        role="region"
         data-fluidbox-chrome
         aria-label="Post"
       >
-        <div data-fluidbox-sheet-handle />
-        {active && (
-          <>
-            <IgActions post={active} />
-            <p className="ig-caption">
-              <strong>{active.by.handle}</strong> {active.text}
-            </p>
-            <Fluidbox.SheetStop stop={2} className="ig-more">
-              View all {active.stats.replies} comments
-            </Fluidbox.SheetStop>
-            <IgComments post={active} />
-          </>
-        )}
+        {({ item }) => {
+          const post = postOf(grams, idOf(item));
+          return (
+            <>
+              <div data-fluidbox-sheet-handle />
+              {post && (
+                <>
+                  <IgActions post={post} />
+                  <p className="ig-caption">
+                    <strong>{post.by.handle}</strong> {post.text}
+                  </p>
+                  <Fluidbox.SheetStop stop={2} className="ig-more">
+                    View all {post.stats.replies} comments
+                  </Fluidbox.SheetStop>
+                  <IgComments post={post} />
+                </>
+              )}
+            </>
+          );
+        }}
       </Fluidbox.Sheet>
     </>
   );
@@ -563,7 +574,7 @@ function InstagramProfile() {
           {grams.map((gram) => (
             <Fluidbox.Trigger key={gram.id} item={gram.items[0]} asChild>
               <button type="button" aria-label={`Open ${gram.text}`}>
-                <img data-fluidbox-origin src={gram.items[0].thumbnail?.src} alt="" />
+                <img data-fluidbox-origin src={gram.items[0].src} alt="" />
               </button>
             </Fluidbox.Trigger>
           ))}

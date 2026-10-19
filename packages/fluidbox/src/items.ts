@@ -1,4 +1,4 @@
-import type { FluidboxItem, FluidboxItemList, FluidboxItems } from "./public-api";
+import type { FluidboxItem, FluidboxItemList, FluidboxItems, FluidboxTarget } from "./public-api";
 import type { FluidboxSource } from "./runtime-types";
 
 /** The id of an item: its own, else its src. */
@@ -7,6 +7,24 @@ export function idOf(item: FluidboxItem): string {
   if (typeof id !== "string" || !id.trim())
     throw new TypeError("A fluidbox item needs an id or a src.");
   return id;
+}
+
+/** The text an item is named by: its alt text or title. */
+export function itemLabel(item: FluidboxItem): string {
+  return item.type === "img" ? item.alt : item.title;
+}
+
+/** A target as an index or an id. An item names itself by its id. */
+export function targetKey(target: FluidboxTarget): number | string {
+  return typeof target === "object" && target !== null ? idOf(target) : target;
+}
+
+/** A target and the items that return to it, as indexes and ids, without repeats. */
+export function targetKeys(
+  target: FluidboxTarget,
+  returns: readonly FluidboxTarget[] = [],
+): (number | string)[] {
+  return [...new Set([target, ...returns].map(targetKey))];
 }
 
 /** A list over arrays and lazy lists alike. Arrays are checked for unique ids. */

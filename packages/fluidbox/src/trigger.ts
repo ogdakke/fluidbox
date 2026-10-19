@@ -1,6 +1,5 @@
 import { hostOf } from "./host";
-import { idOf, indexIn } from "./items";
-import { markedVisualOrigin } from "./origin-geometry";
+import { idOf, indexIn, targetKeys } from "./items";
 import type {
   Fluidbox,
   FluidboxItem,
@@ -13,15 +12,13 @@ import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
 
 /**
  * Find the parts of a trigger the flight uses: the box marked with
- * `data-fluidbox-origin`, `data-fluidbox-target` or `data-fluidbox-preview`,
- * else its image or video, else the trigger itself.
+ * `data-fluidbox-origin`, else its image or video, else the trigger itself.
  */
 export function resolveOrigin(trigger: HTMLElement): FluidboxOrigin {
   const visual =
     (trigger.matches("[data-fluidbox-origin]")
       ? trigger
       : trigger.querySelector<HTMLElement>("[data-fluidbox-origin]")) ??
-    markedVisualOrigin(trigger) ??
     (trigger.matches("img, video")
       ? trigger
       : (trigger.querySelector<HTMLElement>("img, video") ?? trigger));
@@ -33,8 +30,10 @@ export function resolveOrigin(trigger: HTMLElement): FluidboxOrigin {
 
 /** What a trigger opens and returns to. */
 export interface FluidboxTriggerOptions<TItem extends FluidboxItem = FluidboxItem> {
-  /** Every item that may return to this trigger on close. The first is opened. */
-  readonly targets: readonly FluidboxTarget[];
+  /** The item the trigger opens. */
+  readonly target: FluidboxTarget<TItem>;
+  /** More items that close back onto the trigger. */
+  readonly returns?: readonly FluidboxTarget<TItem>[];
   /** Called before the closing flight measures the trigger, with the item it lands on. */
   readonly onPreviewChange?: (item: TItem, index: number) => void;
 }
@@ -85,7 +84,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   options: FluidboxTriggerOptions<TItem>,
 ): FluidboxTrigger<TItem> {
   const host = hostOf(fluidbox);
-  let targets = [...new Set(options.targets)];
+  let targets = targetKeys(options.target, options.returns);
   let onPreviewChange = options.onPreviewChange;
   let element: HTMLElement | null = null;
   let registered = "";
@@ -117,7 +116,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     if (!element || !key) return;
     const origin: RuntimeOrigin = {
       ...resolveOrigin(element),
-      prepareClose: (item, index) => {
+      onPreviewChange: (item, index) => {
         lastPreviewId = idOf(item);
         onPreviewChange?.(item as TItem, index);
       },
@@ -166,7 +165,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     },
     update(next) {
       onPreviewChange = next.onPreviewChange;
-      const nextTargets = [...new Set(next.targets)];
+      const nextTargets = targetKeys(next.target, next.returns);
       if (nextTargets.join("\u0000") === targets.join("\u0000")) return;
       targets = nextTargets;
       register();
@@ -230,4 +229,15 @@ export function bindTrigger<TItem extends FluidboxItem = FluidboxItem>(
       destroy();
     },
   });
+}
+
+/**
+ * The element of a thumbnail overlay marked `data-fluidbox-frame-layer`, the
+ * overlay itself or one inside it: it moves into the flying frame for the
+ * flight and scales with it, as a scrim does.
+ */
+export function frameLayerOf(overlay: HTMLElement): HTMLElement | undefined {
+  return overlay.matches("[data-fluidbox-frame-layer]")
+    ? overlay
+    : (overlay.querySelector<HTMLElement>("[data-fluidbox-frame-layer]") ?? undefined);
 }

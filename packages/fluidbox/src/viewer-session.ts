@@ -193,9 +193,9 @@ export class ViewerSession<
       this.#requestReveal(idOf(activeItem), activeIndex!, "selection");
     }
     const origin = activeItem ? this.#origins.get(idOf(activeItem)) : null;
-    if (activeItem && origin?.prepareClose) {
+    if (activeItem && origin?.onPreviewChange) {
       try {
-        origin.prepareClose(activeItem, activeIndex!);
+        origin.onPreviewChange(activeItem, activeIndex!);
       } catch {
         // A host preview update must not prevent the viewer from closing.
       }
@@ -591,7 +591,7 @@ export class ViewerSession<
     try {
       // Without a revealOrigin, scroll the registered or adapted trigger into view.
       const reveal = adapter?.revealOrigin
-        ? adapter.revealOrigin(id, index, { signal: controller.signal, reason })
+        ? adapter.revealOrigin(id, index, { signal: controller.signal, phase: reason })
         : this.#origins.get(id)?.trigger.scrollIntoView({
             behavior: "instant",
             block: "nearest",

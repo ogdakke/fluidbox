@@ -188,7 +188,7 @@ for (const id of cases) {
       for (const animation of document.getAnimations()) animation.playbackRate = 1;
     });
     await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-      "data-fluidbox-state",
+      "data-fluidbox-status",
       "open",
     );
     await armHold(page, "end");
@@ -208,7 +208,7 @@ test("a travelling badge keeps its size through the flight", async ({ page }) =>
   const size = (await badge.boundingBox())!;
   await trigger.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await armHold(page, "middle");
@@ -258,16 +258,16 @@ test("a wheel during the opening takes over and dismisses", async ({ page }, tes
   await trigger.scrollIntoViewIfNeeded();
   await trigger.click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "opening");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "opening");
   await page.waitForTimeout(400);
   const box = (await trigger.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await expect(dialog, "the wheel lands while the opening still plays").toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "opening",
   );
   await page.mouse.wheel(0, -500);
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "closing");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "closing");
   await expect(dialog).toHaveCount(0, { timeout: 15_000 });
 });
 
@@ -275,7 +275,7 @@ test("a close after an idle moment still animates", async ({ page }) => {
   const trigger = await prepareCase(page, "cover");
   await trigger.click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   // Long enough for a browser to stop advancing its idle timeline.
   await page.waitForTimeout(1200);
   // Watch the close as it happens: a loaded browser can finish it before a
@@ -300,13 +300,13 @@ test("a close after an idle moment still animates", async ({ page }) => {
         new MutationObserver((_, observer) => {
           const state = document
             .querySelector("[data-fluidbox-dialog]")
-            ?.getAttribute("data-fluidbox-state");
+            ?.getAttribute("data-fluidbox-status");
           if (state !== "closing") return;
           observer.disconnect();
           result.closing = true;
         }).observe(document.body, {
           attributes: true,
-          attributeFilter: ["data-fluidbox-state"],
+          attributeFilter: ["data-fluidbox-status"],
           subtree: true,
         });
         requestAnimationFrame(count);
@@ -357,7 +357,7 @@ test("every photo in the scroller opens its own slide of one gallery", async ({ 
   await second.scrollIntoViewIfNeeded();
   await second.click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   await expect(second.locator("img")).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
   // The viewer browses the whole gallery, and the card it hides follows.
   await page.keyboard.press("ArrowRight");
@@ -374,7 +374,7 @@ test("a close right after a swipe flies to the swiped photo", async ({ page }, t
   await items.nth(1).scrollIntoViewIfNeeded();
   await items.nth(1).tap();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   const session = await page.context().newCDPSession(page);
   const touch = (type: "touchStart" | "touchMove" | "touchEnd", x: number) =>
     session.send("Input.dispatchTouchEvent", {
@@ -425,7 +425,7 @@ test("a travelling badge never widens the page", async ({ page }) => {
   });
   await trigger.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("Escape");
@@ -442,7 +442,7 @@ test("a travelling badge lands exactly on the card's badge", async ({ page }) =>
   const card = (await page.locator('[data-flight-case="badge"] .flight-badge').boundingBox())!;
   await trigger.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await armHold(page, "end");
@@ -461,7 +461,7 @@ test("zooming leaves no unzoomed image behind", async ({ page }, testInfo) => {
   const trigger = await prepareCase(page, "cover");
   await trigger.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   const media = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]');
@@ -490,7 +490,7 @@ test("slides stay aligned and images fit their slide on a fractional width", asy
   await cover.scrollIntoViewIfNeeded();
   await cover.click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   for (let step = 1; step <= 4; step++) {
     await page.locator("[data-fluidbox-next]").click();
     const active = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
@@ -535,7 +535,7 @@ test("an opening never reloads a picture that is already on screen", async ({ pa
   });
   await trigger.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.waitForTimeout(400);
@@ -561,7 +561,7 @@ test("a playing clip keeps playing from the same moment in the player and back",
   const clicked = await card.evaluate((video: HTMLVideoElement) => video.currentTime);
   await page.locator('[data-flight-case="video-inline"] [data-flight-trigger]').click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   const player = dialog.locator("video");
   await expect(page.locator("[data-fluidbox-video-stand-in]")).toHaveCount(0);
   const playing = await player.evaluate((video: HTMLVideoElement) => ({

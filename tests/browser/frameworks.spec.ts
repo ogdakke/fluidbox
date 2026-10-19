@@ -12,7 +12,7 @@ test("the overview page mounts its gallery and opens a viewer", async ({ page })
   await opener.scrollIntoViewIfNeeded();
   await opener.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("Escape");
@@ -33,7 +33,7 @@ for (const framework of ["elements", "javascript", "react", "solid", "vue", "ang
     await expect(preview).toHaveAttribute("src", /\/art\/dune\.svg$/);
     await trigger.click();
     const dialog = page.locator("[data-fluidbox-dialog]");
-    await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+    await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
     await page.keyboard.press("ArrowRight");
     await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
       "aria-label",
@@ -61,7 +61,7 @@ for (const framework of ["elements", "javascript", "react", "solid", "vue", "ang
       return {
         origin: { width: origin.width, height: origin.height },
         flight: { width: flight.width, height: flight.height },
-        badgeProgress: Number(getComputedStyle(badge).getPropertyValue("--fluidbox-progress")),
+        badgeProgress: Number(getComputedStyle(badge).getPropertyValue("--fluidbox-closed")),
       };
     });
     expect(landing.origin.height).toBeGreaterThan(0);

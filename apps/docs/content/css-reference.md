@@ -49,7 +49,7 @@ Properties you set. Each is read where the table says, and inherits there from a
 | `--fluidbox-preview-height`                          | `auto`                                                               | `<fluidbox-item>` trigger          | The closed trigger's height.                                                                                     |
 | `--fluidbox-layer-color`                             | `transparent`                                                        | `[data-fluidbox-transition-layer]` | A colour behind the layer's content.                                                                             |
 | `--fluidbox-layer-mask-opacity`                      | `1`                                                                  | `[data-fluidbox-transition-layer]` | The opacity of that colour.                                                                                      |
-| `--fluidbox-transition-layer-opacity`                | `var(--fluidbox-progress)`                                           | `[data-fluidbox-transition-layer]` | The layer's opacity during a flight.                                                                             |
+| `--fluidbox-transition-layer-opacity`                | `var(--fluidbox-closed)`                                             | `[data-fluidbox-transition-layer]` | The layer's opacity during a flight.                                                                             |
 | `--fluidbox-transition-content-opacity`              | fades in near the thumbnail                                          | Travelling overlay copy            | The copy's opacity during a flight.                                                                              |
 
 ### Sheet inputs
@@ -77,7 +77,7 @@ Set by the runtime. Read them for your own effects; don't set them.
 
 | Property                                            | On                                                       | Value                                                                                  |
 | --------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `--fluidbox-progress`                               | Thumbnail overlays, travelling copies, transition layers | `1` at the thumbnail, `0` fully open. A registered `<number>`.                         |
+| `--fluidbox-closed`                                 | Thumbnail overlays, travelling copies, transition layers | `1` at the thumbnail, `0` fully open. A registered `<number>`.                         |
 | `--fluidbox-dismiss-progress`                       | Overlay                                                  | `0` to `1` during a drag to dismiss; at most `0.6` for a wheel.                        |
 | `--fluidbox-drag-x`, `--fluidbox-drag-y`            | Overlay                                                  | The drag's offset in pixels.                                                           |
 | `--fluidbox-media-width`, `--fluidbox-media-height` | Dialog                                                   | The current media's drawn size, without flight or zoom.                                |
@@ -111,7 +111,7 @@ The sheet values follow the scroll on the compositor and inherit to everything i
 | `[data-fluidbox-slide-preview]`                                             | The item's `thumbnail` image.                                                                                      |
 | `[data-fluidbox-media-cover]`                                               | The still over an iframe until it loads.                                                                           |
 | `[data-fluidbox-error]`                                                     | The "Unable to load media." message with its Retry button.                                                         |
-| `[data-fluidbox-status]`                                                    | A visually hidden live region.                                                                                     |
+| `[data-fluidbox-announcer]`                                                 | A visually hidden live region.                                                                                     |
 | `[data-fluidbox-portal]`                                                    | The viewer's layer, where your controls and captions go.                                                           |
 | `[data-fluidbox-close]`, `[data-fluidbox-previous]`, `[data-fluidbox-next]` | The controls.                                                                                                      |
 | `[data-fluidbox-icon]`                                                      | The SVG inside a default control.                                                                                  |
@@ -126,6 +126,8 @@ The sheet values follow the scroll on the compositor and inherit to everything i
 | `[data-fluidbox-transition-layer]`                                          | Mark a travel overlay's `frameLayer` with it to get the layer styles in Inputs.                                    |
 | `[data-fluidbox-trigger]`                                                   | A trigger, on the page.                                                                                            |
 | `[data-fluidbox-thumbnail-overlay]`                                         | A thumbnail overlay inside a `<fluidbox-item>` trigger. The value `travel` makes it fly with the photo.            |
+| `[data-fluidbox-frame-layer]`                                               | A travelling overlay's frame layer: it moves into the flying frame and scales with it.                             |
+| `[data-fluidbox-ghost]`                                                     | The still copy of a frame layer the page shows in the thumbnail while a flight starts.                             |
 
 ### Sheet parts
 
@@ -134,36 +136,34 @@ The sheet values follow the scroll on the compositor and inherit to everything i
 | `[data-fluidbox-sheet-scroller]` | The scroller the photo and the sheet share.             |
 | `[data-fluidbox-sheet-stage]`    | The photos' room inside it.                             |
 | `[data-fluidbox-sheet-slot]`     | Where the sheet element goes.                           |
-| `[data-fluidbox-sheet]`          | The sheet. Yours in slot mode, or made by `render`.     |
+| `[data-fluidbox-sheet]`          | The sheet, a `<section>` that `render` fills.           |
 | `[data-fluidbox-sheet-handle]`   | A grab bar you add.                                     |
 | `[data-fluidbox-sheet-scroll]`   | The part of the sheet that scrolls at the top stop.     |
 | `[data-fluidbox-sheet-stop]`     | A button that moves the sheet to the stop in its value. |
 
 ## State attributes
 
-| Attribute                                                          | On                  | Meaning                                                |
-| ------------------------------------------------------------------ | ------------------- | ------------------------------------------------------ |
-| `data-fluidbox-state`                                              | Overlay, dialog     | `closed`, `opening`, `open` or `closing`.              |
-| `data-open`, `data-closed`                                         | Overlay, dialog     | Not closed, or closed.                                 |
-| `data-starting-style`, `data-opening`                              | Overlay, dialog     | Opening.                                               |
-| `data-ending-style`                                                | Overlay, dialog     | Closing.                                               |
-| `data-dragging`                                                    | Overlay, dialog     | A drag to dismiss is under way.                        |
-| `data-dismissing`                                                  | Overlay, dialog     | Closing, or a drag to dismiss is under way.            |
-| `data-zoomed`                                                      | Dialog              | An image is zoomed.                                    |
-| `data-fluidbox-gallery`                                            | Dialog              | There is more than one item.                           |
-| `data-filmstrip`                                                   | Dialog              | A filmstrip is docked.                                 |
-| `data-sheet`                                                       | Dialog              | The sheet's stop number.                               |
-| `data-sheet-raised`, `data-sheet-expanded`                         | Dialog              | The sheet is above stop `0`; at its top stop.          |
-| `data-sheet-peeking`, `data-sheet-off`                             | Dialog              | The sheet peeks at rest; the sheet is turned off.      |
-| `data-sheet-dismiss`                                               | Overlay             | The sheet's `dismiss` option.                          |
-| `data-sheet-dismissed`                                             | Overlay             | A scroll dismiss is committed.                         |
-| `data-fluidbox-state`, `data-open`, `data-closed`, `aria-expanded` | The active trigger  | The trigger's item is open.                            |
-| `data-fluidbox-thumbnail-hidden`                                   | The trigger's image | Its item is open, so it is hidden.                     |
-| `data-fluidbox-phase`                                              | Thumbnail overlays  | `preview`, `opening`, `open`, `dragging` or `closing`. |
-| `aria-selected`, `data-fluidbox-selected`                          | Filmstrip items     | The current item.                                      |
+| Attribute                                                           | On                  | Meaning                                             |
+| ------------------------------------------------------------------- | ------------------- | --------------------------------------------------- |
+| `data-fluidbox-status`                                              | Overlay, dialog     | `closed`, `opening`, `open` or `closing`.           |
+| `data-open`, `data-closed`                                          | Overlay, dialog     | Not closed, or closed.                              |
+| `data-starting-style`, `data-opening`                               | Overlay, dialog     | Opening.                                            |
+| `data-ending-style`                                                 | Overlay, dialog     | Closing.                                            |
+| `data-dragging`                                                     | Overlay, dialog     | A drag to dismiss is under way.                     |
+| `data-dismissing`                                                   | Overlay, dialog     | Closing, or a drag to dismiss is under way.         |
+| `data-zoomed`                                                       | Dialog              | An image is zoomed.                                 |
+| `data-gallery`                                                      | Dialog              | There is more than one item.                        |
+| `data-filmstrip`                                                    | Dialog              | A filmstrip is docked.                              |
+| `data-sheet`                                                        | Dialog              | The sheet's stop number.                            |
+| `data-sheet-raised`, `data-sheet-expanded`                          | Dialog              | The sheet is above stop `0`; at its top stop.       |
+| `data-sheet-peeking`, `data-sheet-off`                              | Dialog              | The sheet peeks at rest; the sheet is turned off.   |
+| `data-sheet-dismiss`                                                | Overlay             | The sheet's `dismiss` option.                       |
+| `data-sheet-dismissed`                                              | Overlay             | A scroll dismiss is committed.                      |
+| `data-fluidbox-status`, `data-open`, `data-closed`, `aria-expanded` | The active trigger  | The trigger's item is open.                         |
+| `data-fluidbox-thumbnail-hidden`                                    | The trigger's image | Its item is open, so it is hidden.                  |
+| `data-fluidbox-phase`                                               | Thumbnail overlays  | `idle`, `opening`, `open`, `dragging` or `closing`. |
+| `aria-selected`, `data-fluidbox-selected`                           | Filmstrip items     | The current item.                                   |
 
 ## Events
 
-| Event                   | Target | `detail`             |
-| ----------------------- | ------ | -------------------- |
-| `fluidbox-sheet-change` | Dialog | `{ stop }`. Bubbles. |
+The sheet's stop changes arrive as the `sheetchange` event on the fluidbox and on `<fluidbox-gallery>`, not on an element in the viewer. See [Filmstrip and sheet](./filmstrip-and-sheet.md#the-sheet-handle).

@@ -6,7 +6,7 @@ import type {
   FluidboxThumbnailOverlayRegistration,
 } from "./runtime-types";
 
-export type ThumbnailOverlayPhase = "preview" | "opening" | "open" | "dragging" | "closing";
+export type ThumbnailOverlayPhase = "idle" | "opening" | "open" | "dragging" | "closing";
 
 interface ActiveOverlay<TItem extends FluidboxItem> {
   readonly id: FluidboxItemId;
@@ -151,7 +151,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     const css = ownerDocument.defaultView?.CSS;
     if (!progressRegistered && css && "registerProperty" in css) {
       const properties: PropertyDefinition[] = [
-        { name: "--fluidbox-progress", syntax: "<number>", inherits: true, initialValue: "1" },
+        { name: "--fluidbox-closed", syntax: "<number>", inherits: true, initialValue: "1" },
       ];
       for (const property of properties) {
         try {
@@ -166,7 +166,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
 
   register(id: FluidboxItemId, registration: FluidboxThumbnailOverlayRegistration<TItem>) {
     this.#registrations.set(id, registration);
-    this.#publish(registration.element, "preview", 1);
+    this.#publish(registration.element, "idle", 1);
     return () => {
       if (this.#registrations.get(id) !== registration) return;
       this.#registrations.delete(id);
@@ -299,7 +299,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     const progress = progressMotion.map(({ offset, opacity }) => {
       const traveled = Math.min(1, Math.max(0, Number(opacity)));
       const fade = to < from ? 1 - (1 - traveled) ** opacityResponse : traveled ** opacityResponse;
-      return { offset, "--fluidbox-progress": String(from + (to - from) * fade) };
+      return { offset, "--fluidbox-closed": String(from + (to - from) * fade) };
     }) as Keyframe[];
     const targets = [
       ...new Set([active.registration.element, active.frameLayer, active.target]),
@@ -350,9 +350,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   currentProgress(fallback: number) {
     const target = this.#active?.target ?? this.#active?.registration.element;
     if (!target?.isConnected) return fallback;
-    const value = Number.parseFloat(
-      getComputedStyle(target).getPropertyValue("--fluidbox-progress"),
-    );
+    const value = Number.parseFloat(getComputedStyle(target).getPropertyValue("--fluidbox-closed"));
     return Number.isFinite(value) ? value : fallback;
   }
 
@@ -402,8 +400,8 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
       if (!target?.isConnected) continue;
       const holder = this.#progressHolder(target);
       holder.style.setProperty(
-        "--fluidbox-progress",
-        getComputedStyle(holder).getPropertyValue("--fluidbox-progress"),
+        "--fluidbox-closed",
+        getComputedStyle(holder).getPropertyValue("--fluidbox-closed"),
       );
     }
     for (const child of active.adopted.keys()) {
@@ -474,7 +472,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
 
   #publish(target: HTMLElement, phase: ThumbnailOverlayPhase, progress: number) {
     target.dataset.fluidboxPhase = phase;
-    this.#progressHolder(target).style.setProperty("--fluidbox-progress", String(progress));
+    this.#progressHolder(target).style.setProperty("--fluidbox-closed", String(progress));
   }
 
   /**
@@ -536,11 +534,11 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
         else active.frameLayer.style.removeProperty(property);
       }
       if (active.frameLayer !== active.registration.element) {
-        this.#publish(active.frameLayer, "preview", 1);
+        this.#publish(active.frameLayer, "idle", 1);
       }
     }
     if (this.#registrations.get(active.id) === active.registration) {
-      this.#publish(active.registration.element, "preview", 1);
+      this.#publish(active.registration.element, "idle", 1);
     } else {
       this.#reset(active.registration.element);
     }
@@ -548,6 +546,6 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
 
   #reset(target: HTMLElement) {
     delete target.dataset.fluidboxPhase;
-    target.style.removeProperty("--fluidbox-progress");
+    target.style.removeProperty("--fluidbox-closed");
   }
 }

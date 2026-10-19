@@ -1,6 +1,6 @@
 // #region example
-import { createFluidbox } from "@ogdakke/fluidbox";
-import { label, product, strip } from "../shared";
+import { createFluidbox, itemLabel } from "@ogdakke/fluidbox";
+import { product, strip } from "../shared";
 
 export function mountOrigins(root: HTMLElement) {
   // The photo flies from the element marked data-fluidbox-origin, not the whole card.
@@ -10,7 +10,7 @@ export function mountOrigins(root: HTMLElement) {
   card.className = "pattern-card";
   card.dataset.test = "product";
   card.innerHTML = `
-    <span data-fluidbox-origin><img src="${product.src}" alt="${label(product)}" /></span>
+    <span data-fluidbox-origin><img src="${product.src}" alt="${itemLabel(product)}" /></span>
     <span><strong>Coral runner</strong><br />€120</span>`;
   productViewer.bind(card, 0);
 
@@ -24,7 +24,7 @@ export function mountOrigins(root: HTMLElement) {
     button.type = "button";
     button.className = "pattern-thumb";
     button.dataset.test = "trigger";
-    button.append(Object.assign(new Image(), { src: item.src, alt: label(item) }));
+    button.append(Object.assign(new Image(), { src: item.src, alt: itemLabel(item) }));
     scroller.append(button);
     stripViewer.bind(button, index);
   });

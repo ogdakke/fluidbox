@@ -1,8 +1,9 @@
 /** @jsxImportSource solid-js */
 // #region example
 import { createContext, For, useContext } from "solid-js";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/solid";
-import { label, media, theme, thumbnailSrc } from "../shared";
+import { media, theme, thumbnailSrc } from "../shared";
 
 const ThemeContext = createContext("light");
 
@@ -21,7 +22,7 @@ export function Renderers() {
           <For each={media}>
             {(item) => (
               <Fluidbox.Trigger item={item} class="pattern-thumb" data-test="trigger">
-                <img src={thumbnailSrc(item)} alt={label(item)} />
+                <img src={thumbnailSrc(item)} alt={itemLabel(item)} />
               </Fluidbox.Trigger>
             )}
           </For>

@@ -1,9 +1,9 @@
 import type { VNodeChild } from "vue";
 import type {
+  FluidboxCommandOptions,
   FluidboxItem,
   FluidboxItems,
   FluidboxState,
-  FluidboxStatus,
   FluidboxTarget,
 } from "@ogdakke/fluidbox";
 
@@ -20,14 +20,22 @@ export type FluidboxVueRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxVueRenderContext<TItem>,
 ) => VNodeChild;
 
+/** What the Sheet and Filmstrip slots get: the item they draw and its index. */
+export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {
+  readonly item: TItem;
+  readonly index: number;
+}
+
 /** The viewer's commands. Each resolves true once it happened, false when it was prevented. */
 export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
-  /** Open on an item, by index or id, or move to it while open. */
-  open(target?: FluidboxTarget): Promise<boolean>;
-  close(): Promise<boolean>;
-  next(): Promise<boolean>;
-  previous(): Promise<boolean>;
+  /** Open on an item, its index or its id, or move to it while open. */
+  open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean>;
+  close(options?: FluidboxCommandOptions): Promise<boolean>;
+  next(options?: FluidboxCommandOptions): Promise<boolean>;
+  previous(options?: FluidboxCommandOptions): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
+  /** Start loading an item a press is likely to open. Call the result to let go. */
+  preload(target: FluidboxTarget<TItem>): () => void;
 }
 
 /**
@@ -38,32 +46,10 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
 export type FluidboxApi<TItem extends FluidboxItem = FluidboxItem> = FluidboxState<TItem> &
   FluidboxCommands<TItem>;
 
-/** Reads and moves the sheet, from `useFluidboxSheet()` or the Sheet slot. */
+/** Reads and moves the sheet, from `useFluidboxSheet()`. `stop` follows `sheetchange`. */
 export interface FluidboxSheetApi {
   /** The stop the sheet rests at: 0 at rest, then one per snap point. */
   readonly stop: number;
   /** Move the sheet to a stop. Ignored while the viewer is not open. */
   set(stop: number, options?: { readonly animate?: boolean }): void;
-}
-
-/** The default slot of Trigger: the item it shows, which follows the viewer while it is open. */
-export interface FluidboxTriggerSlotProps<TItem extends FluidboxItem = FluidboxItem> {
-  /** Null when the trigger's items have left the list. */
-  readonly item: TItem | null;
-  readonly index: number | null;
-  readonly status: FluidboxStatus;
-}
-
-/** The default slot of Filmstrip: one thumbnail. The strip marks the selected button `data-fluidbox-selected`. */
-export interface FluidboxFilmstripSlotProps<TItem extends FluidboxItem = FluidboxItem> {
-  readonly item: TItem;
-  readonly index: number;
-}
-
-/** The default slot of Sheet: the active item, and the sheet. */
-export interface FluidboxSheetSlotProps<
-  TItem extends FluidboxItem = FluidboxItem,
-> extends FluidboxSheetApi {
-  readonly item: TItem;
-  readonly index: number;
 }

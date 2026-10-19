@@ -2,24 +2,26 @@ import { addon, type Addon } from "./addons";
 import { controlButton, controlNames, wireControls } from "./controls";
 import { DomViewerDriver } from "./dom-viewer-driver";
 import { hostKey, type FluidboxHost } from "./host";
-import { idOf, indexIn, toList, toSource } from "./items";
+import { idOf, indexIn, targetKey, targetKeys, toList, toSource } from "./items";
 import { resolveLabels, type FluidboxLabels } from "./labels";
 import {
-  FluidboxChangeEvent,
+  FluidboxItemChangeEvent,
   FluidboxToggleEvent,
   type Fluidbox,
   type FluidboxBindOptions,
   type FluidboxCommandOptions,
-  type FluidboxFilmstrip,
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
   type FluidboxOptions,
+  type FluidboxOriginAdapter,
   type FluidboxOverlayOptions,
   type FluidboxReason,
   type FluidboxSheet,
   type FluidboxState,
   type FluidboxTarget,
+  type FluidboxUpdateOptions,
+  FluidboxSheetEvent,
 } from "./public-api";
 import type {
   FluidboxExtension,
@@ -41,6 +43,28 @@ const reasonOf = (reason: SessionChangeReason): FluidboxReason =>
 
 const happened = (result: SessionCommandResult) => result.status === "completed";
 
+/** Options objects with the same members, so a binding may pass a fresh literal each render. */
+function sameOptions(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => {
+      const left = (a as Record<string, unknown>)[key];
+      const right = (b as Record<string, unknown>)[key];
+      return Array.isArray(left) && Array.isArray(right)
+        ? left.length === right.length && left.every((each, index) => each === right[index])
+        : left === right;
+    })
+  );
+}
+
+type Settings<TItem extends FluidboxItem> = Pick<
+  FluidboxOptions<TItem>,
+  "controls" | "viewer" | "filmstrip" | "sheet"
+>;
+
 /** Create a fluidbox: a viewer at the end of `<body>`, and the commands, state and events that drive it. */
 export function createFluidbox<TItem extends FluidboxItem = FluidboxItem>(
   options: FluidboxOptions<TItem>,
@@ -50,13 +74,16 @@ export function createFluidbox<TItem extends FluidboxItem = FluidboxItem>(
 
 class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements Fluidbox<TItem> {
   readonly #session: ViewerSession<TItem>;
+  readonly #driver: DomViewerDriver<TItem>;
+  /** Changed in place by update, so every part of the viewer reads the new strings. */
   readonly #labels: FluidboxLabels;
+  #settings: Settings<TItem>;
   readonly #lifetime = new AbortController();
   readonly #bindings = new Set<() => void>();
   /** Re-resolve each binding's targets after the items change. */
   readonly #refreshers = new Set<() => void>();
-  readonly #sheet: Addon<FluidboxSheet> | undefined;
-  readonly #filmstrip: Addon<FluidboxFilmstrip<TItem>> | undefined;
+  #sheet: Addon<FluidboxSheet> | undefined;
+  #filmstrip: Addon<null> | undefined;
   #list: FluidboxItemList<TItem>;
   #state: FluidboxState<TItem>;
   #stateOf: SessionState | undefined;
@@ -69,12 +96,10 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
   constructor(options: FluidboxOptions<TItem>) {
     super();
     this.#list = toList(options.items);
-    this.#labels = resolveLabels(options.labels);
+    this.#labels = { ...resolveLabels(options.labels) };
     const { sheet, filmstrip, controls, viewer } = options;
-    this.#sheet = sheet ? addon("sheet")(sheet === true ? {} : sheet) : undefined;
-    this.#filmstrip = filmstrip
-      ? addon("filmstrip")(filmstrip === true ? {} : filmstrip)
-      : undefined;
+    this.#settings = { sheet, filmstrip, controls, viewer };
+    this.#makeAddons();
     const driver = new DomViewerDriver<TItem>(
       document,
       options.zoom,
@@ -84,18 +109,30 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
     this.#session = new ViewerSession<TItem>(
       {
         source: toSource(this.#list),
-        origins: options.origins,
+        // The adapter only ever sees this fluidbox's items.
+        origins: options.origins as FluidboxOriginAdapter | undefined,
         onBeforeCommand: (event) => this.#before(event),
         onEvent: (event) => this.#event(event),
       },
       driver,
     );
+    this.#driver = driver;
     this.#state = this.#publicState(this.#session.state);
     this[hostKey] = this.#host();
+    driver.connect(this.#session, this.#portal(), this.#extensions());
+  }
+
+  /** The viewer's layer: the default controls, then your viewer content. */
+  #portal(): FluidboxPortalRenderer {
+    const { controls, viewer } = this.#settings;
     // Like the elements and the bindings: the defaults until you draw your own viewer.
     const shown = controls ?? !viewer;
     const names = shown === true ? controlNames : shown || [];
-    const portal: FluidboxPortalRenderer = ({ target, signal }) => {
+    return ({ target, signal: lifetime }) => {
+      // Drawn again on update, so it has a lifetime of its own.
+      const scope = new AbortController();
+      const { signal } = scope;
+      lifetime.addEventListener("abort", () => scope.abort(), { once: true, signal });
       const buttons = names.map((name) => controlButton(document, name, this.#labels));
       target.append(...buttons);
       const disposeViewer = viewer?.({ target, fluidbox: this, signal }) ?? undefined;
@@ -105,13 +142,72 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
       });
       return () => {
         disposeViewer?.();
+        scope.abort();
         for (const button of buttons) button.remove();
       };
     };
-    driver.connect(this.#session, portal, [
+  }
+
+  #makeAddons() {
+    const { sheet, filmstrip } = this.#settings;
+    this.#sheet = sheet
+      ? addon("sheet")(sheet === true ? {} : sheet, (stop, reason) => {
+          this.dispatchEvent(new FluidboxSheetEvent("sheetchange", { stop, reason }));
+        })
+      : undefined;
+    this.#filmstrip = filmstrip
+      ? addon("filmstrip")(filmstrip === true ? {} : filmstrip)
+      : undefined;
+  }
+
+  #extensions() {
+    return [
       this.#filmstrip?.extension as FluidboxExtension<TItem> | undefined,
       this.#sheet?.extension as FluidboxExtension<TItem> | undefined,
-    ]);
+    ];
+  }
+
+  update(options: FluidboxUpdateOptions<TItem>) {
+    if (this.#lifetime.signal.aborted) return;
+    const has = (key: keyof FluidboxUpdateOptions<TItem>) => Object.hasOwn(options, key);
+    const previous = this.#settings;
+    const next: Settings<TItem> = {
+      controls: has("controls") ? options.controls : previous.controls,
+      viewer: has("viewer") ? options.viewer : previous.viewer,
+      filmstrip: has("filmstrip") ? options.filmstrip : previous.filmstrip,
+      sheet: has("sheet") ? options.sheet : previous.sheet,
+    };
+    // Check the add-on entries before changing anything.
+    if (next.sheet && !previous.sheet) addon("sheet");
+    if (next.filmstrip && !previous.filmstrip) addon("filmstrip");
+    this.#settings = next;
+    if (has("zoom")) this.#driver.setZoom(options.zoom);
+    let relabeled = false;
+    if (has("labels")) {
+      const labels = resolveLabels(options.labels);
+      relabeled = Object.entries(labels).some(
+        ([key, value]) => this.#labels[key as keyof FluidboxLabels] !== value,
+      );
+      if (relabeled) {
+        Object.assign(this.#labels, labels);
+        this.#driver.relabel();
+      }
+    }
+    if (
+      relabeled ||
+      !sameOptions(next.controls, previous.controls) ||
+      next.viewer !== previous.viewer
+    ) {
+      this.#driver.setPortal(this.#portal());
+    }
+    if (
+      !sameOptions(next.filmstrip, previous.filmstrip) ||
+      !sameOptions(next.sheet, previous.sheet)
+    ) {
+      // The outgoing sheet announces its return to rest as it is torn down.
+      this.#makeAddons();
+      this.#driver.setExtensions(this.#extensions());
+    }
   }
 
   get state() {
@@ -128,11 +224,7 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
     return this.#sheet?.handle ?? null;
   }
 
-  get filmstrip() {
-    return this.#filmstrip?.handle ?? null;
-  }
-
-  open(target?: FluidboxTarget, options?: FluidboxCommandOptions) {
+  open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions) {
     return this.#command("open", target, "api", options);
   }
 
@@ -158,17 +250,18 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
     return result.then(happened);
   }
 
-  preload(target: FluidboxTarget) {
+  preload(target: FluidboxTarget<TItem>) {
     return this.#session.prepare(this.#target(target));
   }
 
   bind(
     element: HTMLElement,
-    target: FluidboxTarget | readonly FluidboxTarget[],
+    target: FluidboxTarget<TItem>,
     options: FluidboxBindOptions<TItem> = {},
   ) {
     const trigger = bindTrigger(this, element, {
-      targets: typeof target === "object" ? target : [target],
+      target,
+      returns: options.returns,
       onPreviewChange: options.onPreviewChange,
     });
     const refresh = () => trigger.refresh();
@@ -181,7 +274,7 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
 
   bindOverlay(
     element: HTMLElement,
-    target: FluidboxTarget | readonly FluidboxTarget[],
+    target: FluidboxTarget<TItem>,
     options: FluidboxOverlayOptions<TItem> = {},
   ) {
     const { travel, frameLayer } = options;
@@ -199,7 +292,7 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
               : travel,
         }
       : { behavior: "host", element };
-    const targets = typeof target === "object" ? target : [target];
+    const targets = targetKeys(target, options.returns);
     for (const each of targets) {
       if (typeof each === "string" ? !each : !Number.isInteger(each) || each < 0) {
         throw new RangeError(`Not a fluidbox item target: ${String(each)}`);
@@ -264,7 +357,8 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
   }
 
   #target(target: FluidboxTarget): SessionTarget {
-    return typeof target === "number" ? { index: target } : { id: target };
+    const key = targetKey(target);
+    return typeof key === "number" ? { index: key } : { id: key };
   }
 
   #command(
@@ -300,7 +394,7 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
           id,
           registration as FluidboxThumbnailOverlayRegistration<TItem>,
         ),
-      preload: (target) => this.preload(target),
+      preload: (target) => this.preload(target as FluidboxTarget<TItem>),
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
     };
@@ -349,7 +443,7 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
     if (!shown) return;
     const goal = this.#item(event.target);
     if (!goal || goal.index === (state.requestedIndex ?? state.activeIndex)) return;
-    const before = new FluidboxChangeEvent<TItem>("beforeitemchange", {
+    const before = new FluidboxItemChangeEvent<TItem>("beforeitemchange", {
       cancelable: true,
       id: idOf(goal.item),
       index: goal.index,
@@ -378,7 +472,7 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
     } else if (event.type === "selection-change" || event.type === "selection-settle") {
       if (event.index < 0 || event.index >= this.#list.count) return;
       this.dispatchEvent(
-        new FluidboxChangeEvent<TItem>(
+        new FluidboxItemChangeEvent<TItem>(
           event.type === "selection-change" ? "itemchange" : "settle",
           {
             id: event.id,

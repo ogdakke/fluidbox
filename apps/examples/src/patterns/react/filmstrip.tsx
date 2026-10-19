@@ -1,6 +1,7 @@
 // #region example
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 function Thumbnails() {
   return (
@@ -12,7 +13,7 @@ function Thumbnails() {
           className="pattern-thumb"
           data-test="trigger"
         >
-          <img src={photo.src} alt={label(photo)} />
+          <img src={photo.src} alt={itemLabel(photo)} />
         </Fluidbox.Trigger>
       ))}
     </div>

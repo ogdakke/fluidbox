@@ -33,7 +33,7 @@ export function createViewerPortal(
       <div data-fluidbox-dialog role="dialog" aria-modal="true"
            tabindex="-1">
         <div data-fluidbox-frame><img data-fluidbox-media part="image" /></div>
-        <span data-fluidbox-status role="status" aria-live="polite" aria-atomic="true"></span>
+        <span data-fluidbox-announcer role="status" aria-live="polite" aria-atomic="true"></span>
         <div data-fluidbox-portal></div>
       </div>
     </div>
@@ -46,7 +46,7 @@ export function createViewerPortal(
     dialog: required(overlay, "[data-fluidbox-dialog]"),
     frame: required(overlay, "[data-fluidbox-frame]"),
     media: required(overlay, "[data-fluidbox-media]"),
-    status: required(overlay, "[data-fluidbox-status]"),
+    status: required(overlay, "[data-fluidbox-announcer]"),
     portalTarget: required(overlay, "[data-fluidbox-portal]"),
   };
 }

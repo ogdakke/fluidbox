@@ -1,8 +1,9 @@
 /** @jsxImportSource solid-js */
 // #region example
 import { For } from "solid-js";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/solid";
-import { label, product, strip } from "../shared";
+import { product, strip } from "../shared";
 
 export function Origins() {
   return (
@@ -11,7 +12,7 @@ export function Origins() {
       <Fluidbox.Root items={[product]}>
         <Fluidbox.Trigger item={product} class="pattern-card" data-test="product">
           <span data-fluidbox-origin>
-            <img src={product.src} alt={label(product)} />
+            <img src={product.src} alt={itemLabel(product)} />
           </span>
           <span>
             <strong>Coral runner</strong>
@@ -27,7 +28,7 @@ export function Origins() {
           <For each={strip}>
             {(photo) => (
               <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
-                <img src={photo.src} alt={label(photo)} />
+                <img src={photo.src} alt={itemLabel(photo)} />
               </Fluidbox.Trigger>
             )}
           </For>

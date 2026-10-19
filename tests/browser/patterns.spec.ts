@@ -16,7 +16,7 @@ const expectSlide = (page: Page, label: string) =>
 
 async function open(page: Page, trigger: Locator, label: string) {
   await trigger.click();
-  await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
   await expectSlide(page, label);
 }
 
@@ -170,6 +170,10 @@ for (const framework of frameworks) {
       const root = pattern(page, "sheet");
       await open(page, root.locator('[data-test="trigger"]').first(), "Item 1 of 4");
       const sheet = dialog(page).locator("[data-fluidbox-sheet]");
+      // Every framework fills the runtime's own sheet, a section named by its label.
+      await expect(sheet).toHaveCount(1);
+      await expect(sheet).toHaveJSProperty("tagName", "SECTION");
+      await expect(sheet).toHaveAttribute("aria-label", "Details");
       await expect(sheet.locator('[data-test="sheet-title"]')).not.toBeEmpty();
       const stop = sheet.locator('[data-test="stop"]');
       await expect(stop).toHaveText("0");

@@ -7,7 +7,7 @@ test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ 
     element.open(10),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   const handoff = await gallery.evaluate(
@@ -69,7 +69,7 @@ test("a mounted indexed origin follows selection inside its scroll container", a
     element.open(0),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
@@ -111,7 +111,7 @@ test("stale async reveals abort on rapid selection and close never waits", async
           revealOrigin?: (
             id: string,
             index: number,
-            context: { signal: AbortSignal; reason: "open" | "selection" },
+            context: { signal: AbortSignal; phase: "open" | "selection" },
           ) => Promise<void>;
         };
       }
@@ -126,7 +126,7 @@ test("stale async reveals abort on rapid selection and close never waits", async
     Object.assign(window, { __revealEvents: events });
     gallery.origins = {
       getOrigin: () => null,
-      revealOrigin(id, _index, { signal, reason }) {
+      revealOrigin(id, _index, { signal, phase: reason }) {
         return new Promise<void>((resolve) => {
           const event = {
             id,
@@ -156,7 +156,7 @@ test("stale async reveals abort on rapid selection and close never waits", async
     element.open(0),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) => {
@@ -223,7 +223,7 @@ test("item replacement and disconnect abort pending origin reveals", async ({ pa
           revealOrigin(
             id: string,
             index: number,
-            context: { signal: AbortSignal; reason: "open" | "selection" },
+            context: { signal: AbortSignal; phase: "open" | "selection" },
           ): Promise<void>;
         };
         open(target: number): Promise<boolean>;
@@ -312,7 +312,7 @@ test("one-item indexed source handles reveal failures without leaking its sessio
     element.open(0),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("Escape");

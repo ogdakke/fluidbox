@@ -133,6 +133,7 @@ declare global {
     headlessSecondaryViewer: typeof secondaryViewer;
     headlessProtectedViewer: typeof protectedViewer;
     headlessFilmstripViewer: typeof filmstripViewer;
+    loadSheet: () => Promise<unknown>;
   }
 }
 
@@ -140,3 +141,6 @@ window.headlessViewer = viewer;
 window.headlessSecondaryViewer = secondaryViewer;
 window.headlessFilmstripViewer = filmstripViewer;
 window.headlessProtectedViewer = protectedViewer;
+// The sheet add-on loads on demand, so the other headless tests run without it.
+window.loadSheet = () =>
+  Promise.all([import("@ogdakke/fluidbox/sheet"), import("@ogdakke/fluidbox/sheet.css")]);

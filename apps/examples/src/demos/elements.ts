@@ -44,7 +44,7 @@ export function mountElements(gallery: HTMLElement): void {
     trigger.type = "button";
     trigger.slot = "trigger";
     // The rounded button clips the image, so it is the handoff box rather than the bare <img>.
-    trigger.dataset.fluidboxPreview = "";
+    trigger.dataset.fluidboxOrigin = "";
     trigger.append(image(photo, photoThumb(photo)));
 
     const content = document.createElement("template");
@@ -139,9 +139,8 @@ export function mountControls(gallery: HTMLElement, form: HTMLFormElement): void
     toggle(filmstrip, field<HTMLInputElement>("filmstrip").checked);
 
     const zoom = value("zoom");
-    if (zoom === "off") gallery.setAttribute("zoom", "off");
-    else {
-      gallery.removeAttribute("zoom");
+    gallery.toggleAttribute("nozoom", zoom === "off");
+    if (zoom !== "off") {
       if (gallery.getAttribute("zoom-max") !== zoom) gallery.setAttribute("zoom-max", zoom);
     }
 

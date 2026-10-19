@@ -29,7 +29,7 @@ async function loadGallery(page: Page) {
 
 async function openVisible(gallery: Locator, index: number, page: Page) {
   await gallery.locator("fluidbox-item").nth(index).locator('[slot="trigger"]').click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-status", "open");
 }
 
 /**
@@ -88,7 +88,7 @@ async function startFrameProbe(page: Page) {
         time: performance.now(),
         preview: teaser?.querySelector('[slot="trigger"] img')?.getAttribute("src") ?? null,
         concealed: teaser?.hasAttribute("data-preview-concealed") ?? false,
-        state: dialog?.getAttribute("data-fluidbox-state") ?? null,
+        state: dialog?.getAttribute("data-fluidbox-status") ?? null,
         sourcePainted: painted(source),
         flightPainted: painted(flight),
         flightRadius: flightFrame ? getComputedStyle(flightFrame).borderRadius : null,
@@ -106,7 +106,7 @@ async function startFrameProbe(page: Page) {
     const states = new MutationObserver(record);
     states.observe(document.body, {
       attributes: true,
-      attributeFilter: ["data-fluidbox-state"],
+      attributeFilter: ["data-fluidbox-status"],
       subtree: true,
     });
     Object.assign(window, {
@@ -162,7 +162,7 @@ test("visible items preserve the collapsed card while hidden items replace it", 
   }
 
   await teaser.locator('[slot="trigger"]').click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-status", "open");
   await page.keyboard.press("ArrowRight");
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -220,7 +220,7 @@ test("keyboard opening and backdrop click complete a full gallery interaction", 
   const trigger = gallery.locator("fluidbox-item").first().locator('[slot="trigger"]');
   await trigger.focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-status", "open");
   await page.mouse.click(5, 5);
   await expect(page.locator(dialogSelector)).toHaveCount(0);
 });
@@ -347,7 +347,7 @@ test("the teaser layer and label stay on the flying frame both ways", async ({ p
   expect(open.frames).toBeGreaterThan(0);
   // A loaded emulator can sample one frame mid-update; a drift shows on many.
   expect(open.misses.length, open.misses.join("\n")).toBeLessThanOrEqual(1);
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-status", "open");
   const closing = sample();
   await page.keyboard.press("Escape");
   const close = await closing;
@@ -368,7 +368,7 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
       samples.push({
         time: performance.now(),
         state:
-          document.querySelector("[data-fluidbox-dialog]")?.getAttribute("data-fluidbox-state") ??
+          document.querySelector("[data-fluidbox-dialog]")?.getAttribute("data-fluidbox-status") ??
           null,
         phase: layer?.getAttribute("data-fluidbox-phase") ?? null,
         layer: layer ? Number(getComputedStyle(layer).opacity) : 0,
@@ -401,7 +401,7 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
     sample();
     window.__motion.release();
   });
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-status", "open");
   await page.waitForTimeout(100);
   const samples = await page.evaluate(() => {
     const probe = window as unknown as Window & {
@@ -435,7 +435,7 @@ test("the teaser overlay does not flash after opening settles", async ({ page },
 test("the teaser content is already opaque when close settles", async ({ page }, testInfo) => {
   const { teaser } = await loadGallery(page);
   await teaser.locator('[slot="trigger"]').click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-status", "open");
   await page.keyboard.press("ArrowRight");
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -456,7 +456,7 @@ test("the teaser content is already opaque when close settles", async ({ page },
       const visible = getComputedStyle(teaser).visibility !== "hidden";
       return {
         state:
-          document.querySelector("[data-fluidbox-dialog]")?.getAttribute("data-fluidbox-state") ??
+          document.querySelector("[data-fluidbox-dialog]")?.getAttribute("data-fluidbox-status") ??
           "closed",
         label: clone
           ? Number(getComputedStyle(clone).opacity)
@@ -526,7 +526,7 @@ test("close button completes an interaction without a collapsed card", async ({ 
   await page.goto("/harness.html");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   await page.locator("fluidbox-item").first().click();
-  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-status", "open");
   await page.locator("[data-fluidbox-close]").click();
   await expect(page.locator(dialogSelector)).toHaveCount(0);
 });

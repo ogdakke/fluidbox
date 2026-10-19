@@ -144,6 +144,8 @@ export interface FluidboxExtensionInstance<TItem extends FluidboxItem = Fluidbox
   wheel?(deltaY: number): boolean | "native";
   /** Return true to consume the key, as a sheet does with Escape. */
   keydown?(event: KeyboardEvent): boolean;
+  /** The labels changed in place; show them again. */
+  relabel?(): void;
   /** False while zoom would fight the extension. */
   allowsZoom?(): boolean;
   /** Runs before the closing flight, so the viewer can settle into its resting pose. */

@@ -1,6 +1,7 @@
 // #region example
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import { label, product, strip } from "../shared";
+import { product, strip } from "../shared";
 
 const products = [product];
 
@@ -11,7 +12,7 @@ export function ProductCard() {
       <Fluidbox.Trigger item={product} asChild>
         <button type="button" className="pattern-card" data-test="product">
           <span data-fluidbox-origin>
-            <img src={product.src} alt={label(product)} />
+            <img src={product.src} alt={itemLabel(product)} />
           </span>
           <span>
             <strong>Coral runner</strong>
@@ -36,7 +37,7 @@ export function Scroller() {
             className="pattern-thumb"
             data-test="trigger"
           >
-            <img src={photo.src} alt={label(photo)} />
+            <img src={photo.src} alt={itemLabel(photo)} />
           </Fluidbox.Trigger>
         ))}
       </div>

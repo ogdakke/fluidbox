@@ -8,7 +8,6 @@ import {
   createRoot,
   createSignal,
   getOwner,
-  mapArray,
   mergeProps,
   on,
   onCleanup,
@@ -17,18 +16,20 @@ import {
   useContext,
 } from "solid-js";
 import type { Accessor, JSX, Owner } from "solid-js";
-import { Dynamic, insert } from "solid-js/web";
+import { Dynamic, insert, spread } from "solid-js/web";
 import {
   createFluidbox,
   type Fluidbox as FluidboxHandle,
   type FluidboxEventMap,
   type FluidboxControlName,
+  type FluidboxFilmstripOptions,
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
   type FluidboxLabels,
   type FluidboxRenderer,
-  type FluidboxSheetSnapPoint,
+  type FluidboxSheetEvent,
+  type FluidboxSheetOptions,
   type FluidboxState,
   type FluidboxTarget,
 } from "@ogdakke/fluidbox";
@@ -39,19 +40,20 @@ import {
   fluidboxControlIcon,
   fluidboxControls,
   fluidboxEventTypes,
-  idOf,
+  frameLayerOf,
   latestOrigins,
   loadAddons,
   resolveLabels,
+  targetKeys,
   type DeferredFluidbox,
+  type FluidboxAddonName,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxFilmstripProps,
-  FluidboxItemContext,
-  FluidboxItemProps,
+  FluidboxFrameLayerProps,
   FluidboxRootProps,
   FluidboxSheetApi,
   FluidboxSheetProps,
@@ -66,8 +68,7 @@ export type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxFilmstripProps,
-  FluidboxItemContext,
-  FluidboxItemProps,
+  FluidboxFrameLayerProps,
   FluidboxRootProps,
   FluidboxSheetApi,
   FluidboxSheetProps,
@@ -81,17 +82,18 @@ export type {
   FluidboxViewerProps,
 } from "./types";
 export type {
-  FluidboxChangeEvent,
   FluidboxCustomItem,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
+  FluidboxItemChangeEvent,
   FluidboxItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOrigin,
   FluidboxOriginAdapter,
   FluidboxReason,
+  FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
   FluidboxState,
   FluidboxStatus,
@@ -101,13 +103,11 @@ export type {
 } from "@ogdakke/fluidbox";
 
 interface FilmstripRegistration {
-  readonly slots: boolean;
+  readonly option: true | FluidboxFilmstripOptions<any>;
 }
 
 interface SheetRegistration {
-  readonly snapPoints: readonly FluidboxSheetSnapPoint[] | undefined;
-  readonly dismiss: "flight" | "scroll" | "none" | undefined;
-  readonly render: FluidboxRenderer<any>;
+  readonly option: FluidboxSheetOptions<any>;
 }
 
 interface FluidboxContextValue {
@@ -125,9 +125,15 @@ interface FluidboxContextValue {
   setSheet(registration: SheetRegistration): () => void;
 }
 
+interface TriggerContextValue {
+  readonly target: Accessor<FluidboxTarget<any>>;
+  readonly returns: Accessor<readonly FluidboxTarget<any>[] | undefined>;
+}
+
 const FluidboxContext = createContext<FluidboxContextValue>();
-const ItemContext = createContext<string>();
-const TriggerContext = createContext<Accessor<readonly string[]>>();
+const TriggerContext = createContext<TriggerContextValue>();
+/** Where a ThumbnailOverlay's children render: on the page, or in the flying frame. */
+const OverlayContext = createContext<"page" | "travel">();
 
 function useFluidboxContext(): FluidboxContextValue {
   const value = useContext(FluidboxContext);
@@ -206,6 +212,7 @@ const eventProps = {
   beforeitemchange: "onBeforeItemChange",
   itemchange: "onItemChange",
   settle: "onSettle",
+  sheetchange: "onSheetChange",
 } as const satisfies Record<keyof FluidboxEventMap, keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.Element {
@@ -264,70 +271,78 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
   });
 
-  const zoomKey = () =>
-    props.zoom === false ? "off" : `${props.zoom?.step ?? ""}:${props.zoom?.max ?? ""}`;
-  const filmstripKey = createMemo(() => {
-    const part = filmstrip();
-    return part ? (part.slots ? "slots" : "default") : "";
-  });
-  const sheetKey = createMemo(() => {
-    const part = sheet();
-    return part ? JSON.stringify([part.snapPoints ?? null, part.dismiss ?? null]) : "";
-  });
-
-  // The viewer is made in the browser only, and made again when an option it
-  // reads once changes.
-  createEffect(() => {
-    zoomKey();
-    labels();
-    filmstripKey();
-    sheetKey();
-    let live = true;
-    let release: (() => void) | undefined;
-    const build = () => {
-      const zoom = props.zoom;
-      const strip = filmstrip();
-      const details = sheet();
-      const real = createFluidbox<TItem>({
-        items: fluidbox.items,
-        labels: props.labels,
-        zoom: zoom === false ? false : zoom ? { ...zoom } : undefined,
-        renderers,
-        origins: latestOrigins(() => props.origins),
-        filmstrip: strip ? (strip.slots ? { slots: true } : true) : false,
-        sheet: details
-          ? {
-              snapPoints: details.snapPoints,
-              dismiss: details.dismiss,
-              render: (context) => details.render(context),
-            }
-          : false,
-        viewer: ({ target }) => {
-          setViewerTarget(target);
-          return () => setViewerTarget((shown) => (shown === target ? null : shown));
-        },
-      });
-      deferred.attach(real);
-      setCurrent(() => real);
-      release = () => {
-        setCurrent(null);
-        deferred.detach();
-        real.destroy();
-      };
-    };
-    onCleanup(() => {
-      live = false;
-      release?.();
-    });
-    // The Filmstrip and Sheet parts load their add-ons the first time they are used.
-    const names = [
-      ...(filmstripKey() ? (["filmstrip"] as const) : []),
-      ...(sheetKey() ? (["sheet"] as const) : []),
-    ];
+  const zoom = createMemo(
+    () => {
+      const value = props.zoom;
+      return value === false ? false : value ? { ...value } : undefined;
+    },
+    undefined,
+    {
+      equals: (a, b) => a === b || (!!a && !!b && a.step === b.step && a.max === b.max),
+    },
+  );
+  // Each part's render functions stay the same while it is mounted, so the
+  // viewer only remounts an add-on when its options really change.
+  const filmstripOption = createMemo(() => filmstrip()?.option ?? false);
+  const sheetOption = createMemo(() => sheet()?.option ?? false);
+  const addons = () => ({ filmstrip: filmstripOption(), sheet: sheetOption() });
+  // Called again with the newest options until every add-on they turn on has loaded.
+  let live = true;
+  const whenLoaded = (run: (options: ReturnType<typeof addons>) => void) => {
+    const options = untrack(addons);
+    const names: FluidboxAddonName[] = [];
+    if (options.filmstrip) names.push("filmstrip");
+    if (options.sheet) names.push("sheet");
     const loading = loadAddons(names);
-    if (!loading) untrack(build);
-    else void loading.then(() => live && untrack(build));
+    if (!loading) run(options);
+    else void loading.then(() => live && whenLoaded(run));
+  };
+  // Stable, so update never redraws the viewer's layer on its account.
+  const viewer = ({ target }: { target: HTMLElement }) => {
+    setViewerTarget(target);
+    return () => setViewerTarget((shown) => (shown === target ? null : shown));
+  };
+  const origins = latestOrigins(() => props.origins);
+
+  // The viewer is made once, in the browser only. Option changes go to update().
+  createEffect(() =>
+    untrack(() =>
+      whenLoaded((options) => {
+        const real = createFluidbox<TItem>({
+          items: fluidbox.items,
+          labels: props.labels,
+          zoom: zoom(),
+          renderers,
+          origins,
+          viewer,
+          ...options,
+        });
+        deferred.attach(real);
+        setCurrent(() => real);
+      }),
+    ),
+  );
+  onCleanup(() => {
+    live = false;
+    const real = untrack(current);
+    if (!real) return;
+    setCurrent(null);
+    deferred.detach();
+    real.destroy();
   });
+  createEffect(
+    on(
+      () => props.labels,
+      (next) => untrack(current)?.update({ labels: next }),
+      { defer: true },
+    ),
+  );
+  createEffect(on(zoom, (next) => untrack(current)?.update({ zoom: next }), { defer: true }));
+  createEffect(
+    on(addons, () => whenLoaded((options) => untrack(current)?.update(options)), {
+      defer: true,
+    }),
+  );
 
   createRenderEffect(
     on(
@@ -379,33 +394,15 @@ function DefaultViewer(props: { capture(owner: Owner | null): void }): JSX.Eleme
   return null;
 }
 
-function Item(props: FluidboxItemProps): JSX.Element {
-  return createComponent(ItemContext.Provider, {
-    get value() {
-      return props.id;
-    },
-    get children() {
-      return props.children;
-    },
-  });
-}
-
-const targetOf = (value: FluidboxItem | FluidboxTarget): FluidboxTarget =>
-  typeof value === "object" ? idOf(value) : value;
-
-const sameTargets = (a: readonly FluidboxTarget[], b: readonly FluidboxTarget[]) =>
-  a.length === b.length && a.every((target, index) => target === b[index]);
-
 const samePreview = (a: FluidboxTriggerPreview, b: FluidboxTriggerPreview) =>
   a.item === b.item && a.index === b.index && a.status === b.status;
 
 function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>): JSX.Element {
   const context = useFluidboxContext();
-  const enclosingId = useContext(ItemContext);
   const [local, attributes] = splitProps(props, [
     "as",
     "item",
-    "items",
+    "returns",
     "ref",
     "children",
     "onClick",
@@ -413,37 +410,18 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
     "onPointerUp",
     "onPointerCancel",
   ]);
-  // The opened item comes first; the rest may return to this trigger on close.
-  const targets = createMemo(
-    () => {
-      const first = local.item ?? local.items?.[0] ?? enclosingId;
-      if (first === undefined)
-        throw new Error("<Fluidbox.Trigger> needs item, items, or an enclosing <Fluidbox.Item>.");
-      return [...new Set([targetOf(first), ...(local.items?.map(targetOf) ?? [])])];
-    },
-    undefined,
-    { equals: sameTargets },
-  );
-  // The ids, for a ThumbnailOverlay inside.
-  const ids = createMemo(
-    () => {
-      const list = context.items();
-      return targets().flatMap((target) =>
-        typeof target === "string"
-          ? [target]
-          : target >= 0 && target < list.count
-            ? [idOf(list.get(target))]
-            : [],
-      );
-    },
-    undefined,
-    { equals: sameTargets },
-  );
+  const target = () => {
+    const item = local.item;
+    if (item === undefined || item === null)
+      throw new Error("<Fluidbox.Trigger> needs an item: the item, its id or its index.");
+    return item;
+  };
   // Bumped when the closing flight lands on another item. Signals update the DOM
   // synchronously, so the preview is current before the flight measures it.
   const [landing, setLanding] = createSignal(0);
   const options = () => ({
-    targets: targets(),
+    target: target(),
+    returns: local.returns,
     onPreviewChange: () => setLanding((count) => count + 1),
   });
   const trigger = createTrigger<TItem>(context.deferred.fluidbox, untrack(options));
@@ -463,7 +441,7 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
   const isButton = () => local.as === undefined || local.as === "button";
 
   return createComponent(TriggerContext.Provider, {
-    value: ids,
+    value: { target, returns: () => local.returns },
     get children() {
       return createComponent(
         Dynamic,
@@ -596,54 +574,43 @@ function Controls(): JSX.Element {
  */
 function Filmstrip<TItem extends FluidboxItem>(props: FluidboxFilmstripProps<TItem>): JSX.Element {
   const context = useFluidboxContext();
-  const render = untrack(() => props.children);
-  onCleanup(context.setFilmstrip({ slots: typeof render === "function" }));
-  const [slots, setSlots] = createSignal<readonly FluidboxItemContext<TItem>[]>([]);
-  createEffect(() => {
-    const strip = (context.current() as FluidboxHandle<TItem> | null)?.filmstrip;
-    if (!strip) return setSlots([]);
-    const update = () => setSlots(strip.slots);
-    update();
-    onCleanup(strip.subscribe(update));
-  });
   const owner = getOwner();
-  const mounted = mapArray(
-    () => slots() as readonly { item: TItem; index: number; target: HTMLElement }[],
-    ({ item, index, target }) => {
-      const children = props.children;
-      if (children) onCleanup(mountInto(target, () => children({ item, index }), owner));
-    },
-  );
-  createEffect(mounted);
+  const custom = typeof untrack(() => props.children) === "function";
+  // Renders straight into each button; the newest children are read as it does.
+  const render: FluidboxRenderer<TItem> = ({ item, index, target }) =>
+    mountInto(target, () => props.children?.({ item, index }), owner);
+  onCleanup(context.setFilmstrip({ option: custom ? { render } : true }));
   return null;
 }
 
 /**
- * Turns the sheet on, and renders its content for the active item. Needs
- * `@ogdakke/fluidbox/sheet.css`. Changing `snapPoints` or `dismiss` rebuilds the viewer.
+ * Turns the sheet on, and renders its content for the active item into the
+ * runtime's `<section data-fluidbox-sheet>`, which gets this part's attributes.
+ * Needs `@ogdakke/fluidbox/sheet.css`.
  */
 function Sheet<TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>): JSX.Element {
   const context = useFluidboxContext();
   const owner = getOwner();
+  const [local, attributes] = splitProps(props, ["snapPoints", "dismiss", "children"]);
+  const render: FluidboxRenderer<TItem> = ({ item, index, target }) =>
+    mountInto(
+      target,
+      () => {
+        untrack(() => spread(target, attributes, false, true));
+        return local.children?.({ item, index });
+      },
+      owner,
+    );
+  const option = createMemo(() => ({
+    snapPoints: local.snapPoints,
+    dismiss: local.dismiss,
+    render,
+  }));
   onCleanup(
     context.setSheet({
-      get snapPoints() {
-        return props.snapPoints;
+      get option() {
+        return option();
       },
-      get dismiss() {
-        return props.dismiss;
-      },
-      render: ({ item, index, target }) =>
-        mountInto(
-          target,
-          () => {
-            const content = props.children;
-            return typeof content === "function"
-              ? content({ item: item as TItem, index })
-              : content;
-          },
-          owner,
-        ),
     }),
   );
   return null;
@@ -663,33 +630,41 @@ function SheetStop(props: FluidboxSheetStopProps): JSX.Element {
 }
 
 /**
- * A badge or caption on a trigger's thumbnail. It gets `--fluidbox-progress`
- * and `data-fluidbox-phase` as the viewer opens and closes; with `travel` it
- * flies with the photo.
+ * A badge or caption on a trigger's thumbnail. It gets `--fluidbox-closed`
+ * and `data-fluidbox-phase` as the viewer opens and closes; with `travel` its
+ * children render live in the flying frame, and a FrameLayer inside flies too.
  */
 function ThumbnailOverlay(props: FluidboxThumbnailOverlayProps): JSX.Element {
   const context = useFluidboxContext();
-  const id = useContext(ItemContext);
-  const triggerIds = useContext(TriggerContext);
-  const ids = () => triggerIds?.() ?? (id === undefined ? null : [id]);
-  if (!untrack(ids))
-    throw new Error("<Fluidbox.ThumbnailOverlay> needs an enclosing Trigger or Item.");
+  const trigger = useContext(TriggerContext);
+  if (!trigger) throw new Error("<Fluidbox.ThumbnailOverlay> must be inside a <Fluidbox.Trigger>.");
   const [local, attributes] = splitProps(props, ["travel", "ref", "children"]);
   const [element, setElement] = createSignal<HTMLSpanElement | null>(null);
   const owner = getOwner();
+  const targets = createMemo(() => targetKeys(trigger.target(), trigger.returns()).join("\u0000"));
+  const content = (where: "page" | "travel") =>
+    createComponent(OverlayContext.Provider, {
+      value: where,
+      get children() {
+        return local.children;
+      },
+    });
+  const travel: FluidboxRenderer = ({ target }) =>
+    mountInto(target, () => content("travel"), owner);
 
   createEffect(() => {
     const host = element();
-    const targets = ids();
-    const travel = local.travel;
-    context.items();
-    if (!host || !targets?.length) return;
+    const travels = local.travel;
+    targets();
+    if (!host) return;
     onCleanup(
       untrack(() =>
         context.deferred.fluidbox.bindOverlay(
           host,
-          targets,
-          travel ? { travel: ({ target }) => mountInto(target, () => local.children, owner) } : {},
+          trigger.target(),
+          travels
+            ? { returns: trigger.returns(), travel, frameLayer: frameLayerOf(host) }
+            : { returns: trigger.returns() },
         ),
       ),
     );
@@ -707,9 +682,25 @@ function ThumbnailOverlay(props: FluidboxThumbnailOverlayProps): JSX.Element {
         return local.travel ? "travel" : "";
       },
       get children() {
-        return local.children;
+        return content("page");
       },
     }) as never,
+  );
+}
+
+/**
+ * A layer of a travelling ThumbnailOverlay, such as a scrim, that moves into the
+ * flying frame and scales with it. The frame's live copy of the overlay leaves
+ * it out, so it never shows twice.
+ */
+function FrameLayer(props: FluidboxFrameLayerProps): JSX.Element {
+  const where = useContext(OverlayContext);
+  if (!where)
+    throw new Error("<Fluidbox.FrameLayer> must be inside a <Fluidbox.ThumbnailOverlay>.");
+  if (where === "travel") return null;
+  return createComponent(
+    Dynamic,
+    mergeProps(props, { component: "span", "data-fluidbox-frame-layer": "" }) as never,
   );
 }
 
@@ -755,6 +746,7 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
     next: (options) => fluidbox.next(options),
     previous: (options) => fluidbox.previous(options),
     setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
+    preload: (target) => fluidbox.preload(target),
   };
 }
 
@@ -762,12 +754,11 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
 export function useFluidboxSheet(): FluidboxSheetApi {
   const context = useFluidboxContext();
   const [stop, setStop] = createSignal(0);
-  createEffect(() => {
-    const sheet = context.current()?.sheet;
-    if (!sheet) return setStop(0);
-    setStop(sheet.stop);
-    onCleanup(sheet.subscribe(setStop));
-  });
+  createEffect(() => setStop(context.current()?.sheet?.stop ?? 0));
+  const fluidbox = context.deferred.fluidbox;
+  const listener = (event: FluidboxSheetEvent) => setStop(event.stop);
+  fluidbox.addEventListener("sheetchange", listener);
+  onCleanup(() => fluidbox.removeEventListener("sheetchange", listener));
   return {
     stop,
     set: (next, options) => context.current()?.sheet?.set(next, options),
@@ -776,7 +767,6 @@ export function useFluidboxSheet(): FluidboxSheetApi {
 
 export const Fluidbox: FluidboxSolidParts = {
   Root,
-  Item,
   Trigger,
   Viewer,
   Controls,
@@ -787,4 +777,5 @@ export const Fluidbox: FluidboxSolidParts = {
   Sheet,
   SheetStop,
   ThumbnailOverlay,
+  FrameLayer,
 };

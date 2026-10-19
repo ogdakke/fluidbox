@@ -49,7 +49,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    control parts; elements and JS use the defaults). Test: click trigger 1 → "Item 1 of 4"; click
    `[data-fluidbox-next]` → "Item 2 of 4"; Escape closes; focus is on trigger 2.
 2. **overlay** — one trigger `[data-test="trigger"]` for the whole `album` (5): it opens
-   `album[0]`, every album item returns to it, and its `<img data-test="preview">` shows the item
+   `album[0]`, every album item returns to it (`returns`), and its `<img data-test="preview">` shows the item
    the viewer last showed (preview follows the selection). Inside it, a travel thumbnail overlay
    `[data-test="count"]` with the text `+4`. Test: click → "Item 1 of 5"; ArrowRight → "Item 2
    of 5"; Escape; preview src ends with `/art/canyon.svg`; click again → "Item 2 of 5".
@@ -86,10 +86,14 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    `[data-fluidbox-filmstrip]`; trigger 5 → 4 `[data-test="thumb"]` in the dialog, the first one's
    button is selected; ArrowRight → the second one's is and the first one's is not.
 8. **sheet** — a gallery of `photos` with the sheet on and `snapPoints: ["40%", "90%"]`. The example
-   imports `@ogdakke/fluidbox/sheet.css` (the sheet needs its stylesheet). Sheet
-   content `<div data-fluidbox-sheet class="pattern-sheet">` shows the active item's title in
-   `[data-test="sheet-title"]`, the current stop in `output[data-test="stop"]` (from `fluidbox.sheet` or the framework sheet hook), a
-   `button[data-test="expand"]` that calls `sheet.set(2)`, and an `input[data-test="field"]`.
+   imports `@ogdakke/fluidbox/sheet.css` (the sheet needs its stylesheet). The sheet is the
+   runtime's own `<section data-fluidbox-sheet>` (every framework fills it; none draws its own
+   sheet element). `.pattern-sheet` is on that section (where the framework's Sheet part passes
+   its attributes on) or on a `<div>` inside it. The content shows the active item's title in
+   `[data-test="sheet-title"]`, the current stop in `output[data-test="stop"]` (from the
+   `sheetchange` event or the framework sheet hook), a
+   `button[data-test="expand"]` that moves the sheet to stop 2 (`sheet.set(2)` or a sheet-stop
+   button), and an `input[data-test="field"]`.
    Outside the sheet, in the viewer's portal (at stop 0 the sheet is out of sight), a
    `button.pattern-sheet-toggle[data-fluidbox-sheet-stop="1"][data-test="peek"]` that raises it.
    Test: open → stop `0`; click peek → stop `1`; click expand → stop `2`; type in the field (keys

@@ -1,8 +1,9 @@
 /** @jsxImportSource solid-js */
 // #region example
 import { For } from "solid-js";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/solid";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 function Caption() {
   const fluidbox = useFluidbox();
@@ -17,7 +18,7 @@ function Caption() {
         Previous
       </button>
       <span>
-        <strong data-test="title">{fluidbox.item ? label(fluidbox.item) : ""}</strong>{" "}
+        <strong data-test="title">{fluidbox.item ? itemLabel(fluidbox.item) : ""}</strong>{" "}
         <small data-test="counter">
           {(fluidbox.index ?? 0) + 1} / {fluidbox.count}
         </small>
@@ -44,7 +45,7 @@ export function Headless() {
         <For each={photos}>
           {(photo) => (
             <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
-              <img src={photo.src} alt={label(photo)} />
+              <img src={photo.src} alt={itemLabel(photo)} />
             </Fluidbox.Trigger>
           )}
         </For>

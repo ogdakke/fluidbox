@@ -1,14 +1,14 @@
 // #region example
-import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/react";
+import { itemLabel, type FluidboxItem } from "@ogdakke/fluidbox";
+import { Fluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/react";
 import "@ogdakke/fluidbox/sheet.css";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
-function Details() {
+function Details({ item }: { item: FluidboxItem }) {
   const sheet = useFluidboxSheet();
-  const item = useFluidbox(({ item }) => item);
   return (
     <>
-      <h3 data-test="sheet-title">{item && label(item)}</h3>
+      <h3 data-test="sheet-title">{itemLabel(item)}</h3>
       <p>
         Stop <output data-test="stop">{sheet.stop}</output>
       </p>
@@ -31,13 +31,13 @@ export function Sheet() {
             className="pattern-thumb"
             data-test="trigger"
           >
-            <img src={photo.src} alt={label(photo)} />
+            <img src={photo.src} alt={itemLabel(photo)} />
           </Fluidbox.Trigger>
         ))}
       </div>
       {/* Stop 0 rests below the photo; stops 1 and 2 raise it to 40% and 90% of the screen. */}
       <Fluidbox.Sheet snapPoints={["40%", "90%"]} className="pattern-sheet">
-        <Details />
+        {({ item }) => <Details item={item} />}
       </Fluidbox.Sheet>
       <Fluidbox.Viewer>
         <Fluidbox.SheetStop stop={1} className="pattern-sheet-toggle" data-test="peek">

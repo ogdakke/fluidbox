@@ -1,8 +1,9 @@
 <!-- #region example -->
 <script setup lang="ts">
 import { ref } from "vue";
-import { Fluidbox, type FluidboxChangeEvent } from "@ogdakke/fluidbox/vue";
-import { label, photos } from "../shared";
+import { itemLabel } from "@ogdakke/fluidbox";
+import { Fluidbox, type FluidboxItemChangeEvent } from "@ogdakke/fluidbox/vue";
+import { photos } from "../shared";
 
 const locked = ref(false);
 const log = ref<string[]>([]);
@@ -12,7 +13,7 @@ const record = (event: Event) => {
 };
 
 // beforeitemchange comes before every move between items; canceling it keeps the viewer still.
-function onBeforeItemChange(event: FluidboxChangeEvent) {
+function onBeforeItemChange(event: FluidboxItemChangeEvent) {
   if (locked.value) event.preventDefault();
   record(event);
 }
@@ -43,7 +44,7 @@ function onBeforeItemChange(event: FluidboxChangeEvent) {
         class="pattern-thumb"
         data-test="trigger"
       >
-        <img :src="photo.src" :alt="label(photo)" />
+        <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
     <ol class="pattern-log" data-test="log">

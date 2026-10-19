@@ -1,5 +1,5 @@
 // #region example
-import { label } from "../shared";
+import { itemLabel } from "@ogdakke/fluidbox";
 
 export function headless(root: HTMLElement) {
   const gallery = root.querySelector("fluidbox-gallery")!;
@@ -17,7 +17,7 @@ export function headless(root: HTMLElement) {
     const counter = target.querySelector("small")!;
     return fluidbox.subscribe(({ item, index, count, hasPrevious, hasNext }) => {
       if (!item || index === null) return;
-      title.textContent = label(item);
+      title.textContent = itemLabel(item);
       counter.textContent = `${index + 1} / ${count}`;
       previous.disabled = !hasPrevious;
       next.disabled = !hasNext;

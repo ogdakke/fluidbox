@@ -2,7 +2,7 @@
 title: Filmstrip and sheet
 section: Guides
 order: 6
-description: The two optional add-ons, the filmstrip and the sheet, with their imports, every option, slot mode, sheet stops, data-fluidbox-sheet-stop buttons, and sheet.css.
+description: The two optional add-ons, the filmstrip and the sheet, with their imports, every option, sheet stops, the sheetchange event, data-fluidbox-sheet-stop buttons, and sheet.css.
 ---
 
 # Filmstrip and sheet
@@ -35,10 +35,9 @@ The filmstrip docks a row of thumbnails along the bottom of the viewer when ther
 
 `filmstrip: true` draws each item's thumbnail. An object, `FluidboxFilmstripOptions`, changes that:
 
-| Option   | Type                      | What it does                                                                                                  |
-| -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `render` | `FluidboxRenderer<TItem>` | Fill each thumbnail button yourself instead of the default image.                                             |
-| `slots`  | `boolean`                 | Leave each button empty and list it in the handle's `slots`, for framework components. Ignored with `render`. |
+| Option   | Type                      | What it does                                                      |
+| -------- | ------------------------- | ----------------------------------------------------------------- |
+| `render` | `FluidboxRenderer<TItem>` | Fill each thumbnail button yourself instead of the default image. |
 
 `render` gets `{ item, index, target, signal }`. `target` is the thumbnail `<button>`; `signal` aborts, and the function you return runs, when the button scrolls out of the rendered window. By default each button holds the item's `thumbnail`, else the full image or the video's poster.
 
@@ -58,9 +57,7 @@ const fluidbox = createFluidbox({
 
 Each button is a `role="option"` in a listbox named by the `filmstripList` [label](./api.md#labels). It has `data-fluidbox-filmstrip-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name. The dialog gets `data-filmstrip` while a strip is docked. A move from the strip has the reason `"filmstrip"`.
 
-### Slot mode
-
-With `slots: true`, `fluidbox.filmstrip` lists the rendered buttons as `slots`, `{ item, index, target }` in index order, and its `subscribe(listener)` calls back when they change. Render your own component into each `target`. The framework `Filmstrip` parts do this for you: put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
+`render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Filmstrip` parts render through it: put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
 
 <!-- pattern: filmstrip -->
 
@@ -72,11 +69,11 @@ The sheet is a panel that rises from the bottom over the photo, for details, com
 
 `sheet: true` turns it on with the defaults. An object, `FluidboxSheetOptions`, sets them:
 
-| Option       | Type                             | Default              | What it does                                         |
-| ------------ | -------------------------------- | -------------------- | ---------------------------------------------------- |
-| `snapPoints` | `FluidboxSheetSnapPoint[]`       | `["60%", "content"]` | The stops above the resting one, lowest first.       |
-| `dismiss`    | `"flight" \| "scroll" \| "none"` | `"flight"`           | What a swipe down on the photo does at rest.         |
-| `render`     | `FluidboxRenderer<TItem>`        |                      | Fill a sheet the runtime makes, for the active item. |
+| Option       | Type                             | Default              | What it does                                   |
+| ------------ | -------------------------------- | -------------------- | ---------------------------------------------- |
+| `snapPoints` | `FluidboxSheetSnapPoint[]`       | `["60%", "content"]` | The stops above the resting one, lowest first. |
+| `dismiss`    | `"flight" \| "scroll" \| "none"` | `"flight"`           | What a swipe down on the photo does at rest.   |
+| `render`     | `FluidboxRenderer<TItem>`        |                      | Fill the sheet for the item on show.           |
 
 ### Stops
 
@@ -98,19 +95,20 @@ With the sheet on, `fluidbox.sheet` is a `FluidboxSheet` that you drive and read
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `stop`                | The stop the sheet rests at: `0`, then one per snap point.                                                                           |
 | `set(stop, options?)` | Move to a stop, clamped to the stops there are. `{ animate: false }` jumps. Ignored while the viewer isn't open or the sheet is off. |
-| `subscribe(listener)` | Calls `listener(stop)` when the stop changes, and when the slot appears or goes. Returns a function to unsubscribe.                  |
-| `slot`                | The element to render your own sheet into, or `null` before the viewer exists.                                                       |
 
-The dialog also dispatches `fluidbox-sheet-change` with `detail.stop`. The event bubbles from `[data-fluidbox-dialog]`.
+Each time the sheet comes to rest at another stop, the fluidbox fires `sheetchange`, a `FluidboxSheetEvent` with `stop` and `reason`: `"pointer"` for a swipe or a tap, `"wheel"` for a wheel or trackpad, `"keyboard"` for Escape or a key on a stop button, `"api"` for `set()` and for the return to rest as the viewer opens or closes.
 
-In the frameworks, `useFluidboxSheet()` returns `{ stop, set }`, with `stop` in the framework's reactive form, and a `SheetStop` part is a button that moves the sheet to its `stop`. On custom elements, `gallery.sheet` is the handle.
+```ts
+fluidbox.addEventListener("sheetchange", ({ stop, reason }) => {
+  console.log(`sheet at stop ${stop}, by ${reason}`);
+});
+```
+
+In the frameworks, `useFluidboxSheet()` returns `{ stop, set }`, with `stop` in the framework's reactive form, the root takes the event as `onSheetChange`, `@sheetchange` or `(sheetChange)`, and a `SheetStop` part is a button that moves the sheet to its `stop`. On custom elements, `gallery.sheet` is the handle and the gallery fires `sheetchange`.
 
 ### The sheet's content
 
-There are two ways to fill the sheet:
-
-- **`render`.** The runtime makes a `<section data-fluidbox-sheet data-fluidbox-chrome>`, named by the `sheet` [label](./api.md#labels), and calls `render({ item, index, target, signal })` for the current item. `signal` aborts when the viewer moves to another item, and the returned function runs then too.
-- **Slot.** Leave `render` out and render one element with `data-fluidbox-sheet` into `fluidbox.sheet.slot`. The framework `Sheet` parts do this, so their children re-render with the app's state.
+The sheet is a `<section data-fluidbox-sheet data-fluidbox-chrome>` that the runtime makes, named by the `sheet` [label](./api.md#labels). `render({ item, index, target, signal })` fills it for the item on show; `signal` aborts when the viewer moves to another item, the returned function runs, and the section is emptied before the next item's render. The framework `Sheet` parts render through it, so their children re-render with the app's state, and they put their own attributes on the section.
 
 `<fluidbox-sheet>` shows the active item's `<template slot="sheet">`, else its own `<template>`; set its `render` property to draw the sheet yourself. Its `snap-points` and `dismiss` attributes are the options: `<fluidbox-sheet snap-points="40% 90%" dismiss="scroll">`.
 

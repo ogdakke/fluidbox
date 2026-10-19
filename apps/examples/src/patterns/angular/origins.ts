@@ -1,7 +1,8 @@
 // #region example
 import { Component } from "@angular/core";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
-import { label, product, strip } from "../shared";
+import { product, strip } from "../shared";
 
 @Component({
   selector: "pattern-origins",
@@ -30,6 +31,6 @@ import { label, product, strip } from "../shared";
 export class Origins {
   readonly product = product;
   readonly strip = strip;
-  readonly label = label;
+  readonly label = itemLabel;
 }
 // #endregion example

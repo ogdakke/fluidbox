@@ -1,6 +1,6 @@
 // #region example
-import { createFluidbox, type FluidboxRenderer } from "@ogdakke/fluidbox";
-import { label, media, theme, thumbnailSrc } from "../shared";
+import { createFluidbox, itemLabel, type FluidboxRenderer } from "@ogdakke/fluidbox";
+import { media, theme, thumbnailSrc } from "../shared";
 
 // Draws items of type "custom" whose render is "note".
 const note: FluidboxRenderer = ({ target }) => {
@@ -21,7 +21,7 @@ export function mountRenderers(root: HTMLElement) {
     button.type = "button";
     button.className = "pattern-thumb";
     button.dataset.test = "trigger";
-    button.append(Object.assign(new Image(), { src: thumbnailSrc(item), alt: label(item) }));
+    button.append(Object.assign(new Image(), { src: thumbnailSrc(item), alt: itemLabel(item) }));
     grid.append(button);
     fluidbox.bind(button, index);
   });

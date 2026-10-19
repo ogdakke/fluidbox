@@ -17,8 +17,9 @@ import {
 import {
   createFluidbox,
   type Fluidbox,
-  type FluidboxChangeEvent,
+  type FluidboxCommandOptions,
   type FluidboxItem,
+  type FluidboxItemChangeEvent,
   type FluidboxItemList,
   type FluidboxItems,
   type FluidboxLabels,
@@ -26,10 +27,13 @@ import {
   type FluidboxOriginAdapter,
   type FluidboxRenderContext,
   type FluidboxRenderer,
+  type FluidboxSheetEvent,
   type FluidboxSheetSnapPoint,
   type FluidboxState,
   type FluidboxTarget,
   type FluidboxToggleEvent,
+  type FluidboxUpdateOptions,
+  type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
 import {
   createDeferredFluidbox,
@@ -45,30 +49,33 @@ import { injectIsBrowser, mountContent, type FluidboxContent } from "./mount.js"
 export interface FluidboxApi<
   TItem extends FluidboxItem = FluidboxItem,
 > extends FluidboxState<TItem> {
-  /** Open an item by index or id, or move to it while open. Without one, the current item, else the first. */
-  open(target?: FluidboxTarget): Promise<boolean>;
-  close(): Promise<boolean>;
-  next(): Promise<boolean>;
-  previous(): Promise<boolean>;
+  /** Open an item, by the item, its index or its id, or move to it while open. Without one, the current item, else the first. */
+  open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean>;
+  close(options?: FluidboxCommandOptions): Promise<boolean>;
+  next(options?: FluidboxCommandOptions): Promise<boolean>;
+  previous(options?: FluidboxCommandOptions): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
+  /** Start loading an item a press is likely to open. Call the result to let go. */
+  preload(target: FluidboxTarget<TItem>): () => void;
 }
 
 /** The sheet as `injectFluidboxSheet()` gives it. */
 export interface FluidboxSheetApi {
-  /** The stop the sheet rests at: 0 at rest, then one per snap point. */
+  /** The stop the sheet rests at: 0 at rest, then one per snap point. Follows `sheetchange`. */
   readonly stop: Signal<number>;
   /** Move the sheet to a stop. Ignored while the viewer is not open. */
   set(stop: number, options?: { readonly animate?: boolean }): void;
 }
 
 /** A `fluidboxViewer` template, as the root sees it. */
-export interface FluidboxViewerPart {
-  mount(target: HTMLElement): () => void;
+export interface FluidboxViewerPart<TItem extends FluidboxItem = FluidboxItem> {
+  /** Draws the template into the viewer's layer. Stable for the part's life. */
+  readonly render: FluidboxViewerRenderer<TItem>;
 }
 
 /** A `fluidboxFilmstrip`, as the root sees it. */
 export interface FluidboxFilmstripPart<TItem extends FluidboxItem = FluidboxItem> {
-  /** Draws each thumbnail, or null for the default ones. */
+  /** Draws each thumbnail, or null for the default ones. Stable for the part's life. */
   readonly render: FluidboxRenderer<TItem> | null;
 }
 
@@ -76,23 +83,27 @@ export interface FluidboxFilmstripPart<TItem extends FluidboxItem = FluidboxItem
 export interface FluidboxSheetPart<TItem extends FluidboxItem = FluidboxItem> {
   readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
   readonly dismiss?: "flight" | "scroll" | "none";
+  /** Fills the sheet for the active item. Stable for the part's life. */
   readonly render: FluidboxRenderer<TItem>;
 }
 
 interface Parts<TItem extends FluidboxItem> {
-  viewer: FluidboxViewerPart | null;
+  viewer: FluidboxViewerPart<TItem> | null;
   filmstrip: FluidboxFilmstripPart<TItem> | null;
   sheet: FluidboxSheetPart<TItem> | null;
 }
+
+const zoomOption = (zoom: FluidboxOptions["zoom"]) =>
+  zoom === false ? false : zoom ? { ...zoom } : undefined;
 
 /**
  * Owns one viewer for a gallery. Parts inside find it through DI. Exported as
  * `fluidbox`: `<div fluidboxRoot #fb="fluidbox">`, then `fb.state()` and
  * `fb.open(2)`.
  *
- * Origins, renderers and outputs are read at use, so changing them keeps the
- * viewer. New zoom values or labels, or a `fluidboxViewer`, `fluidboxFilmstrip`
- * or `fluidboxSheet` coming, going or changing its inputs, rebuild it.
+ * The viewer is made once and lives as long as the root. New labels or zoom,
+ * and a `fluidboxViewer`, `fluidboxFilmstrip` or `fluidboxSheet` coming, going
+ * or changing its inputs, apply to it in place, open or not.
  */
 @Directive({ selector: "[fluidboxRoot]", exportAs: "fluidbox", standalone: true })
 export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
@@ -107,18 +118,20 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   /** Draw `custom` items, by the name in their `render`: a template or a component. */
   @Input() renderers?: Readonly<Record<string, FluidboxContent<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
-  @Input() origins?: FluidboxOriginAdapter;
+  @Input() origins?: FluidboxOriginAdapter<TItem>;
 
   /** Before the viewer opens or closes. `$event.preventDefault()` cancels a command. */
   @Output() readonly beforeToggle = new EventEmitter<FluidboxToggleEvent>();
   /** As the viewer starts to open or close. */
   @Output() readonly toggle = new EventEmitter<FluidboxToggleEvent>();
   /** Before the viewer moves to another item. `$event.preventDefault()` keeps it still. */
-  @Output() readonly beforeItemChange = new EventEmitter<FluidboxChangeEvent<TItem>>();
+  @Output() readonly beforeItemChange = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
   /** When the active item changes, opening included. */
-  @Output() readonly itemChange = new EventEmitter<FluidboxChangeEvent<TItem>>();
+  @Output() readonly itemChange = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
   /** When the active item comes to rest. */
-  @Output() readonly settle = new EventEmitter<FluidboxChangeEvent<TItem>>();
+  @Output() readonly settle = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
+  /** When the sheet comes to rest at another stop. */
+  @Output() readonly sheetChange = new EventEmitter<FluidboxSheetEvent>();
 
   /** Stands in for the viewer, so parts can bind before it exists. */
   readonly deferred: DeferredFluidbox<TItem> = createDeferredFluidbox<TItem>([]);
@@ -144,7 +157,10 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly #container = inject(ViewContainerRef);
   readonly #browser = injectIsBrowser();
   readonly #parts: Parts<TItem> = { viewer: null, filmstrip: null, sheet: null };
-  #built: { readonly key: readonly unknown[]; readonly destroy: () => void } | undefined;
+  /** Options changed since the viewer last saw them. */
+  #pending: FluidboxUpdateOptions<TItem> = {};
+  #viewer: Fluidbox<TItem> | undefined;
+  #loading = false;
   #scheduled = false;
   #initialized = false;
   #destroyed = false;
@@ -152,11 +168,13 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   constructor() {
     const fluidbox = this.fluidbox;
     const commands = {
-      open: (target?: FluidboxTarget) => fluidbox.open(target),
-      close: () => fluidbox.close(),
-      next: () => fluidbox.next(),
-      previous: () => fluidbox.previous(),
+      open: (target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions) =>
+        fluidbox.open(target, options),
+      close: (options?: FluidboxCommandOptions) => fluidbox.close(options),
+      next: (options?: FluidboxCommandOptions) => fluidbox.next(options),
+      previous: (options?: FluidboxCommandOptions) => fluidbox.previous(options),
       setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
+      preload: (target: FluidboxTarget<TItem>) => fluidbox.preload(target),
     };
     this.api = computed(() => ({ ...this.#state(), ...commands }));
     this.deferred.subscribe(() =>
@@ -165,12 +183,16 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
         this.#list.set(fluidbox.items);
       }),
     );
+    fluidbox.addEventListener("sheetchange", (event) =>
+      this.#zone.run(() => this.#stop.set(event.stop)),
+    );
     const outputs = {
       beforetoggle: this.beforeToggle,
       toggle: this.toggle,
       beforeitemchange: this.beforeItemChange,
       itemchange: this.itemChange,
       settle: this.settle,
+      sheetchange: this.sheetChange,
     } as const;
     for (const type of fluidboxEventTypes) {
       const output = outputs[type] as unknown as EventEmitter<Event>;
@@ -187,8 +209,15 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["items"]) void this.fluidbox.setItems(this.items ?? []);
-    if (changes["labels"]) this.#labels.set(resolveLabels(this.labels));
-    if (changes["zoom"] || changes["labels"]) this.schedule();
+    if (changes["labels"]) {
+      this.#labels.set(resolveLabels(this.labels));
+      this.#pending = { ...this.#pending, labels: this.labels };
+      this.schedule();
+    }
+    if (changes["zoom"]) {
+      this.#pending = { ...this.#pending, zoom: zoomOption(this.zoom) };
+      this.schedule();
+    }
   }
 
   ngOnInit(): void {
@@ -198,29 +227,36 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
 
   ngOnDestroy(): void {
     this.#destroyed = true;
-    this.#built?.destroy();
-    this.#built = undefined;
+    this.deferred.detach();
+    this.#viewer?.destroy();
+    this.#viewer = undefined;
+    this.#stop.set(0);
   }
 
-  /** Open an item by index or id, or move to it while open. */
-  open(target?: FluidboxTarget): Promise<boolean> {
-    return this.fluidbox.open(target);
+  /** Open an item, by the item, its index or its id, or move to it while open. */
+  open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.fluidbox.open(target, options);
   }
 
-  close(): Promise<boolean> {
-    return this.fluidbox.close();
+  close(options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.fluidbox.close(options);
   }
 
-  next(): Promise<boolean> {
-    return this.fluidbox.next();
+  next(options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.fluidbox.next(options);
   }
 
-  previous(): Promise<boolean> {
-    return this.fluidbox.previous();
+  previous(options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.fluidbox.previous(options);
   }
 
   setItems(items: FluidboxItems<TItem>): Promise<boolean> {
     return this.fluidbox.setItems(items);
+  }
+
+  /** Start loading an item a press is likely to open. Call the result to let go. */
+  preload(target: FluidboxTarget<TItem>): () => void {
+    return this.fluidbox.preload(target);
   }
 
   /** For parts: called when the state or the items change. */
@@ -228,7 +264,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     return this.deferred.subscribe(listener);
   }
 
-  /** For parts: plug a viewer, filmstrip or sheet into the next build. */
+  /** For parts: plug a viewer, filmstrip or sheet into the viewer. */
   connect<K extends keyof Parts<TItem>>(kind: K, part: NonNullable<Parts<TItem>[K]>): () => void {
     this.#parts[kind] = part;
     this.schedule();
@@ -240,53 +276,57 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 
   /**
-   * Build the viewer after the current change detection pass, once every part
-   * inside has connected, or rebuild it when what it was built from changed.
+   * Make the viewer after the current change detection pass, once every part
+   * inside has connected; after that, hand it what changed.
    */
   schedule(): void {
     if (!this.#browser || !this.#initialized || this.#scheduled) return;
     this.#scheduled = true;
     queueMicrotask(() => {
       this.#scheduled = false;
-      if (!this.#destroyed) this.#build();
+      if (!this.#destroyed) this.#sync();
     });
   }
 
-  #key(): readonly unknown[] {
-    const { zoom } = this;
+  /** The options the parts give, with their stable renderers. */
+  #partOptions(): FluidboxUpdateOptions<TItem> {
     const { viewer, filmstrip, sheet } = this.#parts;
-    return [
-      zoom === false ? "off" : `${zoom?.step ?? ""}:${zoom?.max ?? ""}`,
-      this.#labels(),
-      viewer,
-      filmstrip,
-      filmstrip?.render,
-      sheet,
-      sheet?.snapPoints?.join(" "),
-      sheet?.dismiss,
-    ];
+    return {
+      viewer: viewer?.render,
+      filmstrip: filmstrip ? (filmstrip.render ? { render: filmstrip.render } : true) : undefined,
+      sheet: sheet
+        ? { snapPoints: sheet.snapPoints, dismiss: sheet.dismiss, render: sheet.render }
+        : undefined,
+    };
   }
 
-  #build(): void {
-    const key = this.#key();
-    if (this.#built && this.#built.key.every((value, index) => value === key[index])) return;
-    const { viewer, filmstrip, sheet } = this.#parts;
+  #sync(): void {
+    if (this.#loading) return;
+    const { filmstrip, sheet } = this.#parts;
     // The filmstrip and sheet runtimes load the first time a root uses them.
     const loading = loadAddons([
       ...(filmstrip ? (["filmstrip"] as const) : []),
       ...(sheet ? (["sheet"] as const) : []),
     ]);
     if (loading) {
-      // Build again once they are in: by then the parts may have changed, or the root gone.
+      // Again once they are in: by then the parts may have changed, or the root gone.
+      this.#loading = true;
       void loading.then(() => {
-        if (!this.#destroyed) this.#build();
+        this.#loading = false;
+        if (!this.#destroyed) this.#sync();
       });
       return;
     }
-    this.#built?.destroy();
-    const zoom = this.zoom;
-    // Renderers resolve by name when a slide mounts, so the newest one is used
-    // without rebuilding the viewer.
+    const parts = this.#partOptions();
+    if (this.#viewer) {
+      const pending = this.#pending;
+      this.#pending = {};
+      // Unchanged parts compare equal, so the viewer redraws only what changed.
+      this.#viewer.update({ ...pending, ...parts });
+      return;
+    }
+    this.#pending = {};
+    // Renderers resolve by name when a slide mounts, so the newest one is used.
     const renderers = new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
       get: (_, name) => {
         const content = typeof name === "string" ? this.renderers?.[name] : undefined;
@@ -298,35 +338,18 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     });
     // The runtime listens to pointer and key events; outside the zone they do
     // not run change detection. Callbacks come back in through zone.run.
-    const fluidbox = this.#zone.runOutsideAngular(() =>
+    const viewer = this.#zone.runOutsideAngular(() =>
       createFluidbox<TItem>({
         items: this.fluidbox.items,
         labels: this.labels,
-        zoom: zoom === false ? false : zoom ? { ...zoom } : undefined,
+        zoom: zoomOption(this.zoom),
         renderers,
         origins: latestOrigins(() => this.origins),
-        // Without a viewer template, the default controls.
-        controls: viewer ? undefined : true,
-        viewer: viewer ? ({ target }) => viewer.mount(target) : undefined,
-        filmstrip: filmstrip ? (filmstrip.render ? { render: filmstrip.render } : true) : undefined,
-        sheet: sheet
-          ? { snapPoints: sheet.snapPoints, dismiss: sheet.dismiss, render: sheet.render }
-          : undefined,
+        ...parts,
       }),
     );
-    this.deferred.attach(fluidbox);
-    const showStop = (stop: number) => this.#zone.run(() => this.#stop.set(stop));
-    showStop(fluidbox.sheet?.stop ?? 0);
-    const unsubscribe = fluidbox.sheet?.subscribe(showStop);
-    this.#built = {
-      key,
-      destroy: () => {
-        unsubscribe?.();
-        this.deferred.detach();
-        fluidbox.destroy();
-        showStop(0);
-      },
-    };
+    this.#viewer = viewer;
+    this.deferred.attach(viewer);
   }
 }
 

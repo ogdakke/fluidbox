@@ -11,7 +11,7 @@ Images zoom with pinch (or Ctrl + wheel), double-tap, double-click and the `+`, 
 
 <!-- pattern: zoom -->
 
-- `zoom: { step, max }` or `zoom: false` on the viewer. The custom elements also read `zoom-step`, `zoom-max` and `zoom="off"` attributes.
-- Changing zoom options rebuilds the viewer, so set them once. The framework roots compare `step` and `max`, so a new object with the same values keeps it.
+- `zoom: { step, max }` or `zoom: false` on the viewer. The custom elements also read the `zoom-step`, `zoom-max` and `nozoom` attributes.
+- Zoom options change live, open viewer included: `fluidbox.update({ zoom })`, or a new `zoom` prop or property. Turning zoom off zooms a zoomed photo back out.
 - `step` defaults to `2` and `max` to `4`.
 - While zoomed, the dialog has `data-zoomed`. Pans can reach under the browser's bars; set `--fluidbox-zoom-bleed: 0px` to keep them inside the window, or `--fluidbox-zoom-clip` to keep them inside the stage insets.

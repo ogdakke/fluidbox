@@ -1,7 +1,8 @@
 // #region example
 import { Component, signal } from "@angular/core";
-import { FluidboxModule, type FluidboxChangeEvent } from "@ogdakke/fluidbox/angular";
-import { label, photos } from "../shared";
+import { itemLabel } from "@ogdakke/fluidbox";
+import { FluidboxModule, type FluidboxItemChangeEvent } from "@ogdakke/fluidbox/angular";
+import { photos } from "../shared";
 
 @Component({
   selector: "pattern-programmatic",
@@ -50,7 +51,7 @@ import { label, photos } from "../shared";
 })
 export class Programmatic {
   readonly photos = photos;
-  readonly label = label;
+  readonly label = itemLabel;
   readonly locked = signal(false);
   readonly events = signal<string[]>([]);
 
@@ -59,7 +60,7 @@ export class Programmatic {
   }
 
   // beforeItemChange comes before every move between items; canceling it keeps the viewer still.
-  guard(event: FluidboxChangeEvent): void {
+  guard(event: FluidboxItemChangeEvent): void {
     this.log(event);
     if (this.locked()) event.preventDefault();
   }

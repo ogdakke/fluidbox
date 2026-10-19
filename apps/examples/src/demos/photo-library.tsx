@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import type {
-  FluidboxChangeEvent,
+  FluidboxItemChangeEvent,
   FluidboxImageItem,
   FluidboxItemList,
   FluidboxOriginAdapter,
+  FluidboxRevealContext,
 } from "@ogdakke/fluidbox";
 import "./photo-library.css";
 
@@ -29,7 +30,6 @@ export const fixtureImages: readonly LibraryImage[] = [
 type LibraryRow =
   | { kind: "date"; key: string; day: number; firstPhoto: number }
   | { kind: "photos"; key: string; firstPhoto: number; count: number };
-type RevealContext = { signal: AbortSignal; reason: "open" | "selection" };
 
 function photoId(index: number): string {
   return `synthetic-photo-${index}`;
@@ -105,7 +105,7 @@ export function PhotoLibrary({
   const scrollElement = useRef<HTMLDivElement | null>(null);
   const origins = useRef(new Map<string, HTMLButtonElement>());
   const revealOrigin = useRef<
-    ((id: string, index: number, context: RevealContext) => Promise<void>) | null
+    ((id: string, index: number, context: FluidboxRevealContext) => Promise<void>) | null
   >(null);
   const [columns, setColumns] = useState(() => columnsFor(window.innerWidth));
   const [requestedNumber, setRequestedNumber] = useState("1");
@@ -127,7 +127,7 @@ export function PhotoLibrary({
       },
     };
   }, [count, images]);
-  const originAdapter = useMemo<FluidboxOriginAdapter>(
+  const originAdapter = useMemo<FluidboxOriginAdapter<PhotoItem>>(
     () => ({
       getOrigin(id) {
         const element = origins.current.get(id);
@@ -202,7 +202,7 @@ export function PhotoLibrary({
   };
 
   const onSettle = useCallback(
-    (event: FluidboxChangeEvent<PhotoItem>) => {
+    (event: FluidboxItemChangeEvent<PhotoItem>) => {
       if (event.index >= 0 && event.index < count) setLastViewed(event.index);
     },
     [count],
@@ -370,37 +370,35 @@ export function PhotoLibrary({
                         const index = row.firstPhoto + offset;
                         const photo = photoAt(index, images);
                         return (
-                          <Fluidbox.Item key={photo.id} item={photo.id}>
-                            <Fluidbox.Trigger asChild>
-                              <button
-                                type="button"
-                                className="library-photo"
-                                data-fluidbox-preview=""
-                                data-photo-id={photo.id}
-                                data-photo-index={index}
-                                aria-label={`Open ${photo.alt}, item ${index + 1} of ${count}`}
-                                ref={(node) => {
-                                  if (!node) return;
-                                  origins.current.set(photo.id, node);
-                                  return () => {
-                                    if (origins.current.get(photo.id) === node)
-                                      origins.current.delete(photo.id);
-                                  };
-                                }}
-                                onClick={() => setLastViewed(index)}
-                              >
-                                <img
-                                  src={photo.thumbnail.src}
-                                  alt=""
-                                  width={photo.width}
-                                  height={photo.height}
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                                <span>{String(index + 1).padStart(5, "0")}</span>
-                              </button>
-                            </Fluidbox.Trigger>
-                          </Fluidbox.Item>
+                          <Fluidbox.Trigger key={photo.id} item={photo.id} asChild>
+                            <button
+                              type="button"
+                              className="library-photo"
+                              data-fluidbox-origin=""
+                              data-photo-id={photo.id}
+                              data-photo-index={index}
+                              aria-label={`Open ${photo.alt}, item ${index + 1} of ${count}`}
+                              ref={(node) => {
+                                if (!node) return;
+                                origins.current.set(photo.id, node);
+                                return () => {
+                                  if (origins.current.get(photo.id) === node)
+                                    origins.current.delete(photo.id);
+                                };
+                              }}
+                              onClick={() => setLastViewed(index)}
+                            >
+                              <img
+                                src={photo.thumbnail.src}
+                                alt=""
+                                width={photo.width}
+                                height={photo.height}
+                                loading="lazy"
+                                decoding="async"
+                              />
+                              <span>{String(index + 1).padStart(5, "0")}</span>
+                            </button>
+                          </Fluidbox.Trigger>
                         );
                       })}
                     </div>

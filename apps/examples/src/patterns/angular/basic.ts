@@ -1,7 +1,8 @@
 // #region example
 import { Component } from "@angular/core";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 @Component({
   selector: "pattern-basic",
@@ -25,6 +26,6 @@ import { label, photos } from "../shared";
 })
 export class Basic {
   readonly photos = photos;
-  readonly label = label;
+  readonly label = itemLabel;
 }
 // #endregion example

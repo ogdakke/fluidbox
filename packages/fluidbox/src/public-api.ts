@@ -110,8 +110,8 @@ export type FluidboxItems<TItem extends FluidboxItem = FluidboxItem> =
   | readonly TItem[]
   | FluidboxItemList<TItem>;
 
-/** An item's index, or its id. */
-export type FluidboxTarget = number | string;
+/** An item, its index, or its id. Items are matched by id. */
+export type FluidboxTarget<TItem extends FluidboxItem = FluidboxItem> = number | string | TItem;
 
 // Rendering.
 
@@ -144,25 +144,29 @@ export type FluidboxViewerRenderer<TItem extends FluidboxItem = FluidboxItem> = 
 
 // Origins: where a flight starts and lands.
 
-export interface FluidboxOrigin {
+export interface FluidboxOrigin<TItem extends FluidboxItem = FluidboxItem> {
   /** The element that opened the item, scrolled into view on close. */
   readonly trigger: HTMLElement;
   /** The box the flight starts from and lands on. */
   readonly visual: HTMLElement;
   /** The image painted at the start of the flight, if any. */
   readonly thumbnail?: HTMLImageElement;
-  /** Called before the closing flight measures `visual`, with the item it lands on. Update it synchronously. */
-  readonly prepareClose?: (item: FluidboxItem, index: number) => void;
+  /**
+   * Called before the closing flight measures `visual`, with the item it lands
+   * on: show that item on the trigger, synchronously, as an album cover does.
+   */
+  readonly onPreviewChange?: (item: TItem, index: number) => void;
 }
 
 export interface FluidboxRevealContext {
   readonly signal: AbortSignal;
-  readonly reason: "open" | "selection";
+  /** "open" before the opening flight, "selection" as the viewer moves between items. */
+  readonly phase: "open" | "selection";
 }
 
 /** Finds origins the viewer can't see, as in a virtualized grid. */
-export interface FluidboxOriginAdapter {
-  getOrigin(id: string): FluidboxOrigin | null;
+export interface FluidboxOriginAdapter<TItem extends FluidboxItem = FluidboxItem> {
+  getOrigin(id: string): FluidboxOrigin<TItem> | null;
   /** Bring the item's trigger into view. Without it, the viewer scrolls it into view. */
   revealOrigin?(id: string, index: number, context: FluidboxRevealContext): void | Promise<void>;
 }
@@ -223,7 +227,7 @@ export class FluidboxToggleEvent extends Event {
  * then `itemchange` when the item changes (opening included), and `settle` once it
  * comes to rest.
  */
-export class FluidboxChangeEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
+export class FluidboxItemChangeEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
   readonly id: string;
   readonly index: number;
   readonly item: TItem;
@@ -241,12 +245,26 @@ export class FluidboxChangeEvent<TItem extends FluidboxItem = FluidboxItem> exte
   }
 }
 
+/** Fired when the sheet comes to rest at another stop. */
+export class FluidboxSheetEvent extends Event {
+  /** The stop the sheet rests at: 0 at rest, then one per snap point. */
+  readonly stop: number;
+  readonly reason: FluidboxReason;
+
+  constructor(type: "sheetchange", init: EventInit & { stop: number; reason: FluidboxReason }) {
+    super(type, init);
+    this.stop = init.stop;
+    this.reason = init.reason;
+  }
+}
+
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   beforetoggle: FluidboxToggleEvent;
   toggle: FluidboxToggleEvent;
-  beforeitemchange: FluidboxChangeEvent<TItem>;
-  itemchange: FluidboxChangeEvent<TItem>;
-  settle: FluidboxChangeEvent<TItem>;
+  beforeitemchange: FluidboxItemChangeEvent<TItem>;
+  itemchange: FluidboxItemChangeEvent<TItem>;
+  settle: FluidboxItemChangeEvent<TItem>;
+  sheetchange: FluidboxSheetEvent;
 }
 
 // Add-ons. Each needs its entry imported once: `import "@ogdakke/fluidbox/sheet"`.
@@ -272,42 +290,27 @@ export interface FluidboxSheetOptions<TItem extends FluidboxItem = FluidboxItem>
    */
   readonly dismiss?: "flight" | "scroll" | "none";
   /**
-   * Fills a sheet the runtime makes, for the active item. Leave it out and draw
-   * your own element with `data-fluidbox-sheet` into the handle's `slot`.
+   * Fills the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`,
+   * for the item on show. It runs again when the item changes; the `signal`
+   * aborts and the section is emptied first.
    */
   readonly render?: FluidboxRenderer<TItem>;
 }
 
-/** Reads and moves the sheet. */
+/** Reads and moves the sheet. A `sheetchange` event follows each new stop. */
 export interface FluidboxSheet {
   /** The stop the sheet rests at: 0 at rest, then one per snap point. */
   readonly stop: number;
-  /** Where to draw your own `data-fluidbox-sheet` element. */
-  readonly slot: HTMLElement | null;
   /** Move the sheet to a stop. Ignored while the viewer is not open. */
   set(stop: number, options?: { readonly animate?: boolean }): void;
-  /** Called when the stop changes, and when the slot appears or goes. */
-  subscribe(listener: (stop: number) => void): () => void;
 }
 
 export interface FluidboxFilmstripOptions<TItem extends FluidboxItem = FluidboxItem> {
-  /** Fills each thumbnail button instead of the default image. */
+  /**
+   * Fills each thumbnail button instead of the default image, while the button
+   * is in the strip's rendered window. The `signal` aborts as it leaves.
+   */
   readonly render?: FluidboxRenderer<TItem>;
-  /** Leave the buttons empty and list them in the handle's `slots`, for framework components. */
-  readonly slots?: boolean;
-}
-
-/** A thumbnail button of the filmstrip, while it is in the strip's rendered window. */
-export interface FluidboxFilmstripSlot<TItem extends FluidboxItem = FluidboxItem> {
-  readonly item: TItem;
-  readonly index: number;
-  readonly target: HTMLElement;
-}
-
-export interface FluidboxFilmstrip<TItem extends FluidboxItem = FluidboxItem> {
-  /** The thumbnail buttons in view, in index order. Empty unless made with `slots: true`. */
-  readonly slots: readonly FluidboxFilmstripSlot<TItem>[];
-  subscribe(listener: () => void): () => void;
 }
 
 // The fluidbox.
@@ -334,8 +337,18 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** A sheet over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and its stylesheet. */
   readonly sheet?: boolean | FluidboxSheetOptions<TItem>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
-  readonly origins?: FluidboxOriginAdapter;
+  readonly origins?: FluidboxOriginAdapter<TItem>;
 }
+
+/**
+ * The options `update` changes on a live fluidbox. A key left out keeps its
+ * value; a key set to undefined goes back to its default.
+ */
+export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
+  readonly [K in "labels" | "zoom" | "controls" | "viewer" | "filmstrip" | "sheet"]?:
+    | FluidboxOptions<TItem>[K]
+    | undefined;
+};
 
 export interface FluidboxCommandOptions {
   readonly signal?: AbortSignal;
@@ -344,6 +357,8 @@ export interface FluidboxCommandOptions {
 export interface FluidboxBindOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Unbinds when aborted. */
   readonly signal?: AbortSignal;
+  /** More items that close back onto this element, as on an album cover. */
+  readonly returns?: readonly FluidboxTarget<TItem>[];
   /**
    * Called before the closing flight measures the trigger, with the item it
    * lands on: show that item on the trigger, synchronously, as an album cover does.
@@ -354,6 +369,8 @@ export interface FluidboxBindOptions<TItem extends FluidboxItem = FluidboxItem> 
 export interface FluidboxOverlayOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Unbinds when aborted. */
   readonly signal?: AbortSignal;
+  /** More items whose flights carry the overlay, as with the trigger's `returns`. */
+  readonly returns?: readonly FluidboxTarget<TItem>[];
   /**
    * Fly with the photo. `true` flies a copy of the element; a renderer draws
    * live content into the flying frame.
@@ -368,39 +385,42 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   readonly items: FluidboxItemList<TItem>;
   /** The sheet, when the `sheet` option is on. */
   readonly sheet: FluidboxSheet | null;
-  /** The filmstrip, when the `filmstrip` option is on. */
-  readonly filmstrip: FluidboxFilmstrip<TItem> | null;
   /**
    * Open the viewer on an item, or move to it while open. Without a target, the
    * current item, else the first. Resolves true once it happened, false when it
    * was prevented, superseded or aborted. Rejects with a RangeError for an
    * unknown target.
    */
-  open(target?: FluidboxTarget, options?: FluidboxCommandOptions): Promise<boolean>;
+  open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean>;
   close(options?: FluidboxCommandOptions): Promise<boolean>;
   next(options?: FluidboxCommandOptions): Promise<boolean>;
   previous(options?: FluidboxCommandOptions): Promise<boolean>;
+  /**
+   * Change options without closing the viewer: labels and zoom apply in place,
+   * and the viewer's layer, the filmstrip and the sheet are drawn again.
+   */
+  update(options: FluidboxUpdateOptions<TItem>): void;
   /** Replace the items. An open viewer stays on the same id when it is still there. */
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
-  preload(target: FluidboxTarget): () => void;
+  preload(target: FluidboxTarget<TItem>): () => void;
   /**
-   * Make an element open the viewer. With several targets, the first opens and
-   * any of them can close back onto it. Returns a function that unbinds.
+   * Make an element open the viewer on an item. The item, and any in
+   * `returns`, close back onto it. Returns a function that unbinds.
    */
   bind(
     element: HTMLElement,
-    target: FluidboxTarget | readonly FluidboxTarget[],
+    target: FluidboxTarget<TItem>,
     options?: FluidboxBindOptions<TItem>,
   ): () => void;
   /**
    * Make an element on a trigger, such as a badge or a caption, a thumbnail
-   * overlay: it gets `--fluidbox-progress` and `data-fluidbox-phase` as the
+   * overlay: it gets `--fluidbox-closed` and `data-fluidbox-phase` as the
    * viewer opens and closes, and with `travel` it flies with the photo.
    */
   bindOverlay(
     element: HTMLElement,
-    target: FluidboxTarget | readonly FluidboxTarget[],
+    target: FluidboxTarget<TItem>,
     options?: FluidboxOverlayOptions<TItem>,
   ): () => void;
   subscribe(listener: (state: FluidboxState<TItem>) => void): () => void;

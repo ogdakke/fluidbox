@@ -1,12 +1,3 @@
-/** Resolve the explicitly marked visual handoff box for a trigger. */
-export function markedVisualOrigin(trigger: HTMLElement): HTMLElement | null {
-  if (trigger.matches("[data-fluidbox-target]")) return trigger;
-  const target = trigger.querySelector<HTMLElement>("[data-fluidbox-target]");
-  if (target) return target;
-  if (trigger.matches("[data-fluidbox-preview]")) return trigger;
-  return trigger.querySelector<HTMLElement>("[data-fluidbox-preview]");
-}
-
 /**
  * Check whether an origin intersects the window and every clipping ancestor.
  * Shadow hosts participate in the same walk.

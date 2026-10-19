@@ -86,7 +86,7 @@ test("indexed image origin opens from its mounted thumbnail", async ({ page }, t
   }
   expect(motion.progress.width - motion.start.width).toBeGreaterThan(20);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("Escape");
@@ -101,7 +101,7 @@ test("indexed image closes to its thumbnail without including the caption", asyn
   await card.locator("img").evaluate((image: HTMLImageElement) => image.decode());
   await card.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -143,7 +143,7 @@ test("indexed close keeps the live image painted until its flight clone decodes"
   await page.goto("/playground.html");
   await page.getByRole("button", { name: "Open", exact: true }).click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -182,7 +182,7 @@ test("touch dismissal decodes its flight image during the drag", async ({ page }
   await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
   await origin.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -244,7 +244,7 @@ test("wheel dismissal reuses the image decoded during the wheel spring", async (
   await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
   await origin.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -308,7 +308,7 @@ test("failed early decode keeps the source painted until the mounted flight deco
   await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
   await origin.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -367,7 +367,7 @@ test("indexed item without a mounted origin uses scale and fade", async ({ page 
   expect(motion.progress.frameOpacity).toBeGreaterThan(0.1);
   expect(motion.progress.width - motion.start.width).toBeGreaterThan(5);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("Escape");
@@ -498,7 +498,7 @@ test("direct React gallery carries clipped-origin geometry through opening and c
     );
   }
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -610,7 +610,7 @@ test("direct React transition matches its reference frames", async ({ page }, te
   });
   await page.evaluate(() => window.__motion.release());
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await holdMotion(page);
@@ -619,11 +619,11 @@ test("direct React transition matches its reference frames", async ({ page }, te
   await page.evaluate(() => {
     const dialog = document.querySelector<HTMLElement>("[data-fluidbox-dialog]")!;
     const observer = new MutationObserver(() => {
-      if (dialog.dataset.fluidboxState !== "closing") return;
+      if (dialog.dataset.fluidboxStatus !== "closing") return;
       observer.disconnect();
       window.__motion.freeze();
     });
-    observer.observe(dialog, { attributeFilter: ["data-fluidbox-state"] });
+    observer.observe(dialog, { attributeFilter: ["data-fluidbox-status"] });
   });
   await page.keyboard.press("Escape");
   await page.evaluate(async () => {
@@ -712,7 +712,7 @@ test("direct React transition reverses from its painted crop", async ({ page }, 
 
   await origin.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await holdMotion(page);
@@ -726,7 +726,7 @@ test("direct React transition reverses from its painted crop", async ({ page }, 
   expect(closing.before.width / closing.before.height).toBeCloseTo(2 / 3, 2);
   expect(closing.after.width / closing.after.height).toBeCloseTo(2 / 3, 2);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("Escape");
@@ -745,7 +745,7 @@ test("direct touch dismissal preserves crop, radii, and native strip position", 
   });
   await origin.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -810,7 +810,7 @@ test("direct touch dismissal preserves crop, radii, and native strip position", 
     "",
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 });
@@ -827,7 +827,7 @@ test("direct close flight retargets after viewport resize", async ({ page }, tes
   });
   await origin.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await holdMotion(page);
@@ -885,7 +885,7 @@ test("square image is prepainted before its close flight hides the source", asyn
   await origin.locator("img").evaluate((image: HTMLImageElement) => image.decode());
   await origin.click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -915,7 +915,7 @@ test("close-flight handoff hides every painted layer of the source frame", async
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -1027,15 +1027,14 @@ test("opening crop transforms the fallback and media together", async ({ page })
   expect(midFlight.fallback).toBe(midFlight.media);
 });
 
-test("nested visual target takes precedence over its preview box", async ({ page }) => {
+test("a marked origin inside the trigger is the flight's box", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/harness.html?no-filmstrip");
   const trigger = page.locator('fluidbox-item[data-test-index="0"] [data-fluidbox-trigger]');
   await trigger.evaluate((button: HTMLElement) => {
-    button.dataset.fluidboxPreview = "";
     button.style.borderRadius = "16px";
     const image = button.querySelector<HTMLImageElement>("img")!;
-    image.dataset.fluidboxTarget = "";
+    image.dataset.fluidboxOrigin = "";
     image.style.borderRadius = "3px";
   });
   await holdMotion(page);
@@ -1060,7 +1059,7 @@ test("nested visual target takes precedence over its preview box", async ({ page
   );
   expect(startRadius).toBeCloseTo(3, 0);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("Escape");
@@ -1084,7 +1083,7 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
   expect(thumbnail).not.toBeNull();
   await trigger.click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open", { timeout: 5_000 });
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open", { timeout: 5_000 });
   const opened = await page
     .locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')
     .boundingBox();
@@ -1177,7 +1176,7 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
   await expect(dialog).toHaveCount(0);
 
   await trigger.click();
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open", { timeout: 5_000 });
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open", { timeout: 5_000 });
   const closing = await interrupt("closing");
   await testInfo.attach("closing-interruption-geometry", {
     body: JSON.stringify({ thumbnail, opened, ...closing }, null, 2),
@@ -1186,7 +1185,7 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
   expect(Math.abs(closing.before.width - thumbnail!.width)).toBeGreaterThan(15);
   expect(Math.abs(closing.before.width - opened!.width)).toBeGreaterThan(15);
   expectContinuous(closing);
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open", { timeout: 5_000 });
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open", { timeout: 5_000 });
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(

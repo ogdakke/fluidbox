@@ -1,6 +1,6 @@
 import type {
-  FluidboxFilmstrip,
   FluidboxFilmstripOptions,
+  FluidboxReason,
   FluidboxSheet,
   FluidboxSheetOptions,
 } from "./public-api";
@@ -12,8 +12,11 @@ export interface Addon<THandle> {
 }
 
 interface Addons {
-  sheet?: (options: FluidboxSheetOptions<any>) => Addon<FluidboxSheet>;
-  filmstrip?: (options: FluidboxFilmstripOptions<any>) => Addon<FluidboxFilmstrip<any>>;
+  sheet?: (
+    options: FluidboxSheetOptions<any>,
+    onChange: (stop: number, reason: FluidboxReason) => void,
+  ) => Addon<FluidboxSheet>;
+  filmstrip?: (options: FluidboxFilmstripOptions<any>) => Addon<null>;
 }
 
 // One registry per page, however many copies of the entries a bundler makes.

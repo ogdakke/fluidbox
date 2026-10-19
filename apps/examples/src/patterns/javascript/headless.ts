@@ -1,6 +1,6 @@
 // #region example
-import { createFluidbox } from "@ogdakke/fluidbox";
-import { label, photos } from "../shared";
+import { createFluidbox, itemLabel } from "@ogdakke/fluidbox";
+import { photos } from "../shared";
 
 export function mountHeadless(root: HTMLElement) {
   const fluidbox = createFluidbox({
@@ -27,7 +27,7 @@ export function mountHeadless(root: HTMLElement) {
 
       return fluidbox.subscribe(({ item, index, count, hasPrevious, hasNext }) => {
         if (!item || index === null) return;
-        title.textContent = label(item);
+        title.textContent = itemLabel(item);
         counter.textContent = `${index + 1} / ${count}`;
         prev.disabled = !hasPrevious;
         next.disabled = !hasNext;
@@ -42,7 +42,7 @@ export function mountHeadless(root: HTMLElement) {
     button.type = "button";
     button.className = "pattern-thumb";
     button.dataset.test = "trigger";
-    button.append(Object.assign(new Image(), { src: photo.src, alt: label(photo) }));
+    button.append(Object.assign(new Image(), { src: photo.src, alt: itemLabel(photo) }));
     grid.append(button);
     fluidbox.bind(button, index);
   });

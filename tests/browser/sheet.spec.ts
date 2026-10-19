@@ -11,7 +11,7 @@ test.describe("sheet on a phone", () => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
     await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
-      "data-fluidbox-state",
+      "data-fluidbox-status",
       "open",
     );
     await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
@@ -43,7 +43,7 @@ test.describe("sheet on a phone", () => {
     await page.keyboard.press("Escape");
     await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
     await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
-      "data-fluidbox-state",
+      "data-fluidbox-status",
       "open",
     );
 
@@ -56,7 +56,7 @@ test.describe("sheet on a phone", () => {
   test("the top stop is reachable however few the replies", async ({ page }) => {
     await page.goto("/social.html");
     await page.locator(".x-post").nth(2).locator(".x-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
     await page.evaluate(() => {
       const scroller = document.querySelector("[data-fluidbox-sheet-scroller]")!;
       scroller.scrollTo({ top: scroller.scrollHeight, behavior: "instant" });
@@ -90,7 +90,7 @@ test.describe("sheet on a phone", () => {
   test("the sheet stays inert and unfocused until it settles", async ({ page }) => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
     const sheet = page.locator("[data-fluidbox-overlay] [data-fluidbox-sheet]");
     await expect(sheet).toHaveAttribute("inert");
     // A screen reader that moves into a sheet still on its way loses its place,
@@ -117,7 +117,7 @@ test.describe("sheet on a phone", () => {
     await page.goto("/social.html");
     await page.locator(".ig-grid").scrollIntoViewIfNeeded();
     await page.locator(".ig-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
     const pageScroll = await page.evaluate(() => scrollY);
     await page.mouse.move(195, 300);
     // A trackpad's momentum: wheel events keep coming, from a timer in the page
@@ -149,7 +149,7 @@ test.describe("sheet on a wide screen", () => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
     await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
-      "data-fluidbox-state",
+      "data-fluidbox-status",
       "open",
     );
     await expect(page.locator(".x-aside")).toBeVisible();
@@ -171,7 +171,7 @@ test.describe("zoom under stage insets", () => {
   async function zoomIn(page: Page) {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
     await page
       .locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')
       .dblclick();
@@ -204,7 +204,7 @@ test.describe("zoom under stage insets", () => {
       content: "[data-fluidbox-dialog] { --fluidbox-zoom-clip: bottom; }",
     });
     await page.locator(".x-grid button").first().click();
-    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
     await page
       .locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')
       .dblclick();

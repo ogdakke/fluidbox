@@ -47,7 +47,7 @@ fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible,
 
 /* Gallery arrows are styled by a dialog-qualified package rule, so match its weight. */
 :where([data-fluidbox-overlay])
-  [data-fluidbox-dialog][data-fluidbox-gallery]
+  [data-fluidbox-dialog][data-gallery]
   :is([data-fluidbox-previous], [data-fluidbox-next]) {
   width: 44px;
   height: 44px;

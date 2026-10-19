@@ -1,7 +1,8 @@
 // #region example
 import { createContext, useContext } from "react";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import { label, media, theme, thumbnailSrc } from "../shared";
+import { media, theme, thumbnailSrc } from "../shared";
 
 const ThemeContext = createContext("light");
 
@@ -24,7 +25,7 @@ export function Renderers() {
               className="pattern-thumb"
               data-test="trigger"
             >
-              <img src={thumbnailSrc(item)} alt={label(item)} />
+              <img src={thumbnailSrc(item)} alt={itemLabel(item)} />
             </Fluidbox.Trigger>
           ))}
         </div>

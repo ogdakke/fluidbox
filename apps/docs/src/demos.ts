@@ -26,7 +26,7 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       const trigger = document.createElement("button");
       trigger.type = "button";
       trigger.slot = "trigger";
-      trigger.dataset.fluidboxPreview = "";
+      trigger.dataset.fluidboxOrigin = "";
       trigger.append(image());
       const content = document.createElement("template");
       content.setAttribute("slot", "content");

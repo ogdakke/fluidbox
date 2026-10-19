@@ -1,12 +1,17 @@
 <!-- #region example -->
 <script setup lang="ts">
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
 import "@ogdakke/fluidbox/sheet.css";
-import { label, photos } from "../shared";
+import { ref } from "vue";
+import { photos } from "../shared";
+
+// The stop the sheet rests at: 0 at rest, then one per snap point.
+const stop = ref(0);
 </script>
 
 <template>
-  <Fluidbox.Root :items="photos">
+  <Fluidbox.Root :items="photos" @sheetchange="stop = $event.stop">
     <div class="pattern-grid">
       <Fluidbox.Trigger
         v-for="photo in photos"
@@ -15,7 +20,7 @@ import { label, photos } from "../shared";
         class="pattern-thumb"
         data-test="trigger"
       >
-        <img :src="photo.src" :alt="label(photo)" />
+        <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
     <Fluidbox.Viewer>
@@ -25,16 +30,14 @@ import { label, photos } from "../shared";
         Details
       </Fluidbox.SheetStop>
     </Fluidbox.Viewer>
-    <!-- The sheet's content, for the active item. -->
-    <Fluidbox.Sheet v-slot="{ item, stop, set }" :snap-points="['40%', '90%']">
-      <div class="pattern-sheet">
-        <h3 data-test="sheet-title">{{ label(item) }}</h3>
-        <p>
-          Stop <output data-test="stop">{{ stop }}</output>
-        </p>
-        <button type="button" data-test="expand" @click="set(2)">Expand</button>
-        <input data-test="field" placeholder="Add a note" aria-label="Note" />
-      </div>
+    <!-- The sheet's content, for the active item. Its attributes go on the sheet. -->
+    <Fluidbox.Sheet v-slot="{ item }" :snap-points="['40%', '90%']" class="pattern-sheet">
+      <h3 data-test="sheet-title">{{ itemLabel(item) }}</h3>
+      <p>
+        Stop <output data-test="stop">{{ stop }}</output>
+      </p>
+      <Fluidbox.SheetStop :stop="2" data-test="expand">Expand</Fluidbox.SheetStop>
+      <input data-test="field" placeholder="Add a note" aria-label="Note" />
     </Fluidbox.Sheet>
   </Fluidbox.Root>
 </template>

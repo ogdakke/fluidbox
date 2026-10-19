@@ -1,12 +1,16 @@
 import {
   ChangeDetectorRef,
   Component,
+  ContentChild,
   Directive,
   ElementRef,
+  InjectionToken,
+  Injector,
   Input,
   NgZone,
   Renderer2,
   TemplateRef,
+  ViewChild,
   ViewContainerRef,
   booleanAttribute,
   computed,
@@ -14,40 +18,37 @@ import {
   numberAttribute,
   signal,
   type AfterContentInit,
+  type AfterViewChecked,
   type DoCheck,
   type OnDestroy,
   type OnInit,
   type Signal,
 } from "@angular/core";
-import type { FluidboxControlName, FluidboxItem, FluidboxTarget } from "@ogdakke/fluidbox";
+import type {
+  FluidboxControlName,
+  FluidboxItem,
+  FluidboxRenderer,
+  FluidboxTarget,
+  FluidboxViewerRenderer,
+} from "@ogdakke/fluidbox";
 import {
   createTrigger,
   fluidboxControlIcon,
   fluidboxControls,
-  idOf,
+  frameLayerOf,
+  targetKeys,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import { injectIsBrowser, mountTemplate } from "./mount.js";
 import { injectRoot } from "./root.js";
 
-/** An item, or its index or id. */
-export type FluidboxItemRef<TItem extends FluidboxItem = FluidboxItem> = TItem | FluidboxTarget;
-
-const targetOf = (value: FluidboxItemRef): FluidboxTarget =>
-  typeof value === "object" ? idOf(value) : value;
-
-const sameTargets = (a: readonly FluidboxTarget[], b: readonly FluidboxTarget[]) =>
-  a.length === b.length && a.every((target, index) => target === b[index]);
-
-/** Scopes an item for the triggers and overlays inside: the item, or its index or id. */
-@Directive({ selector: "[fluidboxItem]", standalone: true })
-export class FluidboxItemDirective<TItem extends FluidboxItem = FluidboxItem> {
-  @Input({ required: true }) fluidboxItem!: FluidboxItemRef<TItem>;
-}
+const sameKeys = (a: readonly unknown[], b: readonly unknown[]) =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
 
 /**
- * Opens an item, on any element. The element is registered as the origin of
- * its items, so the photo flies from it and back to it. Exported as
+ * Opens an item, on any element: `[fluidboxTrigger]="photo"`, or its index or
+ * id. The element is registered as the origin of the item and of every one in
+ * `fluidboxReturns`, so the photo flies from it and back to it. Exported as
  * `fluidboxTrigger`, whose `preview()` is the item the trigger shows.
  *
  * Its listeners are added in ngOnInit, after the listeners of the template it
@@ -58,24 +59,27 @@ export class FluidboxItemDirective<TItem extends FluidboxItem = FluidboxItem> {
 export class FluidboxTriggerDirective<TItem extends FluidboxItem = FluidboxItem>
   implements DoCheck, OnInit, OnDestroy
 {
-  /** The item opened, or its index or id. Defaults to the first of `fluidboxTriggerItems`, then the enclosing `fluidboxItem`. */
-  @Input() fluidboxTrigger?: FluidboxItemRef<TItem> | null;
-  /** Every item that may return to this trigger on close, as for an album cover. */
-  @Input() fluidboxTriggerItems?: readonly FluidboxItemRef<TItem>[];
+  /** The item opened: the item, its index or its id. */
+  @Input({ required: true }) fluidboxTrigger!: FluidboxTarget<TItem>;
+  /** More items that close back onto this trigger, as for an album cover. */
+  @Input() fluidboxReturns?: readonly FluidboxTarget<TItem>[];
 
   readonly #root = injectRoot<TItem>("fluidboxTrigger");
-  readonly #item = inject(FluidboxItemDirective, { optional: true });
   readonly #element = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly #renderer = inject(Renderer2);
   readonly #changes = inject(ChangeDetectorRef);
   readonly #browser = injectIsBrowser();
-  readonly #targets = signal<readonly FluidboxTarget[]>([], { equal: sameTargets });
-  /** The opened item first, then the rest that may return here. */
-  readonly targets: Signal<readonly FluidboxTarget[]> = this.#targets.asReadonly();
+  readonly #target = signal<FluidboxTarget<TItem>>(0);
+  readonly #returns = signal<readonly FluidboxTarget<TItem>[]>([], { equal: sameKeys });
+  #keys: readonly unknown[] = [];
+  /** The item opened. */
+  readonly target: Signal<FluidboxTarget<TItem>> = this.#target.asReadonly();
+  /** The other items that return here. */
+  readonly returns: Signal<readonly FluidboxTarget<TItem>[]> = this.#returns.asReadonly();
   readonly #previewChanges = signal(0);
   #followsPreview = false;
   readonly #trigger = createTrigger<TItem>(this.#root.fluidbox, {
-    targets: [],
+    target: 0,
     onPreviewChange: () => this.#previewChanged(),
   });
   /**
@@ -87,25 +91,24 @@ export class FluidboxTriggerDirective<TItem extends FluidboxItem = FluidboxItem>
     this.#followsPreview = true;
     this.#previewChanges();
     this.#root.list();
-    const state = this.#root.state();
-    return this.#targets().length
-      ? this.#trigger.preview(state)
-      : { item: null, index: null, status: "closed" };
+    this.#target();
+    this.#returns();
+    return this.#trigger.preview(this.#root.state());
   });
   #cleanup: (() => void)[] = [];
 
   ngDoCheck(): void {
+    const target = this.fluidboxTrigger;
     // The bare attribute binds "".
-    const own = this.fluidboxTrigger === "" ? null : this.fluidboxTrigger;
-    const first = own ?? this.fluidboxTriggerItems?.[0] ?? this.#item?.fluidboxItem;
-    if (first === undefined || first === null)
-      throw new Error("fluidboxTrigger needs an item, fluidboxTriggerItems, or a fluidboxItem.");
-    const targets = [
-      ...new Set([first, ...(this.fluidboxTriggerItems ?? [])].map((each) => targetOf(each))),
-    ];
-    if (sameTargets(targets, this.#targets())) return;
-    this.#targets.set(targets);
-    this.#trigger.update({ targets, onPreviewChange: () => this.#previewChanged() });
+    if (target === undefined || target === null || target === "")
+      throw new Error("fluidboxTrigger needs an item, its index or its id.");
+    const returns = this.fluidboxReturns ?? [];
+    const keys = targetKeys(target, returns);
+    if (sameKeys(keys, this.#keys)) return;
+    this.#keys = keys;
+    this.#target.set(target);
+    this.#returns.set(returns);
+    this.#trigger.update({ target, returns, onPreviewChange: () => this.#previewChanged() });
   }
 
   ngOnInit(): void {
@@ -137,33 +140,77 @@ export class FluidboxTriggerDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 }
 
+/** True inside the copy of a thumbnail overlay that flies with the photo. */
+const TRAVELLING = new InjectionToken<boolean>("fluidbox travelling overlay");
+
 /**
  * A badge or caption on a thumbnail, such as a count, that fades as the photo
- * leaves and returns. With `travel`, a copy of it flies with the photo. It
- * belongs to the enclosing trigger's items, else the enclosing `fluidboxItem`.
+ * leaves and returns. It belongs to the enclosing trigger's item and returns.
+ *
+ * With `travel` its content flies with the photo. Give the content as an
+ * `ng-template` child and the flying copy is rendered from it, live, with
+ * DI and change detection; plain content flies as a still copy.
+ *
+ * ```html
+ * <span fluidboxThumbnailOverlay travel>
+ *   <ng-template>+{{ count }}</ng-template>
+ * </span>
+ * ```
  */
-@Directive({ selector: "[fluidboxThumbnailOverlay]", standalone: true })
-export class FluidboxThumbnailOverlayDirective implements DoCheck, OnInit, OnDestroy {
+@Component({
+  selector: "[fluidboxThumbnailOverlay]",
+  standalone: true,
+  template: `<ng-container #content /><ng-content />`,
+})
+export class FluidboxThumbnailOverlayComponent<TItem extends FluidboxItem = FluidboxItem>
+  implements AfterContentInit, AfterViewChecked, OnInit, OnDestroy
+{
   /** Fly with the photo. */
   @Input({ transform: booleanAttribute }) travel = false;
+  /** The content, rendered here and, with `travel`, into the flying frame. */
+  @ContentChild(TemplateRef, { descendants: false }) content?: TemplateRef<unknown>;
+  @ViewChild("content", { read: ViewContainerRef, static: true })
+  private readonly container!: ViewContainerRef;
 
-  readonly #root = injectRoot("fluidboxThumbnailOverlay");
-  readonly #trigger = inject(FluidboxTriggerDirective, { optional: true });
-  readonly #item = inject(FluidboxItemDirective, { optional: true });
+  readonly #root = injectRoot<TItem>("fluidboxThumbnailOverlay");
+  readonly #trigger = inject<FluidboxTriggerDirective<TItem>>(FluidboxTriggerDirective, {
+    optional: true,
+  });
   readonly #element = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #injector = inject(Injector);
+  readonly #zone = inject(NgZone);
   readonly #browser = injectIsBrowser();
   #bound: readonly unknown[] = [];
   #release: (() => void) | undefined;
   #stop: (() => void) | undefined;
 
+  /** Renders the content into the flying frame, without its frame layer. */
+  readonly #travel: FluidboxRenderer<TItem> = ({ target }) =>
+    mountTemplate(
+      this.#zone,
+      this.container,
+      this.content!,
+      {},
+      target,
+      Injector.create({
+        providers: [{ provide: TRAVELLING, useValue: true }],
+        parent: this.#injector,
+      }),
+    );
+
   ngOnInit(): void {
-    if (!this.#browser) return;
-    this.#bind();
-    this.#stop = this.#root.watch(() => this.#bind());
+    if (!this.#trigger)
+      throw new Error("fluidboxThumbnailOverlay must be inside an element with fluidboxTrigger.");
   }
 
-  ngDoCheck(): void {
-    if (this.#stop) this.#bind();
+  ngAfterContentInit(): void {
+    if (this.content) this.container.createEmbeddedView(this.content);
+  }
+
+  ngAfterViewChecked(): void {
+    if (!this.#browser) return;
+    this.#bind();
+    this.#stop ??= this.#root.watch(() => this.#bind());
   }
 
   ngOnDestroy(): void {
@@ -172,22 +219,41 @@ export class FluidboxThumbnailOverlayDirective implements DoCheck, OnInit, OnDes
   }
 
   #bind(): void {
-    const targets =
-      this.#trigger?.targets() ?? (this.#item ? [targetOf(this.#item.fluidboxItem)] : null);
-    if (!targets)
-      throw new Error(
-        "fluidboxThumbnailOverlay needs an enclosing fluidboxTrigger or fluidboxItem.",
-      );
+    const trigger = this.#trigger!;
+    const element = this.#element.nativeElement;
+    const target = trigger.target();
+    const returns = trigger.returns();
+    const travel = !this.travel ? false : this.content ? this.#travel : true;
+    const frameLayer = this.travel ? frameLayerOf(element) : undefined;
     // Overlays are found by id when they bind, so new items bind them again.
-    const key = [this.travel, this.#root.fluidbox.items, ...targets];
-    if (key.length === this.#bound.length && key.every((value, i) => value === this.#bound[i]))
-      return;
+    const key = [travel, frameLayer, this.#root.fluidbox.items, ...targetKeys(target, returns)];
+    if (sameKeys(key, this.#bound)) return;
     this.#bound = key;
     this.#release?.();
-    this.#release = this.#root.fluidbox.bindOverlay(this.#element.nativeElement, targets, {
-      travel: this.travel,
+    this.#release = this.#root.fluidbox.bindOverlay(element, target, {
+      returns,
+      travel,
+      frameLayer,
     });
   }
+}
+
+/**
+ * Marks an element inside a travelling `fluidboxThumbnailOverlay` as its frame
+ * layer: the element itself moves into the flying frame for the flight, scaled
+ * with the photo, and comes back after, so it is left out of the live copy.
+ */
+@Directive({
+  selector: "[fluidboxFrameLayer]",
+  standalone: true,
+  host: {
+    "data-fluidbox-frame-layer": "",
+    "[style.display]": "travelling ? 'none' : null",
+  },
+})
+export class FluidboxFrameLayerDirective {
+  /** In the flying copy, where the moved original stands in for it. */
+  protected readonly travelling = inject(TRAVELLING, { optional: true }) ?? false;
 }
 
 /**
@@ -208,10 +274,12 @@ export class FluidboxViewerDirective implements OnInit, OnDestroy {
   readonly #zone = inject(NgZone);
   #disconnect: (() => void) | undefined;
 
+  /** Draws the template into the viewer's layer. */
+  readonly render: FluidboxViewerRenderer = ({ target }) =>
+    mountTemplate(this.#zone, this.#container, this.#template, {}, target);
+
   ngOnInit(): void {
-    this.#disconnect = this.#root.connect("viewer", {
-      mount: (target) => mountTemplate(this.#zone, this.#container, this.#template, {}, target),
-    });
+    this.#disconnect = this.#root.connect("viewer", this);
   }
 
   ngOnDestroy(): void {

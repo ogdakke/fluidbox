@@ -1,12 +1,13 @@
 // #region example
 import { Component, Input } from "@angular/core";
+import { itemLabel } from "@ogdakke/fluidbox";
 import {
   FluidboxModule,
   injectFluidboxSheet,
   type FluidboxImageItem,
 } from "@ogdakke/fluidbox/angular";
 import "@ogdakke/fluidbox/sheet.css";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 @Component({
   selector: "div[appDetails]",
@@ -24,7 +25,7 @@ import { label, photos } from "../shared";
 export class Details {
   @Input({ required: true }) photo!: FluidboxImageItem;
   readonly sheet = injectFluidboxSheet();
-  readonly label = label;
+  readonly label = itemLabel;
 }
 
 @Component({
@@ -52,6 +53,6 @@ export class Details {
 })
 export class Sheet {
   readonly photos = photos;
-  readonly label = label;
+  readonly label = itemLabel;
 }
 // #endregion example

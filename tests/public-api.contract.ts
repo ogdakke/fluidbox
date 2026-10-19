@@ -2,11 +2,13 @@
 // the shapes a consumer writes. `tsc --noEmit` checks it; nothing runs it.
 import {
   createFluidbox,
-  FluidboxChangeEvent,
+  FluidboxItemChangeEvent,
+  FluidboxSheetEvent,
   FluidboxToggleEvent,
+  idOf,
+  itemLabel as rootItemLabel,
   type Fluidbox,
   type FluidboxCustomItem,
-  type FluidboxFilmstrip,
   type FluidboxIframeItem,
   type FluidboxImageItem,
   type FluidboxItem,
@@ -21,13 +23,14 @@ import {
   type FluidboxState,
   type FluidboxStatus,
   type FluidboxTarget,
+  type FluidboxUpdateOptions,
   type FluidboxVideoItem,
   type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
 import type * as Root from "@ogdakke/fluidbox";
 import type * as SheetEntry from "@ogdakke/fluidbox/sheet";
 import type * as FilmstripEntry from "@ogdakke/fluidbox/filmstrip";
-import type { FluidboxFilmstripOptions, FluidboxFilmstripSlot } from "@ogdakke/fluidbox/filmstrip";
+import type { FluidboxFilmstripOptions } from "@ogdakke/fluidbox/filmstrip";
 import type { FluidboxSheetOptions, FluidboxSheetSnapPoint } from "@ogdakke/fluidbox/sheet";
 import {
   createDeferredFluidbox,
@@ -36,11 +39,15 @@ import {
   defaultLabels,
   fluidboxControlIcon,
   fluidboxControls,
+  createSlots,
   fluidboxEventTypes,
+  frameLayerOf,
   itemLabel,
   latestOrigins,
   resolveOrigin,
   type DeferredFluidbox,
+  type FluidboxSlot,
+  type FluidboxSlots,
   type FluidboxTrigger,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
@@ -145,19 +152,19 @@ const viewer: FluidboxViewerRenderer<Photo> = ({ target, fluidbox, signal }) => 
   const stop = fluidbox.subscribe((state) => (caption.textContent = state.item?.credit ?? ""));
   signal.addEventListener("abort", stop);
 };
-const origins: FluidboxOriginAdapter = {
-  getOrigin(): FluidboxOrigin | null {
+const origins: FluidboxOriginAdapter<Photo> = {
+  getOrigin(): FluidboxOrigin<Photo> | null {
     const trigger = document.createElement("button");
     const visual = document.createElement("img");
     return {
       trigger,
       visual,
       thumbnail: visual,
-      prepareClose: (item, index) => void [item, index],
+      onPreviewChange: (item, index) => void [item.credit, index],
     };
   },
-  revealOrigin(_id, _index, { signal, reason }) {
-    if (!signal.aborted && reason === "selection") return Promise.resolve();
+  revealOrigin(_id, _index, { signal, phase }) {
+    if (!signal.aborted && phase === "selection") return Promise.resolve();
   },
 };
 const labels: Partial<FluidboxLabels> = {
@@ -183,9 +190,10 @@ assert<Equal<typeof fluidbox.state, FluidboxState<Photo>>>();
 assert<Equal<typeof fluidbox.state.item, Photo | null>>();
 assert<Equal<typeof fluidbox.state.status, FluidboxStatus>>();
 assert<Equal<FluidboxStatus, "closed" | "opening" | "open" | "closing">>();
-assert<Equal<FluidboxTarget, number | string>>();
+assert<Equal<FluidboxTarget<Photo>, number | string | Photo>>();
 assert<Equal<typeof fluidbox.sheet, FluidboxSheet | null>>();
-assert<Equal<typeof fluidbox.filmstrip, FluidboxFilmstrip<Photo> | null>>();
+// @ts-expect-error the filmstrip has no handle
+void fluidbox.filmstrip;
 assert<Equal<ReturnType<typeof fluidbox.open>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.close>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.setItems>, Promise<boolean>>>();
@@ -216,13 +224,16 @@ void fluidbox.previous();
 void fluidbox.close();
 void fluidbox.setItems(lazy);
 fluidbox.preload("one")();
-// @ts-expect-error targets are an index or an id, not an object
+void fluidbox.open(photos[0]!);
+fluidbox.preload(photos[0]!)();
+// @ts-expect-error an object target is a whole item
 void fluidbox.open({ id: "one" });
 // @ts-expect-error commands take no reason
 void fluidbox.open(0, { reason: "trigger" });
 
 const button = document.createElement("button");
-const unbind: () => void = fluidbox.bind(button, ["one", 1], {
+const unbind: () => void = fluidbox.bind(button, photos[0]!, {
+  returns: ["one", 1, ...photos],
   signal: new AbortController().signal,
   onPreviewChange(item, index) {
     assert<Equal<typeof item, Photo>>();
@@ -230,8 +241,10 @@ const unbind: () => void = fluidbox.bind(button, ["one", 1], {
   },
 });
 unbind();
+// @ts-expect-error one target; the rest go in returns
+fluidbox.bind(button, ["one", 1]);
 fluidbox.bindOverlay(document.createElement("span"), "one");
-fluidbox.bindOverlay(document.createElement("span"), ["one", 1], { travel: true });
+fluidbox.bindOverlay(document.createElement("span"), "one", { returns: [1], travel: true });
 fluidbox.bindOverlay(document.createElement("span"), 0, {
   travel: ({ item, target }) => void (target.textContent = item.credit),
   frameLayer: document.createElement("span"),
@@ -244,33 +257,44 @@ fluidbox.addEventListener("beforetoggle", (event) => {
   if (event.newState === "closed" && event.reason === "keyboard") event.preventDefault();
 });
 fluidbox.addEventListener("itemchange", (event) => {
-  assert<Equal<typeof event, FluidboxChangeEvent<Photo>>>();
+  assert<Equal<typeof event, FluidboxItemChangeEvent<Photo>>>();
   assert<Equal<typeof event.item, Photo>>();
   void [event.id, event.index];
 });
 fluidbox.addEventListener("settle", (event) => void event.item.credit);
+fluidbox.addEventListener("sheetchange", (event) => {
+  assert<Equal<typeof event, FluidboxSheetEvent>>();
+  void [event.stop, event.reason];
+});
 const toggle = new FluidboxToggleEvent("toggle", {
   oldState: "closed",
   newState: "open",
   reason: "api",
 });
-const change = new FluidboxChangeEvent("itemchange", {
+const change = new FluidboxItemChangeEvent("itemchange", {
   id: "one",
   index: 0,
   item: photo,
   reason: "api",
 });
-void [toggle, change];
+const sheetChange = new FluidboxSheetEvent("sheetchange", { stop: 1, reason: "pointer" });
+void [toggle, change, sheetChange];
+
+const update: FluidboxUpdateOptions<Photo> = { labels: { close: "Sulje" }, zoom: undefined };
+fluidbox.update(update);
+fluidbox.update({ controls: ["close"], filmstrip: true, sheet: { snapPoints: ["50%"] } });
+const id: string = idOf(photo);
+const name: string = rootItemLabel(photo);
+void [id, name];
 
 const sheet = fluidbox.sheet;
 if (sheet) {
   sheet.set(1, { animate: false });
   const stop: number = sheet.stop;
-  const slot: HTMLElement | null = sheet.slot;
-  sheet.subscribe((next: number) => void [next, stop, slot])();
+  void stop;
+  // @ts-expect-error the sheet's stop changes arrive as sheetchange events
+  sheet.subscribe(() => {});
 }
-const slots: readonly FluidboxFilmstripSlot<Photo>[] = fluidbox.filmstrip?.slots ?? [];
-void slots;
 fluidbox.destroy();
 
 const options: FluidboxOptions = { items: [photo, video, embed, note] };
@@ -278,14 +302,28 @@ void options;
 
 // The root holds no kit helpers, elements or old names.
 type RootValues = keyof typeof Root;
-assert<Equal<RootValues, "createFluidbox" | "FluidboxChangeEvent" | "FluidboxToggleEvent">>();
+assert<
+  Equal<
+    RootValues,
+    | "createFluidbox"
+    | "idOf"
+    | "itemLabel"
+    | "FluidboxItemChangeEvent"
+    | "FluidboxSheetEvent"
+    | "FluidboxToggleEvent"
+  >
+>();
 
 // Add-on entries register on import and export types only.
 assert<Equal<keyof typeof SheetEntry, never>>();
 assert<Equal<keyof typeof FilmstripEntry, never>>();
 const snap: FluidboxSheetSnapPoint[] = [120, "50%", "content"];
 const sheetOptions: FluidboxSheetOptions<Photo> = { snapPoints: snap, dismiss: "none" };
-const filmstripOptions: FluidboxFilmstripOptions<Photo> = { slots: true };
+const filmstripOptions: FluidboxFilmstripOptions<Photo> = {
+  render: ({ item, target }) => void (target.title = item.credit),
+};
+// @ts-expect-error the filmstrip renders; frameworks fill slots through the kit
+void ({ slots: true } satisfies FluidboxFilmstripOptions);
 void [sheetOptions, filmstripOptions];
 
 // The binding kit.
@@ -293,7 +331,8 @@ void [sheetOptions, filmstripOptions];
 const deferred: DeferredFluidbox<Photo> = createDeferredFluidbox<Photo>(photos);
 const stand: Fluidbox<Photo> = deferred.fluidbox;
 const trigger: FluidboxTrigger<Photo> = createTrigger(stand, {
-  targets: ["one"],
+  target: "one",
+  returns: photos,
   onPreviewChange: (item) => void item.credit,
 });
 const preview: FluidboxTriggerPreview<Photo> = trigger.preview(stand.state);
@@ -301,7 +340,15 @@ void preview.item?.credit;
 trigger.setElement(button);
 trigger.click({ defaultPrevented: false });
 trigger.destroy();
-bindTrigger(stand, button, { targets: [0] }).destroy();
+bindTrigger(stand, button, { target: 0 }).destroy();
+stand.update({ zoom: false });
+const slotRenderer: FluidboxSlots<Photo> = createSlots<Photo>();
+const firstSlot: FluidboxSlot<Photo> | undefined = slotRenderer.slots[0];
+slotRenderer.subscribe(
+  () => void [firstSlot?.item.credit, firstSlot?.target, firstSlot?.container],
+)();
+const layer: HTMLElement | undefined = frameLayerOf(button);
+void layer;
 deferred.attach(createFluidbox({ items: photos }));
 deferred.subscribe(() => {})();
 deferred.detach();
@@ -309,7 +356,7 @@ const label: string = itemLabel(note);
 const close: Promise<boolean> = fluidboxControls.close.run(stand);
 const disabled: boolean = fluidboxControls.next.disabled(stand.state);
 void [label, close, disabled, fluidboxControlIcon.paths, defaultLabels.viewer, fluidboxEventTypes];
-const adapter: FluidboxOriginAdapter = latestOrigins(() => origins);
+const adapter: FluidboxOriginAdapter = latestOrigins(() => origins as FluidboxOriginAdapter);
 const resolved: FluidboxOrigin = resolveOrigin(button);
 void [adapter, resolved];
 
@@ -322,13 +369,16 @@ gallery.renderers = { note: note2 };
 gallery.viewer = ({ target }) => {
   target.append("Caption");
 };
-gallery.origins = origins;
+gallery.origins = origins as FluidboxOriginAdapter;
 gallery.zoom = false;
 gallery.labels = labels;
 const galleryState: FluidboxState = gallery.state;
 const gallerySheet: FluidboxSheet | null = gallery.sheet;
 const galleryFluidbox: Fluidbox | null = gallery.fluidbox;
-void [galleryState, gallerySheet, galleryFluidbox, gallery.filmstrip];
+void [galleryState, gallerySheet, galleryFluidbox];
+gallery.preload(photo)();
+void gallery.setItems(photos).then((applied: boolean) => applied);
+gallery.addEventListener("sheetchange", (event) => void event.stop);
 gallery.addEventListener("itemchange", (event) => {
   const reason: FluidboxReason = event.reason;
   void [reason, event.item];
@@ -348,7 +398,7 @@ gallery.source = photos;
 gallery.portal = viewer;
 
 const item: FluidboxItemElement = document.createElement("fluidbox-item");
-void [item.itemId, item.originIds, item.trigger];
+void [item.itemId, item.returns, item.trigger];
 item.addEventListener("fluidbox-preview-change", (event: FluidboxPreviewChangeEvent) => {
   void [event.detail.id, event.detail.item];
 });

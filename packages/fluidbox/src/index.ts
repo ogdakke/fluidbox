@@ -1,5 +1,6 @@
 export { createFluidbox } from "./create-fluidbox";
-export { FluidboxChangeEvent, FluidboxToggleEvent } from "./public-api";
+export { idOf, itemLabel } from "./items";
+export { FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxToggleEvent } from "./public-api";
 
 export type {
   Fluidbox,
@@ -8,9 +9,7 @@ export type {
   FluidboxControlName,
   FluidboxCustomItem,
   FluidboxEventMap,
-  FluidboxFilmstrip,
   FluidboxFilmstripOptions,
-  FluidboxFilmstripSlot,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
@@ -35,6 +34,7 @@ export type {
   FluidboxTarget,
   FluidboxThumbnail,
   FluidboxToggleState,
+  FluidboxUpdateOptions,
   FluidboxVideoItem,
   FluidboxViewerContext,
   FluidboxViewerRenderer,

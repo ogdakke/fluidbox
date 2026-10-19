@@ -1,4 +1,9 @@
-import { FluidboxChangeEvent, FluidboxToggleEvent, type FluidboxEventMap } from "./public-api";
+import {
+  FluidboxItemChangeEvent,
+  FluidboxSheetEvent,
+  FluidboxToggleEvent,
+  type FluidboxEventMap,
+} from "./public-api";
 
 export const fluidboxEventTypes = [
   "beforetoggle",
@@ -6,7 +11,33 @@ export const fluidboxEventTypes = [
   "beforeitemchange",
   "itemchange",
   "settle",
+  "sheetchange",
 ] as const satisfies readonly (keyof FluidboxEventMap)[];
+
+/** A copy of a fluidbox event, to fire on another target. */
+function copyOf(event: Event): Event | null {
+  if (event instanceof FluidboxToggleEvent) {
+    return new FluidboxToggleEvent(event.type as "toggle", {
+      cancelable: event.cancelable,
+      oldState: event.oldState,
+      newState: event.newState,
+      reason: event.reason,
+    });
+  }
+  if (event instanceof FluidboxItemChangeEvent) {
+    return new FluidboxItemChangeEvent(event.type as "itemchange", {
+      cancelable: event.cancelable,
+      id: event.id,
+      index: event.index,
+      item: event.item,
+      reason: event.reason,
+    });
+  }
+  if (event instanceof FluidboxSheetEvent) {
+    return new FluidboxSheetEvent("sheetchange", { stop: event.stop, reason: event.reason });
+  }
+  return null;
+}
 
 /**
  * Fire each fluidbox event of `from` on `to` as well, until `signal` aborts.
@@ -14,23 +45,7 @@ export const fluidboxEventTypes = [
  */
 export function forwardEvents(from: EventTarget, to: EventTarget, signal: AbortSignal) {
   const forward = (event: Event) => {
-    const copy =
-      event instanceof FluidboxToggleEvent
-        ? new FluidboxToggleEvent(event.type as "toggle", {
-            cancelable: event.cancelable,
-            oldState: event.oldState,
-            newState: event.newState,
-            reason: event.reason,
-          })
-        : event instanceof FluidboxChangeEvent
-          ? new FluidboxChangeEvent(event.type as "itemchange", {
-              cancelable: event.cancelable,
-              id: event.id,
-              index: event.index,
-              item: event.item,
-              reason: event.reason,
-            })
-          : null;
+    const copy = copyOf(event);
     if (copy && !to.dispatchEvent(copy)) event.preventDefault();
   };
   for (const type of fluidboxEventTypes) from.addEventListener(type, forward, { signal });

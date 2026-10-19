@@ -94,9 +94,6 @@ export const media: FluidboxItem[] = [
 /** The value each framework provides through its own context, read by the custom renderer. */
 export const theme = "dusk";
 
-/** Short alt text or title of an item. */
-export const label = (item: FluidboxItem) => (item.type === "img" ? item.alt : item.title);
-
 /** The picture a trigger shows for an item: its thumbnail, a video's poster, or the image. */
 export const thumbnailSrc = (item: FluidboxItem) =>
   item.thumbnail?.src ??

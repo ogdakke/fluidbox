@@ -101,6 +101,19 @@ function finitePose(pose: PaintedPose) {
 }
 
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
+/** Zoom options with their defaults, or undefined when zoom is off. */
+function zoomConfig(
+  options: false | FluidboxZoomOptions | undefined,
+): Required<FluidboxZoomOptions> | undefined {
+  if (options === false) return undefined;
+  const max = options?.max ?? 4;
+  const step = options?.step ?? 2;
+  if (!Number.isFinite(max) || max <= 1 || !Number.isFinite(step) || step <= 1 || step > max) {
+    throw new RangeError("Fluidbox zoom step must be greater than 1 and no greater than max.");
+  }
+  return { max, step };
+}
+
 export class DomViewerDriver<
   TItem extends FluidboxItem = FluidboxItem,
 > implements ViewerSessionDriver<TItem> {
@@ -124,6 +137,8 @@ export class DomViewerDriver<
   #portalDispose: FluidboxDispose | undefined;
   #source: FluidboxSource<TItem> | undefined;
   #extensions: FluidboxExtensionInstance<TItem>[] = [];
+  /** Aborted when the mounted extensions are replaced. */
+  #extensionLifetime: AbortController | undefined;
   /** The extension that took the current vertical touch drag, if one did. */
   #dragExtension: FluidboxExtensionInstance<TItem> | undefined;
   #animations: Animation[] = [];
@@ -172,7 +187,7 @@ export class DomViewerDriver<
     (state) => this.#paintDrag(state),
     () => this.#commitWheelDismiss(),
   );
-  readonly #zoomOptions: FluidboxZoomOptions | undefined;
+  #zoomOptions: Required<FluidboxZoomOptions> | undefined;
   #zoom: import("./fluidbox-zoom").FluidboxZoom | undefined;
   #zoomLoad: Promise<import("./fluidbox-zoom").FluidboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
@@ -260,13 +275,67 @@ export class DomViewerDriver<
     ownerWindow?.visualViewport?.addEventListener("resize", this.#onResize, {
       signal: this.#lifetime.signal,
     });
-    if (zoomOptions !== false) {
-      const max = zoomOptions?.max ?? 4;
-      const step = zoomOptions?.step ?? 2;
-      if (!Number.isFinite(max) || max <= 1 || !Number.isFinite(step) || step <= 1 || step > max) {
-        throw new RangeError("Fluidbox zoom step must be greater than 1 and no greater than max.");
-      }
-      this.#zoomOptions = { max, step };
+    this.#zoomOptions = zoomConfig(zoomOptions);
+  }
+
+  /** Change the zoom options. Turning zoom off zooms the photo back out. */
+  setZoom(options: false | FluidboxZoomOptions | undefined) {
+    const next = zoomConfig(options);
+    if (next?.max === this.#zoomOptions?.max && next?.step === this.#zoomOptions?.step) return;
+    this.#zoomOptions = next;
+    if (next) return;
+    this.#zoom?.reset();
+    this.#zoom?.destroy();
+    this.#zoom = undefined;
+    this.#zoomLoad = undefined;
+  }
+
+  /** Show the labels again after they changed in place. */
+  relabel() {
+    this.#strip?.relabel();
+    for (const extension of this.#extensions) extension.relabel?.();
+    const controller = this.#controller;
+    const index = controller?.state.requestedIndex ?? controller?.state.activeIndex ?? null;
+    if (index !== null && this.#source && index < this.#source.count) {
+      this.#render(this.#source.getItem(index), index);
+    } else {
+      this.#portal.dialog.setAttribute("aria-label", this.#labels.viewer);
+    }
+  }
+
+  /** Draw the portal layer again, as after its controls or content changed. */
+  setPortal(renderer: FluidboxPortalRenderer | undefined) {
+    this.#portalDispose?.();
+    this.#portalDispose =
+      renderer?.({ target: this.#portal.portalTarget, signal: this.#lifetime.signal }) ?? undefined;
+  }
+
+  /** Replace the extensions, as when the filmstrip or the sheet is turned on, off or changed. */
+  setExtensions(extensions: readonly (FluidboxExtension<TItem> | undefined)[]) {
+    this.#extensionLifetime?.abort();
+    for (const extension of this.#extensions) extension.destroy();
+    this.#extensions = [];
+    this.#dragExtension = undefined;
+    const controller = this.#controller;
+    if (!controller || !this.#source) return;
+    // Destroying the viewer aborts this too.
+    this.#extensionLifetime = new AbortController();
+    const { signal } = this.#extensionLifetime;
+    for (const extension of extensions) {
+      if (!extension) continue;
+      this.#extensions.push(
+        extension.mount({
+          dialog: this.#portal.dialog,
+          controller,
+          source: this.#source,
+          labels: this.#labels,
+          signal,
+        }),
+      );
+    }
+    // A viewer that is showing gives the new extensions their place now.
+    if (this.#portal.overlay.isConnected) {
+      for (const extension of this.#extensions) extension.attach?.();
     }
   }
 
@@ -275,11 +344,15 @@ export class DomViewerDriver<
     if (this.#zoom) return this.#zoom;
     this.#zoomLoad ??= import("./fluidbox-zoom").then(({ FluidboxZoom }) => {
       if (this.#destroyed) return undefined;
-      const { max = 4, step = 2 } = this.#zoomOptions!;
+      if (!this.#zoomOptions) return undefined;
+      const labels = this.#labels;
       return (this.#zoom = new FluidboxZoom(this.#portal.container, {
         prepare: () => this.#prepareZoom(),
-        config: () => ({ max, step }),
-        label: this.#labels.zoomed,
+        // Read on every gesture, so a change of options applies to the next one.
+        config: () => this.#zoomOptions ?? { max: 1, step: 1 },
+        get label() {
+          return labels.zoomed;
+        },
         state: (locked) => {
           const dialog = this.#portal.dialog;
           const wasZoomed = dialog.hasAttribute("data-zoomed");
@@ -308,20 +381,8 @@ export class DomViewerDriver<
     extensions: readonly (FluidboxExtension<TItem> | undefined)[] = [],
   ) {
     this.#controller = controller;
-    this.#portalDispose =
-      renderer?.({ target: this.#portal.portalTarget, signal: this.#lifetime.signal }) ?? undefined;
-    for (const extension of extensions) {
-      if (!extension || !this.#source) continue;
-      this.#extensions.push(
-        extension.mount({
-          dialog: this.#portal.dialog,
-          controller,
-          source: this.#source,
-          labels: this.#labels,
-          signal: this.#lifetime.signal,
-        }),
-      );
-    }
+    this.setPortal(renderer);
+    this.setExtensions(extensions);
   }
 
   setSource(source: FluidboxSource<TItem>) {
@@ -331,7 +392,7 @@ export class DomViewerDriver<
     this.#preparedFlight = undefined;
     if (this.#strip) {
       this.#strip.setSource(source);
-      this.#portal.dialog.toggleAttribute("data-fluidbox-gallery", source.count > 1);
+      this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
       return;
     }
     this.#strip = new ViewerStrip(
@@ -354,7 +415,7 @@ export class DomViewerDriver<
       this.#labels,
     );
     this.#portal.frame.replaceWith(this.#strip.element);
-    this.#portal.dialog.toggleAttribute("data-fluidbox-gallery", source.count > 1);
+    this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
   }
 
   revealed() {
@@ -527,7 +588,7 @@ export class DomViewerDriver<
         0,
       ),
     ];
-    if (this.#portal.dialog.hasAttribute("data-fluidbox-gallery")) {
+    if (this.#portal.dialog.hasAttribute("data-gallery")) {
       this.#portal.dialog.style.setProperty(
         "--fluidbox-gallery-controls-reveal-delay",
         `${controlsRevealDelay}ms`,
@@ -772,6 +833,7 @@ export class DomViewerDriver<
     this.#destroyed = true;
     this.#keepThumbnailVisible(undefined);
     this.#lifetime.abort();
+    this.#extensionLifetime?.abort();
     clearTimeout(this.#suppressClickTimer);
     this.#dragGesture.cancel();
     this.#preparedFlight = undefined;
@@ -1063,7 +1125,7 @@ export class DomViewerDriver<
   }
 
   #paintTrigger(trigger: HTMLElement, open: boolean) {
-    trigger.dataset.fluidboxState = open ? "open" : "closed";
+    trigger.dataset.fluidboxStatus = open ? "open" : "closed";
     trigger.toggleAttribute("data-open", open);
     trigger.toggleAttribute("data-closed", !open);
     trigger.setAttribute("aria-haspopup", "dialog");
@@ -1728,7 +1790,7 @@ export class DomViewerDriver<
 
   #setState(state: "closed" | "opening" | "open" | "closing") {
     for (const target of [this.#portal.overlay, this.#portal.dialog]) {
-      target.dataset.fluidboxState = state;
+      target.dataset.fluidboxStatus = state;
       target.toggleAttribute("data-open", state !== "closed");
       target.toggleAttribute("data-closed", state === "closed");
       target.toggleAttribute("data-starting-style", state === "opening");

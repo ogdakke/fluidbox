@@ -1,7 +1,8 @@
 // #region example
 import { Component, InjectionToken, inject } from "@angular/core";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
-import { label, media, theme, thumbnailSrc } from "../shared";
+import { media, theme, thumbnailSrc } from "../shared";
 
 export const THEME = new InjectionToken<string>("THEME");
 
@@ -35,7 +36,7 @@ export class Note {
 export class Renderers {
   readonly media = media;
   readonly renderers = { note: Note };
-  readonly label = label;
+  readonly label = itemLabel;
   readonly thumbnailSrc = thumbnailSrc;
 }
 // #endregion example

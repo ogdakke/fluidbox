@@ -47,7 +47,7 @@ test("React trigger prepares on pointerdown and discards a cancelled open", asyn
   });
   expect(reuse.count).toBeGreaterThan(0);
   expect(reuse).toMatchObject({ paused: true, reused: true });
-  await expect(page.locator("[data-fluidbox-dialog][data-fluidbox-state='open']")).toBeVisible();
+  await expect(page.locator("[data-fluidbox-dialog][data-fluidbox-status='open']")).toBeVisible();
 });
 
 for (const count of [10_000, 100_000]) {
@@ -141,7 +141,7 @@ for (const count of [10_000, 100_000]) {
     );
     await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
     await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-      "data-fluidbox-state",
+      "data-fluidbox-status",
       "open",
     );
     await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
@@ -382,7 +382,7 @@ test("opening centers the filmstrip once without changing gallery selection", as
   await page.getByRole("button", { name: "Open number" }).click();
   const dialog = page.locator("[data-fluidbox-dialog]");
   const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   await expect(
     page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
   ).toHaveAttribute("data-index", "5000");
@@ -412,7 +412,7 @@ test("opening scrolled virtual origins fills and centers the filmstrip", async (
     const expected = Number(await trigger.getAttribute("data-photo-index"));
     await trigger.click();
     await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-      "data-fluidbox-state",
+      "data-fluidbox-status",
       "open",
     );
 
@@ -463,7 +463,7 @@ test("full-size strip rejects delayed programmatic drift", async ({ page }) => {
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   const slides = page.locator("[data-fluidbox-slides]");
@@ -511,7 +511,7 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
     let expected = visible[Math.floor(random() * visible.length)]!;
     await page.locator(`[data-photo-index="${expected}"]`).click();
     await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-      "data-fluidbox-state",
+      "data-fluidbox-status",
       "open",
     );
 
@@ -597,7 +597,7 @@ test("filmstrip scrubbing reveals the host only after touch settlement", async (
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   const selectedIndex = 5_000;
@@ -644,7 +644,7 @@ test("delayed programmatic filmstrip scrolling cannot take navigation ownership"
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 
   const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
   await filmstrip.evaluate(async (element) => {
@@ -663,7 +663,7 @@ test("delayed programmatic filmstrip scrolling cannot take navigation ownership"
     "aria-label",
     "Item 1 of 10000",
   );
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 });
 
 test("a pointer gesture without scrolling releases filmstrip ownership", async ({ page }) => {
@@ -671,7 +671,7 @@ test("a pointer gesture without scrolling releases filmstrip ownership", async (
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -701,7 +701,7 @@ test("filmstrip input and programmatic sync settle without an event storm", asyn
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -741,7 +741,7 @@ test("a vertical wheel burst scrolls and settles the filmstrip once", async ({ p
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -776,7 +776,7 @@ test("native gallery swiping reveals the virtualized origin only after settlemen
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.locator(".library-scroll").evaluate((element) => {
@@ -815,7 +815,7 @@ test("native slide swiping survives the browser pointer-cancel handoff", async (
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
 
@@ -871,7 +871,7 @@ test("opening remains active until the delayed filmstrip reveal settles", async 
   });
   expect(paused).toBe(true);
   await page.waitForTimeout(600);
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "opening");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "opening");
   await filmstrip.evaluate((element) => {
     element
       .getAnimations()
@@ -880,7 +880,7 @@ test("opening remains active until the delayed filmstrip reveal settles", async 
       )
       ?.finish();
   });
-  await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 });
 
 test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
@@ -929,7 +929,7 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
     return opacity;
   });
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   const { starts } = await page.evaluate(

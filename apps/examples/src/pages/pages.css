@@ -778,7 +778,7 @@ main.fb-shell {
   color: #fff;
   font-family: var(--fb-font-mono);
   font-size: 12px;
-  opacity: var(--fluidbox-progress, 1);
+  opacity: var(--fluidbox-closed, 1);
 }
 
 /* Solid, Vue, Angular panels */

@@ -67,12 +67,12 @@ The gallery adds Previous, Next and Close buttons to the viewer unless you give 
 
 ## `<fluidbox-item>`
 
-| Attribute     | What it does                                                                                        |
-| ------------- | --------------------------------------------------------------------------------------------------- |
-| `item-id`     | Required, unique in the gallery. The item's id for commands, events and `returns`.                  |
-| `returns`     | Space-separated ids of other items whose close flight lands on this trigger, as for an album cover. |
-| `placeholder` | An image painted behind an image slide until it decodes, such as a tiny data URI.                   |
-| `aria-label`  | The title of custom content (see below). Defaults to `item-id`.                                     |
+| Attribute     | What it does                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| `item-id`     | Required, unique in the gallery. The item's id for commands, events and `returns`.                 |
+| `returns`     | Space-separated ids of more items whose close flight lands on this trigger, as for an album cover. |
+| `placeholder` | An image painted behind an image slide until it decodes, such as a tiny data URI.                  |
+| `aria-label`  | The title of custom content (see below). Defaults to `item-id`.                                    |
 
 | Child                       | What it does                                                                                                                                                                                  |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -93,21 +93,21 @@ The template's root element becomes a flat item, attribute for attribute:
 
 A `<video>` reads its boolean attributes as HTML does: present is on. So write `controls` and `playsinline` on it, as you would on the page. See [Media types](./media.md) for what each type does in the viewer.
 
-| Property    | Type                  | What it is                                 |
-| ----------- | --------------------- | ------------------------------------------ |
-| `itemId`    | `string`              | The `item-id`. Throws when it is empty.    |
-| `originIds` | `readonly string[]`   | This item's id, then the ids in `returns`. |
-| `trigger`   | `HTMLElement \| null` | The `slot="trigger"` child.                |
+| Property  | Type                  | What it is                              |
+| --------- | --------------------- | --------------------------------------- |
+| `itemId`  | `string`              | The `item-id`. Throws when it is empty. |
+| `returns` | `readonly string[]`   | The ids in `returns`.                   |
+| `trigger` | `HTMLElement \| null` | The `slot="trigger"` child.             |
 
-| Event                     | `detail`                             | When                                                                                                                                                                                                                   |
-| ------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fluidbox-preview-change` | `{ id: string; item: FluidboxItem }` | Before a close flight lands on this trigger, with the item it lands on: its own or one in `returns`. Bubbles. Show that item on the trigger here, synchronously, and mark the trigger `data-fluidbox-dynamic-preview`. |
+| Event                     | `detail`                             | When                                                                                                                                                             |
+| ------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fluidbox-preview-change` | `{ id: string; item: FluidboxItem }` | Before a close flight lands on this trigger, with the item it lands on: its own or one in `returns`. Bubbles. Show that item on the trigger here, synchronously. |
 
 ## `<fluidbox-gallery>`
 
 | Attribute   | What it does                                                 |
 | ----------- | ------------------------------------------------------------ |
-| `zoom`      | `zoom="off"` turns zoom off.                                 |
+| `nozoom`    | Turns zoom off.                                              |
 | `zoom-step` | The scale of a double-tap or double-click zoom. Default `2`. |
 | `zoom-max`  | The largest zoom scale. Default `4`.                         |
 
@@ -119,52 +119,48 @@ The properties are the [`createFluidbox` options](./javascript.md#createfluidbox
 | `renderers` | `Record<string, FluidboxRenderer>`      | Draw `custom` items of `items`, by the name in their `render`. Read when a slide mounts.                                           |
 | `viewer`    | `FluidboxViewerRenderer \| undefined`   | Your own viewer content. Wins over `<template slot="viewer">` and the default controls.                                            |
 | `origins`   | `FluidboxOriginAdapter \| undefined`    | Origins for items with no trigger in the gallery, and `revealOrigin` to scroll one into view.                                      |
-| `zoom`      | `false \| { step?, max? } \| undefined` | Zoom options, or `false`. Wins over the zoom attributes.                                                                           |
+| `zoom`      | `false \| { step?, max? } \| undefined` | Zoom options, or `false`. Wins over `nozoom` and the zoom attributes.                                                              |
 | `labels`    | `Partial<FluidboxLabels> \| undefined`  | Your strings for the viewer. See [Labels](./api.md#labels).                                                                        |
 | `state`     | `FluidboxState`                         | The viewer's state, or a closed state before the gallery is ready.                                                                 |
 | `sheet`     | `FluidboxSheet \| null`                 | The sheet, while a `<fluidbox-sheet>` turns it on.                                                                                 |
-| `filmstrip` | `FluidboxFilmstrip \| null`             | The filmstrip, while a `<fluidbox-filmstrip>` turns it on.                                                                         |
-| `fluidbox`  | `Fluidbox \| null`                      | The fluidbox behind the gallery, or `null` before it is ready. A rebuild replaces it.                                              |
+| `fluidbox`  | `Fluidbox \| null`                      | The fluidbox behind the gallery, or `null` before it is ready.                                                                     |
 
-| Method                    | Returns             | What it does                                                                                                                       |
-| ------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `open(target?, options?)` | `Promise<boolean>`  | Opens the viewer on an index or id, or moves to it while open.                                                                     |
-| `close(options?)`         | `Promise<boolean>`  | Closes the viewer.                                                                                                                 |
-| `next(options?)`          | `Promise<boolean>`  | Next item.                                                                                                                         |
-| `previous(options?)`      | `Promise<boolean>`  | Previous item.                                                                                                                     |
-| `subscribe(listener)`     | `() => void`        | Calls `listener(state)` on every state change. Unlike `fluidbox.subscribe`, it keeps working when the gallery rebuilds its viewer. |
-| `whenReady()`             | `Promise<Fluidbox>` | Resolves once the gallery has read its items. Rejects if the gallery is not connected.                                             |
+| Method                    | Returns             | What it does                                                                           |
+| ------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `open(target?, options?)` | `Promise<boolean>`  | Opens the viewer on an index or id, or moves to it while open.                         |
+| `close(options?)`         | `Promise<boolean>`  | Closes the viewer.                                                                     |
+| `next(options?)`          | `Promise<boolean>`  | Next item.                                                                             |
+| `previous(options?)`      | `Promise<boolean>`  | Previous item.                                                                         |
+| `setItems(items)`         | `Promise<boolean>`  | Replaces the items, as the `items` property does, and resolves once they apply.        |
+| `preload(target)`         | `() => void`        | Starts loading an item a press is likely to open. Call the result to let go.           |
+| `subscribe(listener)`     | `() => void`        | Calls `listener(state)` on every state change.                                         |
+| `whenReady()`             | `Promise<Fluidbox>` | Resolves once the gallery has read its items. Rejects if the gallery is not connected. |
 
-The commands work as [the fluidbox's](./javascript.md#commands) do. Each waits until the gallery has read its items, and rejects if the gallery isn't connected.
+The commands work as [the fluidbox's](./javascript.md#commands) do, with an item, an index or an id as the target. Each waits until the gallery has read its items, and rejects if the gallery isn't connected.
 
 ### Events
 
-The gallery fires the fluidbox's events: `beforetoggle`, `toggle`, `beforeitemchange`, `itemchange` and `settle`, with the same `reason`, `id`, `index` and `item` fields (see [Events](./javascript.md#events)). They don't bubble, like a popover's. Canceling `beforetoggle` or `beforeitemchange` on the gallery cancels the command.
+The gallery fires the fluidbox's events: `beforetoggle`, `toggle`, `beforeitemchange`, `itemchange`, `settle` and `sheetchange`, with the same fields (see [Events](./javascript.md#events)). They don't bubble, like a popover's. Canceling `beforetoggle` or `beforeitemchange` on the gallery cancels the command.
 
 ```ts
-import { FluidboxChangeEvent } from "@ogdakke/fluidbox";
-
 const gallery = document.querySelector("fluidbox-gallery")!;
-gallery.addEventListener("itemchange", (event) => {
-  if (event instanceof FluidboxChangeEvent) console.log("now showing", event.id);
-});
+gallery.addEventListener("itemchange", (event) => console.log("now showing", event.id));
 gallery.subscribe((state) => console.log(state.status, state.index));
 await gallery.open("fjord");
 ```
 
-The event classes, `FluidboxChangeEvent` and `FluidboxToggleEvent`, are exported from `@ogdakke/fluidbox`.
+The listeners are typed through the gallery's event map. The event classes, `FluidboxItemChangeEvent`, `FluidboxSheetEvent` and `FluidboxToggleEvent`, are exported from `@ogdakke/fluidbox`.
 
 ## Markers
 
-| Attribute                                                             | Put it on                                 | Effect                                                                                                                              |
-| --------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `data-fluidbox-origin`                                                | an element inside a trigger               | The flight starts and ends on this element instead of the trigger's image.                                                          |
-| `data-fluidbox-preview`, `data-fluidbox-target`                       | a trigger or an element inside it         | Also mark the visible box. `data-fluidbox-origin` wins over both, and `data-fluidbox-target` over `data-fluidbox-preview`.          |
-| `data-fluidbox-thumbnail-overlay`                                     | an element inside a trigger               | A thumbnail overlay, one per trigger. It stays on the page and gets `--fluidbox-progress`. `="travel"` makes it fly with the photo. |
-| `data-fluidbox-dynamic-preview`                                       | a trigger                                 | Changes inside it don't make the gallery re-read its items. Use it on a trigger whose image you swap.                               |
-| `data-fluidbox-item-id="id"`                                          | any element in a gallery with `items` set | Makes the element a trigger for that item.                                                                                          |
-| `data-fluidbox-close`, `data-fluidbox-previous`, `data-fluidbox-next` | a button in the viewer content            | Runs that command, with the default control styling. Previous and Next are disabled at the ends, Close while closed.                |
-| `data-fluidbox-sheet-stop="N"`                                        | a button in the viewer                    | Moves the sheet to stop `N`.                                                                                                        |
+| Attribute                                                             | Put it on                                 | Effect                                                                                                                            |
+| --------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `data-fluidbox-origin`                                                | an element inside a trigger               | The flight starts and ends on this element instead of the trigger's image.                                                        |
+| `data-fluidbox-thumbnail-overlay`                                     | an element inside a trigger               | A thumbnail overlay, one per trigger. It stays on the page and gets `--fluidbox-closed`. `="travel"` makes it fly with the photo. |
+| `data-fluidbox-frame-layer`                                           | a travelling overlay, or an element in it | Moves into the flying frame for the flight and scales with it, as a scrim does.                                                   |
+| `data-fluidbox-item-id="id"`                                          | any element in a gallery with `items` set | Makes the element a trigger for that item.                                                                                        |
+| `data-fluidbox-close`, `data-fluidbox-previous`, `data-fluidbox-next` | a button in the viewer content            | Runs that command, with the default control styling. Previous and Next are disabled at the ends, Close while closed.              |
+| `data-fluidbox-sheet-stop="N"`                                        | a button in the viewer                    | Moves the sheet to stop `N`.                                                                                                      |
 
 Each trigger also gets `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded`. The trigger's default styles use `:where()`, so your own classes win.
 
@@ -206,23 +202,23 @@ strip.render = ({ index, target }) => {
 
 ## Patterns
 
-| Pattern                                            | With custom elements                                                                                                                              |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Gallery](./patterns/basic.md)                     | A `<fluidbox-item>` per photo. The default controls come with it.                                                                                 |
-| [One trigger for an album](./patterns/overlay.md)  | `returns="..."` on the cover item, items without a trigger, `fluidbox-preview-change`, `data-fluidbox-dynamic-preview`, and a travelling overlay. |
-| [Rich origins](./patterns/origins.md)              | `data-fluidbox-origin` on an element inside the trigger.                                                                                          |
-| [Custom content](./patterns/renderers.md)          | Any element in the content template, or `gallery.items` with `gallery.renderers`.                                                                 |
-| [Programmatic control](./patterns/programmatic.md) | `gallery.open(2)`, `gallery.subscribe()`, and `beforeitemchange` with `preventDefault()`.                                                         |
-| [Zoom](./patterns/zoom.md)                         | `zoom-step`, `zoom-max` and `zoom="off"`, or the `zoom` property.                                                                                 |
-| [Filmstrip](./patterns/filmstrip.md)               | A `<fluidbox-filmstrip>` child, with a `render` of your own.                                                                                      |
-| [Sheet](./patterns/sheet.md)                       | A `<fluidbox-sheet snap-points>` child, and a `data-fluidbox-sheet-stop` button in `<template slot="viewer">`.                                    |
-| [Headless controls](./patterns/headless.md)        | `gallery.viewer`, or `<template slot="viewer">`.                                                                                                  |
+| Pattern                                            | With custom elements                                                                                             |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [Gallery](./patterns/basic.md)                     | A `<fluidbox-item>` per photo. The default controls come with it.                                                |
+| [One trigger for an album](./patterns/overlay.md)  | `returns="..."` on the cover item, items without a trigger, `fluidbox-preview-change`, and a travelling overlay. |
+| [Rich origins](./patterns/origins.md)              | `data-fluidbox-origin` on an element inside the trigger.                                                         |
+| [Custom content](./patterns/renderers.md)          | Any element in the content template, or `gallery.items` with `gallery.renderers`.                                |
+| [Programmatic control](./patterns/programmatic.md) | `gallery.open(2)`, `gallery.subscribe()`, and `beforeitemchange` with `preventDefault()`.                        |
+| [Zoom](./patterns/zoom.md)                         | `zoom-step`, `zoom-max` and `nozoom`, or the `zoom` property.                                                    |
+| [Filmstrip](./patterns/filmstrip.md)               | A `<fluidbox-filmstrip>` child, with a `render` of your own.                                                     |
+| [Sheet](./patterns/sheet.md)                       | A `<fluidbox-sheet snap-points>` child, and a `data-fluidbox-sheet-stop` button in `<template slot="viewer">`.   |
+| [Headless controls](./patterns/headless.md)        | `gallery.viewer`, or `<template slot="viewer">`.                                                                 |
 
 ## Notes
 
-**Markup changes are picked up.** The gallery watches its children. Adding or removing items, or changing an attribute it reads (`item-id`, `returns`, `src`, `srcset`, `sizes`, `width`, `height`, `alt`, `title`, `poster`, `placeholder`, ...), re-reads the items on the next microtask. An open viewer stays on the same item id if it is still there.
+**Markup changes are picked up.** The gallery watches its children. Adding or removing items, or changing an item's `item-id`, `returns`, `placeholder`, `aria-label` or `slot`, re-reads the items on the next microtask; an open viewer stays on the same item id if it is still there. Inside a trigger, the content is yours: swapping its picture, as an album cover does, changes nothing in the gallery, and its thumbnail is read when the item is. A `<template slot="content">` is read when the items are re-read.
 
-**What rebuilds the viewer.** Setting `viewer`, `zoom` or `labels`, changing the `zoom`, `zoom-step` or `zoom-max` attributes, adding or removing a `<fluidbox-filmstrip>` or `<fluidbox-sheet>`, or changing the sheet's attributes or either element's `render`, destroys the viewer and builds a new one, closing it if it is open. `items`, `origins` and `renderers` change without a rebuild. A rebuild replaces `fluidbox`, so follow the state with `gallery.subscribe` rather than `gallery.fluidbox.subscribe`.
+**Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step` or `zoom-max`, adding or removing a `<fluidbox-filmstrip>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
 
 **Focus.** After a close whose trigger is gone, the gallery focuses itself (it gets `tabindex="-1"` unless it has one), so focus doesn't fall to the page.
 

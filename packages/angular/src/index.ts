@@ -3,11 +3,11 @@ import { FluidboxFilmstripDirective } from "./filmstrip.js";
 import {
   FluidboxCloseDirective,
   FluidboxControlsComponent,
-  FluidboxItemDirective,
+  FluidboxFrameLayerDirective,
   FluidboxNextDirective,
   FluidboxPreviousDirective,
   FluidboxSheetStopDirective,
-  FluidboxThumbnailOverlayDirective,
+  FluidboxThumbnailOverlayComponent,
   FluidboxTriggerDirective,
   FluidboxViewerDirective,
 } from "./parts.js";
@@ -20,14 +20,13 @@ export {
   FluidboxCloseDirective,
   FluidboxControlDirective,
   FluidboxControlsComponent,
-  FluidboxItemDirective,
+  FluidboxFrameLayerDirective,
   FluidboxNextDirective,
   FluidboxPreviousDirective,
   FluidboxSheetStopDirective,
-  FluidboxThumbnailOverlayDirective,
+  FluidboxThumbnailOverlayComponent,
   FluidboxTriggerDirective,
   FluidboxViewerDirective,
-  type FluidboxItemRef,
 } from "./parts.js";
 export {
   FluidboxRootDirective,
@@ -38,9 +37,14 @@ export {
 } from "./root.js";
 export { FluidboxSheetDirective } from "./sheet.js";
 
-export { FluidboxChangeEvent, FluidboxToggleEvent } from "@ogdakke/fluidbox";
+export {
+  FluidboxItemChangeEvent,
+  FluidboxSheetEvent,
+  FluidboxToggleEvent,
+} from "@ogdakke/fluidbox";
 export type {
   Fluidbox,
+  FluidboxCommandOptions,
   FluidboxCustomItem,
   FluidboxIframeItem,
   FluidboxImageItem,
@@ -61,9 +65,9 @@ export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
 const parts = [
   FluidboxRootDirective,
-  FluidboxItemDirective,
   FluidboxTriggerDirective,
-  FluidboxThumbnailOverlayDirective,
+  FluidboxThumbnailOverlayComponent,
+  FluidboxFrameLayerDirective,
   FluidboxViewerDirective,
   FluidboxControlsComponent,
   FluidboxCloseDirective,

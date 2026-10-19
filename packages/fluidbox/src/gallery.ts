@@ -10,7 +10,7 @@ import type {
   Fluidbox,
   FluidboxCommandOptions,
   FluidboxEventMap,
-  FluidboxFilmstrip,
+  FluidboxFilmstripOptions,
   FluidboxItem,
   FluidboxItemList,
   FluidboxItems,
@@ -22,12 +22,13 @@ import type {
   FluidboxSheetSnapPoint,
   FluidboxState,
   FluidboxTarget,
+  FluidboxUpdateOptions,
   FluidboxViewerContext,
   FluidboxViewerRenderer,
 } from "./public-api";
 import { FluidboxToggleEvent } from "./public-api";
 import { latestOrigins } from "./origins";
-import { bindTrigger, type FluidboxTrigger } from "./trigger";
+import { bindTrigger, frameLayerOf, type FluidboxTrigger } from "./trigger";
 
 /** Markup attributes whose change re-reads the items. */
 function same(a: unknown, b: unknown): boolean {
@@ -47,35 +48,31 @@ function sameItems(a: FluidboxItemList, b: FluidboxItemList) {
   return true;
 }
 
+/**
+ * Attributes that change the items. A trigger's own content is the page's to
+ * change, as an album cover does, so changes inside a trigger never count.
+ */
 const ITEM_ATTRIBUTES = new Set([
   "item-id",
   "data-fluidbox-item-id",
   "returns",
   "slot",
-  "src",
-  "srcset",
-  "sizes",
-  "media",
-  "type",
-  "width",
-  "height",
-  "alt",
-  "title",
-  "poster",
   "placeholder",
   "aria-label",
-  "autoplay",
-  "loop",
-  "muted",
-  "playsinline",
-  "controls",
-  "preload",
-  "allow",
-  "referrerpolicy",
-  "sandbox",
 ]);
-/** Attributes whose change rebuilds the viewer. */
-const VIEWER_ATTRIBUTES = ["zoom", "zoom-step", "zoom-max"];
+/** Attributes whose change updates the viewer. */
+const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max"];
+
+/** The `<fluidbox-item>` trigger an element is in, or is. */
+const triggerOf = (node: Node) =>
+  (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(
+    "fluidbox-item > [slot=trigger]",
+  ) ?? null;
+
+const isOverlay = (node: Node) =>
+  node instanceof Element &&
+  (node.matches("[data-fluidbox-thumbnail-overlay]") ||
+    !!node.querySelector("[data-fluidbox-thumbnail-overlay]"));
 
 const closedState: FluidboxState = Object.freeze({
   status: "closed",
@@ -171,18 +168,21 @@ export class FluidboxGalleryElement extends HTMLElement {
   #listeners = new Set<(state: FluidboxState) => void>();
   #readyWaiters: Array<{ resolve(fluidbox: Fluidbox): void; reject(error: unknown): void }> = [];
   #lifetime: AbortController | undefined;
+  #updateQueued = false;
+  /** What the items set through `items` or `setItems` came to, once applied. */
+  #itemsResult: Promise<boolean> | undefined;
+  /** A new function when `viewer` changes, so the update draws the viewer again. */
+  #viewerRenderer: FluidboxViewerRenderer<any> = (context) => this.#mountViewer(context);
 
   connectedCallback() {
     if (!this.hasAttribute("tabindex")) this.tabIndex = -1;
     this.#lifetime = new AbortController();
-    this.addEventListener("fluidbox-addon-change", () => this.#rebuild(), {
+    this.addEventListener("fluidbox-addon-change", () => this.#queueUpdate(), {
       signal: this.#lifetime.signal,
     });
     this.#observer = new MutationObserver((records) => {
       let refresh = false;
       for (const record of records) {
-        const target = record.target as Element;
-        if (target.closest?.("[data-fluidbox-dynamic-preview]")) continue;
         const nodes = [...record.addedNodes, ...record.removedNodes];
         if (
           nodes.some(
@@ -190,8 +190,19 @@ export class FluidboxGalleryElement extends HTMLElement {
               node instanceof FluidboxSheetElement || node instanceof FluidboxFilmstripElement,
           )
         ) {
-          this.#rebuild();
-          return;
+          this.#queueUpdate();
+        }
+        const trigger = triggerOf(record.target);
+        if (trigger) {
+          // Inside a trigger only an overlay coming or going, or the trigger's
+          // own slot, changes what the gallery binds.
+          if (
+            (record.type === "childList" && nodes.some(isOverlay)) ||
+            (record.target === trigger && record.attributeName === "slot")
+          ) {
+            refresh = true;
+          }
+          continue;
         }
         if (record.type === "childList" || ITEM_ATTRIBUTES.has(record.attributeName ?? "")) {
           refresh = true;
@@ -217,7 +228,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   attributeChangedCallback(_name: string, previous: string | null, next: string | null) {
-    if (previous !== next) this.#rebuild();
+    if (previous !== next) this.#queueUpdate();
   }
 
   /** The fluidbox behind the gallery, once it is ready. A rebuild replaces it. */
@@ -233,11 +244,6 @@ export class FluidboxGalleryElement extends HTMLElement {
   /** The sheet, while a `<fluidbox-sheet>` turns it on. */
   get sheet(): FluidboxSheet | null {
     return this.#fluidbox?.sheet ?? null;
-  }
-
-  /** The filmstrip, while a `<fluidbox-filmstrip>` turns it on. */
-  get filmstrip(): FluidboxFilmstrip | null {
-    return this.#fluidbox?.filmstrip ?? null;
   }
 
   /** Resolves with the fluidbox once the gallery has read its items. */
@@ -259,6 +265,13 @@ export class FluidboxGalleryElement extends HTMLElement {
   set items(items: FluidboxItems | null) {
     this.#items = items;
     this.#queueRefresh();
+  }
+
+  /** Replace the items, as the `items` property does. Resolves once they apply. */
+  async setItems(items: FluidboxItems): Promise<boolean> {
+    this.items = items;
+    await this.#ready();
+    return (await this.#itemsResult) ?? true;
   }
 
   /** Origins for items that have no trigger in the gallery. */
@@ -288,7 +301,8 @@ export class FluidboxGalleryElement extends HTMLElement {
   set viewer(viewer: FluidboxViewerRenderer<any> | undefined) {
     if (viewer === this.#viewer) return;
     this.#viewer = viewer;
-    this.#rebuild();
+    this.#viewerRenderer = (context) => this.#mountViewer(context);
+    this.#queueUpdate();
   }
 
   get labels() {
@@ -297,10 +311,10 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   set labels(labels: Partial<FluidboxLabels> | undefined) {
     this.#labels = labels;
-    this.#rebuild();
+    this.#queueUpdate();
   }
 
-  /** Zoom options, or false to turn zoom off. Overrides the zoom attributes. */
+  /** Zoom options, or false to turn zoom off. Overrides `nozoom` and the zoom attributes. */
   get zoom(): FluidboxOptions["zoom"] | undefined {
     return this.#zoom ?? this.#zoomAttributes();
   }
@@ -308,7 +322,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   set zoom(zoom: FluidboxOptions["zoom"] | undefined) {
     if (zoom === this.#zoom) return;
     this.#zoom = zoom;
-    this.#rebuild();
+    this.#queueUpdate();
   }
 
   /** Follow the viewer state, across the rebuilds a change of options makes. */
@@ -321,6 +335,23 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   async open(target?: FluidboxTarget, options?: FluidboxCommandOptions) {
     return (await this.#ready()).open(target, options);
+  }
+
+  /** Start loading an item a press is likely to open. Call the result to let go. */
+  preload(target: FluidboxTarget): () => void {
+    if (this.#fluidbox) return this.#fluidbox.preload(target);
+    let released = false;
+    let dispose: (() => void) | undefined;
+    this.whenReady().then(
+      (fluidbox) => {
+        if (!released) dispose = fluidbox.preload(target);
+      },
+      () => {},
+    );
+    return () => {
+      released = true;
+      dispose?.();
+    };
   }
 
   async close(options?: FluidboxCommandOptions) {
@@ -345,7 +376,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   #zoomAttributes(): FluidboxOptions["zoom"] | undefined {
-    if (this.getAttribute("zoom") === "off") return false;
+    if (this.hasAttribute("nozoom")) return false;
     const number = (name: string) => {
       const value = Number(this.getAttribute(name));
       return this.hasAttribute(name) && Number.isFinite(value) && value > 0 ? value : undefined;
@@ -355,11 +386,44 @@ export class FluidboxGalleryElement extends HTMLElement {
     return step || max ? { ...(step ? { step } : {}), ...(max ? { max } : {}) } : undefined;
   }
 
-  /** Drop the viewer so the next refresh builds one with the current options. */
-  #rebuild() {
-    if (!this.#fluidbox) return;
-    this.#teardown();
-    this.#queueRefresh();
+  /** Hand the viewer the current options, once the add-ons they turn on have loaded. */
+  #queueUpdate() {
+    if (!this.#fluidbox || this.#updateQueued) return;
+    this.#updateQueued = true;
+    queueMicrotask(async () => {
+      this.#updateQueued = false;
+      for (let loading = this.#loadAddons(); loading; loading = this.#loadAddons()) await loading;
+      if (!this.isConnected) return;
+      this.#fluidbox?.update(this.#options());
+    });
+  }
+
+  /** Load the entries of the add-ons the gallery holds elements for. */
+  #loadAddons() {
+    return loadAddons([
+      ...(this.querySelector(":scope > fluidbox-sheet") ? (["sheet"] as const) : []),
+      ...(this.querySelector(":scope > fluidbox-filmstrip") ? (["filmstrip"] as const) : []),
+    ]);
+  }
+
+  #options() {
+    const sheetElement = this.querySelector<FluidboxSheetElement>(":scope > fluidbox-sheet");
+    const filmstripElement = this.querySelector<FluidboxFilmstripElement>(
+      ":scope > fluidbox-filmstrip",
+    );
+    const filmstrip: boolean | FluidboxFilmstripOptions | undefined = filmstripElement
+      ? filmstripElement.render
+        ? { render: filmstripElement.render }
+        : true
+      : undefined;
+    return {
+      labels: this.#labels,
+      zoom: this.zoom,
+      controls: undefined,
+      viewer: this.#viewerRenderer,
+      filmstrip,
+      sheet: sheetElement ? this.#sheetOptions(sheetElement) : undefined,
+    } satisfies FluidboxUpdateOptions;
   }
 
   #teardown() {
@@ -438,20 +502,19 @@ export class FluidboxGalleryElement extends HTMLElement {
     if (!this.#fluidbox) {
       // An add-on loads only for a gallery that holds its element, and again
       // for one added while the first was loading.
-      const wanted = () =>
-        loadAddons([
-          ...(this.querySelector(":scope > fluidbox-sheet") ? (["sheet"] as const) : []),
-          ...(this.querySelector(":scope > fluidbox-filmstrip") ? (["filmstrip"] as const) : []),
-        ]);
-      for (let loading = wanted(); loading; loading = wanted()) await loading;
+      for (let loading = this.#loadAddons(); loading; loading = this.#loadAddons()) await loading;
       if (this.#fluidbox || !this.isConnected) return;
       this.#create(list);
+      this.#itemsResult = undefined;
     } else {
       const fluidbox = this.#fluidbox;
       // Markup that compiles to the same items changes nothing. Setting them
       // anyway would restart an open or close that is under way. Items set
       // through the property always apply.
-      if (this.#items || !sameItems(fluidbox.items, list)) await fluidbox.setItems(list);
+      if (this.#items || !sameItems(fluidbox.items, list)) {
+        this.#itemsResult = fluidbox.setItems(list);
+        await this.#itemsResult;
+      }
       // A rebuild or disconnect during the update leaves nothing to bind.
       if (this.#fluidbox !== fluidbox || !this.isConnected) return;
     }
@@ -462,24 +525,12 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   #create(items: FluidboxItems) {
-    const sheetElement = this.querySelector<FluidboxSheetElement>(":scope > fluidbox-sheet");
-    const filmstripElement = this.querySelector<FluidboxFilmstripElement>(
-      ":scope > fluidbox-filmstrip",
-    );
     const fluidbox = createFluidbox({
+      ...this.#options(),
       items,
-      labels: this.#labels,
       // The origins property can change after the viewer is made.
       origins: latestOrigins(() => this.#origins),
       renderers: this.#runtimeRenderers,
-      zoom: this.zoom,
-      viewer: (context) => this.#mountViewer(context),
-      filmstrip: filmstripElement
-        ? filmstripElement.render
-          ? { render: filmstripElement.render }
-          : true
-        : undefined,
-      sheet: sheetElement ? this.#sheetOptions(sheetElement) : undefined,
     });
     this.#fluidbox = fluidbox;
     this.#events = new AbortController();
@@ -491,34 +542,36 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   #sheetOptions(element: FluidboxSheetElement): FluidboxSheetOptions<FluidboxItem> {
-    const own = element.querySelector<HTMLTemplateElement>(":scope > template");
     const dismiss = element.getAttribute("dismiss");
     return {
       snapPoints: snapPoints(element.getAttribute("snap-points")),
       ...(dismiss === "flight" || dismiss === "scroll" || dismiss === "none" ? { dismiss } : {}),
-      render:
-        element.render ??
-        ((context) => {
-          const template = this.#definitions.get(idOf(context.item))?.sheet ?? own;
-          if (template) context.target.append(template.content.cloneNode(true));
-        }),
+      render: element.render ?? this.#sheetTemplate,
     };
   }
+
+  /** Fills the sheet with the item's `<template slot="sheet">`, else the sheet's own. */
+  #sheetTemplate: FluidboxRenderer<FluidboxItem> = (context) => {
+    const own = this.querySelector<HTMLTemplateElement>(":scope > fluidbox-sheet > template");
+    const template = this.#definitions.get(idOf(context.item))?.sheet ?? own;
+    if (template) context.target.append(template.content.cloneNode(true));
+  };
 
   /** One trigger per `<fluidbox-item>`, or per `data-fluidbox-item-id` descendant with `items` set. */
   #bindTriggers(fluidbox: Fluidbox) {
     const wanted = new Map<
       HTMLElement,
-      { targets: readonly string[]; item?: FluidboxItemElement }
+      { target: string; returns: readonly string[]; item?: FluidboxItemElement }
     >();
     if (this.#items) {
       for (const element of this.querySelectorAll<HTMLElement>("[data-fluidbox-item-id]")) {
-        wanted.set(element, { targets: [element.dataset.fluidboxItemId!] });
+        const returns = element.dataset.fluidboxReturns?.split(/\s+/).filter(Boolean) ?? [];
+        wanted.set(element, { target: element.dataset.fluidboxItemId!, returns });
       }
     } else {
       for (const item of this.#elements()) {
         const trigger = item.trigger;
-        if (trigger) wanted.set(trigger, { targets: item.originIds, item });
+        if (trigger) wanted.set(trigger, { target: item.itemId, returns: item.returns, item });
       }
     }
     for (const [element, { trigger }] of this.#triggers) {
@@ -528,9 +581,10 @@ export class FluidboxGalleryElement extends HTMLElement {
     }
     for (const dispose of this.#overlays) dispose();
     this.#overlays = [];
-    for (const [element, { targets, item }] of wanted) {
+    for (const [element, { target, returns, item }] of wanted) {
       const options = {
-        targets,
+        target,
+        returns,
         onPreviewChange: item
           ? (selected: FluidboxItem) => item.previewChange(idOf(selected), selected)
           : undefined,
@@ -544,9 +598,12 @@ export class FluidboxGalleryElement extends HTMLElement {
       }
       const overlay = element.querySelector<HTMLElement>("[data-fluidbox-thumbnail-overlay]");
       if (overlay) {
+        const travel = overlay.dataset.fluidboxThumbnailOverlay === "travel";
         this.#overlays.push(
-          fluidbox.bindOverlay(overlay, targets, {
-            travel: overlay.dataset.fluidboxThumbnailOverlay === "travel",
+          fluidbox.bindOverlay(overlay, target, {
+            returns,
+            travel,
+            frameLayer: travel ? frameLayerOf(overlay) : undefined,
           }),
         );
       }

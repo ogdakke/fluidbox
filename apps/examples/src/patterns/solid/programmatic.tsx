@@ -1,8 +1,9 @@
 /** @jsxImportSource solid-js */
 // #region example
 import { createSignal, For } from "solid-js";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/solid";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 function Toolbar(props: { locked: boolean; onLockedChange: (locked: boolean) => void }) {
   const fluidbox = useFluidbox();
@@ -50,7 +51,7 @@ export function Programmatic() {
         <For each={photos}>
           {(photo) => (
             <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
-              <img src={photo.src} alt={label(photo)} />
+              <img src={photo.src} alt={itemLabel(photo)} />
             </Fluidbox.Trigger>
           )}
         </For>

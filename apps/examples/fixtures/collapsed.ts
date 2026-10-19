@@ -59,15 +59,14 @@ style.textContent = `
   #collapsed-gallery > [data-preview-more], #collapsed-gallery > [data-preview-more] > [slot="trigger"], #collapsed-gallery > [data-preview-more] > [slot="trigger"] img { border-start-end-radius: 18px; border-end-end-radius: 18px; }
   #collapsed-gallery > [data-preview-more] { overflow: hidden; }
   #collapsed-gallery > [data-preview-more][data-preview-concealed] { visibility: hidden; }
-  :is(#collapsed-gallery, [data-fluidbox-transition-content], [data-fluidbox-frame]) [data-fluidbox-transition-layer] { position: absolute; inset: 0; display: grid; place-items: center; color: white; background: #0008; pointer-events: none; opacity: var(--fluidbox-transition-layer-opacity, var(--fluidbox-progress, 1)); }
-  [data-fluidbox-transition-layer][data-fluidbox-phase]:not([data-fluidbox-phase="preview"]) [data-collapsed-label] { visibility: hidden; }
-  [data-fluidbox-transition-content] [data-collapsed-label] { color: white; opacity: var(--fluidbox-progress); }
+  :is(#collapsed-gallery, [data-fluidbox-transition-content], [data-fluidbox-frame]) [data-fluidbox-transition-layer] { position: absolute; inset: 0; display: grid; place-items: center; color: white; background: #0008; pointer-events: none; opacity: var(--fluidbox-transition-layer-opacity, var(--fluidbox-closed, 1)); }
+  [data-fluidbox-transition-layer][data-fluidbox-phase]:not([data-fluidbox-phase="idle"]) [data-collapsed-label] { visibility: hidden; }
+  [data-fluidbox-transition-content] [data-collapsed-label] { color: white; opacity: var(--fluidbox-closed); }
 `;
 document.head.append(style);
 
 void gallery.whenReady().then((fluidbox) => {
   const teaser = gallery.querySelector<FluidboxItemElement>("[data-preview-more]")!;
-  teaser.dataset.fluidboxDynamicPreview = "";
   const preview = teaser.trigger!.querySelector("img")!;
   const initialSrc = preview.src;
   const hidden = [...gallery.querySelectorAll<FluidboxItemElement>("[data-preview-hidden]")];
@@ -80,7 +79,8 @@ void gallery.whenReady().then((fluidbox) => {
   };
   teaser.addEventListener("fluidbox-preview-change", (event) => showPreview(event.detail.id));
   const overlay = teaser.querySelector<HTMLElement>("[data-fluidbox-transition-layer]")!;
-  fluidbox.bindOverlay(overlay, [teaser.itemId, ...hiddenIds], {
+  fluidbox.bindOverlay(overlay, teaser.itemId, {
+    returns: [...hiddenIds],
     frameLayer: overlay,
     travel({ target }) {
       target.style.setProperty("--fluidbox-transition-content-opacity", "1");

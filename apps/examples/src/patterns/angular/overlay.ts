@@ -1,7 +1,8 @@
 // #region example
 import { Component } from "@angular/core";
+import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
-import { album, label } from "../shared";
+import { album } from "../shared";
 
 @Component({
   selector: "pattern-overlay",
@@ -9,10 +10,10 @@ import { album, label } from "../shared";
   imports: [FluidboxModule],
   template: `
     <div fluidboxRoot [items]="album">
-      <!-- The first album item opens; every one of them closes back onto this button. -->
+      <!-- The cover opens the first photo; every one of them closes back onto it. -->
       <button
-        fluidboxTrigger
-        [fluidboxTriggerItems]="album"
+        [fluidboxTrigger]="album[0]"
+        [fluidboxReturns]="album"
         #trigger="fluidboxTrigger"
         class="pattern-thumb pattern-album"
         data-test="trigger"
@@ -22,16 +23,16 @@ import { album, label } from "../shared";
           [alt]="label(trigger.preview().item ?? album[0])"
           data-test="preview"
         />
-        <!-- The count flies with the photo. -->
-        <span fluidboxThumbnailOverlay travel class="pattern-overlay" data-test="count"
-          >+{{ album.length - 1 }}</span
-        >
+        <!-- The count flies with the photo, rendered live from its template. -->
+        <span fluidboxThumbnailOverlay travel class="pattern-overlay" data-test="count">
+          <ng-template>+{{ album.length - 1 }}</ng-template>
+        </span>
       </button>
     </div>
   `,
 })
 export class Overlay {
   readonly album = album;
-  readonly label = label;
+  readonly label = itemLabel;
 }
 // #endregion example

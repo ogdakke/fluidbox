@@ -1,6 +1,7 @@
 // #region example
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox, type FluidboxRootProps } from "@ogdakke/fluidbox/react";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 function Gallery({ zoom }: Pick<FluidboxRootProps, "zoom">) {
   return (
@@ -13,7 +14,7 @@ function Gallery({ zoom }: Pick<FluidboxRootProps, "zoom">) {
             className="pattern-thumb"
             data-test="trigger"
           >
-            <img src={photo.src} alt={label(photo)} />
+            <img src={photo.src} alt={itemLabel(photo)} />
           </Fluidbox.Trigger>
         ))}
       </div>

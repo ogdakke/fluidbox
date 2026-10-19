@@ -21,7 +21,7 @@ test("collapsed gallery visual checkpoints", async ({ page }, testInfo) => {
         );
         const layer = document.querySelector<HTMLElement>("[data-fluidbox-travel-layer]");
         if (
-          document.querySelector('[data-fluidbox-dialog][data-fluidbox-state="opening"]') &&
+          document.querySelector('[data-fluidbox-dialog][data-fluidbox-status="opening"]') &&
           frame?.getAnimations().some((animation) => animation.playState === "running") &&
           (!withTravelLayer ||
             layer?.getAnimations().some((animation) => animation.playState === "running"))
@@ -66,7 +66,7 @@ test("collapsed gallery visual checkpoints", async ({ page }, testInfo) => {
   await load();
   await page.locator("#collapsed-gallery [data-preview-more] [slot=trigger]").click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-state",
+    "data-fluidbox-status",
     "open",
   );
   await page.keyboard.press("ArrowRight");

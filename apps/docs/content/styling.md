@@ -84,18 +84,20 @@ When the viewer opens, it reads the trigger's computed styles and copies every `
 
 ## State attributes
 
+Attribute names follow one rule. Parts of the viewer, and the markers you put on your own elements, are `data-fluidbox-*`: `[data-fluidbox-dialog]`, `data-fluidbox-origin`. State is a plain flag on the viewer's own elements, `data-open` or `data-zoomed`, and `data-fluidbox-*` on yours, a trigger or an overlay, so it never meets your own attributes. `data-fluidbox-status` is the one name on both, since the active trigger mirrors the viewer.
+
 The overlay and the dialog both carry the viewer's state:
 
 | Attribute                             | When                                        |
 | ------------------------------------- | ------------------------------------------- |
-| `data-fluidbox-state`                 | `closed`, `opening`, `open` or `closing`.   |
+| `data-fluidbox-status`                | `closed`, `opening`, `open` or `closing`.   |
 | `data-open`, `data-closed`            | Open (any status but `closed`), or closed.  |
 | `data-starting-style`, `data-opening` | Opening.                                    |
 | `data-ending-style`                   | Closing.                                    |
 | `data-dragging`                       | A drag to dismiss is under way.             |
 | `data-dismissing`                     | Closing, or a drag to dismiss is under way. |
 
-The dialog alone also has `data-zoomed` while an image is zoomed, `data-fluidbox-gallery` when there is more than one item, and `data-filmstrip` while a filmstrip is docked.
+The dialog alone also has `data-zoomed` while an image is zoomed, `data-gallery` when there is more than one item, and `data-filmstrip` while a filmstrip is docked.
 
 ```css
 [data-fluidbox-dialog][data-zoomed] .caption {
@@ -103,7 +105,7 @@ The dialog alone also has `data-zoomed` while an image is zoomed, `data-fluidbox
 }
 ```
 
-The trigger of the open item gets `data-fluidbox-state="open"`, `data-open` and `aria-expanded="true"`. Every trigger has `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded`.
+The trigger of the open item gets `data-fluidbox-status="open"`, `data-open` and `aria-expanded="true"`. Every trigger has `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded`.
 
 ## Controls
 
@@ -142,11 +144,11 @@ A badge, a play icon or a count on a thumbnail can follow the flight. Make it a 
 - By default the overlay stays on the thumbnail.
 - With `travel`, it flies with the photo and fades as the flight lands: a copy of its content, or live content that a renderer draws into the flying frame. On the custom elements, `data-fluidbox-thumbnail-overlay="travel"`.
 
-The runtime sets `--fluidbox-progress` on the overlay, from `1` at the thumbnail to `0` fully open, and `data-fluidbox-phase` to `preview`, `opening`, `open`, `dragging` or `closing`:
+The runtime sets `--fluidbox-closed` on the overlay, from `1` at the thumbnail to `0` fully open, and `data-fluidbox-phase` to `idle`, `opening`, `open`, `dragging` or `closing`:
 
 ```css
 .photo-count {
-  opacity: var(--fluidbox-progress, 1);
+  opacity: var(--fluidbox-closed, 1);
 }
 ```
 

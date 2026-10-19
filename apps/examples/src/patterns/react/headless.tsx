@@ -1,6 +1,7 @@
 // #region example
+import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
-import { label, photos } from "../shared";
+import { photos } from "../shared";
 
 function Caption() {
   const { item, index, count, hasPrevious, hasNext, previous, next, close } = useFluidbox();
@@ -10,7 +11,7 @@ function Caption() {
         Previous
       </button>
       <span>
-        <strong data-test="title">{item && label(item)}</strong>{" "}
+        <strong data-test="title">{item && itemLabel(item)}</strong>{" "}
         <small data-test="counter">{index === null ? "" : `${index + 1} / ${count}`}</small>
       </span>
       <button type="button" disabled={!hasNext} data-test="next" onClick={() => next()}>
@@ -34,7 +35,7 @@ export function Headless() {
             className="pattern-thumb"
             data-test="trigger"
           >
-            <img src={photo.src} alt={label(photo)} />
+            <img src={photo.src} alt={itemLabel(photo)} />
           </Fluidbox.Trigger>
         ))}
       </div>

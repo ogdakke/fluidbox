@@ -11,7 +11,7 @@ Fluidbox keeps two things apart. The **items** say what the viewer can show. The
 
 ## Items
 
-An item is a plain object: `{ type: "img", src, alt, width, height }`, a `video`, an `iframe`, or `custom` content. [Media types](./media.md) covers every field. Each item is known by its `id`, which defaults to its `src`; ids are what commands, events and triggers use, so they must be unique in a list.
+An item is a plain object: `{ type: "img", src, alt, width, height }`, a `video`, an `iframe`, or `custom` content. [Media types](./media.md) covers every field. Each item is known by its `id`, which defaults to its `src`; `idOf(item)` from the package root gives it. Ids are what events report and what triggers register, so they must be unique in a list. Commands and triggers take the item itself, its index or its id; an item is matched by its id, so a fresh copy of it works too.
 
 The viewer takes its items as an array or as a lazy list: the `items` option of `createFluidbox`, the `items` prop of each framework root, or the `items` property of `<fluidbox-gallery>`.
 
@@ -81,14 +81,14 @@ A move fires `itemchange` and `settle` with the reason `"items"`. A command stil
 
 ## Origins
 
-An origin is where an item lives on the page, `FluidboxOrigin`:
+An origin is where an item lives on the page, `FluidboxOrigin<TItem>`:
 
-| Field          | Type                                          | What it does                                                                               |
-| -------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `trigger`      | `HTMLElement`                                 | The element that opens the item. Focus returns here when the viewer closes.                |
-| `visual`       | `HTMLElement`                                 | The box the flight starts and ends on. Its size, crop and corner radius are copied.        |
-| `thumbnail`    | `HTMLImageElement`                            | Optional. An image already loaded on the page, shown while the full media loads.           |
-| `prepareClose` | `(item: FluidboxItem, index: number) => void` | Optional. Called before the closing flight measures the origin, with the item it lands on. |
+| Field             | Type                                   | What it does                                                                               |
+| ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `trigger`         | `HTMLElement`                          | The element that opens the item. Focus returns here when the viewer closes.                |
+| `visual`          | `HTMLElement`                          | The box the flight starts and ends on. Its size, crop and corner radius are copied.        |
+| `thumbnail`       | `HTMLImageElement`                     | Optional. An image already loaded on the page, shown while the full media loads.           |
+| `onPreviewChange` | `(item: TItem, index: number) => void` | Optional. Called before the closing flight measures the origin, with the item it lands on. |
 
 You rarely build one by hand. Every trigger (`fluidbox.bind`, the framework `Trigger` parts, the `[slot="trigger"]` child of `<fluidbox-item>`) makes its element the origin of its items while it is bound.
 
@@ -97,9 +97,8 @@ You rarely build one by hand. Every trigger (`fluidbox.bind`, the framework `Tri
 For a trigger, the viewer picks the visual in this order:
 
 1. The trigger itself or a descendant, marked `data-fluidbox-origin`.
-2. The trigger or a descendant with `data-fluidbox-target`, then with `data-fluidbox-preview`.
-3. The trigger itself if it is an `<img>` or `<video>`, else its first `<img>` or `<video>`.
-4. The trigger.
+2. The trigger itself if it is an `<img>` or `<video>`, else its first `<img>` or `<video>`.
+3. The trigger.
 
 The flight's thumbnail is the visual if it is an `<img>`, else the first `<img>` inside it. Mark the element that clips the picture. If a rounded wrapper crops a square image, mark the wrapper, or the flight lands with square corners:
 
@@ -120,10 +119,11 @@ The closing flight needs an origin that is in the document and visible: inside t
 
 ### Several items, one origin
 
-One element can stand for several items, such as an album cover with a "+4" badge. Give the trigger every target that may return to it: a list in `fluidbox.bind`, `items` on the framework triggers, `returns="b c"` on a `<fluidbox-item>`. The first is the one it opens. Its `onPreviewChange` runs before the closing flight measures it, so the cover can show the item it lands on:
+One element can stand for several items, such as an album cover with a "+4" badge. The trigger opens its own item, and `returns` lists the rest that may close back onto it: `returns` in `fluidbox.bind`, on the framework triggers (`fluidboxReturns` in Angular), and `returns="b c"` on a `<fluidbox-item>`. `returns` may hold the trigger's own item too, so a whole album works as is. Its `onPreviewChange` runs before the closing flight measures it, so the cover can show the item it lands on:
 
 ```ts
-fluidbox.bind(cover, ["dune", "canyon", "coast"], {
+fluidbox.bind(cover, "dune", {
+  returns: ["canyon", "coast"],
   onPreviewChange(item) {
     coverImage.src = item.thumbnail?.src ?? coverImage.src;
   },
@@ -137,12 +137,12 @@ An origin bound for one id wins over one bound for several. Both win over the ad
 Triggers cover items that have a bound element. For the rest, as in a virtualized grid that recycles its rows, give the viewer an `origins` adapter, `FluidboxOriginAdapter`:
 
 ```ts
-interface FluidboxOriginAdapter {
-  getOrigin(id: string): FluidboxOrigin | null;
+interface FluidboxOriginAdapter<TItem extends FluidboxItem = FluidboxItem> {
+  getOrigin(id: string): FluidboxOrigin<TItem> | null;
   revealOrigin?(
     id: string,
     index: number,
-    context: { signal: AbortSignal; reason: "open" | "selection" },
+    context: { signal: AbortSignal; phase: "open" | "selection" },
   ): void | Promise<void>;
 }
 ```
@@ -186,7 +186,7 @@ const origins: FluidboxOriginAdapter = {
 };
 ```
 
-- `reason` is `"open"` after an opening and `"selection"` after a move.
+- `phase` is `"open"` after an opening and `"selection"` after a move.
 - The viewer's motion never waits for the promise. When it resolves, the viewer hides the item's thumbnail on the page, so the picture doesn't show twice.
 - `signal` aborts when the selection moves on, the viewer closes, the items change or the fluidbox is destroyed. Check it before late work.
 - Errors thrown here are ignored.

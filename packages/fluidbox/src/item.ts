@@ -72,12 +72,12 @@ export type FluidboxPreviewChangeEvent = CustomEvent<{
  * it, and a `<template slot="content">` holding the `<img>`, `<picture>`,
  * `<video>`, `<iframe>` or other markup the viewer shows.
  *
- * `returns="b c"` lists other items whose close flight returns to this trigger,
- * as a "+3" teaser does for an album. The trigger opens the item it last
- * showed. Before such a flight, the item dispatches `fluidbox-preview-change`
- * with the id and item it lands on; update the trigger's preview synchronously
- * there. Mark the trigger `data-fluidbox-dynamic-preview` so those updates
- * are not read as changes to the gallery's items.
+ * `returns="b c"` lists more items whose close flight returns to this trigger,
+ * as a "+3" teaser does for an album; the item's own id may be among them. The
+ * trigger opens the item it last showed. Before such a flight, the item
+ * dispatches `fluidbox-preview-change` with the id and item it lands on;
+ * update the trigger's preview synchronously there. The gallery doesn't read
+ * changes inside a trigger as changes to its items.
  */
 export class FluidboxItemElement extends HTMLElement {
   get itemId() {
@@ -86,10 +86,9 @@ export class FluidboxItemElement extends HTMLElement {
     return id;
   }
 
-  /** This item, then each id in `returns`. */
-  get originIds(): readonly string[] {
-    const returns = this.getAttribute("returns")?.split(/\s+/).filter(Boolean) ?? [];
-    return [...new Set([this.itemId, ...returns])];
+  /** The ids in `returns`. */
+  get returns(): readonly string[] {
+    return this.getAttribute("returns")?.split(/\s+/).filter(Boolean) ?? [];
   }
 
   /** @internal Called by the gallery before a close flight measures this trigger. */
