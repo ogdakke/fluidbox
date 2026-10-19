@@ -1,0 +1,42 @@
+<!-- #region example -->
+<div class="pattern-toolbar">
+  <button type="button" data-action="open-third" data-test="open-third">Open the third</button>
+  <label><input type="checkbox" name="lock" data-test="lock" /> Lock navigation</label>
+  <output name="status" data-test="status">closed -</output>
+</div>
+<fluidbox-gallery class="pattern-grid">
+  <fluidbox-item item-id="photo-aurora">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/aurora.svg" alt="Aurora over the tundra" />
+    </button>
+    <template slot="content">
+      <img src="/art/aurora.svg" alt="Aurora over the tundra" width="1100" height="1650" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="photo-ridge">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/ridge.svg" alt="Night ridge" />
+    </button>
+    <template slot="content">
+      <img src="/art/ridge.svg" alt="Night ridge" width="1200" height="1500" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="photo-fjord">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/fjord.svg" alt="Fjord in the blue hour" />
+    </button>
+    <template slot="content">
+      <img src="/art/fjord.svg" alt="Fjord in the blue hour" width="1200" height="1600" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="photo-lagoon">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/lagoon.svg" alt="Lagoon after sunset" />
+    </button>
+    <template slot="content">
+      <img src="/art/lagoon.svg" alt="Lagoon after sunset" width="1800" height="1200" />
+    </template>
+  </fluidbox-item>
+</fluidbox-gallery>
+<ol class="pattern-log" data-test="log"></ol>
+<!-- #endregion example -->

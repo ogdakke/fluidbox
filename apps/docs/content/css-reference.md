@@ -2,106 +2,168 @@
 title: CSS reference
 section: Reference
 order: 2
+description: Every CSS custom property, part selector and state attribute fluidbox exposes in styles.css and sheet.css, with defaults and where each is set or read.
 ---
 
 # CSS reference
 
-The public styling surface: part selectors, state hooks, theme inputs, and the variables the runtime publishes. Anything else the runtime renders is an implementation detail.
+The styling surface of `@ogdakke/fluidbox/styles.css` and `@ogdakke/fluidbox/sheet.css`. [Styling](./styling.md) explains how to use it. The stylesheets use other `--fluidbox-*` properties and data attributes internally; anything not listed here can change without notice.
+
+The viewer's rules are wrapped in `:where([data-fluidbox-overlay], [data-fluidbox-flight])`, so a rule of yours on the same part wins when it comes later. Defaults declared on the dialog, the filmstrip's and the sheet's, are wrapped in `:where()` whole, so `[data-fluidbox-dialog] { … }` overrides them in any order. When the viewer opens it copies every `--fluidbox-*` property on the trigger onto the overlay as inline styles. So you can set most inputs on `:root`, on the trigger or an ancestor of it, or on `[data-fluidbox-overlay]`; the ones declared on the dialog you set on `[data-fluidbox-dialog]`.
+
+## Theme variables
+
+| Variable                           | Default                | Used for                                                                                   |
+| ---------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
+| `--fluidbox-background`            | `#111`                 | The backdrop (through `--fluidbox-backdrop-background`), the close button, error messages. |
+| `--fluidbox-color`                 | `white`                | Text and icons.                                                                            |
+| `--fluidbox-control-background`    | `rgb(20 20 20 / 0.72)` | The Previous and Next buttons; the close button on hover.                                  |
+| `--fluidbox-focus-color`           | `currentColor`         | Focus rings on the controls, filmstrip items, the dialog and `<fluidbox-item>` triggers.   |
+| `--fluidbox-filmstrip-item-radius` | `3px`                  | The corners of filmstrip thumbnails.                                                       |
+
+An error message without `--fluidbox-background` and `--fluidbox-color` set is black on white.
+
+## Inputs
+
+Properties you set. Each is read where the table says, and inherits there from any ancestor unless noted.
+
+| Property                                             | Default                                                              | Read on                            | What it does                                                                                                     |
+| ---------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--layer-fluidbox`                                   | `7` (on `:root`)                                                     | Overlay                            | The overlay's `z-index`.                                                                                         |
+| `--layer-fluidbox-flight`                            | `8` (on `:root`)                                                     | Flight                             | The `z-index` of flights and travelling overlays.                                                                |
+| `--fluidbox-backdrop-background`                     | `var(--fluidbox-background, #111)`                                   | Backdrop                           | The backdrop's `background`.                                                                                     |
+| `--fluidbox-backdrop-filter`                         | `none`                                                               | Backdrop                           | The backdrop's `backdrop-filter`, such as `blur(24px)`.                                                          |
+| `--fluidbox-backdrop-opacity`                        | `1`                                                                  | Backdrop                           | The backdrop's resting opacity.                                                                                  |
+| `--fluidbox-image-placeholder-background`            | `rgb(127 127 127 / 0.12)`                                            | Image frames                       | Shown behind an image before anything has loaded.                                                                |
+| `--fluidbox-slide-gap`                               | `0px`                                                                | Slides                             | Space between slides, seen only while swiping.                                                                   |
+| `--fluidbox-stage-top`, `-right`, `-bottom`, `-left` | `0px`                                                                | Dialog                             | Insets of the stage the media fits into. Registered `<length>`s, so they can transition.                         |
+| `--fluidbox-zoom-clip`                               | none                                                                 | Dialog                             | Keeps a zoomed image inside the stage insets: `stage`, or sides such as `right` or `top bottom`.                 |
+| `--fluidbox-zoom-bleed`                              | the browser's bar height on touch screens, else `0px`                | Zoom viewport                      | How far a zoomed image pans past the window's top and bottom. `0px` keeps it inside.                             |
+| `--fluidbox-gallery-control-opacity`                 | `1`; `0.35` when disabled                                            | Previous, Next, Close              | The default controls' opacity.                                                                                   |
+| `--fluidbox-filmstrip-item-size`                     | `52px`; `38px` on touch                                              | Dialog                             | The thumbnails' size. The strip's height and its end padding follow it, so the first and last thumbnails centre. |
+| `--fluidbox-filmstrip-gap`                           | `5px`; `3px` on touch                                                | Dialog                             | Space between thumbnails.                                                                                        |
+| `--fluidbox-filmstrip-space`                         | the item size plus `32px` (`30px` on touch) and the bottom safe area | Dialog                             | The height kept for the strip below the slides.                                                                  |
+| `--fluidbox-filmstrip-zoom-duration`                 | `180ms`                                                              | Filmstrip                          | How fast the strip hides and returns, as on zoom.                                                                |
+| `--fluidbox-filmstrip-zoom-travel`                   | `18px`                                                               | Filmstrip                          | How far the strip drops as it hides.                                                                             |
+| `--fluidbox-preview-width`                           | `100%`                                                               | `<fluidbox-item>` trigger          | The closed trigger's width.                                                                                      |
+| `--fluidbox-preview-height`                          | `auto`                                                               | `<fluidbox-item>` trigger          | The closed trigger's height.                                                                                     |
+| `--fluidbox-layer-color`                             | `transparent`                                                        | `[data-fluidbox-transition-layer]` | A colour behind the layer's content.                                                                             |
+| `--fluidbox-layer-mask-opacity`                      | `1`                                                                  | `[data-fluidbox-transition-layer]` | The opacity of that colour.                                                                                      |
+| `--fluidbox-transition-layer-opacity`                | `var(--fluidbox-progress)`                                           | `[data-fluidbox-transition-layer]` | The layer's opacity during a flight.                                                                             |
+| `--fluidbox-transition-content-opacity`              | fades in near the thumbnail                                          | Travelling overlay copy            | The copy's opacity during a flight.                                                                              |
+
+### Sheet inputs
+
+From `sheet.css`, declared on the dialog at zero specificity. Override them on `[data-fluidbox-dialog]`. The runtime reads the first five.
+
+| Property                      | Default                                      | What it does                                                                                         |
+| ----------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `--fluidbox-sheet-enabled`    | `1`                                          | `0` turns the sheet off.                                                                             |
+| `--fluidbox-sheet-photo`      | `push`                                       | `push` slides the photo up ahead of the sheet; `fit` shrinks it above the sheet.                     |
+| `--fluidbox-sheet-peek`       | `0px`                                        | How much of the sheet shows at rest. Also sets `--fluidbox-stage-bottom`.                            |
+| `--fluidbox-sheet-gap`        | `12px`                                       | Space between the photo and the sheet.                                                               |
+| `--fluidbox-sheet-fit-inset`  | `0px`                                        | With `fit`, space the photo keeps clear above and beside it.                                         |
+| `--fluidbox-sheet-fit-limit`  | `55%` (not declared; the runtime's fallback) | With `fit`, how much the sheet covers before the photo rises. A length or a percentage of the stage. |
+| `--fluidbox-sheet-top`        | `calc(env(safe-area-inset-top, 0px) + 56px)` | Space above the sheet at its tallest.                                                                |
+| `--fluidbox-sheet-radius`     | `18px`                                       | The sheet's top corners.                                                                             |
+| `--fluidbox-sheet-max-width`  | `640px`                                      | The sheet's widest.                                                                                  |
+| `--fluidbox-sheet-background` | `Canvas`                                     | The sheet's background.                                                                              |
+| `--fluidbox-sheet-color`      | `CanvasText`                                 | The sheet's text colour.                                                                             |
+| `--fluidbox-sheet-fade`       | `1` (not declared)                           | How much the photo fades towards the top stop. `0` keeps it.                                         |
+
+## Published values
+
+Set by the runtime. Read them for your own effects; don't set them.
+
+| Property                                            | On                                                       | Value                                                                                  |
+| --------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `--fluidbox-progress`                               | Thumbnail overlays, travelling copies, transition layers | `1` at the thumbnail, `0` fully open. A registered `<number>`.                         |
+| `--fluidbox-dismiss-progress`                       | Overlay                                                  | `0` to `1` during a drag to dismiss; at most `0.6` for a wheel.                        |
+| `--fluidbox-drag-x`, `--fluidbox-drag-y`            | Overlay                                                  | The drag's offset in pixels.                                                           |
+| `--fluidbox-media-width`, `--fluidbox-media-height` | Dialog                                                   | The current media's drawn size, without flight or zoom.                                |
+| `--fluidbox-height`                                 | Overlay                                                  | The window's inner height in pixels.                                                   |
+| `--fluidbox-scroll-top`                             | Overlay                                                  | The page's scroll position, where the container sits.                                  |
+| `--fluidbox-content-height`                         | Dialog                                                   | The stage's height: `--fluidbox-height` less the stage insets and the filmstrip space. |
+| `--fluidbox-sheet-visible`                          | Overlay                                                  | Pixels of the sheet showing.                                                           |
+| `--fluidbox-sheet-progress`                         | Overlay                                                  | `0` at rest to `1` at the first stop.                                                  |
+| `--fluidbox-sheet-expand`                           | Overlay                                                  | `0` at the first stop to `1` at the top stop.                                          |
+| `--fluidbox-sheet-dismiss`                          | Overlay                                                  | `1` with the photo scrolled away to `0` at rest (`dismiss: "scroll"`).                 |
+| `--fluidbox-sheet-keyboard`                         | Overlay                                                  | Pixels the software keyboard covers, while a sheet field has focus.                    |
+
+The sheet values follow the scroll on the compositor and inherit to everything in the viewer.
 
 ## Parts
 
-| Selector                                                                    | Part                                                             |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `[data-fluidbox-trigger]`                                                   | Element that opens the lightbox                                  |
-| `[data-fluidbox-preview]`                                                   | Optional preview box used for handoff geometry                   |
-| `[data-fluidbox-target]`                                                    | Preferred handoff target inside a custom preview                 |
-| `[data-fluidbox-overlay]`                                                   | Body-level portal root                                           |
-| `[data-fluidbox-container]`                                                 | Gesture and layout container                                     |
-| `[data-fluidbox-backdrop]`                                                  | Modal backdrop                                                   |
-| `[data-fluidbox-dialog]`                                                    | Accessible dialog                                                |
-| `[data-fluidbox-portal]`                                                    | Application controls and caption mount target                    |
-| `[data-fluidbox-slides]`                                                    | Native horizontal gallery scroller                               |
-| `[data-fluidbox-slide]`                                                     | Gallery item                                                     |
-| `[data-fluidbox-frame]`                                                     | Cropping and radius frame                                        |
-| `[data-fluidbox-media]`                                                     | Media element                                                    |
-| `[data-fluidbox-media-cover]`                                               | Snapshot shown over an iframe until it loads and while it closes |
-| `[data-fluidbox-content]`                                                   | Arbitrary standalone content wrapper                             |
-| `[data-fluidbox-item-content]`                                              | Arbitrary gallery item                                           |
-| `[data-fluidbox-close]`, `[data-fluidbox-previous]`, `[data-fluidbox-next]` | Default controls                                                 |
-| `[data-fluidbox-icon]`                                                      | SVG icon inside a default control                                |
-| `[data-fluidbox-chrome]`                                                    | Your own floating layer in the portal; see Stage and chrome      |
-| `[data-fluidbox-filmstrip]`                                                 | Filmstrip root                                                   |
-| `[data-fluidbox-filmstrip-scroll]`                                          | Filmstrip scroller                                               |
-| `[data-fluidbox-filmstrip-item]`                                            | Filmstrip option                                                 |
-| `[data-fluidbox-transition-layer]`                                          | Authored content that travels with an item                       |
-| `[data-fluidbox-transition-content]`                                        | Portalled transition content plane                               |
+| Selector                                                                    | Part                                                                                                               |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `[data-fluidbox-overlay]`                                                   | The viewer's root, at the end of `<body>` while open.                                                              |
+| `[data-fluidbox-backdrop]`                                                  | The backdrop.                                                                                                      |
+| `[data-fluidbox-container]`                                                 | The viewport-sized box at the page's scroll position.                                                              |
+| `[data-fluidbox-dialog]`                                                    | The dialog, with `role="dialog"` and `aria-modal="true"`.                                                          |
+| `[data-fluidbox-slides]`                                                    | The horizontal scroller of slides.                                                                                 |
+| `[data-fluidbox-slide]`                                                     | A slide. `aria-hidden="false"` on the current one.                                                                 |
+| `[data-fluidbox-frame]`                                                     | The box that crops and rounds the media.                                                                           |
+| `[data-fluidbox-image-frame]`                                               | A frame that holds an image.                                                                                       |
+| `[data-fluidbox-media]`                                                     | The `<img>`, `<video>`, `<iframe>` or custom content element.                                                      |
+| `[data-fluidbox-item-content]`                                              | A custom slide's content element.                                                                                  |
+| `[data-fluidbox-mount]`                                                     | A framework binding's wrapper inside custom content, with `display: contents`.                                     |
+| `[data-fluidbox-slide-placeholder]`                                         | The item's `placeholder` image.                                                                                    |
+| `[data-fluidbox-slide-preview]`                                             | The item's `thumbnail` image.                                                                                      |
+| `[data-fluidbox-media-cover]`                                               | The still over an iframe until it loads.                                                                           |
+| `[data-fluidbox-error]`                                                     | The "Unable to load media." message with its Retry button.                                                         |
+| `[data-fluidbox-status]`                                                    | A visually hidden live region.                                                                                     |
+| `[data-fluidbox-portal]`                                                    | The viewer's layer, where your controls and captions go.                                                           |
+| `[data-fluidbox-close]`, `[data-fluidbox-previous]`, `[data-fluidbox-next]` | The controls.                                                                                                      |
+| `[data-fluidbox-icon]`                                                      | The SVG inside a default control.                                                                                  |
+| `[data-fluidbox-chrome]`                                                    | A layer outside the viewer's layer that shows and hides with the controls. Content in the layer does this already. |
+| `[data-fluidbox-zoom-viewport]`                                             | The scroller a zoomed image pans in. `data-grabbing` while dragged.                                                |
+| `[data-fluidbox-filmstrip-dock]`                                            | The band the filmstrip sits in.                                                                                    |
+| `[data-fluidbox-filmstrip]`                                                 | The filmstrip.                                                                                                     |
+| `[data-fluidbox-filmstrip-scroll]`                                          | Its scroller, `role="listbox"`.                                                                                    |
+| `[data-fluidbox-filmstrip-item]`                                            | A thumbnail button, `role="option"`, with `data-index`.                                                            |
+| `[data-fluidbox-flight]`                                                    | A flight layer at the end of `<body>`, during opening and closing.                                                 |
+| `[data-fluidbox-transition-content]`                                        | A travelling overlay's copy, in the flight.                                                                        |
+| `[data-fluidbox-transition-layer]`                                          | Mark a travel overlay's `frameLayer` with it to get the layer styles in Inputs.                                    |
+| `[data-fluidbox-trigger]`                                                   | A trigger, on the page.                                                                                            |
+| `[data-fluidbox-thumbnail-overlay]`                                         | A thumbnail overlay inside a `<fluidbox-item>` trigger. The value `travel` makes it fly with the photo.            |
 
-## State hooks
+### Sheet parts
 
-| Hook                                                    | On                    | Meaning                                                |
-| ------------------------------------------------------- | --------------------- | ------------------------------------------------------ |
-| `data-fluidbox-state`                                   | Host, overlay, dialog | `closed`, `opening`, `open`, or `closing`              |
-| `[data-open]`, `[data-closed]`                          | Host, overlay, dialog | Presence versions of the state                         |
-| `[data-starting-style]`, `[data-ending-style]`          | Overlay, dialog       | Opening and closing                                    |
-| `[data-dragging]`, `[data-dismissing]`, `[data-zoomed]` | Dialog                | Gesture and zoom state                                 |
-| `[data-fluidbox-gallery]`, `[data-filmstrip]`           | Dialog                | Multi-item gallery; filmstrip present                  |
-| `data-fluidbox-phase`                                   | Transition layers     | `preview`, `opening`, `open`, `dragging`, or `closing` |
-| `aria-hidden`                                           | Slides                | `false` on the active slide                            |
-| `aria-selected`                                         | Filmstrip items       | `true` on the active item                              |
+| Selector                         | Part                                                    |
+| -------------------------------- | ------------------------------------------------------- |
+| `[data-fluidbox-sheet-scroller]` | The scroller the photo and the sheet share.             |
+| `[data-fluidbox-sheet-stage]`    | The photos' room inside it.                             |
+| `[data-fluidbox-sheet-slot]`     | Where the sheet element goes.                           |
+| `[data-fluidbox-sheet]`          | The sheet. Yours in slot mode, or made by `render`.     |
+| `[data-fluidbox-sheet-handle]`   | A grab bar you add.                                     |
+| `[data-fluidbox-sheet-scroll]`   | The part of the sheet that scrolls at the top stop.     |
+| `[data-fluidbox-sheet-stop]`     | A button that moves the sheet to the stop in its value. |
 
-## Theme inputs
+## State attributes
 
-Read from the opening element and copied onto the portal: `--background`, `--color`, `--accent`, `--primary`, `--border`, `--radius`.
+| Attribute                                                          | On                  | Meaning                                                |
+| ------------------------------------------------------------------ | ------------------- | ------------------------------------------------------ |
+| `data-fluidbox-state`                                              | Overlay, dialog     | `closed`, `opening`, `open` or `closing`.              |
+| `data-open`, `data-closed`                                         | Overlay, dialog     | Not closed, or closed.                                 |
+| `data-starting-style`, `data-opening`                              | Overlay, dialog     | Opening.                                               |
+| `data-ending-style`                                                | Overlay, dialog     | Closing.                                               |
+| `data-dragging`                                                    | Overlay, dialog     | A drag to dismiss is under way.                        |
+| `data-dismissing`                                                  | Overlay, dialog     | Closing, or a drag to dismiss is under way.            |
+| `data-zoomed`                                                      | Dialog              | An image is zoomed.                                    |
+| `data-fluidbox-gallery`                                            | Dialog              | There is more than one item.                           |
+| `data-filmstrip`                                                   | Dialog              | A filmstrip is docked.                                 |
+| `data-sheet`                                                       | Dialog              | The sheet's stop number.                               |
+| `data-sheet-raised`, `data-sheet-expanded`                         | Dialog              | The sheet is above stop `0`; at its top stop.          |
+| `data-sheet-peeking`, `data-sheet-off`                             | Dialog              | The sheet peeks at rest; the sheet is turned off.      |
+| `data-sheet-dismiss`                                               | Overlay             | The sheet's `dismiss` option.                          |
+| `data-sheet-dismissed`                                             | Overlay             | A scroll dismiss is committed.                         |
+| `data-fluidbox-state`, `data-open`, `data-closed`, `aria-expanded` | The active trigger  | The trigger's item is open.                            |
+| `data-fluidbox-thumbnail-hidden`                                   | The trigger's image | Its item is open, so it is hidden.                     |
+| `data-fluidbox-phase`                                              | Thumbnail overlays  | `preview`, `opening`, `open`, `dragging` or `closing`. |
+| `aria-selected`, `data-fluidbox-selected`                          | Filmstrip items     | The current item.                                      |
 
-Read from `:root` or the overlay: `--layer-fluidbox`, `--layer-fluidbox-flight`, `--fluidbox-backdrop-background`, `--fluidbox-filmstrip-dock-background`, `--fluidbox-filmstrip-zoom-duration`, `--fluidbox-filmstrip-zoom-travel`.
+## Events
 
-`--fluidbox-backdrop-filter` sets the backdrop's `backdrop-filter`, `none` by default. Pair it with a translucent `--fluidbox-backdrop-background`, for example `blur(24px) saturate(1.5)`; iOS 26 Safari then shows the blurred page behind its bars.
-
-`[data-fluidbox-container]` is `position: absolute` at the page's scroll position, which the runtime sets as `--fluidbox-scroll-top`. Don't make it sticky or fixed: iOS 26 Safari tints its bars from a sticky or fixed layer at the screen's edge, using colours from anywhere inside it.
-
-While zoomed, the image can pan under the browser's own bars. On touch screens the zoom viewport reaches past the window by the difference between the screen and window heights, which covers iOS Safari's status bar and toolbar wherever they sit. Set `--fluidbox-zoom-bleed` on `:root` or the overlay to choose the reach yourself, or `0px` to keep the image inside the window.
-
-`--fluidbox-slide-gap` adds space between gallery slides, shown only while swiping; images stay full-bleed. It is `0` by default. Set it on the opening element, `:root`, or the overlay; like every `--fluidbox-*` property on the opening element, it is copied onto the portal.
-
-Closed previews read `--fluidbox-preview-width`, `--fluidbox-preview-height`, and `--fluidbox-preview-aspect`.
-
-## Stage and chrome
-
-The stage is the part of the dialog the photo fits into. By default it is the whole dialog. Set `--fluidbox-stage-top`, `--fluidbox-stage-right`, `--fluidbox-stage-bottom`, and `--fluidbox-stage-left` on the dialog to make room for a sidebar, an action row, or margins. The photo fits and centres in the stage, opening and closing flights land there, zoom centres inside it, and the default arrows and close button sit against its edges. The insets are registered lengths, so you can transition them.
-
-```css
-[data-fluidbox-dialog]:has(.replies) {
-  --fluidbox-stage-right: 360px;
-  --fluidbox-stage-bottom: 56px;
-}
-```
-
-Mark your own floating layers in `[data-fluidbox-portal]` with `data-fluidbox-chrome`, such as a sidebar, an action row, or a caption. They behave like the default controls: hidden during the opening flight, revealed as it lands, and faded out when a dismiss starts by drag, Escape, or the close button. A cancelled drag brings them back. If you set your own `transition` on a chrome layer, include `opacity`.
-
-Zoomed in, the photo pans under the insets, so a see-through action row or caption floats over it; panned to the end, its edges still stop at the stage's. Set `--fluidbox-zoom-clip` on the dialog to keep it inside the stage instead: `stage` clips every side, or list the sides, such as `right` behind an opaque sidebar or `top bottom`.
-
-```css
-[data-fluidbox-dialog]:has(.replies) {
-  --fluidbox-zoom-clip: right;
-}
-```
-
-To attach something to the photo, read `--fluidbox-media-width` and `--fluidbox-media-height` on the dialog. Together with the stage insets they place the photo: it is centred in the stage.
-
-## Runtime-owned variables
-
-Read these to synchronize your own effects. Do not set them; inline values or Web Animations control the active pose.
-
-| Variable                                                        | Published on                  | Value                                                          |
-| --------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------- |
-| `--fluidbox-progress`                                           | Transition layers and content | `1` at the preview pose, `0` open. Inherits to children.       |
-| `--fluidbox-dismiss-progress`                                   | Overlay                       | `0`–`1` during a pointer dismissal; capped at `0.6` for wheel. |
-| `--fluidbox-drag-x`, `--fluidbox-drag-y`                        | Overlay                       | Drag displacement in pixels.                                   |
-| `--fluidbox-frame-transform`, `--fluidbox-frame-radius`         | Frame                         | Crop pose transform and radius.                                |
-| `--fluidbox-media-transform`                                    | Media                         | Media pose, also updated by zoom.                              |
-| `--fluidbox-backdrop-opacity`, `--fluidbox-close-opacity`       | Backdrop, close               | Opacity during interactive dismissal.                          |
-| `--fluidbox-item-width`, `--fluidbox-item-height`               | Frame                         | Item size constrained to the stage.                            |
-| `--fluidbox-media-width`, `--fluidbox-media-height`             | Dialog                        | The active item's drawn size, without flight or zoom.          |
-| `--fluidbox-zoom-canvas-width`, `--fluidbox-zoom-canvas-height` | Zoom canvas                   | Geometry while zoomed.                                         |
-
-Authored transition layers can supply `--fluidbox-transition-layer-opacity` and `--fluidbox-transition-content-opacity`, which the runtime copies when it moves content to the body.
+| Event                   | Target | `detail`             |
+| ----------------------- | ------ | -------------------- |
+| `fluidbox-sheet-change` | Dialog | `{ stop }`. Bubbles. |

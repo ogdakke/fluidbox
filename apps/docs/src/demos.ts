@@ -31,10 +31,7 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       const content = document.createElement("template");
       content.setAttribute("slot", "content");
       content.content.append(image());
-      const caption = document.createElement("span");
-      caption.slot = "caption";
-      caption.textContent = scene.title;
-      item.append(trigger, content, caption);
+      item.append(trigger, content);
       gallery.append(item);
     }
     if (root.hasAttribute("data-filmstrip"))

@@ -1,0 +1,23 @@
+{
+  "name": "@ogdakke/fluidbox-angular",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Built into @ogdakke/fluidbox/angular. Not published on its own. Compiled with the oldest supported Angular, so its partial output links in every newer one.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "build": "rm -rf dist && ngc -p tsconfig.build.json && bun run scripts/fix-declarations.ts"
+  },
+  "devDependencies": {
+    "@angular/compiler": "~17.3.12",
+    "@angular/compiler-cli": "~17.3.12",
+    "@angular/core": "~17.3.12",
+    "rxjs": "^7.8.0",
+    "typescript": "~5.4.5",
+    "zone.js": "~0.14.10"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=17",
+    "@ogdakke/fluidbox": "workspace:*"
+  }
+}

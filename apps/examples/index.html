@@ -11,15 +11,16 @@
     <main class="fb-shell">
       <section class="hero">
         <div class="hero__copy fb-crossed">
-          <p class="fb-label">@ogdakke/fluidbox</p>
-          <h1>A lightbox that moves like the page is physical.</h1>
+          <p class="hero__package">@ogdakke/fluidbox</p>
+          <h1>Finally, a fluid lightbox for the web.</h1>
           <p class="hero__lede">
-            Images fly out of their thumbnails and land back where they came from. One runtime,
-            shared by plain custom elements, a headless controller, and every framework binding.
+            Photos open from their thumbnails and close back into them. Pinch to zoom, swipe between
+            slides, drag down to close. One runtime behind the custom elements, plain JavaScript and
+            every framework binding.
           </p>
           <div class="hero__actions">
-            <a class="fb-button fb-button--primary" href="/elements/">Explore the elements</a>
-            <a class="fb-button" href="/react/">React examples</a>
+            <a class="fb-button fb-button--primary" href="#playground">Try the playground</a>
+            <a class="fb-button" href="/elements/">Explore the elements</a>
           </div>
           <ul class="hints" aria-label="Controls">
             <li><kbd>←</kbd><kbd>→</kbd>&nbsp;swipe</li>
@@ -30,115 +31,149 @@
         <div class="fb-grid">
           <div class="fb-cell feature">
             <span class="fb-number">01</span>
-            <h3>Shared-element flights</h3>
-            <p>Media leaves its thumbnail and lands back on it, corners and all.</p>
+            <h3>Shared element transitions</h3>
+            <p>Media opens from its thumbnail and closes back into it, corners and all.</p>
           </div>
           <div class="fb-cell feature">
             <span class="fb-number">02</span>
-            <h3>Zoom that follows you</h3>
-            <p>Pinch, wheel, and double-tap zoom with continuous handoff.</p>
+            <h3>Familiar zoom gestures</h3>
+            <p>Pinch, scroll wheel and double-tap, and switch between them mid-zoom.</p>
           </div>
           <div class="fb-cell feature">
             <span class="fb-number">03</span>
             <h3>Native gestures</h3>
-            <p>Swipe between slides, drag down to dismiss, momentum intact.</p>
+            <p>Slides swipe on native CSS scroll snapping. Drag down to close.</p>
           </div>
           <div class="fb-cell feature">
             <span class="fb-number">04</span>
-            <h3>Indexed sources</h3>
-            <p>A million items; the host mounts only what it shows.</p>
+            <h3>Virtualization</h3>
+            <p>Lists of any length; only the slides and triggers in view are mounted.</p>
           </div>
           <div class="fb-cell feature">
             <span class="fb-number">05</span>
             <h3>Any media</h3>
-            <p>Images, video, iframes, and your own renderers.</p>
+            <p>Images, video, iframes and your own renderers.</p>
           </div>
           <div class="fb-cell feature">
             <span class="fb-number">06</span>
-            <h3>Five bindings</h3>
-            <p>Custom elements, headless, React, Solid, Vue, Angular.</p>
+            <h3>Framework support</h3>
+            <p>React, Solid, Vue and Angular, plus custom elements and plain JavaScript.</p>
           </div>
         </div>
       </section>
-      <section class="section" aria-labelledby="gallery-title">
+      <section class="section" id="playground" aria-labelledby="playground-title">
         <header class="section__head">
-          <p class="fb-label"><span class="fb-number">01</span>&nbsp;&nbsp;gallery</p>
-          <h2 class="fb-rule-title" id="gallery-title">Plain markup, any aspect ratio</h2>
-          <p>
-            Portrait, square, and panorama images keep their shape in flight. Open one and swipe
-            through the rest.
-          </p>
+          <span class="fb-number">01</span>
+          <h2 class="fb-rule-title" id="playground-title">Playground</h2>
+          <p>Open a photo, then change how the viewer behaves.</p>
         </header>
-        <div class="stage">
-          <fluidbox-gallery id="mosaic" class="mosaic" aria-label="Landscape gallery">
-            <fluidbox-filmstrip></fluidbox-filmstrip>
-          </fluidbox-gallery>
+        <div class="playground">
+          <fluidbox-gallery id="mosaic" class="mosaic" aria-label="Photos"></fluidbox-gallery>
+          <form class="controls" id="controls" aria-label="Viewer options">
+            <fieldset>
+              <legend>Info sheet</legend>
+              <label><input type="radio" name="sheet" value="off" checked /> Off</label>
+              <label><input type="radio" name="sheet" value="on" /> Floating</label>
+              <label class="controls__field">
+                Swipe down
+                <select name="dismiss">
+                  <option value="flight">Flies home</option>
+                  <option value="scroll">Scrolls away</option>
+                </select>
+              </label>
+              <label class="controls__field">
+                Photo
+                <select name="photo">
+                  <option value="push">Pushed up</option>
+                  <option value="fit">Fits above</option>
+                  <option value="round">Fits, rounded</option>
+                </select>
+              </label>
+            </fieldset>
+            <fieldset>
+              <legend>Backdrop</legend>
+              <label><input type="radio" name="backdrop" value="solid" checked /> Solid</label>
+              <label><input type="radio" name="backdrop" value="blur" /> Translucent blur</label>
+            </fieldset>
+            <fieldset>
+              <legend>Zoom</legend>
+              <label class="controls__field">
+                Largest scale
+                <select name="zoom">
+                  <option value="off">Off</option>
+                  <option value="2">2×</option>
+                  <option value="4" selected>4×</option>
+                  <option value="8">8×</option>
+                </select>
+              </label>
+            </fieldset>
+            <fieldset>
+              <legend>Thumbnails</legend>
+              <label><input type="checkbox" name="filmstrip" /> Filmstrip in the viewer</label>
+              <label class="controls__field">
+                Corner radius <output name="radiusValue">6px</output>
+                <input type="range" name="radius" min="0" max="28" step="1" value="6" />
+              </label>
+            </fieldset>
+          </form>
         </div>
-        <details class="fb-code">
-          <summary>Markup</summary>
-          <pre><code>&lt;script type="module"&gt;
-  import "@ogdakke/fluidbox/elements";
-  import "@ogdakke/fluidbox/styles.css";
-&lt;/script&gt;
-
-&lt;fluidbox-gallery aria-label="Landscapes"&gt;
-  &lt;fluidbox-item item-id="dune"&gt;
-    &lt;button slot="trigger" type="button" data-fluidbox-preview&gt;
-      &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
-    &lt;/button&gt;
-    &lt;template slot="content"&gt;
-      &lt;img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" /&gt;
-    &lt;/template&gt;
-    &lt;span slot="caption"&gt;Dune at golden hour&lt;/span&gt;
-  &lt;/fluidbox-item&gt;
-  &lt;!-- …more items --&gt;
-  &lt;fluidbox-filmstrip&gt;&lt;/fluidbox-filmstrip&gt;
-&lt;/fluidbox-gallery&gt;</code></pre>
-        </details>
       </section>
       <section class="section" aria-labelledby="integrations-title">
         <header class="section__head">
-          <p class="fb-label"><span class="fb-number">02</span>&nbsp;&nbsp;integrations</p>
-          <h2 class="fb-rule-title" id="integrations-title">Pick how you build</h2>
-          <p>Every page runs the same runtime. Pick the one that matches your stack.</p>
+          <span class="fb-number">02</span>
+          <h2 class="fb-rule-title" id="integrations-title">Framework support</h2>
+          <p>
+            Every page runs the same nine patterns on the same runtime. Pick the one that matches
+            your stack.
+          </p>
         </header>
         <div class="fb-grid integrations">
           <a class="fb-cell integration" href="/elements/"
             ><span class="fb-number">01</span>
             <h3>Elements <span>→</span></h3>
             <p>
-              Declarative <code>&lt;fluidbox-gallery&gt;</code> markup, plus an indexed 100,000-item
-              source.
+              <code>&lt;fluidbox-gallery&gt;</code> markup with properties for sources, renderers
+              and extensions. All nine patterns.
             </p></a
           >
-          <a class="fb-cell integration" href="/headless/"
+          <a class="fb-cell integration" href="/javascript/"
             ><span class="fb-number">02</span>
-            <h3>Headless <span>→</span></h3>
+            <h3>JavaScript <span>→</span></h3>
             <p>
-              <code>createFluidbox()</code> with your own thumbnails and a portal for custom chrome.
+              <code>createFluidbox()</code> and <code>bindTrigger()</code> on your own elements. All
+              nine patterns.
             </p></a
           >
           <a class="fb-cell integration" href="/react/"
             ><span class="fb-number">03</span>
             <h3>React <span>→</span></h3>
-            <p>Composed parts, rich origins, a live iframe, and a virtualized photo library.</p></a
+            <p>
+              <code>Fluidbox.Root</code>, triggers and portal parts; renderers keep your context.
+              All nine patterns.
+            </p></a
           >
           <a class="fb-cell integration" href="/solid/"
             ><span class="fb-number">04</span>
             <h3>Solid <span>→</span></h3>
-            <p><code>useFluidboxGallery</code> with source switching and an indexed window.</p></a
+            <p>
+              The same parts as Solid components, with accessors for state. All nine patterns.
+            </p></a
           >
           <a class="fb-cell integration" href="/vue/"
             ><span class="fb-number">05</span>
             <h3>Vue <span>→</span></h3>
             <p>
-              <code>&lt;FluidboxGallery&gt;</code> with source switching and an indexed window.
+              Components and composables; the root slot gives you the controller and state. All nine
+              patterns.
             </p></a
           >
           <a class="fb-cell integration" href="/angular/"
             ><span class="fb-number">06</span>
             <h3>Angular <span>→</span></h3>
-            <p>Signals and <code>useFluidboxGallery</code>, zoneless, with an indexed window.</p></a
+            <p>
+              Standalone <code>fluidbox*</code> directives, zoneless and signal-based. All nine
+              patterns.
+            </p></a
           >
         </div>
       </section>

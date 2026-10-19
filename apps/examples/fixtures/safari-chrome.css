@@ -248,7 +248,7 @@ html.lab-scroll-locked {
 /* Fluidbox variants. These override the runtime's zero-specificity rules. */
 
 html[data-lab-backdrop="translucent"] [data-fluidbox-overlay] [data-fluidbox-backdrop] {
-  background: color-mix(in srgb, var(--background, #111) 55%, transparent);
+  background: color-mix(in srgb, var(--fluidbox-background, #111) 55%, transparent);
 }
 
 html[data-lab-blur="on"] {

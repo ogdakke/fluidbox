@@ -11,7 +11,7 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   const first = page.locator('[data-photo-id="one"]');
   await first.evaluate((trigger) => {
     trigger.style.setProperty("--fluidbox-backdrop-background", "rgb(12 34 56)");
-    trigger.style.setProperty("--accent", "rgb(78 90 123)");
+    trigger.style.setProperty("--fluidbox-control-background", "rgb(78 90 123)");
   });
   await first.click();
 
@@ -34,7 +34,7 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
     "background-color",
     "rgb(12, 34, 56)",
   );
-  await expect(overlay).toHaveCSS("--accent", "rgb(78 90 123)");
+  await expect(overlay).toHaveCSS("--fluidbox-control-background", "rgb(78 90 123)");
   await expect(first).toHaveAttribute("aria-haspopup", "dialog");
   await expect(first).toHaveAttribute("aria-expanded", "true");
   await expect(first).toHaveAttribute("data-fluidbox-state", "open");
@@ -134,7 +134,7 @@ test("plain controllers hand body-level ownership to the newest viewer", async (
     "open",
   );
 
-  await page.evaluate(() => void window.headlessSecondaryViewer.open({ id: "two" }));
+  await page.evaluate(() => void window.headlessSecondaryViewer.open("two"));
   await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(1);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-state",
@@ -154,15 +154,15 @@ test("plain controllers hand body-level ownership to the newest viewer", async (
 
 test("active viewer ownership honors a prevented close", async ({ page }) => {
   await page.goto("/headless.html");
-  await page.evaluate(() => void window.headlessProtectedViewer.open({ id: "one" }));
+  await page.evaluate(() => void window.headlessProtectedViewer.open("one"));
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-state",
     "open",
   );
 
-  const result = await page.evaluate(() => window.headlessSecondaryViewer.open({ id: "two" }));
+  const result = await page.evaluate(() => window.headlessSecondaryViewer.open("two"));
 
-  expect(result).toEqual({ status: "prevented" });
+  expect(result).toBe(false);
   await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(1);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-state",
@@ -185,52 +185,34 @@ test("plain runtime owns video and iframe media while custom renderers own desce
 }) => {
   await page.goto("/headless.html");
   await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 3,
-      getItem(index) {
-        return (
-          [
-            {
-              id: "custom",
-              media: {
-                type: "custom",
-                renderer: "demo",
-                title: "Custom study",
-                width: 800,
-                height: 600,
-              },
-            },
-            {
-              id: "video",
-              media: {
-                type: "video",
-                src: "data:video/mp4;base64,",
-                title: "Video study",
-                width: 800,
-                height: 450,
-              },
-            },
-            {
-              id: "iframe",
-              media: {
-                type: "iframe",
-                src: "about:blank",
-                title: "Iframe study",
-                width: 800,
-                height: 600,
-                sandbox: "allow-scripts",
-              },
-            },
-          ] as const
-        )[index]!;
+    await window.headlessViewer.setItems([
+      {
+        id: "custom",
+        type: "custom",
+        render: "demo",
+        title: "Custom study",
+        width: 800,
+        height: 600,
       },
-      getIndex(id) {
-        const ids = ["custom", "video", "iframe"];
-        const index = ids.indexOf(id);
-        return index < 0 ? null : index;
+      {
+        id: "video",
+        type: "video",
+        src: "data:video/mp4;base64,",
+        title: "Video study",
+        width: 800,
+        height: 450,
       },
-    });
-    void window.headlessViewer.open({ id: "custom" });
+      {
+        id: "iframe",
+        type: "iframe",
+        src: "about:blank",
+        title: "Iframe study",
+        width: 800,
+        height: 600,
+        sandbox: "allow-scripts",
+      },
+    ]);
+    void window.headlessViewer.open("custom");
   });
   const dialog = page.locator("[data-fluidbox-dialog]");
   await expect(dialog).toHaveAttribute("data-fluidbox-state", "open");
@@ -255,25 +237,10 @@ test("plain runtime owns video and iframe media while custom renderers own desce
 test("destroy unloads mounted custom media before removing the viewer", async ({ page }) => {
   await page.goto("/headless.html");
   await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 1,
-      getItem() {
-        return {
-          id: "one",
-          media: {
-            type: "custom",
-            renderer: "demo",
-            title: "Custom study",
-            width: 800,
-            height: 600,
-          },
-        };
-      },
-      getIndex(id) {
-        return id === "one" ? 0 : null;
-      },
-    });
-    await window.headlessViewer.open({ id: "one" });
+    await window.headlessViewer.setItems([
+      { id: "one", type: "custom", render: "demo", title: "Custom study", width: 800, height: 600 },
+    ]);
+    await window.headlessViewer.open("one");
     window.headlessViewer.destroy();
   });
 
@@ -288,25 +255,10 @@ test("custom media uses the document close flight and returns to its retained sl
 }) => {
   await page.goto("/headless.html");
   await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 1,
-      getItem() {
-        return {
-          id: "one",
-          media: {
-            type: "custom",
-            renderer: "demo",
-            title: "Custom study",
-            width: 800,
-            height: 600,
-          },
-        };
-      },
-      getIndex(id) {
-        return id === "one" ? 0 : null;
-      },
-    });
-    await window.headlessViewer.open({ id: "one" });
+    await window.headlessViewer.setItems([
+      { id: "one", type: "custom", render: "demo", title: "Custom study", width: 800, height: 600 },
+    ]);
+    await window.headlessViewer.open("one");
     void window.headlessViewer.close();
   });
 
@@ -316,7 +268,7 @@ test("custom media uses the document close flight and returns to its retained sl
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
   await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
 
-  await page.evaluate(() => void window.headlessViewer.open({ id: "one" }));
+  await page.evaluate(() => void window.headlessViewer.open("one"));
   await expect(
     page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-test-custom-media]'),
   ).toHaveText("Custom one");
@@ -387,26 +339,18 @@ test("plain runtime keeps the preview painted until the full image can replace i
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/headless.html");
   await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 1,
-      getItem() {
-        return {
-          id: "preview-test",
-          preview: { src: "/photo-portrait.svg", width: 240, height: 360 },
-          media: {
-            type: "image",
-            src: "/photo-square.svg",
-            alt: "Preview handoff",
-            width: 800,
-            height: 800,
-          },
-        };
+    await window.headlessViewer.setItems([
+      {
+        id: "preview-test",
+        type: "img",
+        src: "/photo-square.svg",
+        alt: "Preview handoff",
+        width: 800,
+        height: 800,
+        thumbnail: { src: "/photo-portrait.svg", width: 240, height: 360 },
       },
-      getIndex(id) {
-        return id === "preview-test" ? 0 : null;
-      },
-    });
-    void window.headlessViewer.open({ id: "preview-test" });
+    ]);
+    void window.headlessViewer.open("preview-test");
   });
   const dialog = page.locator("[data-fluidbox-dialog]");
   await expect(dialog).toHaveAttribute("data-fluidbox-state", "opening");
@@ -432,33 +376,25 @@ test("adjacent slides paint their placeholder while responsive images are pendin
       '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="teal"/></svg>',
     );
   await page.evaluate(async (src) => {
-    await window.headlessViewer.setSource({
-      count: 2,
-      getItem(index) {
-        return {
-          id: `pending-${index}`,
-          placeholder: { src },
-          preview: { src: `/pending-slide-preview-${index}.svg` },
-          media: {
-            type: "image",
-            src: `/pending-slide-full-${index}.svg`,
-            alt: `Pending image ${index}`,
-            width: 800,
-            height: 800,
-          },
-        };
-      },
-      getIndex(id) {
-        return id === "pending-0" ? 0 : id === "pending-1" ? 1 : null;
-      },
-    });
-    await window.headlessViewer.open({ index: 0 });
+    await window.headlessViewer.setItems(
+      [0, 1].map((index) => ({
+        id: `pending-${index}`,
+        type: "img" as const,
+        src: `/pending-slide-full-${index}.svg`,
+        alt: `Pending image ${index}`,
+        width: 800,
+        height: 800,
+        placeholder: src,
+        thumbnail: { src: `/pending-slide-preview-${index}.svg` },
+      })),
+    );
+    await window.headlessViewer.open(0);
   }, placeholder);
   const neighbor = page.locator("[data-fluidbox-slide] [data-fluidbox-media]").nth(1);
   await expect(neighbor).toHaveAttribute("loading", "eager");
   // Mobile WebKit has no wheel input.
   if (testInfo.project.name === "iphone-15-pro" || testInfo.project.name === "ipad-pro-11") {
-    await page.evaluate(() => window.headlessViewer.goTo({ index: 1 }));
+    await page.evaluate(() => window.headlessViewer.open(1));
   } else {
     const strip = page.locator("[data-fluidbox-slides]");
     const bounds = (await strip.boundingBox())!;
@@ -492,30 +428,22 @@ test("plain runtime retains the last decoded origin when its next source is pend
   });
   await page.goto("/headless.html");
   await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 1,
-      getItem() {
-        return {
-          id: "one",
-          media: {
-            type: "image",
-            src: "/deferred-full.svg",
-            alt: "Deferred full image",
-            width: 800,
-            height: 800,
-          },
-        };
+    await window.headlessViewer.setItems([
+      {
+        id: "one",
+        type: "img",
+        src: "/deferred-full.svg",
+        alt: "Deferred full image",
+        width: 800,
+        height: 800,
       },
-      getIndex(id) {
-        return id === "one" ? 0 : null;
-      },
-    });
+    ]);
     const trigger = document.querySelector<HTMLElement>('[data-photo-id="one"]')!;
     const thumbnail = trigger.querySelector<HTMLImageElement>("img")!;
     await thumbnail.decode();
-    window.headlessViewer.registerOrigin("one", { trigger, visual: thumbnail, thumbnail });
+    // The fixture binds the trigger, so its thumbnail is the origin.
     thumbnail.src = "/pending-origin.svg";
-    void window.headlessViewer.open({ id: "one" });
+    void window.headlessViewer.open("one");
   });
 
   const activeMedia = page.locator(
@@ -548,26 +476,18 @@ test("plain runtime keeps the preview available while a failed full image is ret
     });
   await page.goto("/headless.html");
   await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 1,
-      getItem() {
-        return {
-          id: "retry-test",
-          preview: { src: "/photo-portrait.svg", width: 240, height: 360 },
-          media: {
-            type: "image",
-            src: "/retry-full.svg",
-            alt: "Retry handoff",
-            width: 800,
-            height: 800,
-          },
-        };
+    await window.headlessViewer.setItems([
+      {
+        id: "retry-test",
+        type: "img",
+        src: "/retry-full.svg",
+        alt: "Retry handoff",
+        width: 800,
+        height: 800,
+        thumbnail: { src: "/photo-portrait.svg", width: 240, height: 360 },
       },
-      getIndex(id) {
-        return id === "retry-test" ? 0 : null;
-      },
-    });
-    void window.headlessViewer.open({ id: "retry-test" });
+    ]);
+    void window.headlessViewer.open("retry-test");
   });
 
   const slide = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
@@ -591,15 +511,17 @@ test("plain runtime keeps focus that moved into the dialog during the opening", 
   await page.route("**/focus-full.svg", (route) => route.abort("failed"));
   await page.goto("/headless.html");
   const during = await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 1,
-      getItem: () => ({
+    await window.headlessViewer.setItems([
+      {
         id: "focus-test",
-        preview: { src: "/photo-portrait.svg", width: 240, height: 360 },
-        media: { type: "image", src: "/focus-full.svg", alt: "Focus", width: 800, height: 800 },
-      }),
-      getIndex: (id) => (id === "focus-test" ? 0 : null),
-    });
+        type: "img",
+        src: "/focus-full.svg",
+        alt: "Focus",
+        width: 800,
+        height: 800,
+        thumbnail: { src: "/photo-portrait.svg", width: 240, height: 360 },
+      },
+    ]);
     // Hold the opening so the failed slide's Retry can be focused before it settles.
     const animate = Object.getOwnPropertyDescriptor(Element.prototype, "animate")!
       .value as Element["animate"];
@@ -610,7 +532,7 @@ test("plain runtime keeps focus that moved into the dialog during the opening", 
       held.push(animation);
       return animation;
     };
-    void window.headlessViewer.open({ id: "focus-test" });
+    void window.headlessViewer.open("focus-test");
     const retry = () =>
       document.querySelector<HTMLElement>(
         '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-error]:not([hidden]) button',
@@ -720,7 +642,7 @@ test("plain runtime preserves the painted frame when open and close reverse", as
       return animation;
     };
 
-    void window.headlessViewer.open({ id: "one" });
+    void window.headlessViewer.open("one");
     for (let frames = 0; frames < 240; frames += 1) {
       await nextFrame();
       if (held.length && !document.querySelector("[data-fluidbox-prepared]")) break;
@@ -734,7 +656,7 @@ test("plain runtime preserves the painted frame when open and close reverse", as
     setMotionTime(90);
     await nextFrame();
     const closingBefore = bounds();
-    void window.headlessViewer.open({ id: "one" });
+    void window.headlessViewer.open("one");
     await Promise.resolve();
     await Promise.resolve();
     const closingAfter = bounds();
@@ -975,23 +897,21 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     const host = document.createElement("span");
     host.dataset.testThumbnailOverlay = "";
     document.querySelector('[data-photo-id="one"]')!.append(host);
-    window.headlessViewer.registerThumbnailOverlay("one", {
-      behavior: "travel",
-      element: host,
+    window.headlessViewer.bindOverlay(host, "one", {
       frameLayer: host,
-      renderer: {
-        mount({ target, item, signal }) {
-          const badge = document.createElement("strong");
-          badge.dataset.testTravelingOverlay = "";
-          badge.textContent = `Traveling ${item.id}`;
-          const actions = document.createElement("span");
-          actions.dataset.fluidboxVideoActions = "";
-          target.append(badge, actions);
-          signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
-            once: true,
-          });
-          return () => (host.dataset.rendererDisposed = "");
-        },
+      travel({ target, item, signal }) {
+        const badge = document.createElement("strong");
+        badge.dataset.testTravelingOverlay = "";
+        badge.textContent = `Traveling ${item.id}`;
+        const actions = document.createElement("span");
+        actions.dataset.fluidboxVideoActions = "";
+        target.append(badge, actions);
+        signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
+          once: true,
+        });
+        return () => {
+          host.dataset.rendererDisposed = "";
+        };
       },
     });
   });
@@ -1009,7 +929,7 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
       held.push(animation);
       return animation;
     };
-    void window.headlessViewer.open({ id: "one" });
+    void window.headlessViewer.open("one");
     for (let frames = 0; frames < 240; frames += 1) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (document.querySelector("[data-fluidbox-frame]")?.getAnimations().length) break;
@@ -1021,7 +941,9 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     }
     for (const animation of held) animation.playbackRate = 1;
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    const host = document.querySelector<HTMLElement>("[data-test-thumbnail-overlay]")!;
+    const host = document.querySelector<HTMLElement>(
+      "[data-test-thumbnail-overlay]:not([data-fluidbox-ghost])",
+    )!;
     const travel = document.querySelector<HTMLElement>("[data-fluidbox-transition-content]")!;
     return {
       hostPhase: host.dataset.fluidboxPhase,
@@ -1135,21 +1057,15 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
     const host = document.createElement("span");
     host.dataset.testParkedLayer = "";
     document.querySelector('[data-photo-id="one"]')!.append(host);
-    const registration = {
-      behavior: "travel" as const,
-      element: host,
+    window.headlessViewer.bindOverlay(host, ["one", "two"], {
       frameLayer: host,
-      renderer: {
-        mount({ target }: { target: HTMLElement }) {
-          host.dataset.mounts = String(Number(host.dataset.mounts ?? 0) + 1);
-          target.textContent = "Overlay";
-        },
+      travel({ target }) {
+        host.dataset.mounts = String(Number(host.dataset.mounts ?? 0) + 1);
+        target.textContent = "Overlay";
       },
-    };
-    window.headlessViewer.registerThumbnailOverlay("one", registration);
-    window.headlessViewer.registerThumbnailOverlay("two", registration);
-    await window.headlessViewer.open({ id: "one" });
-    await window.headlessViewer.goTo({ id: "two" });
+    });
+    await window.headlessViewer.open("one");
+    await window.headlessViewer.open("two");
   });
   const parked = await page.evaluate(() => {
     const layer = document.querySelector<HTMLElement>("[data-test-parked-layer]")!;
@@ -1158,7 +1074,7 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
         layer.closest("[data-fluidbox-slide]")!,
       ),
       mounts: layer.dataset.mounts,
-      selected: window.headlessViewer.state.activeId,
+      selected: window.headlessViewer.state.id,
     };
   });
   expect(parked).toEqual({ slide: 0, mounts: "1", selected: "two" });
@@ -1169,26 +1085,17 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
 test("native gallery scrolling is never corrected by the runtime", async ({ page }) => {
   await page.goto("/headless.html");
   await page.evaluate(async () => {
-    await window.headlessViewer.setSource({
-      count: 6,
-      getItem(index) {
-        return {
-          id: `slide-${index}`,
-          media: {
-            type: "image",
-            src: "/photo-square.svg",
-            alt: `Slide ${index}`,
-            width: 800,
-            height: 800,
-          },
-        };
-      },
-      getIndex(id) {
-        const index = Number(String(id).replace("slide-", ""));
-        return Number.isInteger(index) && index >= 0 && index < 6 ? index : null;
-      },
-    });
-    await window.headlessViewer.open({ index: 0 });
+    await window.headlessViewer.setItems(
+      Array.from({ length: 6 }, (_, index) => ({
+        id: `slide-${index}`,
+        type: "img" as const,
+        src: "/photo-square.svg",
+        alt: `Slide ${index}`,
+        width: 800,
+        height: 800,
+      })),
+    );
+    await window.headlessViewer.open(0);
   });
   const offsets = await page
     .locator("[data-fluidbox-slides]")
@@ -1213,26 +1120,22 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
   await page.goto("/headless.html");
   await page.evaluate(() => {
     const count = 100_000;
-    void window.headlessViewer.setSource({
+    void window.headlessViewer.setItems({
       count,
-      getItem(index) {
-        return {
-          id: `large-${index}`,
-          media: {
-            type: "image",
-            src: "/photo-square.svg",
-            alt: `Large item ${index + 1}`,
-            width: 800,
-            height: 800,
-          },
-        };
-      },
-      getIndex(id) {
+      get: (index) => ({
+        id: `large-${index}`,
+        type: "img",
+        src: "/photo-square.svg",
+        alt: `Large item ${index + 1}`,
+        width: 800,
+        height: 800,
+      }),
+      indexOf(id: string) {
         const index = Number(String(id).replace("large-", ""));
-        return Number.isInteger(index) && index >= 0 && index < count ? index : null;
+        return Number.isInteger(index) && index >= 0 && index < count ? index : -1;
       },
     });
-    void window.headlessViewer.open({ index: 90_000 });
+    void window.headlessViewer.open(90_000);
   });
 
   const active = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
@@ -1255,7 +1158,7 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
 
 test("the filmstrip option docks thumbnails that navigate the viewer", async ({ page }) => {
   await page.goto("/headless.html");
-  await page.evaluate(() => void window.headlessFilmstripViewer.open({ id: "one" }));
+  await page.evaluate(() => void window.headlessFilmstripViewer.open("one"));
 
   const dialog = page.locator("[data-fluidbox-dialog]");
   await expect(dialog).toHaveAttribute("data-filmstrip", /.*/);
@@ -1267,10 +1170,53 @@ test("the filmstrip option docks thumbnails that navigate the viewer", async ({ 
   );
 
   await page.locator('[data-fluidbox-filmstrip-item][data-index="1"]').click();
-  await expect
-    .poll(() => page.evaluate(() => window.headlessFilmstripViewer.state.activeIndex))
-    .toBe(1);
+  await expect.poll(() => page.evaluate(() => window.headlessFilmstripViewer.state.index)).toBe(1);
 
   await page.evaluate(() => void window.headlessFilmstripViewer.close());
   await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+});
+
+test("bindings follow setItems, by index and by an id that arrives later", async ({ page }) => {
+  await page.goto("/headless.html");
+  const errors = await page.evaluate(async () => {
+    const item = (name: string) => ({
+      type: "img" as const,
+      src: `/art/${name}.svg`,
+      alt: name,
+      width: 1200,
+      height: 800,
+    });
+    const viewer = window.headlessViewer;
+    await viewer.setItems([item("dune"), item("canyon")]);
+    const byIndex = document.body.appendChild(document.createElement("button"));
+    const later = document.body.appendChild(document.createElement("button"));
+    const badge = byIndex.appendChild(document.createElement("span"));
+    viewer.bind(byIndex, 1);
+    viewer.bindOverlay(badge, 1);
+    viewer.bind(later, "/art/coast.svg");
+    const thrown: string[] = [];
+    try {
+      await viewer.setItems([item("coast"), item("meadow"), item("alpine")]);
+    } catch (error) {
+      thrown.push(String(error));
+    }
+    return { thrown, count: viewer.state.count, items: viewer.items.count };
+  });
+  expect(errors).toEqual({ thrown: [], count: 3, items: 3 });
+});
+
+test("an aborted open toggles back to closed", async ({ page }) => {
+  await page.goto("/headless.html");
+  const events = await page.evaluate(async () => {
+    const viewer = window.headlessViewer;
+    const seen: string[] = [];
+    viewer.addEventListener("toggle", (event) => seen.push(event.newState));
+    const controller = new AbortController();
+    const opening = viewer.open(0, { signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    controller.abort();
+    const result = await opening;
+    return { seen, result, status: viewer.state.status };
+  });
+  expect(events).toEqual({ seen: ["open", "closed"], result: false, status: "closed" });
 });

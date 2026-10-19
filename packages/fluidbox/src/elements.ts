@@ -1,5 +1,11 @@
 import "./item";
+import "./filmstrip";
+import { FluidboxGalleryElement } from "./gallery";
 
-export { FluidboxGalleryElement } from "./gallery";
-export { FluidboxFilmstripElement } from "./filmstrip";
-export { FluidboxItemElement } from "./item";
+if (!customElements.get("fluidbox-gallery"))
+  customElements.define("fluidbox-gallery", FluidboxGalleryElement);
+
+export { FluidboxGalleryElement };
+export type { FluidboxGalleryEventMap } from "./gallery";
+export { FluidboxFilmstripElement, FluidboxSheetElement } from "./filmstrip";
+export { FluidboxItemElement, type FluidboxPreviewChangeEvent } from "./item";

@@ -2,26 +2,44 @@
 title: Browser support
 section: Reference
 order: 3
+description: Which browsers fluidbox supports, the platform features it relies on, and how the sheet degrades without scroll-driven animations.
 ---
 
 # Browser support
 
-Fluidbox targets recent browsers and keeps a single gesture and portal implementation. Legacy support is not part of the runtime.
+Fluidbox targets current browsers and has one implementation of its gestures, flights and body-level viewer, with no legacy fallbacks.
 
-## Target window
+## Supported browsers
 
-- **Chrome, Edge, Firefox (desktop):** current and previous stable major versions.
-- **Safari (macOS and iOS):** current and previous OS major releases with their latest Safari.
-- **Chrome (Android):** current and previous stable versions. Physical Android validation is still a gap.
+| Browser                  | Versions                                                  |
+| ------------------------ | --------------------------------------------------------- |
+| Chrome and Edge, desktop | The current and previous stable major versions.           |
+| Firefox, desktop         | The current and previous stable major versions.           |
+| Safari, macOS and iOS    | The Safari of the current and previous OS major releases. |
+| Chrome, Android          | The current and previous stable major versions.           |
 
-Embedded webviews, in-app browsers, and older ESR releases are outside the initial guarantee.
+Embedded web views, in-app browsers and Firefox ESR are not covered.
 
-## Required capabilities
+## What the browser needs
 
-Native scroll snapping, Web Animations, `inert`, pointer events, and modern viewport units. CSS `@scope` is not required; isolation comes from data attributes and `:where()`.
+The viewer uses these platform features. Every supported browser has them.
 
-## What is tested
+- CSS: scroll snapping, `:has()`, `:where()`, `@property`, container query units (`cqw`), small viewport units (`svh`), `env(safe-area-inset-*)`.
+- DOM: Pointer Events, Web Animations, the `inert` attribute, `ResizeObserver`, `IntersectionObserver`, `HTMLImageElement.decode()`.
+- The sheet also uses `AbortSignal.any()`.
 
-Playwright runs Chromium, Firefox, and WebKit, plus Pixel 7, iPhone 15 Pro, and iPad Pro 11 emulation. Those are engine checks, not proof that a specific branded browser or physical device passed. Each release records the exact versions it verified.
+The package root and the add-on entries touch no browser globals on import, so they also load in Node, Bun, Deno and edge runtimes for server rendering. See [Getting started](./getting-started.md#server-rendering).
 
-> This is the intended policy for the first release, not a claim that the full matrix has passed.
+## Progressive features
+
+These are used where the browser has them, and the viewer works without them:
+
+| Feature                                                   | Without it                                                                                                                                       |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Scroll-driven animations (`animation-timeline: scroll()`) | The sheet still scrolls and snaps between its stops, but the photo keeps its size behind it and the backdrop doesn't fade with a scroll dismiss. |
+| The `scrollend` event                                     | The viewer waits for a short pause in scroll events instead.                                                                                     |
+| `visualViewport`                                          | The sheet doesn't make room for the software keyboard.                                                                                           |
+
+## Motion preferences
+
+With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights and moves between slides, zoom levels and sheet stops without animation. See [Styling](./styling.md#reduced-motion).

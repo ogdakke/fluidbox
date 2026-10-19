@@ -386,9 +386,9 @@ test("indexed source timing and frame capture", async ({ page, browserName }, te
   }
   const openMs = await page
     .locator("fluidbox-gallery")
-    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) => {
+    .evaluate((gallery: HTMLElement & { open(target: number): Promise<boolean> }) => {
       const start = performance.now();
-      gallery.open({ index: 99_990 });
+      void gallery.open(99_990);
       return performance.now() - start;
     });
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(

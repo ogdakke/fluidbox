@@ -2,92 +2,207 @@
 title: Media types
 section: Guides
 order: 4
+description: Every item type (img, video, iframe, custom) with all their fields, responsive images with srcset, sizes and sources, thumbnails, placeholders, renderers, and fields of your own.
 ---
 
 # Media types
 
-Images, video, iframes, and custom content share one slide strip, one set of gestures, and one transition model.
+An item is one of four types: `"img"`, `"video"`, `"iframe"` or `"custom"`. They share one slide strip, one set of gestures and the same flights. Their fields are the attributes of the element the viewer draws, by DOM property name, so `srcset`, `poster` and `referrerPolicy` mean what they mean on `<img>`, `<video>` and `<iframe>`.
 
-## Images
+Every type needs `width` and `height` in pixels: the viewer uses their ratio to size the slide before anything loads.
+
+Every type can also have:
+
+| Field         | Type                | What it does                                                                                                    |
+| ------------- | ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `id`          | `string`            | The item's identity across updates, for `open("id")`, events and triggers. Defaults to `src`. Unique in a list. |
+| `thumbnail`   | `FluidboxThumbnail` | A small image of the item. See [Thumbnails and placeholders](#thumbnails-and-placeholders).                     |
+| `placeholder` | `string`            | An image URL, such as a data URI, painted at once behind an image slide.                                        |
+
+## Image
+
+`FluidboxImageItem`, drawn as an `<img>`, or a `<picture>` when it has `sources`:
+
+| Field     | Type                      | What it does                                                 |
+| --------- | ------------------------- | ------------------------------------------------------------ |
+| `type`    | `"img"`                   | Required.                                                    |
+| `src`     | `string`                  | Required. The full image.                                    |
+| `alt`     | `string`                  | Required. Alt text. Also the filmstrip button's label.       |
+| `width`   | `number`                  | Required. Intrinsic width.                                   |
+| `height`  | `number`                  | Required. Intrinsic height.                                  |
+| `srcset`  | `string`                  | The `<img>`'s `srcset`.                                      |
+| `sizes`   | `string`                  | The `<img>`'s `sizes`. `"auto"` works too.                   |
+| `sources` | `FluidboxPictureSource[]` | `<source>` elements of a `<picture>`, such as AVIF and WebP. |
+
+Each `FluidboxPictureSource` has `srcset` (required), and `sizes`, `media` and `type`, as on `<source>`.
 
 ```ts
-{
-  type: "image",
-  src: "/photo.jpg",
+import type { FluidboxImageItem } from "@ogdakke/fluidbox";
+
+const photo: FluidboxImageItem = {
+  type: "img",
+  id: "footpath",
+  src: "/photos/footpath-2400.jpg",
+  srcset: "/photos/footpath-1200.jpg 1200w, /photos/footpath-2400.jpg 2400w",
+  sizes: "100vw",
   alt: "A footpath through tall grass",
   width: 2400,
   height: 1600,
-  candidates: [
-    { src: "/photo-1200.jpg", width: 1200 },
-    { src: "/photo-2400.jpg", width: 2400 },
+  sources: [
+    {
+      type: "image/avif",
+      srcset: "/photos/footpath-1200.avif 1200w, /photos/footpath-2400.avif 2400w",
+    },
   ],
-  sizes: "100vw",
-}
+  thumbnail: { src: "/photos/footpath-400.jpg", width: 400, height: 267 },
+};
 ```
 
-Loading is layered so the viewer never shows an empty frame:
-
-1. `placeholder` paints immediately beneath everything.
-2. The origin's decoded `thumbnail`, or the item's `preview`, covers it.
-3. The browser-selected full image covers both once it has decoded.
-
-The active image and its neighbours load eagerly. A failed full image keeps the preview visible and offers a retry.
+Only images zoom. The viewer loads the full image for the current slide and the one on each side, and keeps the picture it already shows until the sharper one has decoded. If the full image fails, the slide shows "Unable to load media." with a Retry button.
 
 ## Video
 
+`FluidboxVideoItem`, drawn as a `<video>`:
+
+| Field         | Type                             | Default      | What it does                                                       |
+| ------------- | -------------------------------- | ------------ | ------------------------------------------------------------------ |
+| `type`        | `"video"`                        |              | Required.                                                          |
+| `src`         | `string`                         |              | Required. The video file.                                          |
+| `title`       | `string`                         |              | Required. The video's accessible name, and the filmstrip button's. |
+| `width`       | `number`                         |              | Required. Intrinsic width.                                         |
+| `height`      | `number`                         |              | Required. Intrinsic height.                                        |
+| `poster`      | `string`                         |              | The poster frame's URL.                                            |
+| `autoplay`    | `boolean`                        | `false`      | Plays when its slide comes into view, and pauses when it leaves.   |
+| `loop`        | `boolean`                        | `false`      | Starts again at the end.                                           |
+| `muted`       | `boolean`                        | `false`      | Starts muted. Browsers let a video autoplay only when it is muted. |
+| `playsInline` | `boolean`                        | `true`       | Plays in the slide rather than full screen on iOS.                 |
+| `controls`    | `boolean`                        | `true`       | Shows the browser's playback controls.                             |
+| `preload`     | `"none" \| "metadata" \| "auto"` | `"metadata"` | How much to load before it plays.                                  |
+
 ```ts
-{ type: "video", src: "/clip.mp4", title: "Harbour timelapse", width: 1920, height: 1080, poster: { src: "/clip.jpg" } }
+import type { FluidboxVideoItem } from "@ogdakke/fluidbox";
+
+const clip: FluidboxVideoItem = {
+  type: "video",
+  src: "/video/harbour.mp4",
+  title: "Harbour timelapse",
+  width: 1920,
+  height: 1080,
+  poster: "/video/harbour.jpg",
+  thumbnail: { src: "/video/harbour-thumb.jpg", width: 480, height: 270 },
+};
 ```
 
-Videos render with native controls. Closing animates the video inside its own frame so playback is never reset by moving the element.
+A video pauses when its slide leaves, and unloads when it leaves the loaded window. Moving a playing video would restart it, so a video closes inside its own frame instead of in the flight.
 
-## Iframes
+## Iframe
+
+`FluidboxIframeItem`, drawn as an `<iframe>`:
+
+| Field            | Type             | What it does                      |
+| ---------------- | ---------------- | --------------------------------- |
+| `type`           | `"iframe"`       | Required.                         |
+| `src`            | `string`         | Required. The embedded page.      |
+| `title`          | `string`         | Required. The iframe's `title`.   |
+| `width`          | `number`         | Required. The frame's width.      |
+| `height`         | `number`         | Required. The frame's height.     |
+| `allow`          | `string`         | The iframe's `allow` attribute.   |
+| `referrerPolicy` | `ReferrerPolicy` | The iframe's `referrerpolicy`.    |
+| `sandbox`        | `string`         | The iframe's `sandbox` attribute. |
 
 ```ts
-{
+import type { FluidboxIframeItem } from "@ogdakke/fluidbox";
+
+const map: FluidboxIframeItem = {
   type: "iframe",
-  src: "https://www.openstreetmap.org/export/embed.html?bbox=…",
+  id: "market-map",
+  src: "https://www.openstreetmap.org/export/embed.html?bbox=24.94,60.16,24.96,60.17",
   title: "Market Square on OpenStreetMap",
   width: 1000,
   height: 700,
-  thumbnail: { src: "/map-preview.png" },
-}
+  thumbnail: { src: "/map/market.png", width: 1000, height: 700 },
+};
 ```
 
-`allow`, `referrerPolicy`, and `sandbox` pass through to the element.
+The iframe gets `loading="lazy"` and `allowfullscreen`. An embedded page paints well after the opening flight starts, so the viewer covers the frame with a still image until the page has loaded, then fades it out. On close it fades the still back in, so the frame lands as the picture it left from. The still is the item's `thumbnail`, else the trigger's image. Use a screenshot of what the embed first shows.
 
-Embedded pages paint well after the opening motion starts. The runtime covers the frame with a snapshot until the iframe has loaded, then fades it away; on close it fades the snapshot back in so the frame lands on the card it came from. The snapshot is the item's `preview` or `thumbnail`, or the origin's thumbnail image.
+## Custom
 
-> Give an iframe item a static preview that matches what the embed shows first. A screenshot or tile snapshot makes the handoff seamless.
+`FluidboxCustomItem` names a renderer that draws your own content into the slide:
 
-## Custom content
+| Field    | Type       | What it does                                           |
+| -------- | ---------- | ------------------------------------------------------ |
+| `type`   | `"custom"` | Required.                                              |
+| `id`     | `string`   | Required: custom content has no `src` to fall back on. |
+| `render` | `string`   | Required. The key of a renderer in `renderers`.        |
+| `title`  | `string`   | Required. The content's accessible name.               |
+| `width`  | `number`   | Required. The width the content is laid out at.        |
+| `height` | `number`   | Required. The height the content is laid out at.       |
 
-Custom media names a renderer; the renderer mounts whatever you like into a stable target.
+### Renderers
+
+A renderer is a function. It gets `{ item, index, target, signal }`: draw into `target`, the slide's element. You may return a function that releases your own resources, such as timers or listeners; the viewer empties `target` itself afterwards. `signal` aborts at the same moment.
 
 ```ts
-const viewer = createFluidbox({
-  source: arraySource([
-    {
-      id: "chart",
-      media: {
-        type: "custom",
-        renderer: "chart",
-        title: "Monthly visitors",
-        width: 1200,
-        height: 800,
-      },
-    },
-  ]),
-  renderers: {
-    chart: {
-      mount({ target, item, signal }) {
-        const chart = drawChart(target, item.id);
-        signal.addEventListener("abort", () => chart.stop(), { once: true });
-        return () => chart.destroy();
-      },
-    },
+import { createFluidbox, type FluidboxRenderer } from "@ogdakke/fluidbox";
+
+const note: FluidboxRenderer = ({ item, target }) => {
+  const article = document.createElement("article");
+  const tick = () => (article.textContent = `${item.id}, ${new Date().toLocaleTimeString()}`);
+  tick();
+  const timer = setInterval(tick, 1000);
+  target.append(article);
+  return () => clearInterval(timer);
+};
+
+const fluidbox = createFluidbox({
+  items: [{ type: "custom", id: "note", render: "note", title: "A note", width: 800, height: 600 }],
+  renderers: { note },
+});
+```
+
+The same renderer shape fills filmstrip thumbnails, the sheet and travelling overlays. The framework roots take `renderers` as framework components, keyed the same way, and they keep your app's context. Where a binding needs a wrapper (React does), it is marked `data-fluidbox-mount` and has `display: contents`, so your component's element still sizes to the slide as plain content does. An item whose renderer is missing throws a `TypeError` when its slide loads.
+
+A custom slide mounts when it comes within one slide of the current one, and its cleanup runs when it moves further away. Keep state you need in your app, not in the mounted nodes. Clicks on buttons, links and fields inside custom content never count as zoom taps.
+
+[Custom content](./patterns/renderers.md) shows a framework component, a map, a video and a YouTube embed in every framework.
+
+## Thumbnails and placeholders
+
+`thumbnail` is a `FluidboxThumbnail`: `src`, plus optional `srcset`, `sizes`, `width` and `height`.
+
+| Field         | Used for                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------- |
+| `thumbnail`   | The filmstrip, the iframe still, and the picture shown while the full image loads.                  |
+| `placeholder` | Image items only. Painted at once behind the slide, such as a blurred 32-pixel image or a data URI. |
+
+While an image opens, the slide paints, from the bottom up: the `placeholder`, then the trigger's image or the `thumbnail`, then the full image once it has decoded. The frame's background, `--fluidbox-image-placeholder-background`, shows when there is none of them.
+
+The filmstrip tries the `thumbnail`, then the full image or the video's poster, the smallest `srcset` candidate of each first. The slide and the iframe still show the thumbnail with its `srcset` and `sizes`, so the browser picks the candidate that fits.
+
+## Fields of your own
+
+Items are yours: add any field, and the viewer hands your object back in every state, event and callback. Type them by extending an item type, and the type flows through:
+
+```ts
+import { createFluidbox, type FluidboxImageItem } from "@ogdakke/fluidbox";
+
+interface Photo extends FluidboxImageItem {
+  readonly caption: string;
+}
+
+declare const photos: Photo[];
+
+createFluidbox<Photo>({
+  items: photos,
+  viewer({ target, fluidbox }) {
+    const caption = document.createElement("p");
+    target.append(caption);
+    return fluidbox.subscribe(({ item }) => {
+      if (item) caption.textContent = item.caption;
+    });
   },
 });
 ```
 
-Custom slides outside the bounded window are disposed and remounted when revisited. Keep state you need to preserve in application state, not in the mounted nodes.
+Content in the viewer fades in and out with the controls; see [Styling](./styling.md#your-own-controls). [Headless controls](./patterns/headless.md) builds a caption bar in every framework.

@@ -2,33 +2,40 @@
 title: Introduction
 section: Start
 order: 1
+description: What fluidbox is, which entry point to use for your stack, and where to read next.
 ---
 
 # Fluidbox
 
-A lightbox that moves like the page is physical. Media flies out of its thumbnail, follows your fingers, and lands back where it came from.
+Fluidbox is a lightbox for photos, video, iframes and your own content. The picture flies out of its thumbnail, follows your finger, zooms with a pinch or a double-tap, and flies back to the thumbnail it came from when it closes.
 
-<div data-demo="gallery" data-scenes="dune,fjord,alpine,canyon,coast,aurora" data-filmstrip aria-label="Try it"></div>
+It ships as one package, `@ogdakke/fluidbox`. One runtime does the gestures, flights, zoom and the body-level viewer; each entry point is a thin layer over it.
 
-Open any image above, then swipe, pinch or scroll to zoom, and drag down or press <kbd>Esc</kbd> to close.
+## Entry points
 
-## What you get
+| You build with                  | Read                                    | Import from                  |
+| ------------------------------- | --------------------------------------- | ---------------------------- |
+| React                           | [React](./react.md)                     | `@ogdakke/fluidbox/react`    |
+| Vue                             | [Vue](./vue.md)                         | `@ogdakke/fluidbox/vue`      |
+| Solid                           | [Solid](./solid.md)                     | `@ogdakke/fluidbox/solid`    |
+| Angular                         | [Angular](./angular.md)                 | `@ogdakke/fluidbox/angular`  |
+| Plain HTML, any server template | [Custom elements](./custom-elements.md) | `@ogdakke/fluidbox/elements` |
+| Plain JavaScript or TypeScript  | [JavaScript](./javascript.md)           | `@ogdakke/fluidbox`          |
 
-- **Shared-element flights.** Opening and closing animate between the thumbnail and the viewer, including the thumbnail's crop and corner radius.
-- **Gestures that hand off.** Swipe between slides with native scrolling and momentum, pinch or wheel to zoom with continuous handoff, and drag to dismiss.
-- **Indexed sources.** Describe a collection by index. The host renders only the thumbnails it shows, and the viewer keeps a small window of slides mounted.
-- **Any media.** Images, video, iframes, and your own renderers share one slide strip.
-- **One runtime, several entry points.** Custom elements, a headless controller, and bindings for React, Solid, Vue, and Angular all drive the same runtime.
+Every entry point uses the same items, the same stylesheet (`@ogdakke/fluidbox/styles.css`) and the same optional add-ons: `@ogdakke/fluidbox/filmstrip` and `@ogdakke/fluidbox/sheet`.
 
-## Pick an entry point
+## Concepts
 
-| You are building with                | Start with                                                    |
-| ------------------------------------ | ------------------------------------------------------------- |
-| Plain HTML or a server-rendered site | [Custom elements](./custom-elements.md)                       |
-| Your own components and controls     | [Headless runtime](./headless.md)                             |
-| React                                | [React](./react.md)                                           |
-| Solid, Vue, or Angular               | [Solid](./solid.md), [Vue](./vue.md), [Angular](./angular.md) |
+- **Item.** A plain object that reads like the element the viewer draws: `{ type: "img", src, alt, width, height }`, a `video`, an `iframe`, or `custom` content. See [Media types](./media.md).
+- **Items.** The list the viewer can show: an array, or a lazy list that makes each item on demand, so it can be a thousand items with a dozen thumbnails on the page. See [Items and origins](./items-and-origins.md).
+- **Trigger.** The element that opens an item. The flight starts on it, usually on the thumbnail image inside it, and lands back there on close.
+- **Viewer.** One layer at the end of `<body>`. You put your own controls and captions into it.
+- **The fluidbox.** What `createFluidbox()` returns: the viewer's state, the commands that open, move and close it, and the events that say what happened and why.
 
-Every entry point shares the same [sources and origins](./sources-and-origins.md) model and the same [styling contract](./styling.md).
+## Patterns
 
-> Fluidbox is pre-release. The package is private while its API settles; this documentation tracks the current workspace.
+The [pattern pages](./patterns/index.md) show nine common setups, each live and in every framework: a [gallery](./patterns/basic.md), [one trigger for an album](./patterns/overlay.md), [rich origins](./patterns/origins.md), [custom content](./patterns/renderers.md), [programmatic control](./patterns/programmatic.md), [zoom](./patterns/zoom.md), a [filmstrip](./patterns/filmstrip.md), a [sheet](./patterns/sheet.md) and [headless controls](./patterns/headless.md).
+
+## Next
+
+Start with [Getting started](./getting-started.md) to install the package and build a first gallery. Then open the page for your framework, and the [API reference](./api.md) when you need the exact types.

@@ -2,73 +2,98 @@
 title: Getting started
 section: Start
 order: 2
+description: How to install fluidbox, import its styles, describe items, build a first gallery, and set it up for your framework and for server rendering.
 ---
 
 # Getting started
 
-Install one package, import its styles once, and register the elements or pick a binding.
-
 ## Install
 
 ```bash
-bun add @ogdakke/fluidbox
+npm install @ogdakke/fluidbox
 ```
 
-Framework packages are optional peers. Install only `@ogdakke/fluidbox` next to the framework your app already uses.
+The framework bindings are in the same package. React, Vue, Solid and Angular are optional peer dependencies, so install only the one your app already uses.
 
 ## Import the styles
 
-The viewer's layout, geometry, and default appearance live in one stylesheet. Import it once in a client entry, before your own overrides.
+The viewer's layout and default look are in one stylesheet. Import it once, in a client entry, before your own CSS:
 
 ```ts
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-## Your first gallery
+The sheet add-on has its own stylesheet, `@ogdakke/fluidbox/sheet.css`. Import it only if you use the sheet.
 
-Register the custom elements and write markup. Each `<fluidbox-item>` needs a stable `item-id`, a trigger, and an inert content template.
+## Describe your items
+
+An item is a plain object whose fields are the attributes of the element the viewer draws: `src`, `srcset`, `sizes` and `alt` for an image, as on `<img>`. It needs `width` and `height`, so the viewer can size the slide before the file loads. A `thumbnail` gives the viewer a picture to show while the full image loads.
 
 ```ts
-import "@ogdakke/fluidbox/elements";
-import "@ogdakke/fluidbox/styles.css";
+import type { FluidboxItem } from "@ogdakke/fluidbox";
+
+export const photos: FluidboxItem[] = [
+  {
+    type: "img",
+    src: "/photos/aurora.jpg",
+    alt: "Aurora over the tundra",
+    width: 2200,
+    height: 3300,
+    thumbnail: { src: "/photos/aurora-thumb.jpg", width: 440, height: 660 },
+  },
+];
 ```
 
-```html
-<fluidbox-gallery aria-label="Photos">
-  <fluidbox-item item-id="mountain">
-    <button slot="trigger" type="button">
-      <img src="/photos/mountain-thumb.jpg" alt="A mountain at dusk" width="300" height="200" />
-    </button>
-    <template slot="content">
-      <img src="/photos/mountain.jpg" alt="A mountain at dusk" width="2400" height="1600" />
-    </template>
-  </fluidbox-item>
-  <fluidbox-filmstrip></fluidbox-filmstrip>
-</fluidbox-gallery>
+Each item is known by its `id`, which defaults to its `src`. Give items an `id` of your own when two share a `src`, or when you want to open one by a name. See [Media types](./media.md) for video, iframes and custom content.
+
+## A first gallery
+
+One viewer for the whole list, and a trigger for each thumbnail. Pick your framework in the tabs:
+
+<!-- pattern: basic -->
+
+The examples import `photos` and `label` from a local `./data` module; see [the example data](./patterns/index.md#the-example-data). Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own; then the `controls` option, the `Controls` part or `<fluidbox-controls>` keeps them.
+
+## Framework setup
+
+| Framework        | Import                       | Peer dependency                     |
+| ---------------- | ---------------------------- | ----------------------------------- |
+| React            | `@ogdakke/fluidbox/react`    | `react` and `react-dom` 18 or later |
+| Vue              | `@ogdakke/fluidbox/vue`      | `vue` 3.3 or later                  |
+| Solid            | `@ogdakke/fluidbox/solid`    | `solid-js` 1.8 or later             |
+| Angular          | `@ogdakke/fluidbox/angular`  | `@angular/core` 17 or later         |
+| Custom elements  | `@ogdakke/fluidbox/elements` | none                                |
+| Plain JavaScript | `@ogdakke/fluidbox`          | none                                |
+
+Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Filmstrip` and `Sheet` turn those add-ons on by being there. `useFluidbox()` reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md).
+
+- **Custom elements.** `<fluidbox-gallery>` with `<fluidbox-item>` children. See [Custom elements](./custom-elements.md).
+- **Plain JavaScript.** `createFluidbox()`, and `fluidbox.bind()` for each trigger. See [JavaScript](./javascript.md).
+
+## Add-ons
+
+The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. Import the entry once, anywhere in the browser bundle, before you turn the add-on on:
+
+```ts
+import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/sheet";
+import "@ogdakke/fluidbox/sheet.css";
 ```
 
-The template is inert, so the full-size image does not load until the viewer opens.
-
-<div data-demo="gallery" data-scenes="meadow,lagoon,ridge" aria-label="First gallery"></div>
+Turning one on without its import throws an `Error` that names the import. `<fluidbox-gallery>` loads the entries itself for a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child; the sheet still needs `sheet.css`. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
 
 ## Server rendering
 
-The package root never touches `window` or `document` on import. Register the elements after hydration instead of importing `./elements` on the server:
+The package root, `@ogdakke/fluidbox`, is safe to import on the server: it has no side effects and touches no browser globals until you call `createFluidbox()`. So are the add-on entries. The framework bindings create the viewer only in the browser, after mount, so they render on the server as plain markup.
+
+`@ogdakke/fluidbox/elements` defines the custom elements when it is imported, so it is browser only. In a server-rendered app, import it after hydration:
 
 ```ts
-import { registerFluidboxElements } from "@ogdakke/fluidbox";
-
-await registerFluidboxElements();
+if (typeof customElements !== "undefined") await import("@ogdakke/fluidbox/elements");
 ```
 
-## Entry points
+## Next
 
-| Import                                        | What it provides                                                                                       |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `@ogdakke/fluidbox`                           | `createFluidbox()`, `arraySource()`, element registration, and types. Safe to import on the server.    |
-| `@ogdakke/fluidbox/elements`                  | Registers `<fluidbox-gallery>`, `<fluidbox-item>`, and `<fluidbox-filmstrip>` on import. Browser only. |
-| `@ogdakke/fluidbox/react`                     | The composed `Fluidbox` parts and hooks.                                                               |
-| `@ogdakke/fluidbox/solid`, `/vue`, `/angular` | Gallery bindings that keep an `<fluidbox-gallery>` in sync with a source.                              |
-| `@ogdakke/fluidbox/styles.css`                | The viewer stylesheet.                                                                                 |
-
-Next, read [Custom elements](./custom-elements.md) or jump to your framework.
+- The [patterns](./patterns/index.md): nine common setups in every framework.
+- [Items and origins](./items-and-origins.md): large or virtualized lists, and where the flight lands.
+- [Styling](./styling.md): theme the viewer and add your own controls.

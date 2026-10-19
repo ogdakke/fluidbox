@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OriginRegistry } from "../src/origin-registry";
-import type { FluidboxOrigin } from "../src/public-api";
+import type { FluidboxOrigin } from "../src/runtime-types";
 
 function origin(name: string): FluidboxOrigin {
   return {

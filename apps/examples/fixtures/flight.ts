@@ -1,6 +1,6 @@
 import { mountSite } from "../src/site";
-import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
-import type { FluidboxController, FluidboxItem, FluidboxOrigin } from "@ogdakke/fluidbox";
+import { createFluidbox } from "@ogdakke/fluidbox";
+import type { Fluidbox, FluidboxItem } from "@ogdakke/fluidbox";
 import { artItem, artSrc, sceneById } from "../src/art";
 import { mapEmbedUrl, mapView } from "../src/map-view";
 import "./flight.css";
@@ -22,23 +22,24 @@ type FlightCase = {
    * button opens its own item and is its origin.
    */
   readonly group?: boolean;
-  /** Extra wiring once the controller exists. */
-  readonly setup?: (controller: FluidboxController, trigger: HTMLElement) => void;
+  /** Extra wiring once the fluidbox exists. */
+  readonly setup?: (fluidbox: Fluidbox, trigger: HTMLElement) => void;
 };
 
-const art = (id: string, itemId = `flight-${id}`) => artItem(sceneById(id), itemId);
+// A declared thumbnail lets the viewer tell when the card shows another picture.
+const art = (id: string, itemId = `flight-${id}`): FluidboxItem => {
+  const item = artItem(sceneById(id), itemId);
+  return { ...item, thumbnail: { src: item.src, width: item.width, height: item.height } };
+};
 const scrollerScenes = ["canyon", "coast", "lagoon", "dune"];
 const video: FluidboxItem = {
   id: "flight-video",
-  media: {
-    type: "video",
-    src: "/video/drift.webm",
-    mimeType: "video/webm",
-    title: "Drifting gradient",
-    width: 960,
-    height: 540,
-    poster: { src: "/video/drift-poster.jpg", width: 960, height: 540 },
-  },
+  type: "video",
+  src: "/video/drift.webm",
+  title: "Drifting gradient",
+  width: 960,
+  height: 540,
+  poster: "/video/drift-poster.jpg",
   thumbnail: { src: "/video/drift-poster.jpg", width: 960, height: 540 },
 };
 const inlineVideo = `<video data-fluidbox-origin autoplay loop muted playsinline poster="/video/drift-poster.jpg">
@@ -88,20 +89,16 @@ const cases: FlightCase[] = [
     expect: "The badge rides on the image at its own size and lands where it started.",
     items: [art("meadow")],
     markup: `<span class="flight-visual" data-fluidbox-origin><img src="${artSrc(sceneById("meadow"))}" alt="" /><span class="flight-badge-host" data-flight-badge-host><span class="flight-badge">New</span></span></span>`,
-    setup(controller, trigger) {
+    setup(fluidbox, trigger) {
       const host = trigger.querySelector<HTMLElement>("[data-flight-badge-host]")!;
-      controller.registerThumbnailOverlay("flight-meadow", {
-        behavior: "travel",
-        element: host,
-        renderer: {
-          mount({ target }) {
-            // Travel content fades near the card by default; a badge stays on the image.
-            target.style.setProperty("--fluidbox-transition-content-opacity", "1");
-            const badge = document.createElement("span");
-            badge.className = "flight-badge";
-            badge.textContent = "New";
-            target.append(badge);
-          },
+      fluidbox.bindOverlay(host, "flight-meadow", {
+        travel({ target }) {
+          // Travel content fades near the card by default; a badge stays on the image.
+          target.style.setProperty("--fluidbox-transition-content-opacity", "1");
+          const badge = document.createElement("span");
+          badge.className = "flight-badge";
+          badge.textContent = "New";
+          target.append(badge);
         },
       });
     },
@@ -156,13 +153,11 @@ const cases: FlightCase[] = [
     items: [
       {
         id: "flight-map",
-        media: {
-          type: "iframe",
-          src: mapEmbedUrl(),
-          title: mapView.title,
-          width: mapView.width,
-          height: mapView.height,
-        },
+        type: "iframe",
+        src: mapEmbedUrl(),
+        title: mapView.title,
+        width: mapView.width,
+        height: mapView.height,
         thumbnail: { src: "/map/preview.svg", width: mapView.width, height: mapView.height },
       },
     ],
@@ -171,7 +166,7 @@ const cases: FlightCase[] = [
 ];
 
 const grid = document.querySelector<HTMLElement>("[data-flight-cases]")!;
-const viewers: Record<string, FluidboxController> = {};
+const viewers: Record<string, Fluidbox> = {};
 
 for (const flight of cases) {
   const cell = document.createElement("article");
@@ -191,33 +186,14 @@ for (const flight of cases) {
     flight.group
       ? cell.querySelector<HTMLElement>(`[data-flight-item="${CSS.escape(id)}"]`)
       : trigger;
-  const origin = (id: string): FluidboxOrigin | null => {
-    const button = triggerFor(id);
-    if (!button) return null;
-    const visual =
-      button.querySelector<HTMLElement>("[data-fluidbox-origin]") ??
-      button.querySelector<HTMLElement>("video") ??
-      button;
-    const thumbnail = visual.matches("img") ? visual : visual.querySelector("img");
-    return {
-      trigger: button,
-      visual,
-      thumbnail: (thumbnail as HTMLImageElement | null) ?? undefined,
-    };
-  };
-  const controller = createFluidbox({
-    source: arraySource(flight.items),
-    origins: {
-      getOrigin: (id) => (flight.items.some((item) => item.id === id) ? origin(id) : null),
-    },
-  });
-  flight.setup?.(controller, trigger);
+  // Each trigger flies from its data-fluidbox-origin, or its video.
+  const fluidbox = createFluidbox({ items: flight.items });
+  flight.setup?.(fluidbox, trigger);
   for (const item of flight.items) {
-    triggerFor(item.id)?.addEventListener("click", () => {
-      void controller.open({ id: item.id }, { reason: "trigger" });
-    });
+    const button = triggerFor(item.id!);
+    if (button) fluidbox.bind(button, item.id!);
   }
-  viewers[flight.id] = controller;
+  viewers[flight.id] = fluidbox;
 }
 
 // Scroll the first photo a third of the way out, so the scroller clips its left side.

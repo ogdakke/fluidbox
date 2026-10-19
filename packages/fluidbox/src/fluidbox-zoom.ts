@@ -15,6 +15,8 @@ interface View {
 interface Options {
   prepare: () => View | null;
   config: () => { step: number; max: number };
+  /** The zoomed image scroller's name. */
+  label: string;
   state: (locked: boolean) => void;
   close: () => void;
   reducedMotion: () => boolean;
@@ -177,7 +179,7 @@ export class FluidboxZoom {
     viewport.addEventListener("pointerup", this.#finishMousePan);
     viewport.addEventListener("pointercancel", this.#finishMousePan);
     viewport.addEventListener("lostpointercapture", this.#finishMousePan);
-    viewport.setAttribute("aria-label", "Zoomed image");
+    viewport.setAttribute("aria-label", this.#options.label);
     const canvas = document.createElement("div");
     canvas.dataset.fluidboxZoomCanvas = "";
     viewport.style.setProperty("--fluidbox-zoom-chrome", `${chromeReach(window)}px`);
@@ -665,6 +667,10 @@ export class FluidboxZoom {
     if (this.#suppressClick && (onMedia || target.closest("[data-fluidbox-zoom-viewport]"))) {
       this.#suppressClick = false;
       return true;
+    }
+    // Controls inside custom content keep their clicks.
+    if (target.closest("button, a[href], input, select, textarea, label, [contenteditable]")) {
+      return false;
     }
     if (target.matches("[data-fluidbox-zoom-canvas], [data-fluidbox-zoom-viewport]")) {
       this.#options.close();

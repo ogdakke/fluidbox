@@ -3,7 +3,7 @@ import { mountChrome, type NavLink } from "@ogdakke/fluidbox-design/chrome";
 export type PageKey =
   | "overview"
   | "elements"
-  | "headless"
+  | "javascript"
   | "react"
   | "solid"
   | "vue"
@@ -17,7 +17,7 @@ export const docsUrl = env.VITE_DOCS_URL ?? "https://docs.fluidbox.local";
 const links: NavLink[] = [
   { key: "overview", href: "/", label: "Overview" },
   { key: "elements", href: "/elements/", label: "Elements" },
-  { key: "headless", href: "/headless/", label: "Headless" },
+  { key: "javascript", href: "/javascript/", label: "JavaScript" },
   { key: "react", href: "/react/", label: "React" },
   { key: "solid", href: "/solid/", label: "Solid" },
   { key: "vue", href: "/vue/", label: "Vue" },

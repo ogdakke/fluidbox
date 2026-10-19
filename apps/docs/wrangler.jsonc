@@ -1,0 +1,10 @@
+{
+  // The docs are static: the landing page, prerendered docs routes, Markdown copies and llms.txt.
+  "name": "fluidbox",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+  },
+}

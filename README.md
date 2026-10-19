@@ -1,8 +1,10 @@
 # @ogdakke/fluidbox
 
-A lightbox for image galleries. Use the custom elements with plain HTML, or attach an indexed source when the page renders only some of its thumbnails. The viewer supports keyboard navigation, swiping, zooming, and a filmstrip.
+A lightbox for the web. The picture flies out of its thumbnail, follows your finger, zooms with a pinch or a double-tap, and flies back to the thumbnail it came from when it closes. One runtime does the gestures, flights, zoom and the body-level viewer; custom elements, a plain JavaScript API, and bindings for React, Solid, Vue and Angular are thin layers over it.
 
-## Getting started
+The documentation lives in [`apps/docs/content`](apps/docs/content/index.md), and is served by the docs site in `apps/docs`.
+
+## Custom elements
 
 Import the elements and styles in a browser entry:
 
@@ -33,77 +35,47 @@ Add a gallery to the page:
 </fluidbox-gallery>
 ```
 
-The `elements` import registers the custom elements. Import the CSS separately to style the viewer. See the [markup and styling guide](docs/FLUIDBOX.md) for slots, state attributes, and CSS hooks.
+See [Custom elements](apps/docs/content/custom-elements.md).
 
-For server rendering, import the package root and register the elements after hydration:
-
-```ts
-import { registerFluidboxElements } from "@ogdakke/fluidbox";
-
-await registerFluidboxElements();
-```
-
-The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue`, and `/angular`. Install only `@ogdakke/fluidbox` alongside the framework your app already uses. The framework packages are optional peers, and each binding has its own export. See [framework bindings](docs/BINDINGS.md) for working examples.
-
-## Indexed galleries
-
-An indexed source lets a gallery open items whose thumbnails are not currently in the DOM. This is useful with virtual lists. The viewer and filmstrip keep a bounded number of elements mounted.
+## Plain JavaScript
 
 ```ts
-import type {
-  FluidboxGalleryElement,
-  FluidboxOriginAdapter,
-  FluidboxSource,
-} from "@ogdakke/fluidbox";
+import { createFluidbox } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/styles.css";
 
-const gallery = document.querySelector<FluidboxGalleryElement>("fluidbox-gallery")!;
-const source: FluidboxSource = {
-  count: photos.length,
-  getItem(index) {
-    const photo = photos[index]!;
-    return {
-      id: photo.id,
-      media: {
-        type: "image",
-        src: photo.full,
-        alt: photo.alt,
-        width: photo.width,
-        height: photo.height,
-      },
-      thumbnail: { src: photo.thumb },
-    };
-  },
-  getIndex(id) {
-    const index = photos.findIndex((photo) => photo.id === id);
-    return index < 0 ? null : index;
-  },
-};
-const origins: FluidboxOriginAdapter = {
-  getOrigin(id) {
-    const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${CSS.escape(id)}"]`);
-    return trigger
-      ? { trigger, visual: trigger, thumbnail: trigger.querySelector("img") ?? undefined }
-      : null;
-  },
-};
-
-gallery.source = source;
-gallery.origins = origins;
-void gallery.open({ index: 0 });
+const fluidbox = createFluidbox({
+  items: [
+    {
+      type: "img",
+      src: "/photos/mountain.jpg",
+      alt: "A mountain at dusk",
+      width: 2400,
+      height: 1600,
+    },
+  ],
+  controls: true,
+});
+fluidbox.bind(document.querySelector("button")!, 0);
 ```
 
-`getOrigin` is optional. When an item has no mounted thumbnail, the viewer uses a scale and fade transition. Keep IDs, item count, and item metadata stable while the viewer is open. The source API is synchronous; it does not currently handle asynchronous pagination or mutation notifications.
+Items are plain objects whose fields are the attributes of the element the viewer draws. `items` can also be a lazy list, `{ count, get(index), indexOf?(id) }`, so a gallery can open items whose thumbnails aren't in the DOM, as in a virtualized grid. See [JavaScript](apps/docs/content/javascript.md) and [Items and origins](apps/docs/content/items-and-origins.md).
+
+## Frameworks
+
+The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue` and `/angular`. The framework packages are optional peers: install `@ogdakke/fluidbox` alongside the one your app already uses. Every binding has the same parts (`Root`, `Trigger`, `Viewer`, `Controls`, `Filmstrip`, `Sheet`, ...) and the same patterns. See the [patterns](apps/docs/content/patterns/index.md).
+
+The package root is safe to import on the server. `@ogdakke/fluidbox/elements` defines the elements on import, so it is browser only: in a server-rendered app, `await import("@ogdakke/fluidbox/elements")` after hydration.
 
 ## Development
 
-This repository uses Bun. The package lives in `packages/fluidbox`. The showcase and test fixtures in `apps/examples` use its built exports.
+This repository uses Bun. The package lives in `packages/fluidbox`. The examples and test fixtures in `apps/examples` use its built exports.
 
 ```sh
 bun install
 bun run build
 bun run dev                 # builds the package, then watches package code and runs Vite
-bun run build:example
-bun run build:frameworks
+bun run build:examples
+bun run build:docs
 bun run test
 bun run test:contract
 bun run test:ssr
@@ -113,12 +85,10 @@ bun run lint:all
 bun run format:check
 ```
 
-Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the example site in `apps/examples`: an overview plus a page each for custom elements, the headless runtime, React, Solid, Vue, and Angular, and an index of test fixtures. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
+Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the example site in `apps/examples`: an overview, a page of the nine patterns for each entry point, and an index of test fixtures. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
 
 The documentation site lives in `apps/docs`. Run `bun run docs`, or `bun run docs:share` to expose it through portless as `docs.fluidbox`. Both sites share the design tokens and chrome in `apps/design`.
 
-The [public API contract](docs/PUBLIC_API.md) defines the headless source, controller, renderer,
-origin, and thumbnail-overlay target. The [roadmap to 1.0](docs/ROADMAP.md) tracks its runtime and
-framework implementation, CDN adapters, styling work, and release gates.
+The [public API contract](docs/PUBLIC_API.md) summarizes the API's shape and rules.
 
 Portfolio declares `"@ogdakke/fluidbox": "file:../fluidbox/packages/fluidbox"`, so a fresh checkout works after building this package and running `bun install` in `portfolio-v4`. For a live directory link during development, run `bun link` in `packages/fluidbox`, then `bun link @ogdakke/fluidbox` in `portfolio-v4`. Reapply the consumer link after reinstalling dependencies.

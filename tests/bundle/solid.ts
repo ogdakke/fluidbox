@@ -1,1 +1,1 @@
-export { useFluidboxGallery } from "@ogdakke/fluidbox/solid";
+export { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/solid";

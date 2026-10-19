@@ -4,12 +4,9 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     elements: "src/elements.ts",
-    react: "src/react.ts",
-    solid: "src/solid.ts",
-    vue: "src/vue.ts",
-    angular: "src/angular.ts",
-    filmstrip: "src/filmstrip-extension.ts",
-    sheet: "src/sheet.ts",
+    filmstrip: "src/filmstrip-entry.ts",
+    sheet: "src/sheet-entry.ts",
+    kit: "src/kit.ts",
   },
   format: "esm",
   platform: "browser",
@@ -24,6 +21,5 @@ export default defineConfig({
     { from: "src/sheet.css", to: "dist", rename: "sheet.css" },
     { from: "src/styles.css.d.ts", to: "dist", rename: "sheet.css.d.ts" },
   ],
-  publint: { level: "error" },
-  attw: { profile: "esm-only", level: "error" },
+  // publint and attw run in scripts/build.ts once the framework bindings are copied in.
 });

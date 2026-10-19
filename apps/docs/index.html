@@ -3,23 +3,120 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Fluidbox docs</title>
+    <title>Fluidbox — a lightbox that moves like the page is physical</title>
+    <meta
+      name="description"
+      content="A lightbox for the web. Media flies out of its thumbnail, follows your fingers, and lands back where it came from. Custom elements, plain JavaScript, React, Solid, Vue and Angular."
+    />
     <link rel="icon" href="/favicon.svg" />
-    <script type="module" src="/src/main.ts"></script>
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+    <script type="module" src="/src/landing.ts"></script>
   </head>
   <body>
-    <div class="docs fb-shell">
-      <aside class="docs-nav" aria-label="Documentation">
-        <details class="docs-nav__menu" open>
-          <summary class="fb-label">Menu</summary>
-          <nav id="docs-nav"></nav>
-        </details>
-      </aside>
-      <main id="content" class="docs-content"></main>
-      <nav class="docs-toc" aria-label="On this page">
-        <p class="fb-label">On this page</p>
-        <ol id="docs-toc"></ol>
-      </nav>
-    </div>
+    <main class="fb-shell landing">
+      <section class="hero">
+        <div class="hero__copy fb-crossed">
+          <p class="fb-label">@ogdakke/fluidbox</p>
+          <h1>A lightbox that moves like the page is physical.</h1>
+          <p class="hero__lede">
+            Media flies out of its thumbnail, follows your fingers, and lands back where it came
+            from. One runtime for custom elements, plain JavaScript, React, Solid, Vue and Angular.
+          </p>
+          <div class="hero__actions">
+            <a class="fb-button fb-button--primary" href="/docs/getting-started/">Get started</a>
+            <a class="fb-button" href="/docs/patterns/">Browse patterns</a>
+          </div>
+          <pre
+            class="landing-install"
+            data-lang="sh"
+          ><code>npm install @ogdakke/fluidbox</code></pre>
+          <ul class="hints" aria-label="Controls">
+            <li><kbd>←</kbd><kbd>→</kbd>&nbsp;swipe</li>
+            <li><kbd>pinch</kbd><kbd>wheel</kbd>&nbsp;zoom</li>
+            <li><kbd>esc</kbd>&nbsp;drag down to close</li>
+          </ul>
+        </div>
+        <div class="landing-demo">
+          <div
+            data-demo="gallery"
+            data-scenes="dune,fjord,alpine,canyon,coast,aurora"
+            data-filmstrip
+            aria-label="Try it"
+          ></div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="features-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">01</span>&nbsp;&nbsp;what you get</p>
+          <h2 class="fb-rule-title" id="features-title">Motion that keeps its place</h2>
+        </header>
+        <div class="fb-grid landing-features">
+          <div class="fb-cell feature">
+            <h3>Shared-element flights</h3>
+            <p>Opening and closing fly between thumbnail and viewer, crop and corners included.</p>
+          </div>
+          <div class="fb-cell feature">
+            <h3>Gestures that hand off</h3>
+            <p>Native swiping with momentum, pinch and wheel zoom, drag down to dismiss.</p>
+          </div>
+          <div class="fb-cell feature">
+            <h3>Lazy item lists</h3>
+            <p>Describe a million items by index. You render only the thumbnails you show.</p>
+          </div>
+          <div class="fb-cell feature">
+            <h3>Any media</h3>
+            <p>Images, video, iframes and your own components share one slide strip.</p>
+          </div>
+          <div class="fb-cell feature">
+            <h3>Filmstrip and sheet</h3>
+            <p>Optional add-ons: a thumbnail strip, and a panel with snap points.</p>
+          </div>
+          <div class="fb-cell feature">
+            <h3>Headless when you need it</h3>
+            <p>Bring your own controls and captions; the runtime keeps the motion.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="frameworks-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">02</span>&nbsp;&nbsp;your stack</p>
+          <h2 class="fb-rule-title" id="frameworks-title">The same gallery, six ways</h2>
+          <p>
+            Every binding drives the same runtime and supports the same patterns. Pick yours; the
+            docs remember it.
+          </p>
+        </header>
+        <div class="landing-tabs">
+          <!-- pattern: basic -->
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="next-title">
+        <header class="section__head">
+          <p class="fb-label"><span class="fb-number">03</span>&nbsp;&nbsp;next</p>
+          <h2 class="fb-rule-title" id="next-title">Read on</h2>
+        </header>
+        <div class="fb-grid landing-links">
+          <a class="fb-cell integration" href="/docs/getting-started/"
+            ><h3>Getting started <span>→</span></h3>
+            <p>Install, import the styles, open your first gallery.</p></a
+          >
+          <a class="fb-cell integration" href="/docs/patterns/"
+            ><h3>Patterns <span>→</span></h3>
+            <p>Nine live examples, each in every framework.</p></a
+          >
+          <a class="fb-cell integration" href="/docs/api/"
+            ><h3>API <span>→</span></h3>
+            <p>Options, state, commands, events and items.</p></a
+          >
+          <a class="fb-cell integration" href="/llms.txt"
+            ><h3>llms.txt <span>→</span></h3>
+            <p>Every page as Markdown, for coding agents.</p></a
+          >
+        </div>
+      </section>
+    </main>
   </body>
 </html>

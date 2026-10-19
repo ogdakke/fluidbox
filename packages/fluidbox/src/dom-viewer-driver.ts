@@ -1,3 +1,4 @@
+import { idOf } from "./items";
 import { chromeReach } from "./chrome-reach";
 import { originIsVisible } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
@@ -20,7 +21,7 @@ import {
   type ImageTransitionPose,
 } from "./image-transition-motion";
 import type {
-  FluidboxController,
+  SessionController,
   FluidboxDispose,
   FluidboxExtension,
   FluidboxExtensionInstance,
@@ -30,7 +31,7 @@ import type {
   FluidboxRenderer,
   FluidboxSource,
   FluidboxZoomOptions,
-} from "./public-api";
+} from "./runtime-types";
 import type {
   ViewerSessionCloseContext,
   ViewerSessionDriver,
@@ -42,6 +43,7 @@ import {
   ViewerModalIsolation,
   type ViewerPortalElements,
 } from "./viewer-portal";
+import type { FluidboxLabels } from "./labels";
 import { ViewerStrip } from "./viewer-strip";
 import { activeViewer } from "./viewer-ownership";
 import { handoffDecodedFlightImage } from "./flight-image";
@@ -58,14 +60,6 @@ const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
 const WHEEL_HANDOFF_TIMEOUT = 1200;
-const LEGACY_THEME_PROPERTIES = new Set([
-  "--radius",
-  "--background",
-  "--color",
-  "--accent",
-  "--border",
-  "--primary",
-]);
 const FOCUSABLE_HOST_SELECTOR =
   "[tabindex], a[href], button, input, select, textarea, summary, video[controls], audio[controls], iframe";
 
@@ -125,7 +119,7 @@ export class DomViewerDriver<
     },
   };
   readonly #lifetime = new AbortController();
-  #controller: FluidboxController<TItem> | undefined;
+  #controller: SessionController<TItem> | undefined;
   #strip: ViewerStrip<TItem> | undefined;
   #portalDispose: FluidboxDispose | undefined;
   #source: FluidboxSource<TItem> | undefined;
@@ -189,12 +183,16 @@ export class DomViewerDriver<
   #forceImmediateClose = false;
   #destroyed = false;
 
+  readonly #labels: FluidboxLabels;
+
   constructor(
     ownerDocument: Document,
     zoomOptions: false | FluidboxZoomOptions | undefined,
-    renderers?: Readonly<Record<string, FluidboxRenderer<TItem>>>,
+    renderers: Readonly<Record<string, FluidboxRenderer<TItem>>> | undefined,
+    labels: FluidboxLabels,
   ) {
-    this.#portal = createViewerPortal(ownerDocument, { defaultCloseButton: false });
+    this.#labels = labels;
+    this.#portal = createViewerPortal(ownerDocument, { label: labels.viewer });
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
     this.#thumbnailOverlays = new ThumbnailOverlayRuntime(ownerDocument);
     this.#renderers = renderers ?? {};
@@ -281,6 +279,7 @@ export class DomViewerDriver<
       return (this.#zoom = new FluidboxZoom(this.#portal.container, {
         prepare: () => this.#prepareZoom(),
         config: () => ({ max, step }),
+        label: this.#labels.zoomed,
         state: (locked) => {
           const dialog = this.#portal.dialog;
           const wasZoomed = dialog.hasAttribute("data-zoomed");
@@ -304,17 +303,13 @@ export class DomViewerDriver<
   }
 
   connect(
-    controller: FluidboxController<TItem>,
-    renderer?: FluidboxPortalRenderer<TItem>,
+    controller: SessionController<TItem>,
+    renderer?: FluidboxPortalRenderer,
     extensions: readonly (FluidboxExtension<TItem> | undefined)[] = [],
   ) {
     this.#controller = controller;
     this.#portalDispose =
-      renderer?.mount({
-        target: this.#portal.portalTarget,
-        controller,
-        signal: this.#lifetime.signal,
-      }) ?? undefined;
+      renderer?.({ target: this.#portal.portalTarget, signal: this.#lifetime.signal }) ?? undefined;
     for (const extension of extensions) {
       if (!extension || !this.#source) continue;
       this.#extensions.push(
@@ -322,6 +317,7 @@ export class DomViewerDriver<
           dialog: this.#portal.dialog,
           controller,
           source: this.#source,
+          labels: this.#labels,
           signal: this.#lifetime.signal,
         }),
       );
@@ -350,15 +346,24 @@ export class DomViewerDriver<
           void controller.goTo({ index }, viewerSelectionCommandOptions("pointer", settled));
         }
       },
+      (index) => {
+        const controller = this.#controller;
+        return controller?.state.status !== "open" || controller.allows({ index }, "pointer");
+      },
       this.#renderers,
+      this.#labels,
     );
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-fluidbox-gallery", source.count > 1);
   }
 
+  revealed() {
+    this.#onPageScroll();
+  }
+
   registerThumbnailOverlay(
-    id: import("./public-api").FluidboxItemId,
-    registration: import("./public-api").FluidboxThumbnailOverlayRegistration<TItem>,
+    id: import("./runtime-types").FluidboxItemId,
+    registration: import("./runtime-types").FluidboxThumbnailOverlayRegistration<TItem>,
   ) {
     return this.#thumbnailOverlays.register(id, registration);
   }
@@ -427,7 +432,9 @@ export class DomViewerDriver<
     void this.#loadZoom();
     this.#cancelAnimations(true);
     const prepared =
-      this.#preparedOpen?.item.id === context.item.id && this.#preparedOpen.index === context.index
+      this.#preparedOpen &&
+      idOf(this.#preparedOpen.item) === idOf(context.item) &&
+      this.#preparedOpen.index === context.index
         ? this.#preparedOpen
         : undefined;
     if (!prepared) this.#discardPreparation();
@@ -545,6 +552,7 @@ export class DomViewerDriver<
     // exactly over the card, so the card stays painted underneath until the
     // overlay has been presented once.
     if (!crossfade) this.#releaseThumbnailAfterFirstFrame(keptThumbnail, context.signal);
+    if (!keptThumbnail) this.#releaseThumbnailAfterFirstFrame(undefined, context.signal);
     await this.#play(animations, context.signal, () =>
       this.#thumbnailOverlays.set("opening", 0, new DOMMatrix()),
     );
@@ -793,10 +801,13 @@ export class DomViewerDriver<
   }
 
   #render(item: TItem, index: number) {
-    const media = item.media;
-    const label = media.type === "image" ? media.alt : media.title;
-    this.#portal.dialog.setAttribute("aria-label", label || "Media viewer");
-    this.#portal.status.textContent = `Item ${index + 1} of ${this.#controller?.state.count ?? 1}`;
+    const media = item;
+    const label = media.type === "img" ? media.alt : media.title;
+    this.#portal.dialog.setAttribute("aria-label", label || this.#labels.viewer);
+    this.#portal.status.textContent = this.#labels.position(
+      index,
+      this.#controller?.state.count ?? 1,
+    );
     this.#trackMedia();
   }
 
@@ -833,15 +844,16 @@ export class DomViewerDriver<
       delete this.#crossfadeThumbnail.dataset.fluidboxThumbnailCrossfade;
     this.#crossfadeThumbnail = thumbnail;
     if (thumbnail) thumbnail.dataset.fluidboxThumbnailCrossfade = "";
+    else this.#thumbnailOverlays.releaseGhost();
   }
 
   #releaseThumbnailAfterFirstFrame(thumbnail: HTMLElement | undefined, signal: AbortSignal) {
-    if (!thumbnail) return;
     const view = this.#portal.overlay.ownerDocument.defaultView!;
     view.requestAnimationFrame(() =>
       view.requestAnimationFrame(() => {
         if (!signal.aborted && this.#crossfadeThumbnail === thumbnail) {
           this.#keepThumbnailVisible(undefined);
+          this.#thumbnailOverlays.releaseGhost();
         }
       }),
     );
@@ -986,7 +998,7 @@ export class DomViewerDriver<
     if (!source) return;
     const style = getComputedStyle(source);
     for (const property of style) {
-      if (!property.startsWith("--fluidbox-") && !LEGACY_THEME_PROPERTIES.has(property)) continue;
+      if (!property.startsWith("--fluidbox-")) continue;
       const value = style.getPropertyValue(property);
       if (!value) continue;
       this.#portal.overlay.style.setProperty(property, value);
@@ -1018,7 +1030,9 @@ export class DomViewerDriver<
   }
 
   async #waitForChromeReveal(signal: AbortSignal) {
-    const chrome = this.#portal.dialog.querySelector<HTMLElement>("[data-fluidbox-chrome]");
+    const chrome = this.#portal.dialog.querySelector<HTMLElement>(
+      "[data-fluidbox-chrome], [data-fluidbox-portal] > :not([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close], [data-fluidbox-mount]), [data-fluidbox-portal] > [data-fluidbox-mount] > *",
+    );
     const animation = chrome
       ?.getAnimations()
       .find(
@@ -1372,7 +1386,7 @@ export class DomViewerDriver<
     this.#portal.overlay.style.setProperty("--fluidbox-scroll-top", `${view.scrollY}px`);
   }
 
-  // The page can still scroll under an open lightbox; follow it as sticky did.
+  // The page can still scroll under an open viewer; follow it as sticky did.
   #onPageScroll = () => {
     const view = this.#portal.overlay.ownerDocument.defaultView;
     if (!view || this.#controller?.state.status === "closed") return;

@@ -1,9 +1,10 @@
+import { idOf } from "./items";
 import type {
   FluidboxDispose,
   FluidboxItem,
   FluidboxItemId,
   FluidboxThumbnailOverlayRegistration,
-} from "./public-api";
+} from "./runtime-types";
 
 export type ThumbnailOverlayPhase = "preview" | "opening" | "open" | "dragging" | "closing";
 
@@ -17,8 +18,17 @@ interface ActiveOverlay<TItem extends FluidboxItem> {
   readonly dispose?: FluidboxDispose;
   readonly frameLayer?: HTMLElement;
   readonly marker?: Comment;
+  /** A still copy of the frame layer that stays on the card until the flight paints. */
+  ghost?: HTMLElement;
   readonly previousStyles?: ReadonlyMap<string, string>;
-  readonly layerAnimations: Animation[];
+  /** Children the runtime counter-scales, with the inline styles they had. */
+  readonly adopted: Map<HTMLElement, { transform: string; transformOrigin: string }>;
+  readonly observer?: MutationObserver;
+  /** The frame's current transform, for children that arrive between flights. */
+  scale: string;
+  /** The flight in progress, for children that arrive during it. */
+  motion?: { keyframes: Keyframe[]; options: KeyframeAnimationOptions; reference: Animation };
+  readonly childAnimations: Animation[];
 }
 
 interface FrameBox {
@@ -26,39 +36,104 @@ interface FrameBox {
   readonly height: number;
 }
 
+function matrixOf(transform: string | DOMMatrix | null | undefined) {
+  if (transform instanceof DOMMatrix) return transform;
+  const value = String(transform ?? "none");
+  return new DOMMatrix(value === "none" ? undefined : value);
+}
+
 /**
- * The travelling copy follows the frame's painted box without scaling: it is
- * moved and resized, so its content keeps its own size and offsets throughout
- * the flight and lands exactly where the thumbnail's copy sits.
+ * The travelling copy is laid out at the frame's full size and takes the
+ * frame's whole transform, so it moves and scales with the frame on the
+ * compositor. Its children scale back by the inverse (see `counterScale`).
  */
 function targetStyle(transform: string | DOMMatrix | null | undefined, box: FrameBox) {
-  const value = String(transform ?? "none");
-  const matrix = new DOMMatrix(value === "none" ? undefined : value);
+  const { a, d, e, f } = matrixOf(transform);
   return {
-    transform: `translate(${matrix.e}px, ${matrix.f}px)`,
-    width: `${box.width * Math.abs(matrix.a)}px`,
-    height: `${box.height * Math.abs(matrix.d)}px`,
+    transform: `matrix(${a}, 0, 0, ${d}, ${e}, ${f})`,
+    width: `${box.width}px`,
+    height: `${box.height}px`,
   };
 }
 
 function targetMotion(frameMotion: Keyframe[], box: FrameBox): Keyframe[] {
   return frameMotion.map(({ offset, transform }) => ({
     offset,
-    ...targetStyle(transform as string | undefined, box),
+    transform: targetStyle(transform as string | undefined, box).transform,
   }));
 }
 
 /**
- * A travel layer sits inside the full-size media frame, so the frame's scale
- * would shrink it with the image. Lay it out at the frame's painted size and
- * scale it back up, so its content keeps the size it had on the thumbnail.
+ * A frame layer and the travelling copy both scale with the frame, so their
+ * boxes always match it. Their children scale back by the inverse, so they
+ * keep the size they had on the thumbnail. Everything moves by transforms,
+ * which keeps the overlay in step with the frame on the compositor.
  */
-function travelLayerStyle(transform: string | DOMMatrix | null | undefined) {
-  const value = String(transform ?? "none");
-  const matrix = new DOMMatrix(value === "none" ? undefined : value);
+function counterScale(transform: string | DOMMatrix | null | undefined) {
+  const matrix = matrixOf(transform);
   const x = Math.max(0.0001, Math.abs(matrix.a));
   const y = Math.max(0.0001, Math.abs(matrix.d));
-  return { transform: `scale(${1 / x}, ${1 / y})`, width: `${x * 100}%`, height: `${y * 100}%` };
+  return `scale(${1 / x}, ${1 / y})`;
+}
+
+/**
+ * The frame's scale moves linearly between its keyframes, and its inverse
+ * does not. Extra keyframes keep the inverse on the frame between them.
+ */
+function counterMotion(frameMotion: Keyframe[]): Keyframe[] {
+  const steps = 4;
+  const keyframes: Keyframe[] = [];
+  frameMotion.forEach(({ offset, transform }, index) => {
+    const matrix = matrixOf(transform as string | undefined);
+    const previous = frameMotion[index - 1];
+    if (previous && typeof previous.offset === "number" && typeof offset === "number") {
+      const from = matrixOf(previous.transform as string | undefined);
+      for (let step = 1; step < steps; step++) {
+        const t = step / steps;
+        keyframes.push({
+          offset: previous.offset + (offset - previous.offset) * t,
+          transform: counterScale(
+            new DOMMatrix([
+              from.a + (matrix.a - from.a) * t,
+              0,
+              0,
+              from.d + (matrix.d - from.d) * t,
+              0,
+              0,
+            ]),
+          ),
+        });
+      }
+    }
+    keyframes.push({ offset, transform: counterScale(matrix) });
+  });
+  return keyframes;
+}
+
+/**
+ * A child scales back around the edge it is anchored to, or around the
+ * centre, so it sits where it would in a box of the frame's painted size: a
+ * badge in a corner stays in the corner and a centred label stays centred.
+ */
+function anchoredOrigin(child: HTMLElement, container: HTMLElement) {
+  if (child.offsetParent !== container) return "50% 50%";
+  const axis = (start: number, size: number, extent: number) => {
+    const end = extent - start - size;
+    // Offsets round to whole pixels, so a centred child can be a pixel off.
+    const anchor = Math.abs(start - end) <= 2 ? extent / 2 : start < end ? 0 : extent;
+    return `${anchor - start}px`;
+  };
+  return `${axis(child.offsetLeft, child.offsetWidth, container.offsetWidth)} ${axis(
+    child.offsetTop,
+    child.offsetHeight,
+    container.offsetHeight,
+  )}`;
+}
+
+function elementChildren(container: HTMLElement) {
+  return [...container.children].filter(
+    (child): child is HTMLElement => child instanceof HTMLElement,
+  );
 }
 
 let progressRegistered = false;
@@ -106,18 +181,31 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     phase: ThumbnailOverlayPhase,
     progress: number,
   ) {
-    const registration = this.#registrations.get(item.id);
+    const registration = this.#registrations.get(idOf(item));
     const active = this.#active;
-    if (active?.registration !== registration || active?.id !== item.id) {
+    if (active?.registration !== registration || active?.id !== idOf(item)) {
       this.#disposeActive();
       if (!registration) return;
       if (registration.behavior === "travel") {
         const frameLayer = registration.frameLayer;
         let marker: Comment | undefined;
+        let ghost: HTMLElement | undefined;
         let previousStyles: Map<string, string> | undefined;
         if (frameLayer?.isConnected) {
           marker = this.#document.createComment("fluidbox-frame-layer");
           frameLayer.before(marker);
+          // The card stays painted until the opening's first frame covers it.
+          if (phase === "opening") {
+            ghost = frameLayer.cloneNode(true) as HTMLElement;
+            ghost.dataset.fluidboxGhost = "";
+            for (const element of [ghost, ...ghost.querySelectorAll("[id]")]) {
+              element.removeAttribute("id");
+            }
+            ghost.setAttribute("aria-hidden", "true");
+            ghost.inert = true;
+            ghost.style.visibility = "visible";
+            marker.after(ghost);
+          }
           frameLayer.dataset.fluidboxTravelLayer = "";
           this.#publish(frameLayer, phase, progress);
           previousStyles = new Map();
@@ -146,14 +234,14 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
         this.#publish(target, phase, progress);
         this.#position(target, frame);
         this.#document.body.append(host);
-        const dispose = registration.renderer.mount({
+        const dispose = registration.renderer({
           item,
           index,
           target,
           signal: controller.signal,
         });
-        this.#active = {
-          id: item.id,
+        const next: ActiveOverlay<TItem> = {
+          id: idOf(item),
           item,
           index,
           registration,
@@ -162,11 +250,29 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
           dispose: dispose ?? undefined,
           frameLayer,
           marker,
+          ghost,
           previousStyles,
-          layerAnimations: [],
+          adopted: new Map(),
+          // A framework renderer can fill the target after this call.
+          observer: new MutationObserver(() => this.#adoptChildren(next)),
+          scale: getComputedStyle(frame).transform,
+          childAnimations: [],
         };
+        this.#active = next;
+        for (const container of [frameLayer, target]) {
+          if (container) next.observer!.observe(container, { childList: true });
+        }
+        this.#adoptChildren(next);
       } else {
-        this.#active = { id: item.id, item, index, registration, layerAnimations: [] };
+        this.#active = {
+          id: idOf(item),
+          item,
+          index,
+          registration,
+          adopted: new Map(),
+          scale: "none",
+          childAnimations: [],
+        };
       }
     } else if (active.target) {
       if (active.frameLayer && active.frameLayer.parentElement !== frame)
@@ -201,20 +307,18 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     const animations = targets.map((target) =>
       this.#progressHolder(target).animate(progress, options),
     );
-    if (active.frameLayer?.isConnected) {
-      const layer = active.frameLayer.animate(
-        frameMotion.map(({ offset, transform }) => ({
-          offset,
-          ...travelLayerStyle(transform as string | undefined),
-        })),
-        options,
-      );
-      active.layerAnimations.push(layer);
-      animations.push(layer);
-    }
     if (!active.target) return animations;
     const box = this.#boxes.get(active.target);
-    if (box) animations.push(active.target.animate(targetMotion(frameMotion, box), options));
+    if (!box) return animations;
+    const reference = active.target.animate(targetMotion(frameMotion, box), options);
+    animations.push(reference);
+    this.#stopChildren(active);
+    active.motion = { keyframes: counterMotion(frameMotion), options, reference };
+    for (const child of active.adopted.keys()) {
+      const animation = child.animate(active.motion.keyframes, options);
+      active.childAnimations.push(animation);
+      animations.push(animation);
+    }
     return animations;
   }
 
@@ -225,12 +329,14 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     if (active.frameLayer && active.frameLayer !== active.registration.element) {
       this.#publish(active.frameLayer, phase, progress);
     }
-    const frame = active.frameLayer?.parentElement;
-    if (active.frameLayer?.dataset.fluidboxTravelLayer !== undefined && frame) {
-      Object.assign(active.frameLayer.style, travelLayerStyle(getComputedStyle(frame).transform));
-    }
     if (!active.target) return;
     this.#publish(active.target, phase, progress);
+    const frame = active.frameLayer?.parentElement;
+    const scale = transform ?? (frame ? getComputedStyle(frame).transform : undefined);
+    if (scale !== undefined) {
+      active.scale = String(scale);
+      for (const child of active.adopted.keys()) child.style.transform = counterScale(scale);
+    }
     const box = this.#boxes.get(active.target);
     if (transform && box) this.#placeTarget(active.target, targetStyle(transform, box));
   }
@@ -272,32 +378,19 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   }
 
   retarget(animations: readonly Animation[], frameMotion: Keyframe[]) {
-    const target = this.#active?.target;
-    const layer = this.#active?.frameLayer;
-    for (const animation of animations) {
-      if (
-        layer &&
-        animation.effect instanceof KeyframeEffect &&
-        animation.effect.target === layer
-      ) {
-        if (!animation.effect.getKeyframes().some((frame) => frame.width)) continue;
-        animation.effect.setKeyframes(
-          frameMotion.map(({ offset, transform }) => ({
-            offset,
-            ...travelLayerStyle(transform as string | undefined),
-          })),
-        );
-      }
-    }
+    const active = this.#active;
+    const target = active?.target;
     const box = target && this.#boxes.get(target);
-    if (!target || !box) return;
-    for (const animation of animations) {
-      if (
-        animation.effect instanceof KeyframeEffect &&
-        animation.effect.target === target &&
-        animation.effect.getKeyframes().some((frame) => frame.transform)
-      ) {
+    if (!active || !target || !box) return;
+    const counter = counterMotion(frameMotion);
+    if (active.motion) active.motion.keyframes = counter;
+    for (const animation of [...animations, ...active.childAnimations]) {
+      if (!(animation.effect instanceof KeyframeEffect) || !animation.effect.target) continue;
+      const element = animation.effect.target as HTMLElement;
+      if (element === target && animation.effect.getKeyframes().some((frame) => frame.transform)) {
         animation.effect.setKeyframes(targetMotion(frameMotion, box));
+      } else if (active.adopted.has(element)) {
+        animation.effect.setKeyframes(counter);
       }
     }
   }
@@ -313,24 +406,70 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
         getComputedStyle(holder).getPropertyValue("--fluidbox-progress"),
       );
     }
-    if (active.frameLayer?.dataset.fluidboxTravelLayer !== undefined) {
-      const { transform, width, height } = getComputedStyle(active.frameLayer);
-      Object.assign(active.frameLayer.style, { transform, width, height });
+    for (const child of active.adopted.keys()) {
+      child.style.transform = getComputedStyle(child).transform;
     }
     if (active.target) {
       const { transform, width, height } = getComputedStyle(active.target);
       this.#placeTarget(active.target, { transform, width, height });
     }
+    this.#stopChildren(active);
   }
 
   finishClose() {
     this.#disposeActive();
   }
 
+  /** The flight has painted over the card. Its still copy of the frame layer can go. */
+  releaseGhost() {
+    const active = this.#active;
+    active?.ghost?.remove();
+    if (active) active.ghost = undefined;
+  }
+
   destroy() {
     this.#disposeActive();
     for (const registration of this.#registrations.values()) this.#reset(registration.element);
     this.#registrations.clear();
+  }
+
+  /** Counter-scale the children of the frame layer and the target, including late ones. */
+  #adoptChildren(active: ActiveOverlay<TItem>) {
+    if (this.#active !== active) return;
+    for (const container of [active.frameLayer, active.target]) {
+      if (!container) continue;
+      for (const child of elementChildren(container)) {
+        if (active.adopted.has(child)) continue;
+        active.adopted.set(child, {
+          transform: child.style.transform,
+          transformOrigin: child.style.transformOrigin,
+        });
+        child.style.transformOrigin = anchoredOrigin(child, container);
+        child.style.transform = counterScale(active.scale);
+        const motion = active.motion;
+        if (motion && motion.reference.playState !== "finished") {
+          const animation = child.animate(motion.keyframes, motion.options);
+          animation.startTime = motion.reference.startTime;
+          animation.currentTime = motion.reference.currentTime;
+          if (motion.reference.playState === "paused") animation.pause();
+          active.childAnimations.push(animation);
+        }
+      }
+    }
+    for (const [child, previous] of active.adopted) {
+      if (child.parentElement === active.frameLayer || child.parentElement === active.target) {
+        continue;
+      }
+      child.style.transform = previous.transform;
+      child.style.transformOrigin = previous.transformOrigin;
+      active.adopted.delete(child);
+    }
+  }
+
+  #stopChildren(active: ActiveOverlay<TItem>) {
+    for (const animation of active.childAnimations) animation.cancel();
+    active.childAnimations.length = 0;
+    active.motion = undefined;
   }
 
   #publish(target: HTMLElement, phase: ThumbnailOverlayPhase, progress: number) {
@@ -341,7 +480,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   /**
    * The element that carries an overlay's progress. The travelling target
    * inherits it from its host: WebKit stops applying the target's animated
-   * width and height while the registered progress animates on the target.
+   * transform while the registered progress animates on the target.
    */
   #progressHolder(target: HTMLElement) {
     const host = target.parentElement;
@@ -354,10 +493,8 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   #position(target: HTMLElement, frame: HTMLElement) {
     const view = this.#document.defaultView!;
     const rect = frame.getBoundingClientRect();
-    // The target is placed at the frame's layout box and follows the frame's
-    // transform as a translation and a resize, never as a scale.
-    const transformValue = getComputedStyle(frame).transform;
-    const transform = new DOMMatrix(transformValue === "none" ? undefined : transformValue);
+    // The target is placed at the frame's layout box and takes the frame's transform.
+    const transform = matrixOf(getComputedStyle(frame).transform);
     const box = { width: frame.offsetWidth, height: frame.offsetHeight };
     this.#boxes.set(target, box);
     target.parentElement?.style.setProperty(
@@ -378,17 +515,21 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   #disposeActive() {
     const active = this.#active;
     if (!active) return;
+    this.#active = undefined;
+    active.observer?.disconnect();
+    this.#stopChildren(active);
+    for (const [child, previous] of active.adopted) {
+      child.style.transform = previous.transform;
+      child.style.transformOrigin = previous.transformOrigin;
+    }
     delete active.target?.dataset.fluidboxControlsRevealing;
     active.target?.style.removeProperty("--fluidbox-controls-reveal-delay");
     active.controller?.abort();
     active.dispose?.();
     (active.target?.parentElement ?? active.target)?.remove();
-    for (const animation of active.layerAnimations) animation.cancel();
+    active.ghost?.remove();
     if (active.frameLayer && active.marker?.isConnected) {
       delete active.frameLayer.dataset.fluidboxTravelLayer;
-      for (const property of ["transform", "width", "height"] as const) {
-        active.frameLayer.style[property] = "";
-      }
       active.marker.replaceWith(active.frameLayer);
       for (const [property, value] of active.previousStyles ?? []) {
         if (value) active.frameLayer.style.setProperty(property, value);
@@ -403,7 +544,6 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     } else {
       this.#reset(active.registration.element);
     }
-    this.#active = undefined;
   }
 
   #reset(target: HTMLElement) {

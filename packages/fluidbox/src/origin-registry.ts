@@ -3,7 +3,7 @@ import type {
   FluidboxItemId,
   FluidboxOrigin,
   FluidboxOriginAdapter,
-} from "./public-api";
+} from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
 
 interface OriginRegistration {

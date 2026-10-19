@@ -37,7 +37,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: none;
 }
 
-fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]) {
+:where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger])) {
   appearance: none;
   box-sizing: border-box;
   margin: 0;
@@ -56,31 +56,9 @@ fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]) {
   touch-action: manipulation;
 }
 
-fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible {
-  outline: 1px solid var(--border, currentColor);
+:where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible) {
+  outline: 1px solid var(--fluidbox-focus-color, currentColor);
   outline-offset: 2px;
-}
-
-[data-fluidbox-video-trigger] {
-  position: relative;
-  width: var(--fluidbox-preview-width, 100%);
-  height: var(--fluidbox-preview-height, auto);
-  aspect-ratio: var(--fluidbox-preview-aspect, var(--fluidbox-content-aspect));
-  overflow: hidden;
-}
-
-[data-fluidbox-video-trigger] > video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-[data-fluidbox-video-trigger] > [data-fluidbox-transition-layer] {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
 }
 
 [data-fluidbox-video-actions] {
@@ -88,46 +66,6 @@ fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible {
   inset: 0;
   pointer-events: none;
   transition: opacity 180ms linear;
-}
-
-[data-fluidbox-video-actions]::before {
-  content: "";
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--background, oklch(0% 0 0 / 0.7));
-  box-shadow: 0 2px 8px oklch(0% 0 0 / 0.25);
-}
-
-[data-fluidbox-video-actions] > button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color, white);
-  cursor: zoom-in;
-  pointer-events: auto;
-}
-
-[data-fluidbox-video-actions] > [data-fluidbox-close] {
-  opacity: 0;
-  cursor: zoom-out;
-  pointer-events: none;
-}
-
-@keyframes fluidbox-video-actions-appear {
-  from {
-    opacity: 0;
-  }
 }
 
 @keyframes fluidbox-filmstrip-appear {
@@ -157,10 +95,6 @@ fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible {
   }
 }
 
-fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
-  animation: fluidbox-video-actions-appear 120ms ease-out both;
-}
-
 [data-fluidbox-transition-host] {
   --fluidbox-progress: 1;
 
@@ -187,26 +121,11 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   height: var(--fluidbox-transition-height, auto);
   transform: var(--fluidbox-transition-transform, none);
   transform-origin: top left;
+  opacity: var(--fluidbox-transition-content-opacity, 0);
   will-change: transform, opacity;
 }
 
-[data-fluidbox-transition-content]:has([data-fluidbox-transition-controls]) {
-  opacity: var(--fluidbox-transition-content-opacity, 1);
-}
-
-[data-fluidbox-transition-content]:has(
-  [data-fluidbox-transition-controls]
-)[data-fluidbox-phase="open"] {
-  opacity: 1;
-}
-
-[data-fluidbox-transition-content]:not(:has([data-fluidbox-transition-controls])) {
-  opacity: var(--fluidbox-transition-content-opacity, 0);
-}
-
-[data-fluidbox-transition-content][data-fluidbox-phase="opening"]:not(
-  :has([data-fluidbox-transition-controls])
-) {
+[data-fluidbox-transition-content][data-fluidbox-phase="opening"] {
   opacity: var(
     --fluidbox-transition-content-opacity,
     clamp(0, calc((var(--fluidbox-progress) - 0.78) * 4.5455), 1)
@@ -216,21 +135,11 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
 [data-fluidbox-transition-content]:is(
   [data-fluidbox-phase="dragging"],
   [data-fluidbox-phase="closing"]
-):not(:has([data-fluidbox-transition-controls])) {
+) {
   opacity: var(
     --fluidbox-transition-content-opacity,
     clamp(0, calc((var(--fluidbox-progress) - 0.56) * 2.9412), 1)
   );
-}
-
-[data-fluidbox-transition-content]:has([data-fluidbox-transition-controls]) [data-fluidbox-open] {
-  opacity: var(--fluidbox-progress);
-  pointer-events: none;
-}
-
-[data-fluidbox-transition-content]:has([data-fluidbox-transition-controls]) [data-fluidbox-close] {
-  opacity: calc(1 - var(--fluidbox-progress));
-  pointer-events: none;
 }
 
 [data-fluidbox-transition-content]:is(
@@ -254,30 +163,6 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
     animation-duration: 0ms;
     animation-delay: 0ms;
   }
-}
-
-@starting-style {
-  [data-fluidbox-transition-content][data-fluidbox-phase="opening"] [data-fluidbox-video-actions] {
-    opacity: 1;
-  }
-}
-
-[data-fluidbox-transition-content]:is(
-    [data-fluidbox-phase="opening"],
-    [data-fluidbox-phase="dragging"],
-    [data-fluidbox-phase="closing"]
-  )
-  [data-fluidbox-video-actions]
-  > button {
-  pointer-events: none;
-}
-
-[data-fluidbox-transition-content]:has(
-    [data-fluidbox-transition-controls]
-  )[data-fluidbox-phase="open"]
-  [data-fluidbox-close] {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 [data-fluidbox-thumbnail] {
@@ -376,13 +261,13 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   isolation: isolate;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
-  color: var(--color, white);
+  color: var(--fluidbox-color, white);
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-backdrop] {
   position: absolute;
   inset: 0;
-  background: var(--fluidbox-backdrop-background, var(--background, #111));
+  background: var(--fluidbox-backdrop-background, var(--fluidbox-background, #111));
   opacity: var(--fluidbox-backdrop-opacity, 1);
   -webkit-backdrop-filter: var(--fluidbox-backdrop-filter, none);
   backdrop-filter: var(--fluidbox-backdrop-filter, none);
@@ -402,7 +287,7 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]:focus-visible {
-  outline: 1px solid var(--border, currentColor);
+  outline: 1px solid var(--fluidbox-focus-color, currentColor);
   outline-offset: 2px;
 }
 
@@ -415,13 +300,6 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   object-fit: contain;
   aspect-ratio: var(--fluidbox-media-aspect, auto);
   border-radius: 0;
-}
-
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-more-label] {
-  color: var(--fluidbox-label-color, inherit);
-  font: var(--fluidbox-label-font, inherit);
-  letter-spacing: var(--fluidbox-label-letter-spacing, normal);
-  text-shadow: var(--fluidbox-label-text-shadow, none);
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
@@ -444,12 +322,22 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   max-height: var(--fluidbox-height, 100svh);
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-content] > * {
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-content] > *,
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-content]
+  > [data-fluidbox-mount]
+  > * {
   display: block;
   width: 100%;
   height: 100%;
   max-width: 100%;
   max-height: 100%;
+}
+
+/* A framework binding's mount host: layout sees through it to the content. */
+[data-fluidbox-mount],
+[data-fluidbox-content] > [data-fluidbox-mount] {
+  display: contents;
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
@@ -482,6 +370,10 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-content]:not([data-sized])
+  > *,
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-content]:not([data-sized])
+  > [data-fluidbox-mount]
   > * {
   width: auto;
   height: auto;
@@ -497,8 +389,8 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   height: 32px;
   border-radius: 50%;
   border: none;
-  background: var(--background, #111);
-  color: var(--color, white);
+  background: var(--fluidbox-background, #111);
+  color: var(--fluidbox-color, white);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
@@ -509,7 +401,7 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
     transform 150ms ease-out,
     background 150ms ease-out,
     opacity 180ms linear;
-  opacity: var(--fluidbox-gallery-control-opacity, var(--fluidbox-close-opacity, 1));
+  opacity: var(--fluidbox-gallery-control-opacity, 1);
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close][hidden],
@@ -517,6 +409,16 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   display: none;
 }
 
+/* Filmstrip defaults. :where() keeps them at zero specificity, so a rule of
+   yours on the dialog wins in any order. The strip is the thumbnails plus 6px
+   above and below; the space adds 10px either side of it and the safe area. */
+:where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
+  --fluidbox-filmstrip-item-size: 52px;
+  --fluidbox-filmstrip-gap: 5px;
+  --fluidbox-filmstrip-space: calc(
+    var(--fluidbox-filmstrip-item-size) + 32px + env(safe-area-inset-bottom, 0px)
+  );
+}
 /* Every dialog fills the viewport. A dialog that shrinks to its media would
    clip the opening and closing flights to the media's column. */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog] {
@@ -532,7 +434,6 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-gallery][data-filmstrip] {
-  --fluidbox-filmstrip-space: calc(84px + env(safe-area-inset-bottom, 0px));
   --fluidbox-content-height: calc(
     var(--fluidbox-height, 100svh) - var(--fluidbox-filmstrip-space) - var(--fluidbox-stage-top) -
       var(--fluidbox-stage-bottom)
@@ -579,6 +480,10 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   scroll-snap-align: center;
   transform: translateX(var(--fluidbox-scroll-compensation, 0px));
 }
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide][hidden] {
+  /* A refused swipe hides the slides past the fence. */
+  display: none;
+}
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-slide]
   :is([data-fluidbox-media], [data-fluidbox-item-content]) {
@@ -613,13 +518,11 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   background: transparent;
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
-  --fluidbox-filmstrip-item-size: 52px;
-  --fluidbox-filmstrip-gap: 5px;
   position: relative;
   inset-inline: 0;
   align-self: start;
   margin-block-start: 10px;
-  height: 64px;
+  height: calc(var(--fluidbox-filmstrip-item-size) + 12px);
   overflow: hidden;
   touch-action: pan-x;
   -webkit-user-select: none;
@@ -684,11 +587,12 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   display: flex;
   gap: var(--fluidbox-filmstrip-gap);
   height: 100%;
-  padding-inline: calc(50vw - 26px);
+  /* Half the window less half a thumbnail, so the first and last centre. */
+  padding-inline: calc(50vw - var(--fluidbox-filmstrip-item-size) / 2);
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
-  scroll-padding-inline: calc(50vw - 26px);
+  scroll-padding-inline: calc(50vw - var(--fluidbox-filmstrip-item-size) / 2);
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-x;
@@ -711,7 +615,7 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   height: var(--fluidbox-filmstrip-item-size);
   margin-block: 6px;
   overflow: hidden;
-  border-radius: max(2px, calc(var(--radius, 6px) / 2));
+  border-radius: var(--fluidbox-filmstrip-item-radius, 3px);
   opacity: 0.58;
   scroll-snap-align: center;
   cursor: pointer;
@@ -734,28 +638,19 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-filmstrip-item]:focus-visible {
-  outline: 2px solid var(--primary, currentColor);
+  outline: 2px solid var(--fluidbox-focus-color, currentColor);
   outline-offset: -2px;
 }
 @media (hover: none) and (pointer: coarse) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
-    [data-fluidbox-dialog][data-fluidbox-gallery][data-filmstrip] {
-    --fluidbox-filmstrip-space: calc(68px + env(safe-area-inset-bottom, 0px));
-  }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
-    height: 50px;
-    margin-block-start: 8px;
-  }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+  :where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
     --fluidbox-filmstrip-item-size: 38px;
     --fluidbox-filmstrip-gap: 3px;
+    --fluidbox-filmstrip-space: calc(
+      var(--fluidbox-filmstrip-item-size) + 30px + env(safe-area-inset-bottom, 0px)
+    );
   }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-scroll] {
-    padding-inline: calc(50vw - 19px);
-    scroll-padding-inline: calc(50vw - 19px);
-  }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] {
-    margin-block: 6px;
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+    margin-block-start: 8px;
   }
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-frame] {
@@ -764,8 +659,6 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   width: max-content;
   max-width: 100cqw;
   max-height: var(--fluidbox-height, 100svh);
-  border-radius: var(--fluidbox-frame-radius, 0);
-  transform: var(--fluidbox-frame-transform, none);
   transform-origin: top left;
   overflow: hidden;
   will-change: transform, border-radius;
@@ -888,8 +781,8 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--accent, rgb(20 20 20 / 0.72));
-  color: var(--color, white);
+  background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
+  color: var(--fluidbox-color, white);
   font: inherit;
   cursor: pointer;
   transform: translateY(-50%);
@@ -927,29 +820,69 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-dismissing]
+  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-dismissing]
   :is(
-    [data-fluidbox-previous],
-    [data-fluidbox-next],
-    [data-fluidbox-close],
-    [data-fluidbox-chrome]
+    [data-fluidbox-chrome],
+    [data-fluidbox-portal]
+      > :not(
+        [data-fluidbox-previous],
+        [data-fluidbox-next],
+        [data-fluidbox-close],
+        [data-fluidbox-mount]
+      ),
+    [data-fluidbox-portal] > [data-fluidbox-mount] > *
   ) {
   opacity: 0;
   pointer-events: none;
 }
-/* Consumer layers marked data-fluidbox-chrome reveal and dismiss with the controls. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-chrome] {
+/* Your portal content, and other layers marked data-fluidbox-chrome, reveal and
+   dismiss with the controls. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is(
+    [data-fluidbox-chrome],
+    [data-fluidbox-portal]
+      > :not(
+        [data-fluidbox-previous],
+        [data-fluidbox-next],
+        [data-fluidbox-close],
+        [data-fluidbox-mount]
+      ),
+    [data-fluidbox-portal] > [data-fluidbox-mount] > *
+  ) {
   transition: opacity 180ms linear;
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-opening]
-  [data-fluidbox-chrome] {
+  :is(
+    [data-fluidbox-chrome],
+    [data-fluidbox-portal]
+      > :not(
+        [data-fluidbox-previous],
+        [data-fluidbox-next],
+        [data-fluidbox-close],
+        [data-fluidbox-mount]
+      ),
+    [data-fluidbox-portal] > [data-fluidbox-mount] > *
+  ) {
   opacity: 0;
   pointer-events: none;
   transition: none;
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-opening][data-chrome-revealing]
-  [data-fluidbox-chrome] {
+  :is(
+    [data-fluidbox-chrome],
+    [data-fluidbox-portal]
+      > :not(
+        [data-fluidbox-previous],
+        [data-fluidbox-next],
+        [data-fluidbox-close],
+        [data-fluidbox-mount]
+      ),
+    [data-fluidbox-portal] > [data-fluidbox-mount] > *
+  ) {
   animation: fluidbox-gallery-controls-appear 180ms linear
     var(--fluidbox-chrome-reveal-delay, 210ms) both;
 }
@@ -958,7 +891,9 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
     :is(
       [data-fluidbox-dialog][data-fluidbox-gallery]
         :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
-      [data-fluidbox-chrome]
+      [data-fluidbox-chrome],
+      [data-fluidbox-portal] > *,
+      [data-fluidbox-portal] > [data-fluidbox-mount] > *
     ) {
     transition-duration: 0ms;
     animation-duration: 0ms;
@@ -1083,8 +1018,8 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
   left: 8px;
   right: 8px;
   padding: 8px;
-  background: var(--background, white);
-  color: var(--color, black);
+  background: var(--fluidbox-background, white);
+  color: var(--fluidbox-color, black);
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-status] {
   position: absolute;
@@ -1097,10 +1032,10 @@ fluidbox-item[data-fluidbox-state="closed"] [data-fluidbox-video-actions] {
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close]:hover {
   transform: scale(1.1);
-  background: var(--accent);
+  background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close]:focus-visible {
-  outline: 2px solid var(--primary, currentColor);
+  outline: 2px solid var(--fluidbox-focus-color, currentColor);
   outline-offset: 2px;
 }

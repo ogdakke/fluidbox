@@ -1,0 +1,16 @@
+{
+  "name": "@ogdakke/fluidbox-react",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Built into @ogdakke/fluidbox/react. Not published on its own.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsdown"
+  },
+  "peerDependencies": {
+    "@ogdakke/fluidbox": "workspace:*",
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}

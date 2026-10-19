@@ -4,15 +4,23 @@ type Rest = {
   readonly top: number;
   readonly bottom: number;
   readonly height: number;
+  readonly width: number;
   readonly originX: number;
   readonly originY: number;
 };
 
 export interface PhotoRoomVariables {
-  /** `fit` shrinks the photo into the room left above the panel; `push` slides it up. */
+  /**
+   * `fit` shrinks the photo into the room left above the panel. With `push` the
+   * panel's own layout pushes the stage, from where it meets the active photo,
+   * see `hold`; the room moves the other photos to where their own push would
+   * put them, and lifts a photo with less room under it than the gap.
+   */
   readonly photo: string;
   /** Space kept between the photo and the panel. */
   readonly gap: string;
+  /** In `fit`, space the photo keeps clear above and beside it as it shrinks. */
+  readonly inset: string;
   /**
    * In `fit`, how much the panel may cover, in pixels or a percentage of the
    * stage, before the photo stops shrinking and rises with it instead.
@@ -33,32 +41,12 @@ export interface PhotoRoomTrack {
 
 /** How much the panel covers before a fitting photo stops shrinking, unless set. */
 const DEFAULT_FIT_LIMIT = 0.55;
-/** The least distance over which a photo eases into or out of its rest pose. */
+/** The panel rise over which a pushed photo short of the gap lifts by the rest of it. */
 const KNEE = 48;
-/** The most distance short of the photo over which it starts to ease. */
-const LONGEST_EASE = 200;
 /** Covered pixels between samples of a tracked pose; collinear samples are dropped. */
 const SAMPLE_STEP = 4;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-
-/**
- * Eases the panel's overlap with the photo, so the photo starts and stops
- * moving gently. `start` is the overlap with the panel at rest, mostly short of
- * the photo; the curve leaves 0 there, flat, and joins the overlap at slope 1
- * as far past the photo, so it never falls under it. The photo then comes to
- * rest only as the panel does, not while the panel is still moving fast.
- */
-function ease(overlap: number, start: number) {
-  const from = Math.max(start, -LONGEST_EASE);
-  const to = Math.max(-from, from + 2 * KNEE);
-  if (overlap <= from) return 0;
-  if (overlap >= to) return overlap;
-  // A cubic from (from, 0) flat to (to, to) at slope 1.
-  const span = to - from;
-  const t = (overlap - from) / span;
-  return to * (3 * t * t - 2 * t ** 3) + span * (t ** 3 - t * t);
-}
 
 /**
  * Fits the photos in a viewer into the room above a panel covering the bottom of
@@ -128,6 +116,30 @@ export class PhotoRoom {
     this.#clearStyles();
   }
 
+  /** Whether the photos are pushed by layout rather than fitted. */
+  get pushes() {
+    return getComputedStyle(this.#dialog).getPropertyValue(this.#variables.photo).trim() === "push";
+  }
+
+  /**
+   * With `push`, how far the panel rises from rest before it comes within the
+   * gap of the active photo: as far as the stage holds before the panel pushes it.
+   */
+  hold(lead: number, peek: number) {
+    const slide = this.#active();
+    const rest = slide && this.#restOf(slide);
+    return rest ? this.#holdOf(rest, lead, peek) : 0;
+  }
+
+  #holdOf(rest: Rest, lead: number, peek: number) {
+    const gap = this.#length(this.#variables.gap);
+    return Math.max(0, Math.round(this.#stage.clientHeight - rest.bottom + lead - peek - gap));
+  }
+
+  #active() {
+    return this.#stage.querySelector<HTMLElement>('[data-fluidbox-slide][aria-hidden="false"]');
+  }
+
   /** Measure the photos afresh, as after a resize. */
   forget() {
     this.#cancel();
@@ -189,6 +201,7 @@ export class PhotoRoom {
       top: at.top,
       bottom: at.top + media.offsetHeight,
       height: media.offsetHeight,
+      width: media.offsetWidth,
       originX: at.left - box.left + media.offsetWidth / 2,
       originY: at.top - box.top,
     };
@@ -196,53 +209,89 @@ export class PhotoRoom {
     return rest;
   }
 
-  /** The photo shrinks (fit) or rises (push) into the room above a panel covering `covered`. */
+  /**
+   * The photo shrinks into the room above a panel covering `covered`. It goes
+   * from its rest pose to its pose centred in the room above the panel at `end`,
+   * clear of the inset and the gap, with its scale and offset both linear in
+   * the panel's rise, so each edge moves in a straight line and none crosses
+   * the panel. Past `end` it rises with the panel at that size.
+   */
   #pose(
     rest: Rest,
     covered: number,
+    end: number,
     height: number,
     style: CSSStyleDeclaration,
-    lead: number,
   ): Pose {
-    const rising = Math.max(0, covered - this.#rest);
-    const gap =
-      (Number.parseFloat(style.getPropertyValue(this.#variables.gap)) || 0) *
-      Math.min(1, rising / 48);
-    // How far the panel's edge has come over the photo, eased; see ease().
-    const atRest = rest.bottom - (height - this.#rest + lead);
-    const overlap = ease(rest.bottom - (height - covered - gap), atRest);
-    if (overlap <= 0) return { ty: 0, scale: 1 };
-    const bottom = rest.bottom - overlap;
-    const top = Math.min(rest.top, this.#length("--fluidbox-stage-top"));
-    if (style.getPropertyValue(this.#variables.photo).trim() === "push") {
-      // Rises with the panel until its top meets the stage; then the panel covers it.
-      return { ty: clamp(bottom - rest.bottom, top - rest.top, 0), scale: 1 };
-    }
-    // Shrinks until the panel reaches the limit, then rises with it at that size.
-    const beyond = Math.max(0, covered - Math.max(this.#rest, this.#limit(height)));
-    const scale = clamp((bottom + beyond - top) / rest.height, 0.25, 1);
-    return { ty: bottom - scale * rest.height - rest.top, scale };
+    if (covered <= this.#rest || end <= this.#rest) return { ty: 0, scale: 1 };
+    const length = (name: string) => Number.parseFloat(style.getPropertyValue(name)) || 0;
+    const inset = length(this.#variables.inset);
+    const top = Math.max(Math.min(rest.top, this.#length("--fluidbox-stage-top")), inset);
+    const room = height - end - length(this.#variables.gap) - top;
+    const scale = clamp(
+      Math.min(1, room / rest.height, (this.#stage.clientWidth - 2 * inset) / rest.width),
+      0.25,
+      1,
+    );
+    const ty = top + (room - scale * rest.height) / 2 - rest.top;
+    const t = Math.min(1, (covered - this.#rest) / (end - this.#rest));
+    return {
+      ty: ty * t - Math.max(0, covered - end),
+      scale: 1 + (scale - 1) * t,
+    };
   }
 
   /** One scroll-driven animation per slide, sampled from the pose at each scroll offset. */
+  /**
+   * With `push`, the stage rises with the panel once it has risen `active`, the
+   * active photo's hold; a photo whose own hold differs moves by the difference,
+   * so each sits the gap above the panel. A photo with less room under it than
+   * the gap is pushed from the start, touching the panel, and rises by the rest
+   * of the gap, eased, over the panel's first KNEE pixels. Only the photos to
+   * either side, and that lift of a few pixels, move by animation: neither
+   * shows while the panel moves, so its lag can't either.
+   */
+  #pushed(rest: Rest, risen: number, height: number, lead: number, active: number): Pose {
+    const own = this.#holdOf(rest, lead, this.#rest);
+    const gap = this.#length(this.#variables.gap);
+    const short = gap - (height - rest.bottom + lead - this.#rest);
+    const t = clamp(risen / KNEE, 0, 1);
+    const lift = short > 0 ? short * (3 * t * t - 2 * t ** 3) : 0;
+    return { ty: Math.max(0, risen - active) - Math.max(0, risen - own) - lift, scale: 1 };
+  }
+
   #animateSlides() {
     const track = this.#track!;
     if (track.range <= 0) return;
+    const pushes = this.pushes;
     const height = this.#stage.clientHeight;
     const style = getComputedStyle(this.#dialog);
     const lead = track.lead ?? 0;
+    const active = pushes ? this.hold(lead, this.#rest) : 0;
+    // With fit, the photo shrinks until the panel is all the way up or covers the limit.
+    const end = Math.min(
+      this.#rest - lead + track.range - track.from,
+      Math.max(this.#rest, this.#limit(height)),
+    );
     for (const slide of this.#slides()) {
       if (this.#animations.has(slide)) continue;
       const rest = this.#restOf(slide);
       if (!rest) continue;
-      const points: [number, Pose][] = [[0, { ty: 0, scale: 1 }]];
-      if (track.from > 0) points.push([track.from, { ty: 0, scale: 1 }]);
-      for (let offset = track.from; ; offset += SAMPLE_STEP) {
-        const at = Math.min(offset, track.range);
-        const covered = this.#rest - lead + at - track.from;
-        points.push([at, this.#pose(rest, covered, height, style, lead)]);
-        if (at >= track.range) break;
-      }
+      const pose = (at: number) =>
+        pushes
+          ? this.#pushed(rest, at - track.from, height, lead, active)
+          : this.#pose(rest, this.#rest - lead + at - track.from, end, height, style);
+      const offsets = [0, track.from];
+      for (let offset = track.from; offset < track.range; offset += SAMPLE_STEP)
+        offsets.push(offset);
+      // A push bends where the panel meets each hold; sample there exactly.
+      if (pushes)
+        offsets.push(track.from + active, track.from + this.#holdOf(rest, lead, this.#rest));
+      else offsets.push(track.from + lead, track.from + lead + end - this.#rest);
+      offsets.push(track.range);
+      const points = [...new Set(offsets.map((at) => clamp(at, 0, track.range)))]
+        .sort((a, b) => a - b)
+        .map((at): [number, Pose] => [at, at < track.from ? { ty: 0, scale: 1 } : pose(at)]);
       const keyframes = collinearFree(points).map(([at, pose]) => ({
         offset: at / track.range,
         translate: `0 ${pose.ty}px`,

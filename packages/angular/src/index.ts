@@ -1,0 +1,82 @@
+import { NgModule } from "@angular/core";
+import { FluidboxFilmstripDirective } from "./filmstrip.js";
+import {
+  FluidboxCloseDirective,
+  FluidboxControlsComponent,
+  FluidboxItemDirective,
+  FluidboxNextDirective,
+  FluidboxPreviousDirective,
+  FluidboxSheetStopDirective,
+  FluidboxThumbnailOverlayDirective,
+  FluidboxTriggerDirective,
+  FluidboxViewerDirective,
+} from "./parts.js";
+import { FluidboxRootDirective } from "./root.js";
+import { FluidboxSheetDirective } from "./sheet.js";
+
+export { FluidboxFilmstripDirective } from "./filmstrip.js";
+export type { FluidboxContent, FluidboxItemContext } from "./mount.js";
+export {
+  FluidboxCloseDirective,
+  FluidboxControlDirective,
+  FluidboxControlsComponent,
+  FluidboxItemDirective,
+  FluidboxNextDirective,
+  FluidboxPreviousDirective,
+  FluidboxSheetStopDirective,
+  FluidboxThumbnailOverlayDirective,
+  FluidboxTriggerDirective,
+  FluidboxViewerDirective,
+  type FluidboxItemRef,
+} from "./parts.js";
+export {
+  FluidboxRootDirective,
+  injectFluidbox,
+  injectFluidboxSheet,
+  type FluidboxApi,
+  type FluidboxSheetApi,
+} from "./root.js";
+export { FluidboxSheetDirective } from "./sheet.js";
+
+export { FluidboxChangeEvent, FluidboxToggleEvent } from "@ogdakke/fluidbox";
+export type {
+  Fluidbox,
+  FluidboxCustomItem,
+  FluidboxIframeItem,
+  FluidboxImageItem,
+  FluidboxItem,
+  FluidboxItemList,
+  FluidboxItems,
+  FluidboxLabels,
+  FluidboxOrigin,
+  FluidboxOriginAdapter,
+  FluidboxReason,
+  FluidboxSheetSnapPoint,
+  FluidboxState,
+  FluidboxStatus,
+  FluidboxTarget,
+  FluidboxVideoItem,
+} from "@ogdakke/fluidbox";
+export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+
+const parts = [
+  FluidboxRootDirective,
+  FluidboxItemDirective,
+  FluidboxTriggerDirective,
+  FluidboxThumbnailOverlayDirective,
+  FluidboxViewerDirective,
+  FluidboxControlsComponent,
+  FluidboxCloseDirective,
+  FluidboxPreviousDirective,
+  FluidboxNextDirective,
+  FluidboxFilmstripDirective,
+  FluidboxSheetDirective,
+  FluidboxSheetStopDirective,
+];
+
+/**
+ * Every fluidbox part, for NgModule apps and quick starts. The filmstrip and
+ * sheet runtimes load on demand, the first time a root uses them.
+ */
+@NgModule({ imports: parts, exports: parts })
+export class FluidboxModule {}

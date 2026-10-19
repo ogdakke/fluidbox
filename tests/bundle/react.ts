@@ -1,1 +1,1 @@
-export { Fluidbox, useFluidbox, useFluidboxState } from "@ogdakke/fluidbox/react";
+export { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";

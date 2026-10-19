@@ -181,11 +181,12 @@ test("visible items preserve the collapsed card while hidden items replace it", 
       );
     }),
   ).toBe(true);
-  const hiddenSource = await gallery
-    .locator("[data-preview-hidden]")
-    .first()
-    .locator('[slot="trigger"] img')
-    .getAttribute("src");
+  const hiddenSource = await page.evaluate(
+    () =>
+      document
+        .querySelector<HTMLTemplateElement>("#collapsed-gallery [data-preview-hidden] template")!
+        .content.querySelector("img")!.src,
+  );
   expect(hiddenFrames.at(-1)?.preview).toBe(hiddenSource);
   expect(hiddenFrames.some((frame) => frame.layerOpacity > 0 && frame.layerOpacity < 1)).toBe(true);
   expect(hiddenFrames.some((frame) => frame.labelOpacity > 0 && frame.labelOpacity < 1)).toBe(true);
@@ -300,6 +301,59 @@ test("the first card carries its left corners into the opening transition", asyn
   expect(corners[1]).toBe(0);
   expect(corners[2]).toBe(0);
   expect(corners[3]).toBeGreaterThan(0);
+});
+
+test("the teaser layer and label stay on the flying frame both ways", async ({ page }) => {
+  const { teaser } = await loadGallery(page);
+  const sample = () =>
+    page.evaluate(async () => {
+      const misses: string[] = [];
+      let frames = 0;
+      const started = performance.now();
+      while (performance.now() - started < 900) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        const frame =
+          document.querySelector<HTMLElement>("[data-fluidbox-flight] [data-fluidbox-frame]") ??
+          document.querySelector<HTMLElement>(
+            '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
+          );
+        const layer = frame?.querySelector<HTMLElement>(
+          ":scope > [data-fluidbox-transition-layer]",
+        );
+        const label = document.querySelector<HTMLElement>(
+          "[data-fluidbox-transition-content] [data-collapsed-label]",
+        );
+        if (!frame || !layer || !label) continue;
+        frames += 1;
+        const box = frame.getBoundingClientRect();
+        const scrim = layer.getBoundingClientRect();
+        const text = label.getBoundingClientRect();
+        const off = Math.max(
+          Math.abs(scrim.width - box.width),
+          Math.abs(scrim.height - box.height),
+          Math.abs(text.x + text.width / 2 - (box.x + box.width / 2)),
+          Math.abs(text.y + text.height / 2 - (box.y + box.height / 2)),
+        );
+        if (off > 3)
+          misses.push(
+            `${Math.round(box.width)}px frame: scrim ${Math.round(scrim.width - box.width)},${Math.round(scrim.height - box.height)} label ${Math.round(text.x + text.width / 2 - (box.x + box.width / 2))},${Math.round(text.y + text.height / 2 - (box.y + box.height / 2))} flight ${!!frame.closest("[data-fluidbox-flight]")}`,
+          );
+      }
+      return { frames, misses };
+    });
+  const opening = sample();
+  await teaser.locator('[slot="trigger"]').click();
+  const open = await opening;
+  expect(open.frames).toBeGreaterThan(0);
+  // A loaded emulator can sample one frame mid-update; a drift shows on many.
+  expect(open.misses.length, open.misses.join("\n")).toBeLessThanOrEqual(1);
+  await expect(page.locator(dialogSelector)).toHaveAttribute("data-fluidbox-state", "open");
+  const closing = sample();
+  await page.keyboard.press("Escape");
+  const close = await closing;
+  expect(close.frames).toBeGreaterThan(0);
+  // A loaded emulator can sample one frame mid-update; a drift shows on many.
+  expect(close.misses.length, close.misses.join("\n")).toBeLessThanOrEqual(1);
 });
 
 test("the teaser overlay does not flash after opening settles", async ({ page }, testInfo) => {

@@ -5,58 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Angular — Fluidbox</title>
     <link rel="icon" href="/favicon.svg" />
-    <script type="module" src="/src/pages/angular.ts"></script>
+    <script type="module" src="/src/patterns/angular/page.ts"></script>
   </head>
   <body>
-    <main class="fb-shell">
+    <main class="fb-shell" id="patterns">
       <header class="page-head">
         <p class="fb-label">@ogdakke/fluidbox/angular</p>
         <h1>Angular</h1>
         <p>
-          <code>useFluidboxGallery()</code> runs in a constructor and writes a signal's source after
-          each render. Zoneless, no Angular library build step.
+          Standalone directives over the same runtime. Each example below is the code shown under
+          it.
         </p>
       </header>
-      <section class="section" aria-labelledby="source-switching-title">
-        <header class="section__head">
-          <p class="fb-label"><span class="fb-number">01</span>&nbsp;&nbsp;source switching</p>
-          <h2 class="fb-rule-title" id="source-switching-title">Switch the source</h2>
-          <p>
-            The binding writes a new source to the gallery. The next open uses the new collection
-            and the thumbnails follow.
-          </p>
-        </header>
-        <div class="stage">
-          <div class="fb-grid" style="--fb-columns: 1">
-            <div id="gallery-root" class="framework-slot" aria-busy="true"></div>
-          </div>
-        </div>
-        <details class="fb-code">
-          <summary>Binding</summary>
-          <pre><code>@Component({ schemas: [CUSTOM_ELEMENTS_SCHEMA], template: `&lt;fluidbox-gallery&gt;…&lt;/fluidbox-gallery&gt;` })
-class Photos {
-  readonly source = signal(photos);
-  constructor() {
-    useFluidboxGallery(() =&gt; this.host.nativeElement.querySelector("fluidbox-gallery"), this.source);
-  }
-}</code></pre>
-        </details>
-      </section>
-      <section class="section" aria-labelledby="indexed-window-title">
-        <header class="section__head">
-          <p class="fb-label"><span class="fb-number">02</span>&nbsp;&nbsp;indexed window</p>
-          <h2 class="fb-rule-title" id="indexed-window-title">
-            100,000 items, rendered by Angular
-          </h2>
-          <p>
-            The framework renders a 12-card window. Jump anywhere and the viewer opens from the card
-            it just mounted.
-          </p>
-        </header>
-        <div class="stage">
-          <div id="indexed-root" class="framework-slot" aria-busy="true"></div>
-        </div>
-      </section>
     </main>
   </body>
 </html>

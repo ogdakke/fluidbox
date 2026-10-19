@@ -1,51 +1,44 @@
 import { mountSite } from "../src/site";
-import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
-import { filmstrip } from "@ogdakke/fluidbox/filmstrip";
-import type { FluidboxController, FluidboxItem, FluidboxRenderer } from "@ogdakke/fluidbox";
+import { createFluidbox } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/filmstrip";
+import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "@ogdakke/fluidbox";
 import "./headless.css";
 
 mountSite("fixtures", {
   fixture: "Headless runtime · custom renderers, a protected viewer, and a secondary viewer",
 });
 
-const source = arraySource<FluidboxItem>([
+type DemoItem = FluidboxItem;
+
+const items: readonly DemoItem[] = [
   {
     id: "one",
-    media: {
-      type: "image",
-      src: "/photo-square.svg",
-      alt: "Blue square study",
-      width: 800,
-      height: 800,
-      candidates: [
-        { src: "/photo-square.svg", width: 400 },
-        { src: "/photo-square.svg", width: 800 },
-      ],
-      sizes: "min(100vw, 800px)",
-      sources: [
-        {
-          media: "(min-width: 1px)",
-          candidates: [{ src: "/photo-square.svg", width: 800 }],
-          sizes: "min(100vw, 800px)",
-        },
-      ],
-    },
-    placeholder: { src: "/photo-square.svg" },
-    preview: { src: "/photo-square.svg" },
+    type: "img",
+    src: "/photo-square.svg",
+    alt: "Blue square study",
+    width: 800,
+    height: 800,
+    srcset: "/photo-square.svg 400w, /photo-square.svg 800w",
+    sizes: "min(100vw, 800px)",
+    sources: [
+      {
+        media: "(min-width: 1px)",
+        srcset: "/photo-square.svg 800w",
+        sizes: "min(100vw, 800px)",
+      },
+    ],
+    placeholder: "/photo-square.svg",
+    thumbnail: { src: "/photo-square.svg" },
   },
   {
     id: "two",
-    media: {
-      type: "image",
-      src: "/photo-portrait.svg",
-      alt: "Orange portrait study",
-      width: 600,
-      height: 900,
-    },
+    type: "img",
+    src: "/photo-portrait.svg",
+    alt: "Orange portrait study",
+    width: 600,
+    height: 900,
   },
-]);
-
-type DemoItem = ReturnType<typeof source.getItem>;
+];
 
 const origins = {
   getOrigin(id: string) {
@@ -58,86 +51,80 @@ const increment = (name: string) => {
   document.body.dataset[name] = String(Number(document.body.dataset[name] ?? 0) + 1);
 };
 const renderers = {
-  demo: {
-    mount({ target, item, signal }) {
-      increment("customMounts");
-      const content = document.createElement("button");
-      content.type = "button";
-      content.dataset.testCustomMedia = "";
-      content.textContent = `Custom ${item.id}`;
-      target.append(content);
-      signal.addEventListener("abort", () => increment("customAborts"), { once: true });
-      return () => increment("customDisposals");
-    },
+  demo({ target, item, signal }) {
+    increment("customMounts");
+    const content = document.createElement("button");
+    content.type = "button";
+    content.dataset.testCustomMedia = "";
+    content.textContent = `Custom ${item.id}`;
+    target.append(content);
+    signal.addEventListener("abort", () => increment("customAborts"), { once: true });
+    return () => increment("customDisposals");
   },
 } satisfies Record<string, FluidboxRenderer<DemoItem>>;
 
-const viewer: FluidboxController<DemoItem> = createFluidbox({
-  source,
+const viewer: Fluidbox<DemoItem> = createFluidbox({
+  items,
   origins,
   renderers,
-  portal: {
-    mount({ target, controller, signal }) {
-      const controls = document.createElement("div");
-      controls.dataset.demoControls = "";
-      controls.innerHTML = `
-        <button type="button" data-demo-previous aria-label="Previous image">Previous</button>
-        <p data-demo-caption></p>
-        <button type="button" data-demo-next aria-label="Next image">Next</button>
-        <button type="button" data-demo-close aria-label="Close viewer">Close</button>
-      `;
-      const caption = controls.querySelector<HTMLElement>("[data-demo-caption]")!;
-      const sync = () => {
-        const state = controller.state;
-        caption.textContent = state.activeId ?? "";
-        controls.querySelector<HTMLButtonElement>("[data-demo-previous]")!.disabled =
-          !state.canPrevious;
-        controls.querySelector<HTMLButtonElement>("[data-demo-next]")!.disabled = !state.canNext;
-      };
-      const disposeState = controller.subscribe(sync);
-      controls
-        .querySelector("[data-demo-previous]")!
-        .addEventListener("click", () => void controller.previous(), { signal });
-      controls
-        .querySelector("[data-demo-next]")!
-        .addEventListener("click", () => void controller.next(), { signal });
-      controls
-        .querySelector("[data-demo-close]")!
-        .addEventListener("click", () => void controller.close(), { signal });
-      target.append(controls);
-      sync();
-      return () => {
-        disposeState();
-        controls.remove();
-      };
-    },
+  viewer({ target, fluidbox, signal }) {
+    const controls = document.createElement("div");
+    controls.dataset.demoControls = "";
+    controls.innerHTML = `
+      <button type="button" data-demo-previous aria-label="Previous image">Previous</button>
+      <p data-demo-caption></p>
+      <button type="button" data-demo-next aria-label="Next image">Next</button>
+      <button type="button" data-demo-close aria-label="Close viewer">Close</button>
+    `;
+    const caption = controls.querySelector<HTMLElement>("[data-demo-caption]")!;
+    const sync = () => {
+      const state = fluidbox.state;
+      caption.textContent = state.id ?? "";
+      controls.querySelector<HTMLButtonElement>("[data-demo-previous]")!.disabled =
+        !state.hasPrevious;
+      controls.querySelector<HTMLButtonElement>("[data-demo-next]")!.disabled = !state.hasNext;
+    };
+    const disposeState = fluidbox.subscribe(sync);
+    controls
+      .querySelector("[data-demo-previous]")!
+      .addEventListener("click", () => void fluidbox.previous(), { signal });
+    controls
+      .querySelector("[data-demo-next]")!
+      .addEventListener("click", () => void fluidbox.next(), { signal });
+    controls
+      .querySelector("[data-demo-close]")!
+      .addEventListener("click", () => void fluidbox.close(), { signal });
+    target.append(controls);
+    sync();
+    return () => {
+      disposeState();
+      controls.remove();
+    };
   },
 });
-const secondaryViewer: FluidboxController<DemoItem> = createFluidbox({
-  source,
+const secondaryViewer: Fluidbox<DemoItem> = createFluidbox({
+  items,
   origins,
   renderers,
 });
-// The filmstrip is an option: its code loads only with this import.
-const filmstripViewer: FluidboxController<DemoItem> = createFluidbox({
-  source,
+// The filmstrip is an option: its code loads only with the side-effect import.
+const filmstripViewer: Fluidbox<DemoItem> = createFluidbox({
+  items,
   origins,
   renderers,
-  filmstrip: filmstrip(),
+  filmstrip: true,
 });
-const protectedViewer: FluidboxController<DemoItem> = createFluidbox({
-  source,
+const protectedViewer: Fluidbox<DemoItem> = createFluidbox({
+  items,
   origins,
   renderers,
-  onBeforeCommand(event) {
-    if (event.command === "close") event.preventDefault();
-  },
+});
+protectedViewer.addEventListener("beforetoggle", (event) => {
+  if (event.newState === "closed") event.preventDefault();
 });
 
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
-  trigger.addEventListener("click", () => {
-    void viewer.open({ id: trigger.dataset.photoId! }, { reason: "trigger" });
-  });
+  viewer.bind(trigger, trigger.dataset.photoId!);
 }
 
 declare global {

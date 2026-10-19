@@ -1,0 +1,62 @@
+// #region example
+import { Component } from "@angular/core";
+import { FluidboxModule, injectFluidbox } from "@ogdakke/fluidbox/angular";
+import { label, photos } from "../shared";
+
+/** Your own controls and caption. In the viewer, it injects the fluidbox of the root. */
+@Component({
+  selector: "div[appCaption]",
+  standalone: true,
+  host: { class: "pattern-caption" },
+  template: `
+    <button
+      type="button"
+      data-test="prev"
+      [disabled]="!fluidbox().hasPrevious"
+      (click)="fluidbox().previous()"
+    >
+      Previous
+    </button>
+    <span>
+      <strong data-test="title">{{ title() }}</strong>
+      <small data-test="counter">{{ (fluidbox().index ?? 0) + 1 }} / {{ fluidbox().count }}</small>
+    </span>
+    <button
+      type="button"
+      data-test="next"
+      [disabled]="!fluidbox().hasNext"
+      (click)="fluidbox().next()"
+    >
+      Next
+    </button>
+    <button type="button" data-test="close" (click)="fluidbox().close()">Close</button>
+  `,
+})
+export class Caption {
+  readonly fluidbox = injectFluidbox();
+  readonly title = injectFluidbox(({ item }) => (item ? label(item) : ""));
+}
+
+@Component({
+  selector: "pattern-headless",
+  standalone: true,
+  imports: [FluidboxModule, Caption],
+  template: `
+    <div fluidboxRoot [items]="photos" class="pattern-grid">
+      @for (photo of photos; track photo.id) {
+        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+          <img [src]="photo.src" [alt]="label(photo)" />
+        </button>
+      }
+      <!-- A viewer template replaces the default controls. -->
+      <ng-template fluidboxViewer>
+        <div appCaption></div>
+      </ng-template>
+    </div>
+  `,
+})
+export class Headless {
+  readonly photos = photos;
+  readonly label = label;
+}
+// #endregion example

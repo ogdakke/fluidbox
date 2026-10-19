@@ -1,23 +1,23 @@
 import { expect, test } from "@playwright/test";
 
-test("custom gallery exposes controller readiness and cancels a disconnected waiter", async ({
+test("custom gallery exposes fluidbox readiness and cancels a disconnected waiter", async ({
   page,
 }) => {
   await page.goto("/harness.html");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   const result = await page.evaluate(async () => {
     const existing =
-      document.querySelector<import("@ogdakke/fluidbox").FluidboxGalleryElement>(
+      document.querySelector<import("@ogdakke/fluidbox/elements").FluidboxGalleryElement>(
         "fluidbox-gallery",
       )!;
-    const controller = await existing.whenReady();
+    const fluidbox = await existing.whenReady();
     const pending = document.createElement(
       "fluidbox-gallery",
-    ) as import("@ogdakke/fluidbox").FluidboxGalleryElement;
+    ) as import("@ogdakke/fluidbox/elements").FluidboxGalleryElement;
     document.body.append(pending);
     const cancelled = pending.whenReady().catch((error: DOMException) => error.name);
     pending.remove();
-    return { count: controller.state.count, cancelled: await cancelled };
+    return { count: fluidbox.state.count, cancelled: await cancelled };
   });
   expect(result).toEqual({ count: 3, cancelled: "AbortError" });
 });
@@ -29,28 +29,31 @@ test("dynamic preview child changes do not rebuild the gallery during a swipe", 
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   const calls = await page.evaluate(async () => {
     const gallery =
-      document.querySelector<import("@ogdakke/fluidbox").FluidboxGalleryElement>(
+      document.querySelector<import("@ogdakke/fluidbox/elements").FluidboxGalleryElement>(
         "fluidbox-gallery",
       )!;
-    const controller = await gallery.whenReady();
-    const original = controller.setSource.bind(controller);
+    const fluidbox = await gallery.whenReady();
+    const original = fluidbox.setItems.bind(fluidbox);
     let refreshes = 0;
-    controller.setSource = (source) => {
+    fluidbox.setItems = (items) => {
       refreshes++;
-      return original(source);
+      return original(items);
     };
     const preview =
-      gallery.querySelector<import("@ogdakke/fluidbox").FluidboxItemElement>("fluidbox-item")!;
+      gallery.querySelector<import("@ogdakke/fluidbox/elements").FluidboxItemElement>(
+        "fluidbox-item",
+      )!;
     preview.dataset.fluidboxDynamicPreview = "";
     const layer = document.createElement("span");
     preview.append(layer);
     layer.remove();
-    preview.trigger.querySelector("img")!.alt = "Updated preview";
+    preview.trigger!.querySelector("img")!.alt = "Updated preview";
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
     const dynamic = refreshes;
-    gallery.querySelectorAll("fluidbox-item")[1]!.querySelector("img")!.alt = "Updated source";
+    // A thumbnail change changes the item; an alt on the trigger alone would not.
+    gallery.querySelectorAll("fluidbox-item")[1]!.querySelector("img")!.src = "/art/canyon.svg";
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
@@ -67,7 +70,7 @@ test("declarative items carry placeholder images into neighboring slides", async
     "data:image/svg+xml," +
     encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>');
   await page.evaluate((src) => {
-    document.querySelectorAll("fluidbox-item")[1]!.setAttribute("placeholder-src", src);
+    document.querySelectorAll("fluidbox-item")[1]!.setAttribute("placeholder", src);
   }, placeholder);
   await page.locator("fluidbox-item").first().click();
   await expect(
@@ -75,24 +78,16 @@ test("declarative items carry placeholder images into neighboring slides", async
   ).toHaveAttribute("src", placeholder);
 });
 
-test("a gallery trigger can open another item without a close control", async ({ page }) => {
-  await page.goto("/harness.html?hide-close-button");
+test("a viewer template replaces the default controls", async ({ page }) => {
+  await page.goto("/harness.html?viewer-template");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
-  await page.evaluate(() => {
-    const gallery =
-      document.querySelector<import("@ogdakke/fluidbox").FluidboxGalleryElement>(
-        "fluidbox-gallery",
-      )!;
-    const items =
-      gallery.querySelectorAll<import("@ogdakke/fluidbox").FluidboxItemElement>("fluidbox-item");
-    items[0]!.openItemId = items[1]!.itemId;
-  });
   await page.locator("fluidbox-item").first().click();
+  await expect(page.locator("[data-fluidbox-dialog] [data-fluidbox-close]")).toHaveCount(0);
+  await page.locator("[data-fluidbox-dialog] [data-test-next]").click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 2 of 3",
   );
-  await expect(page.locator("[data-fluidbox-dialog] [data-fluidbox-close]")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
 });
@@ -111,7 +106,7 @@ test("viewer selectors stay isolated and honor stylesheet order", async ({ page 
 
     const earlyOverride = document.createElement("style");
     earlyOverride.textContent =
-      "[data-fluidbox-close] { width: 41px; } fluidbox-item { --background: rgb(12 34 56); }";
+      "[data-fluidbox-close] { width: 41px; } fluidbox-item { --fluidbox-background: rgb(12 34 56); }";
     document.head.prepend(earlyOverride);
   });
   await expect(page.locator("#outside-fluidbox-lookalike")).toHaveCSS("position", "static");
@@ -366,8 +361,8 @@ test("indexed source survives host thumbnail recycling", async ({ page }) => {
   });
   await page
     .locator("fluidbox-gallery")
-    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) =>
-      gallery.open({ index: 501 }),
+    .evaluate((gallery: HTMLElement & { open(target: number): Promise<boolean> }) =>
+      gallery.open(501),
     );
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -375,8 +370,8 @@ test("indexed source survives host thumbnail recycling", async ({ page }) => {
   );
   await page
     .locator("fluidbox-gallery")
-    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) =>
-      gallery.open({ index: 9000 }),
+    .evaluate((gallery: HTMLElement & { open(target: number): Promise<boolean> }) =>
+      gallery.open(9000),
     );
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -398,8 +393,8 @@ test("100k indexed items retain a bounded viewer DOM", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=100000");
   await page
     .locator("fluidbox-gallery")
-    .evaluate((gallery: HTMLElement & { open(target: { index: number }): void }) =>
-      gallery.open({ index: 99990 }),
+    .evaluate((gallery: HTMLElement & { open(target: number): Promise<boolean> }) =>
+      gallery.open(99990),
     );
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -468,8 +463,8 @@ test("indexed source works inside a shadow root", async ({ page }) => {
     "aria-label",
     "Item 1 of 10000",
   );
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
-    element.open({ index: 5000 }),
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
+    element.open(5000),
   );
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",

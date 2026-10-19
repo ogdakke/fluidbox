@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import type {
-  FluidboxController,
-  FluidboxEvent,
+  FluidboxChangeEvent,
+  FluidboxImageItem,
+  FluidboxItemList,
   FluidboxOriginAdapter,
-  FluidboxSource,
 } from "@ogdakke/fluidbox";
 import "./photo-library.css";
 
@@ -35,36 +35,32 @@ function photoId(index: number): string {
   return `synthetic-photo-${index}`;
 }
 
-function photoAt(index: number, images: readonly LibraryImage[] = fixtureImages) {
+type PhotoItem = FluidboxImageItem & { readonly id: string; readonly thumbnail: { src: string } };
+
+function photoAt(index: number, images: readonly LibraryImage[] = fixtureImages): PhotoItem {
   const fixture = images[(index * 17 + Math.floor(index / sectionSize)) % images.length]!;
   return {
+    type: "img",
     id: photoId(index),
-    media: {
-      type: "image" as const,
-      src: fixture.src,
-      alt: `Synthetic ${fixture.shape} illustration, photo ${index + 1}`,
-      width: fixture.width,
-      height: fixture.height,
-    },
+    src: fixture.src,
+    alt: `Synthetic ${fixture.shape} illustration, photo ${index + 1}`,
+    width: fixture.width,
+    height: fixture.height,
     thumbnail: { src: fixture.src, width: fixture.width, height: fixture.height },
-    preview: { src: fixture.src, width: fixture.width, height: fixture.height },
   };
 }
 
-type PhotoItem = ReturnType<typeof photoAt>;
+type OpenPhoto = (index: number) => Promise<boolean>;
 
-function ControllerBridge({
-  controllerRef,
-}: {
-  controllerRef: React.RefObject<FluidboxController<PhotoItem> | null>;
-}) {
-  const controller = useFluidbox<PhotoItem>();
+/** Hands the fluidbox's open command to the page, which sits outside Root's hooks. */
+function OpenBridge({ openRef }: { openRef: React.RefObject<OpenPhoto | null> }) {
+  const open = useFluidbox(({ open }) => open);
   useEffect(() => {
-    controllerRef.current = controller;
+    openRef.current = open;
     return () => {
-      if (controllerRef.current === controller) controllerRef.current = null;
+      if (openRef.current === open) openRef.current = null;
     };
-  }, [controller, controllerRef]);
+  }, [open, openRef]);
   return null;
 }
 
@@ -105,7 +101,7 @@ export function PhotoLibrary({
   embedded?: boolean;
 }) {
   const count = new URLSearchParams(location.search).get("count") === "100000" ? 100_000 : 10_000;
-  const gallery = useRef<FluidboxController<PhotoItem> | null>(null);
+  const openRef = useRef<OpenPhoto | null>(null);
   const scrollElement = useRef<HTMLDivElement | null>(null);
   const origins = useRef(new Map<string, HTMLButtonElement>());
   const revealOrigin = useRef<
@@ -117,21 +113,20 @@ export function PhotoLibrary({
   const [lastViewed, setLastViewed] = useState<number | null>(null);
   const pendingResizeAnchor = useRef<number | null>(null);
   const { rows, photoToRow } = useMemo(() => makeRows(count, columns), [count, columns]);
-  const source = useMemo<FluidboxSource<PhotoItem>>(
-    () => ({
+  const items = useMemo<FluidboxItemList<PhotoItem>>(() => {
+    return {
       count,
-      getItem(index) {
+      get(index) {
         return photoAt(index, images);
       },
-      getIndex(id) {
+      indexOf(id) {
         const index = Number(id.slice("synthetic-photo-".length));
         return Number.isInteger(index) && index >= 0 && index < count && photoId(index) === id
           ? index
-          : null;
+          : -1;
       },
-    }),
-    [count, images],
-  );
+    };
+  }, [count, images]);
   const originAdapter = useMemo<FluidboxOriginAdapter>(
     () => ({
       getOrigin(id) {
@@ -206,11 +201,9 @@ export function PhotoLibrary({
     });
   };
 
-  const onFluidboxEvent = useCallback(
-    (event: FluidboxEvent) => {
-      if (event.type === "selection-settle" && event.index >= 0 && event.index < count) {
-        setLastViewed(event.index);
-      }
+  const onSettle = useCallback(
+    (event: FluidboxChangeEvent<PhotoItem>) => {
+      if (event.index >= 0 && event.index < count) setLastViewed(event.index);
     },
     [count],
   );
@@ -241,7 +234,7 @@ export function PhotoLibrary({
 
   function openPhoto(index: number) {
     setLastViewed(index);
-    void gallery.current?.open({ index });
+    void openRef.current?.(index);
   }
 
   function scrollToPhoto(index: number) {
@@ -258,8 +251,9 @@ export function PhotoLibrary({
   const visibleEnd = lastRow?.kind === "photos" ? lastRow.firstPhoto + lastRow.count : visibleStart;
 
   return (
-    <Fluidbox.Root source={source} origins={originAdapter} onEvent={onFluidboxEvent}>
-      <ControllerBridge controllerRef={gallery} />
+    <Fluidbox.Root items={items} origins={originAdapter} onSettle={onSettle}>
+      <OpenBridge openRef={openRef} />
+      {showFilmstrip && <Fluidbox.Filmstrip />}
       <main
         className={embedded ? "library-page library-page--embedded" : "library-page"}
         data-library-count={count}
@@ -338,12 +332,11 @@ export function PhotoLibrary({
             Mounted range {visibleStart}–{visibleEnd}.
           </span>
         </p>
-        <Fluidbox.Portal>
-          {showFilmstrip && <Fluidbox.Filmstrip />}
+        <Fluidbox.Viewer>
           <Fluidbox.Previous aria-label="Previous photo" />
           <Fluidbox.Next aria-label="Next photo" />
           <Fluidbox.Close aria-label="Close" />
-        </Fluidbox.Portal>
+        </Fluidbox.Viewer>
         <div className="library-scroll" ref={scrollElement} tabIndex={0} aria-label="Photo library">
           <div className="library-track" style={{ height: virtualizer.getTotalSize() }}>
             {virtualRows.map((virtualRow) => {
@@ -377,7 +370,7 @@ export function PhotoLibrary({
                         const index = row.firstPhoto + offset;
                         const photo = photoAt(index, images);
                         return (
-                          <Fluidbox.Item key={photo.id} id={photo.id}>
+                          <Fluidbox.Item key={photo.id} item={photo.id}>
                             <Fluidbox.Trigger asChild>
                               <button
                                 type="button"
@@ -385,7 +378,7 @@ export function PhotoLibrary({
                                 data-fluidbox-preview=""
                                 data-photo-id={photo.id}
                                 data-photo-index={index}
-                                aria-label={`Open ${photo.media.alt}, item ${index + 1} of ${count}`}
+                                aria-label={`Open ${photo.alt}, item ${index + 1} of ${count}`}
                                 ref={(node) => {
                                   if (!node) return;
                                   origins.current.set(photo.id, node);
@@ -399,8 +392,8 @@ export function PhotoLibrary({
                                 <img
                                   src={photo.thumbnail.src}
                                   alt=""
-                                  width={photo.media.width}
-                                  height={photo.media.height}
+                                  width={photo.width}
+                                  height={photo.height}
                                   loading="lazy"
                                   decoding="async"
                                 />

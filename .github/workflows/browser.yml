@@ -20,8 +20,8 @@ jobs:
       - run: bun run test
       - run: bun run test:bundle
       - run: bun run test:ssr
-      - run: bun run build:example
-      - run: bun run build:frameworks
+      - run: bun run build:examples
+      - run: bun run build:docs
       - run: bunx playwright install --with-deps chromium firefox webkit
       - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
       - run: bun run test:browser

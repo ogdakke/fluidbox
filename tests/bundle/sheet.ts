@@ -1,1 +1,1 @@
-export { sheet } from "@ogdakke/fluidbox/sheet";
+import "@ogdakke/fluidbox/sheet";

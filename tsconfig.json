@@ -11,7 +11,20 @@
     "jsxImportSource": "react",
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "paths": {
+      "@ogdakke/fluidbox": ["./packages/fluidbox/src/index.ts"],
+      "@ogdakke/fluidbox/elements": ["./packages/fluidbox/src/elements.ts"],
+      "@ogdakke/fluidbox/filmstrip": ["./packages/fluidbox/src/filmstrip-entry.ts"],
+      "@ogdakke/fluidbox/sheet": ["./packages/fluidbox/src/sheet-entry.ts"],
+      "@ogdakke/fluidbox/kit": ["./packages/fluidbox/src/kit.ts"],
+      "@ogdakke/fluidbox/styles.css": ["./packages/fluidbox/src/styles.css.d.ts"],
+      "@ogdakke/fluidbox/sheet.css": ["./packages/fluidbox/src/styles.css.d.ts"],
+      "@ogdakke/fluidbox/react": ["./packages/react/src/index.ts"],
+      "@ogdakke/fluidbox/solid": ["./packages/solid/src/index.ts"],
+      "@ogdakke/fluidbox/vue": ["./packages/vue/src/index.ts"],
+      "@ogdakke/fluidbox/angular": ["./packages/angular/src/index.ts"]
+    }
   },
   "include": [
     "packages/**/*.ts",
@@ -19,9 +32,11 @@
     "apps/**/*.ts",
     "apps/**/*.tsx",
     "tests/**/*.ts",
+    "tests/**/*.tsx",
     "playwright.config.ts",
     "types.d.ts",
     "scripts/**/*.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["**/dist/**", "**/node_modules/**"]
 }

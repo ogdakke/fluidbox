@@ -8,26 +8,25 @@ The first external-library pilot is `/photo-library.html` on the main playground
 
 Open the “Photo library” link from the playground, or use `/photo-library.html` on the same local/Portless origin. The host is React with TanStack Virtual; the rest of the playground remains vanilla JavaScript.
 
-The example has date sections, responsive fixed-height virtual rows, three-row overscan, and lazy thumbnails. Its controls jump the host grid, open an item by number, reveal the last viewed item after close, and enable/disable the filmstrip for the next opening. The source object stays stable while the grid mounts and unmounts thumbnails.
+The example has date sections, responsive fixed-height virtual rows, three-row overscan, and lazy thumbnails. Its controls jump the host grid, open an item by number, reveal the last viewed item after close, and enable/disable the filmstrip for the next opening. The item list stays stable while the grid mounts and unmounts thumbnails.
 
 Assets are repeated local SVG illustrations with landscape, portrait, and square dimensions. This is a deterministic geometry/lifecycle fixture, not photographic decode or transfer evidence. A varied-photo dataset and resource measurements remain separate benchmark work.
 
 ## Current public contract
 
-Use a `FluidboxSource` with `createFluidbox()` or the composed React binding. The photo-library
-example uses `arraySource()`, `Fluidbox.Root`, `Fluidbox.Item`, and `Fluidbox.Trigger`; it does not
-register custom elements.
+Give `createFluidbox()`, or a framework `Root`, a lazy item list. The photo-library example uses the
+React binding's `Root`, `Item` and `Trigger`; it does not register custom elements.
 
-- `count` is the full source count, not the number of mounted thumbnails.
-- `getItem(index)` synchronously returns media metadata with a stable, unique ID. Keep metadata lookup independent of DOM mounting and avoid scanning every item during a scroll or navigation.
-- Register mounted origins through `controller.registerOrigin(id, origin)`, or supply an origin adapter whose `getOrigin(id)` returns the currently mounted match. Recheck identity and connection on each lookup; a cached element reference may now represent a different item.
+- `count` is the full item count, not the number of mounted thumbnails.
+- `get(index)` synchronously returns the item, with a stable, unique id. Keep item lookup independent of DOM mounting and avoid scanning every item during a scroll or navigation: give the list an `indexOf(id)`, since without one ids are found by scanning.
+- Bind mounted thumbnails with `fluidbox.bind(element, id)` (or a framework `Trigger`), or supply an `origins` adapter whose `getOrigin(id)` returns the currently mounted match. Recheck identity and connection on each lookup; a cached element reference may now represent a different item.
 - `revealOrigin(id, index, { signal, reason })` optionally asks the host to scroll or mount the selected item. Reasons are `open` and `selection`. It may return a promise, but viewer motion never waits for it. Check the abort signal before deferred work changes the host.
-- Mount only the host virtualizer's visible/overscan range. Fluidbox resolves source items even when their thumbnails are absent.
-- Treat each source as an immutable snapshot. `controller.setSource(snapshot)` supports insertion,
-  removal, and reordering while open while preserving the active ID when possible. Asynchronous
-  metadata lookup and mutation of an existing snapshot are outside the beta contract.
+- Mount only the host virtualizer's visible/overscan range. Fluidbox reads items even when their thumbnails are absent.
+- Treat each list as an immutable snapshot. `fluidbox.setItems(list)` supports insertion,
+  removal, and reordering while open while preserving the active id when possible. Asynchronous
+  item lookup and mutation of an existing list are outside the contract.
 
-The viewer uses a persistent controller independent of thumbnail mounting. A missing image origin
+The fluidbox persists independently of thumbnail mounting. A missing image origin
 uses a scale-and-fade transition. Closing returns focus to the selected origin when available, then
 to the opening trigger's retained focusable ancestor. Hosts that need a different fallback must keep
 an appropriate focus target mounted for the session lifetime.
@@ -61,9 +60,9 @@ Use the virtualizer's stable item-key API and the framework's own mounting/ref l
 
 Opening the lightbox must not replace the host grid or reset its scroll position. The modal keeps background interaction inert. To test recycling while open, change the host's virtual window programmatically rather than disabling modal isolation.
 
-The photo-library example follows the selected item in the background, including distant filmstrip navigation. The runtime calls `revealOrigin` after capturing the opening pose and when navigation settles. The application uses its virtualizer's scrolling API and may resolve its promise when the matching origin is mounted. A newer selection aborts previous work immediately, even before that selection settles. Source replacement, close, and teardown also abort it. Host code must honor the signal; the runtime cannot undo arbitrary work performed by a callback.
+The photo-library example follows the selected item in the background, including distant filmstrip navigation. The runtime calls `revealOrigin` after capturing the opening pose and when navigation settles. The application uses its virtualizer's scrolling API and may resolve its promise when the matching origin is mounted. A newer selection aborts previous work immediately, even before that selection settles. `setItems`, close, and teardown also abort it. Host code must honor the signal; the runtime cannot undo arbitrary work performed by a callback.
 
-Without a custom hook, indexed galleries scroll a mounted matching origin into view through its native scroll ancestors. A virtualized host needs the hook to mount an absent origin. Before closing, the runtime resolves the current origin again instead of retaining its pre-scroll rectangle. A node clipped outside the viewport or a scroll container cannot supply a useful close target.
+Without a custom hook, the viewer scrolls a mounted matching origin into view through its native scroll ancestors. A virtualized host needs the hook to mount an absent origin. Before closing, the runtime resolves the current origin again instead of retaining its pre-scroll rectangle. A node clipped outside the viewport or a scroll container cannot supply a useful close target.
 
 Closing never waits for an asynchronous reveal. It cancels pending reveal work and uses an available matching target, or immediately starts the fallback transition with usable focus.
 
@@ -82,11 +81,11 @@ Run these against actual virtualizer implementations and public Fluidbox APIs:
 | Distant filmstrip selection                     | Host virtualizer follows selection and registers the matching origin; stale reveal work cannot move it back         |
 | Change responsive column count                  | Visible range remains valid, item IDs still match registrations, layout stays bounded                               |
 | Jump near either end at 10k and 100k items      | Correct range/selection without blank end-of-track states or total-DOM growth proportional to count                 |
-| Repeat open/navigate/close                      | Host and viewer DOM return to expected bounds; no orphan portal or persistent inert state                           |
-| Strict Mode/remount                             | Framework refs and source binding cleanup do not leave stale registrations or active viewers                        |
+| Repeat open/navigate/close                      | Host and viewer DOM return to expected bounds; no orphan viewer layer or persistent inert state                     |
+| Strict Mode/remount                             | Framework refs and binding cleanup do not leave stale registrations or active viewers                               |
 
 Measure host rendering and viewer rendering separately. Deterministic synthetic assets test geometry and lifecycle, but do not establish photographic decode cost, real transfer volume, or low-memory-device behavior. Record dataset, candidate sizes, browser, hardware, and raw samples for those benchmarks.
 
 ## Scope of compatibility
 
-Initial evidence covers a known-count, stable source with bounded virtual rows. Unknown-length pagination, masonry measurement, window-scrolling hosts, source mutation while open, and each framework's renderer ownership need their own scenarios. Do not infer those guarantees from one passing grid example.
+Initial evidence covers a known-count, stable item list with bounded virtual rows. Unknown-length pagination, masonry measurement, window-scrolling hosts, list mutation while open, and each framework's renderer ownership need their own scenarios. Do not infer those guarantees from one passing grid example.

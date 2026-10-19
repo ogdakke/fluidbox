@@ -26,9 +26,9 @@ test("indexed source open cost stays near constant with gallery size", async ({
       const elapsed = await page
         .locator("fluidbox-gallery")
         .evaluate(
-          (gallery: HTMLElement & { open(target: { index: number }): void }, target: number) => {
+          (gallery: HTMLElement & { open(target: number): Promise<boolean> }, target: number) => {
             const start = performance.now();
-            gallery.open({ index: target });
+            void gallery.open(target);
             return performance.now() - start;
           },
           count - 10,

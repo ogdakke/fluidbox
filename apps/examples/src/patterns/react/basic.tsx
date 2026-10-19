@@ -1,0 +1,29 @@
+// #region example
+import { Fluidbox } from "@ogdakke/fluidbox/react";
+import { label, photos } from "../shared";
+
+export function Basic() {
+  return (
+    <Fluidbox.Root items={photos}>
+      <div className="pattern-grid">
+        {photos.map((photo) => (
+          <Fluidbox.Trigger
+            key={photo.src}
+            item={photo}
+            className="pattern-thumb"
+            data-test="trigger"
+          >
+            <img src={photo.src} alt={label(photo)} />
+          </Fluidbox.Trigger>
+        ))}
+      </div>
+      {/* Without a Viewer, the viewer has these same three buttons. */}
+      <Fluidbox.Viewer>
+        <Fluidbox.Previous />
+        <Fluidbox.Next />
+        <Fluidbox.Close />
+      </Fluidbox.Viewer>
+    </Fluidbox.Root>
+  );
+}
+// #endregion example

@@ -1,9 +1,8 @@
 import { mountSite } from "../src/site";
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { FluidboxItem } from "@ogdakke/fluidbox";
-import { Fluidbox, useFluidboxState } from "@ogdakke/fluidbox/react";
-import { sheet, type FluidboxSheet } from "@ogdakke/fluidbox/sheet";
+import type { FluidboxImageItem } from "@ogdakke/fluidbox";
+import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import { tallScenes } from "@ogdakke/fluidbox-design/art-scenes";
 import { artItem, scenes } from "../src/art";
 import {
@@ -51,7 +50,7 @@ type Post = {
   readonly date: string;
   readonly stats: { replies: number; reposts: number; likes: number; views: number };
   readonly replies: readonly Reply[];
-  readonly items: readonly FluidboxItem[];
+  readonly items: readonly FluidboxImageItem[];
 };
 
 const allScenes = [...scenes, ...tallScenes];
@@ -150,7 +149,7 @@ const postOf = (posts: readonly Post[], id: string | null) =>
 function useActivePost(posts: readonly Post[]) {
   return postOf(
     posts,
-    useFluidboxState((state) => state.activeId),
+    useFluidbox(({ id }) => id),
   );
 }
 
@@ -189,10 +188,7 @@ function Grid({ post }: { post: Post }) {
     <div className="x-grid" data-count={post.items.length}>
       {post.items.map((item) => (
         <Fluidbox.Trigger key={item.id} item={item} asChild>
-          <button
-            type="button"
-            aria-label={`Open ${item.media.type === "image" && item.media.alt}`}
-          >
+          <button type="button" aria-label={`Open ${item.alt}`}>
             <img
               data-fluidbox-origin
               src={item.thumbnail?.src}
@@ -277,7 +273,7 @@ function XViewer() {
   const active = useActivePost(tweets);
   const [aside, setAside] = useState(true);
   return (
-    <Fluidbox.Portal>
+    <Fluidbox.Viewer>
       <div className="x-layer" data-aside={aside ? "open" : "closed"} data-fluidbox-chrome>
         <button
           type="button"
@@ -362,40 +358,42 @@ function XViewer() {
       <Fluidbox.Previous />
       <Fluidbox.Next />
       <Fluidbox.Close />
-    </Fluidbox.Portal>
+    </Fluidbox.Viewer>
   );
 }
 
 /** In the sheet's slot, which scrolls with the photo: the replies, and the composer at the end. */
-function XReplies({ replies }: { replies: FluidboxSheet }) {
+function XReplies() {
   const active = useActivePost(tweets);
   return (
-    <Fluidbox.Sheet sheet={replies}>
-      <section className="x-sheet" data-fluidbox-sheet data-fluidbox-chrome aria-label="Replies">
-        <div data-fluidbox-sheet-handle />
-        <header className="x-sheet__head">
-          <strong>Replies</strong>
-          <span className="x-muted">{active && compact(active.stats.replies)}</span>
-        </header>
-        <ul className="x-replies" data-fluidbox-sheet-scroll>
-          {active?.replies.map((reply) => (
-            <ReplyRow key={reply.by.handle} reply={reply} />
-          ))}
-        </ul>
-        <Composer me={me} />
-      </section>
+    <Fluidbox.Sheet
+      snapPoints={["62%", "100%"]}
+      className="x-sheet"
+      role="region"
+      data-fluidbox-chrome
+      aria-label="Replies"
+    >
+      <div data-fluidbox-sheet-handle />
+      <header className="x-sheet__head">
+        <strong>Replies</strong>
+        <span className="x-muted">{active && compact(active.stats.replies)}</span>
+      </header>
+      <ul className="x-replies" data-fluidbox-sheet-scroll>
+        {active?.replies.map((reply) => (
+          <ReplyRow key={reply.by.handle} reply={reply} />
+        ))}
+      </ul>
+      <Composer me={me} />
     </Fluidbox.Sheet>
   );
 }
 
 function XThread({ post }: { post: Post }) {
-  // One sheet per viewer, kept for its lifetime.
-  const replies = useMemo(() => sheet({ snapPoints: ["62%", "100%"] }), []);
   return (
-    <Fluidbox.Root items={post.items} sheet={replies}>
+    <Fluidbox.Root items={post.items}>
       <Tweet post={post} />
       <XViewer />
-      <XReplies replies={replies} />
+      <XReplies />
     </Fluidbox.Root>
   );
 }
@@ -479,58 +477,64 @@ function IgAuthor({ post }: { post: Post }) {
   );
 }
 
-function InstagramViewer({ details }: { details: FluidboxSheet }) {
+function InstagramViewer() {
   const active = useActivePost(grams);
   return (
-    <Fluidbox.Portal>
-      {/* Always rendered: the stage insets hang off it, and the opening flight
+    <>
+      <Fluidbox.Viewer>
+        {/* Always rendered: the stage insets hang off it, and the opening flight
           measures its landing before the active post is known. */}
-      <div className="ig-layer" data-fluidbox-chrome />
-      {active && (
-        <aside className="ig-panel" data-fluidbox-chrome aria-label="Post">
-          <IgAuthor post={active} />
-          <IgComments post={active} />
-          <footer>
-            <IgActions post={active} />
-            <p className="ig-muted ig-date">{active.date}</p>
-            <form className="ig-add" onSubmit={(event) => event.preventDefault()}>
-              <input aria-label="Add a comment" placeholder="Add a comment…" />
-              <button type="submit">Post</button>
-            </form>
-          </footer>
-        </aside>
-      )}
-      <Fluidbox.Previous />
-      <Fluidbox.Next />
-      <Fluidbox.Close />
-      {/* On a phone the caption peeks under the photo and drags up into the comments. */}
-      <Fluidbox.Sheet sheet={details}>
-        <section className="ig-sheet" data-fluidbox-sheet data-fluidbox-chrome aria-label="Post">
-          <div data-fluidbox-sheet-handle />
-          {active && (
-            <>
+        <div className="ig-layer" data-fluidbox-chrome />
+        {active && (
+          <aside className="ig-panel" data-fluidbox-chrome aria-label="Post">
+            <IgAuthor post={active} />
+            <IgComments post={active} />
+            <footer>
               <IgActions post={active} />
-              <p className="ig-caption">
-                <strong>{active.by.handle}</strong> {active.text}
-              </p>
-              <button type="button" className="ig-more" data-fluidbox-sheet-stop="2">
-                View all {active.stats.replies} comments
-              </button>
-              <IgComments post={active} />
-            </>
-          )}
-        </section>
+              <p className="ig-muted ig-date">{active.date}</p>
+              <form className="ig-add" onSubmit={(event) => event.preventDefault()}>
+                <input aria-label="Add a comment" placeholder="Add a comment…" />
+                <button type="submit">Post</button>
+              </form>
+            </footer>
+          </aside>
+        )}
+        <Fluidbox.Previous />
+        <Fluidbox.Next />
+        <Fluidbox.Close />
+      </Fluidbox.Viewer>
+      {/* On a phone the caption peeks under the photo and drags up into the comments.
+        It can't be put away; a swipe down scrolls the photo off. */}
+      <Fluidbox.Sheet
+        snapPoints={["55%", "content"]}
+        dismiss="scroll"
+        className="ig-sheet"
+        role="region"
+        data-fluidbox-chrome
+        aria-label="Post"
+      >
+        <div data-fluidbox-sheet-handle />
+        {active && (
+          <>
+            <IgActions post={active} />
+            <p className="ig-caption">
+              <strong>{active.by.handle}</strong> {active.text}
+            </p>
+            <Fluidbox.SheetStop stop={2} className="ig-more">
+              View all {active.stats.replies} comments
+            </Fluidbox.SheetStop>
+            <IgComments post={active} />
+          </>
+        )}
       </Fluidbox.Sheet>
-    </Fluidbox.Portal>
+    </>
   );
 }
 
 function InstagramProfile() {
-  // The caption peeks and can't be put away; a swipe down scrolls the photo off.
-  const details = useMemo(() => sheet({ snapPoints: ["55%", "content"], dismiss: "scroll" }), []);
   const profile = people.fjord;
   return (
-    <Fluidbox.Root items={grams.flatMap((gram) => gram.items)} sheet={details}>
+    <Fluidbox.Root items={grams.flatMap((gram) => gram.items)}>
       <div className="ig-profile">
         <header className="ig-profile__head">
           <Avatar person={profile} size={86} />
@@ -565,7 +569,7 @@ function InstagramProfile() {
           ))}
         </div>
       </div>
-      <InstagramViewer details={details} />
+      <InstagramViewer />
     </Fluidbox.Root>
   );
 }

@@ -1,0 +1,41 @@
+<!-- #region example -->
+<fluidbox-gallery class="pattern-album">
+  <fluidbox-item item-id="album-dune" returns="album-canyon album-coast album-meadow album-alpine">
+    <button
+      slot="trigger"
+      type="button"
+      class="pattern-thumb"
+      data-test="trigger"
+      data-fluidbox-dynamic-preview
+    >
+      <img src="/art/dune.svg" alt="Dune at golden hour" data-test="preview" />
+      <span class="pattern-overlay" data-test="count" data-fluidbox-thumbnail-overlay="travel"
+        >+4</span
+      >
+    </button>
+    <template slot="content">
+      <img src="/art/dune.svg" alt="Dune at golden hour" width="1800" height="1200" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="album-canyon">
+    <template slot="content">
+      <img src="/art/canyon.svg" alt="Canyon walls" width="1400" height="1400" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="album-coast">
+    <template slot="content">
+      <img src="/art/coast.svg" alt="Coastline panorama" width="2400" height="1000" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="album-meadow">
+    <template slot="content">
+      <img src="/art/meadow.svg" alt="Meadow hills" width="1600" height="1200" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="album-alpine">
+    <template slot="content">
+      <img src="/art/alpine.svg" alt="Alpine ridge at dawn" width="1920" height="1080" />
+    </template>
+  </fluidbox-item>
+</fluidbox-gallery>
+<!-- #endregion example -->

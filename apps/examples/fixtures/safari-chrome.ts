@@ -1,13 +1,7 @@
 import { mountSite } from "../src/site";
-import { arraySource, createFluidbox } from "@ogdakke/fluidbox";
-import type {
-  FluidboxGalleryElement,
-  FluidboxController,
-  FluidboxItem,
-  FluidboxOrigin,
-  FluidboxStatus,
-  FluidboxTarget,
-} from "@ogdakke/fluidbox";
+import { createFluidbox } from "@ogdakke/fluidbox";
+import type { Fluidbox, FluidboxItem, FluidboxStatus } from "@ogdakke/fluidbox";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox/elements";
 import { artItem, artSrc, scenes } from "../src/art";
 import "./safari-chrome.css";
 
@@ -180,24 +174,14 @@ for (const [index, item] of items.entries()) {
   button.setAttribute("aria-label", `Open ${scene.title}`);
   button.innerHTML = `<img data-fluidbox-origin src="${artSrc(scene)}" alt="" />`;
   gallery.append(button);
-  triggers.set(item.id, button);
+  triggers.set(item.id!, button);
 }
 
 let status: FluidboxStatus = "closed";
-const origin = (id: string): FluidboxOrigin | null => {
-  const trigger = triggers.get(id);
-  if (!trigger) return null;
-  const thumbnail = trigger.querySelector("img")!;
-  return { trigger, visual: thumbnail, thumbnail };
-};
 function onStatus(next: FluidboxStatus) {
   if (next === status) return;
   status = next;
   updateReadout();
-}
-function connect(controller: FluidboxController, open: (target: FluidboxTarget) => unknown) {
-  for (const [id, trigger] of triggers) trigger.addEventListener("click", () => void open({ id }));
-  window.safariChromeLab = controller;
 }
 
 if (current.filmstrip === "on") {
@@ -207,22 +191,18 @@ if (current.filmstrip === "on") {
     const element = document.createElement("fluidbox-gallery") as FluidboxGalleryElement;
     element.setAttribute("aria-label", "Lab gallery");
     gallery.replaceWith(element);
+    // With items set, the gallery binds every data-fluidbox-item-id descendant as a trigger.
+    for (const [id, trigger] of triggers) trigger.dataset.fluidboxItemId = id;
     element.append(gallery, document.createElement("fluidbox-filmstrip"));
-    element.source = arraySource(items);
-    element.origins = { getOrigin: origin };
-    const controller = await element.whenReady();
-    controller.subscribe((state) => onStatus(state.status));
-    connect(controller, (target) => element.open(target));
+    element.items = items;
+    element.subscribe((state) => onStatus(state.status));
+    window.safariChromeLab = await element.whenReady();
   });
 } else {
-  const controller = createFluidbox({
-    source: arraySource(items),
-    origins: { getOrigin: origin },
-    onEvent(event) {
-      if (event.type === "status-change") onStatus(event.status);
-    },
-  });
-  connect(controller, (target) => controller.open(target, { reason: "trigger" }));
+  const fluidbox = createFluidbox({ items });
+  fluidbox.subscribe((state) => onStatus(state.status));
+  for (const [id, trigger] of triggers) fluidbox.bind(trigger, id);
+  window.safariChromeLab = fluidbox;
 }
 
 // Readout: viewport units, insets and what the page has on, as plain text to paste back.
@@ -265,6 +245,6 @@ updateReadout();
 
 declare global {
   interface Window {
-    safariChromeLab: FluidboxController;
+    safariChromeLab: Fluidbox;
   }
 }

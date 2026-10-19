@@ -1,0 +1,15 @@
+{
+  "name": "@ogdakke/fluidbox-vue",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Built into @ogdakke/fluidbox/vue. Not published on its own.",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsdown"
+  },
+  "peerDependencies": {
+    "@ogdakke/fluidbox": "workspace:*",
+    "vue": ">=3.3"
+  }
+}

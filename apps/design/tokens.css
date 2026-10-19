@@ -44,13 +44,12 @@
   --fb-cross-size: 9px;
   --fb-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* Viewer theme inputs. The runtime copies these six onto its body-level overlay. */
-  --background: var(--fb-bg);
-  --color: var(--fb-fg);
-  --accent: var(--fb-surface-2);
-  --primary: var(--fb-fg);
-  --border: var(--fb-line-strong);
-  --radius: 0px;
+  /* Viewer theme inputs. The runtime copies --fluidbox-* properties onto its body-level overlay. */
+  --fluidbox-background: var(--fb-bg);
+  --fluidbox-color: var(--fb-fg);
+  --fluidbox-control-background: var(--fb-surface-2);
+  --fluidbox-focus-color: var(--fb-fg);
+  --fluidbox-filmstrip-item-radius: 2px;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -1,16 +1,12 @@
 import { mountSite } from "../src/site";
-import type {
-  FluidboxGalleryElement,
-  FluidboxItem,
-  FluidboxOriginAdapter,
-  FluidboxSource,
-} from "@ogdakke/fluidbox";
+import type { FluidboxItemList, FluidboxOriginAdapter } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox/elements";
 import "./site.css";
 
 mountSite("fixtures", {
   fixture:
-    "Harness · query flags: count, virtual, shadow, no-filmstrip, iframe, iframes, pictures, hide-close-button",
+    "Harness · query flags: count, virtual, shadow, no-filmstrip, iframe, iframes, pictures, viewer-template",
 });
 
 const root = document.querySelector<HTMLElement>("#fixture")!;
@@ -33,25 +29,23 @@ if (params.has("virtual")) {
   gallery.setAttribute("aria-label", "Virtual source gallery");
   target.append(gallery);
   const origins = new Map<string, HTMLElement>();
-  const source: FluidboxSource<FluidboxItem> = {
+  const items: FluidboxItemList = {
     count,
-    getItem(index) {
+    get(index) {
       const src = index % 2 ? "/second.svg" : "/first.svg";
       return {
         id: String(index),
-        media: {
-          type: "image",
-          src,
-          alt: `Virtual item ${index + 1}`,
-          width: 600,
-          height: 400,
-        },
+        type: "img",
+        src,
+        alt: `Virtual item ${index + 1}`,
+        width: 600,
+        height: 400,
         thumbnail: { src, width: 600, height: 400 },
       };
     },
-    getIndex(id) {
+    indexOf(id) {
       const index = Number(id);
-      return Number.isInteger(index) && index >= 0 && index < count ? index : null;
+      return Number.isInteger(index) && index >= 0 && index < count ? index : -1;
     },
   };
   const originAdapter: FluidboxOriginAdapter = {
@@ -60,7 +54,7 @@ if (params.has("virtual")) {
       return trigger ? { trigger, visual: trigger } : null;
     },
   };
-  gallery.source = source;
+  gallery.items = items;
   gallery.origins = originAdapter;
   function renderWindow(start: number) {
     for (const button of origins.values()) button.remove();
@@ -70,7 +64,7 @@ if (params.has("virtual")) {
       button.type = "button";
       button.dataset.virtualIndex = String(index);
       button.textContent = `Item ${index + 1}`;
-      button.addEventListener("click", () => gallery.open({ index }));
+      button.addEventListener("click", () => gallery.open(index));
       gallery.append(button);
       origins.set(String(index), button);
     }
@@ -80,7 +74,12 @@ if (params.has("virtual")) {
   if (filmstrip) gallery.append(document.createElement("fluidbox-filmstrip"));
 } else {
   const gallery = document.createElement("fluidbox-gallery");
-  if (params.has("hide-close-button")) gallery.setAttribute("hide-close-button", "");
+  if (params.has("viewer-template")) {
+    const viewer = document.createElement("template");
+    viewer.setAttribute("slot", "viewer");
+    viewer.innerHTML = `<button type="button" data-fluidbox-next data-test-next>Next</button>`;
+    gallery.append(viewer);
+  }
   gallery.setAttribute("aria-label", "Test gallery");
   for (let index = 0; index < count; index++) {
     const lightbox = document.createElement("fluidbox-item");

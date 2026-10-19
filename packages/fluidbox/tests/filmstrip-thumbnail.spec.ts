@@ -5,39 +5,27 @@ describe("filmstrip thumbnail sources", () => {
   it("tries the smallest thumbnail candidates before progressively larger fallbacks", () => {
     expect(
       filmstripThumbnailSources({
-        id: "image",
-        thumbnail: {
-          src: "/thumb.jpg",
-          candidates: [
-            { src: "/thumb-320.jpg", width: 320 },
-            { src: "/thumb-160.jpg", width: 160 },
-          ],
-        },
-        preview: { src: "/preview.jpg" },
-        media: {
-          type: "image",
-          src: "/full.jpg",
-          alt: "",
-          width: 1200,
-          height: 800,
-        },
+        type: "img",
+        thumbnail: { src: "/thumb.jpg", srcset: "/thumb-320.jpg 320w, /thumb-160.jpg 160w" },
+        src: "/full.jpg",
+        srcset: "/full-800.jpg 800w",
+        alt: "",
+        width: 1200,
+        height: 800,
       }),
-    ).toEqual(["/thumb-160.jpg", "/thumb-320.jpg", "/thumb.jpg", "/preview.jpg", "/full.jpg"]);
+    ).toEqual(["/thumb-160.jpg", "/thumb-320.jpg", "/thumb.jpg", "/full-800.jpg", "/full.jpg"]);
   });
 
   it("uses a video poster and removes duplicate requests", () => {
     expect(
       filmstripThumbnailSources({
-        id: "video",
+        type: "video",
         thumbnail: { src: "/poster.jpg" },
-        media: {
-          type: "video",
-          src: "/video.mp4",
-          title: "Video",
-          width: 1920,
-          height: 1080,
-          poster: { src: "/poster.jpg" },
-        },
+        src: "/video.mp4",
+        title: "Video",
+        width: 1920,
+        height: 1080,
+        poster: "/poster.jpg",
       }),
     ).toEqual(["/poster.jpg"]);
   });

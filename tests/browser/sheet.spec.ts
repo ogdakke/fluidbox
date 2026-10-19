@@ -86,6 +86,60 @@ test.describe("sheet on a phone", () => {
     await page.keyboard.press("Escape");
     await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
   });
+
+  test("the sheet stays inert and unfocused until it settles", async ({ page }) => {
+    await page.goto("/social.html");
+    await page.locator(".x-grid button").first().click();
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+    const sheet = page.locator("[data-fluidbox-overlay] [data-fluidbox-sheet]");
+    await expect(sheet).toHaveAttribute("inert");
+    // A screen reader that moves into a sheet still on its way loses its place,
+    // as React Aria's sheet notes, so focus and inert wait for the scroll end.
+    const moving = await page.evaluate(() => {
+      document.querySelector<HTMLElement>(".x-phone [data-fluidbox-sheet-stop]")!.click();
+      const sheet = document.querySelector("[data-fluidbox-overlay] [data-fluidbox-sheet]")!;
+      return {
+        inert: sheet.hasAttribute("inert"),
+        focused: sheet.contains(document.activeElement),
+      };
+    });
+    expect(moving).toEqual({ inert: true, focused: false });
+    await expect(dialog(page)).toHaveAttribute("data-sheet", "1");
+    await expect(sheet).not.toHaveAttribute("inert");
+    await expect(sheet).toBeFocused();
+  });
+
+  test("a wheel scroll dismiss keeps the momentum from the page until it ends", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "Synthetic wheel scrolling of the sheet is Chromium's.");
+    await page.goto("/social.html");
+    await page.locator(".ig-grid").scrollIntoViewIfNeeded();
+    await page.locator(".ig-grid button").first().click();
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-state", "open");
+    const pageScroll = await page.evaluate(() => scrollY);
+    await page.mouse.move(195, 300);
+    // A trackpad's momentum: wheel events keep coming, from a timer in the page
+    // so a slow test run leaves no gaps in them.
+    await page.evaluate(() => {
+      const momentum = setInterval(() => dispatchEvent(new WheelEvent("wheel")), 30);
+      Object.assign(window, { stopMomentum: () => clearInterval(momentum) });
+    });
+    // The flick scrolls the photo off.
+    const overlay = page.locator("[data-fluidbox-overlay]");
+    await expect(async () => {
+      for (let event = 0; event < 8; event++) await page.mouse.wheel(0, -300);
+      expect(await overlay.evaluate((node) => getComputedStyle(node).opacity)).toBe("0");
+    }).toPass({ intervals: [0] });
+    // Well past the fade: without the wait the overlay would be gone, and the
+    // momentum would scroll the page.
+    await page.waitForTimeout(400);
+    await expect(overlay).toHaveCount(1);
+    await page.evaluate(() => (window as unknown as { stopMomentum(): void }).stopMomentum());
+    await expect(overlay).toHaveCount(0);
+    expect(await page.evaluate(() => scrollY)).toBe(pageScroll);
+  });
 });
 
 test.describe("sheet on a wide screen", () => {

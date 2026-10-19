@@ -11,6 +11,7 @@ const entrypoints = [
   "angular",
   "filmstrip",
   "sheet",
+  "kit",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const frameworkPeers = ["react", "react-dom", "solid-js", "vue", "@angular/core"] as const;
@@ -23,39 +24,48 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   angular: ["@angular/core"],
   filmstrip: [],
   sheet: [],
+  kit: [],
 };
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
+/** A chunk that is the sheet's or the filmstrip's entry. */
+const isAddon = (chunk: { facadeModuleId?: string | null } | undefined) =>
+  !!chunk?.facadeModuleId && /[/\\](sheet|filmstrip)(-entry)?\.[jt]s$/.test(chunk.facadeModuleId);
+
 const initialGzipLimits: Record<Entry, number> = {
-  root: 23_250,
-  elements: 28_250,
-  react: 27_700,
-  solid: 1_500,
-  vue: 1_500,
-  angular: 1_500,
-  filmstrip: 3_100,
-  sheet: 6_400,
+  root: 27_800,
+  elements: 31_400,
+  react: 31_500,
+  solid: 35_500,
+  vue: 31_500,
+  angular: 32_100,
+  filmstrip: 3_300,
+  sheet: 7_000,
+  kit: 2_500,
 };
-const cssGzipLimit = 5_450;
+const cssGzipLimit = 5_600;
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 33_450,
-  elements: 32_350,
-  react: 31_900,
-  solid: 32_500,
-  vue: 32_600,
-  angular: 32_500,
-  filmstrip: 3_100,
-  sheet: 6_400,
+  root: 36_800,
+  // The gallery loads the filmstrip and sheet entries when it holds their elements.
+  elements: 35_500,
+  react: 35_900,
+  solid: 39_900,
+  vue: 35_900,
+  angular: 36_500,
+  filmstrip: 3_300,
+  sheet: 7_000,
+  kit: 2_500,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 38_850,
-  elements: 37_750,
-  react: 37_350,
-  solid: 38_000,
-  vue: 38_100,
-  angular: 38_000,
-  filmstrip: 8_450,
-  sheet: 9_350,
+  root: 42_200,
+  elements: 40_900,
+  react: 41_200,
+  solid: 45_200,
+  vue: 41_200,
+  angular: 41_800,
+  filmstrip: 8_750,
+  sheet: 9_650,
+  kit: 7_900,
 };
 
 type Chunk = Extract<
@@ -158,6 +168,8 @@ for (const name of entrypoints) {
     const chunk = byName.get(fileName);
     if (!chunk) throw new Error(`${name}: missing emitted chunk ${fileName}`);
     for (const imported of [...chunk.imports, ...chunk.dynamicImports]) {
+      // An add-on loads only for a viewer that uses it; it has its own budget.
+      if (chunk.dynamicImports.includes(imported) && isAddon(byName.get(imported))) continue;
       if (byName.has(imported)) visitActivation(imported);
       else if (peerFor(imported)) externals.add(imported);
       else unresolved.add(imported);
@@ -193,7 +205,8 @@ for (const name of entrypoints) {
   });
   const initialCode = initialChunks.map((chunk) => chunk.code).join("\n");
   const registersFluidbox = /customElements\.define\([`"']fluidbox-item[`"']/.test(initialCode);
-  // Extensions cost nothing until imported: no core entry may carry their code.
+  // Add-ons cost nothing until used: no core entry may carry their code, only
+  // load it lazily for a viewer that turns them on.
   const activationCode = activationChunks.map((chunk) => chunk.code).join("\n");
   const carriesExtension =
     name !== "filmstrip" && name !== "sheet" && /fluidboxSheetHost/.test(activationCode);

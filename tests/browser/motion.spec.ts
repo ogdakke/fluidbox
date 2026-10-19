@@ -29,10 +29,10 @@ async function sampleIndexedOpening(page: Page, gallerySelector: string, index: 
     async ({ gallerySelector, index }) => {
       const gallery = document.querySelector<
         HTMLElement & {
-          controller: { open(target: { index: number }): Promise<unknown> };
+          fluidbox: { open(target: number): Promise<boolean> };
         }
       >(gallerySelector)!;
-      void gallery.controller.open({ index });
+      void gallery.fluidbox.open(index);
       await window.__motion.ready();
       const media = document.querySelector<HTMLElement>(
         '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
@@ -985,7 +985,7 @@ test("close-flight handoff hides every painted layer of the source frame", async
 test("opening crop transforms the fallback and media together", async ({ page }) => {
   await page.goto("/headless.html");
   const transforms = await page.evaluate(() => {
-    const dispose = window.headlessViewer.prepare({ id: "one" });
+    const dispose = window.headlessViewer.preload("one");
     const frame = document.querySelector<HTMLElement>(
       '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
     )!;
@@ -1002,7 +1002,7 @@ test("opening crop transforms the fallback and media together", async ({ page })
   expect(transforms.fallback).toBe(transforms.media);
 
   const midFlight = await page.evaluate(async () => {
-    void window.headlessViewer.open({ id: "one" });
+    void window.headlessViewer.open("one");
     for (let frame = 0; frame < 8; frame++) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (
@@ -1042,10 +1042,10 @@ test("nested visual target takes precedence over its preview box", async ({ page
   const startRadius = await page.locator("fluidbox-gallery").evaluate(
     async (
       gallery: HTMLElement & {
-        controller: { open(target: { index: number }): Promise<unknown> };
+        fluidbox: { open(target: number): Promise<boolean> };
       },
     ) => {
-      void gallery.controller.open({ index: 0 });
+      void gallery.fluidbox.open(0);
       await window.__motion.ready();
       window.__motion.seek(0);
       const frame = document.querySelector<HTMLElement>(
@@ -1094,14 +1094,14 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
 
   const interrupt = (phase: "opening" | "closing") =>
     page.evaluate(async (phase): Promise<Interruption> => {
-      const controller = document.querySelector<
+      const fluidbox = document.querySelector<
         HTMLElement & {
-          controller: {
-            open(target: { index: number }): Promise<unknown>;
-            close(): Promise<unknown>;
+          fluidbox: {
+            open(target: number): Promise<boolean>;
+            close(): Promise<boolean>;
           };
         }
-      >("fluidbox-gallery")!.controller;
+      >("fluidbox-gallery")!.fluidbox;
       const slideFrame = () =>
         document.querySelector<HTMLElement>(
           '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
@@ -1140,8 +1140,8 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
         animation.playbackRate = 1e-6;
         return animation;
       };
-      if (phase === "opening") void controller.open({ index: 0 });
-      else void controller.close();
+      if (phase === "opening") void fluidbox.open(0);
+      else void fluidbox.close();
       const beforeFrame = await waitForAnimation(phase === "opening" ? slideFrame : flightFrame);
       // Pin every transition track to the same unfinished timeline position.
       // A timer can wake after settlement on a busy browser worker.
@@ -1150,8 +1150,8 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
         animation.currentTime = 90;
       }
       const before = sample(beforeFrame);
-      if (phase === "opening") void controller.close();
-      else void controller.open({ index: 0 });
+      if (phase === "opening") void fluidbox.close();
+      else void fluidbox.open(0);
       const afterFrame = await waitForAnimation(phase === "opening" ? flightFrame : slideFrame);
       for (const animation of document.getAnimations()) {
         animation.pause();

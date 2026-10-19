@@ -3,15 +3,15 @@ import { expect, test } from "@playwright/test";
 test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=1000");
   const gallery = page.locator("fluidbox-gallery");
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
-    element.open({ index: 10 }),
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
+    element.open(10),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-state",
     "open",
   );
   const handoff = await gallery.evaluate(
-    (element: HTMLElement & { open(target: { index: number }): void }) => {
+    (element: HTMLElement & { open(target: number): Promise<boolean> }) => {
       const scroller = document.querySelector<HTMLElement>("[data-fluidbox-filmstrip-scroll]")!;
       const style = getComputedStyle(scroller);
       const filmstrip = scroller.closest<HTMLElement>("[data-fluidbox-filmstrip]")!;
@@ -28,7 +28,7 @@ test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ 
         scroller.scrollTo({ left: 9 * step, behavior: "instant" });
       };
       beginUnsettledScroll();
-      element.open({ index: 10 });
+      void element.open(10);
       scroller.dispatchEvent(new Event("scrollend"));
       const sameIndex = selectedLabel();
       beginUnsettledScroll();
@@ -65,15 +65,15 @@ test("a mounted indexed origin follows selection inside its scroll container", a
     gallery.prepend(scroller);
   });
   const gallery = page.locator("fluidbox-gallery");
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
-    element.open({ index: 0 }),
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
+    element.open(0),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-state",
     "open",
   );
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
-    element.open({ index: 10 }),
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
+    element.open(10),
   );
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -152,16 +152,16 @@ test("stale async reveals abort on rapid selection and close never waits", async
     };
   });
   const gallery = page.locator("fluidbox-gallery");
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
-    element.open({ index: 0 }),
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
+    element.open(0),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-state",
     "open",
   );
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) => {
-    element.open({ index: 1 });
-    element.open({ index: 0 });
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) => {
+    void element.open(1);
+    void element.open(0);
   });
   await expect
     .poll(() =>
@@ -208,15 +208,15 @@ test("stale async reveals abort on rapid selection and close never waits", async
   expect(events.every((event) => !event.completed)).toBe(true);
 });
 
-test("source replacement and disconnect abort pending origin reveals", async ({ page }) => {
+test("item replacement and disconnect abort pending origin reveals", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=2&no-filmstrip");
   const events = await page.evaluate(async () => {
     const gallery = document.querySelector<
       HTMLElement & {
-        source: {
+        items: {
           count: number;
-          getItem(index: number): { id: string };
-          getIndex(id: string): number | null;
+          get(index: number): unknown;
+          indexOf?(id: string): number;
         } | null;
         origins: {
           getOrigin(id: string): null;
@@ -226,17 +226,17 @@ test("source replacement and disconnect abort pending origin reveals", async ({ 
             context: { signal: AbortSignal; reason: "open" | "selection" },
           ): Promise<void>;
         };
-        open(target: { index: number }): Promise<unknown>;
+        open(target: number): Promise<boolean>;
         close(): Promise<unknown>;
       }
     >("fluidbox-gallery")!;
-    const original = gallery.source!;
+    const original = gallery.items!;
     const events: { source: string; aborted: boolean }[] = [];
     Object.assign(window, { __swapEvents: events });
-    const makeSource = () => ({
+    const makeItems = () => ({
       count: original.count,
-      getItem: (index: number) => original.getItem(index),
-      getIndex: (id: string) => original.getIndex(id),
+      get: (index: number) => original.get(index),
+      indexOf: (id: string) => original.indexOf!(id),
     });
     const makeOrigins = (name: string) => ({
       getOrigin: () => null,
@@ -256,14 +256,14 @@ test("source replacement and disconnect abort pending origin reveals", async ({ 
       },
     });
     gallery.origins = makeOrigins("old");
-    gallery.source = makeSource();
+    gallery.items = makeItems();
     await Promise.resolve();
-    await gallery.open({ index: 0 });
+    await gallery.open(0);
     gallery.origins = makeOrigins("new");
-    gallery.source = makeSource();
+    gallery.items = makeItems();
     await new Promise((resolve) => setTimeout(resolve, 500));
     const oldAbortedOnReplace = events[0]?.aborted;
-    if (events.length < 2) throw new Error("replacement source did not request an origin reveal");
+    if (events.length < 2) throw new Error("replacement items did not request an origin reveal");
     gallery.remove();
     return { oldAbortedOnReplace, events: events.map((event) => ({ ...event })) };
   });
@@ -291,8 +291,8 @@ test("one-item indexed source handles reveal failures without leaking its sessio
       },
     };
   });
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
-    element.open({ index: 0 }),
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
+    element.open(0),
   );
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -308,8 +308,8 @@ test("one-item indexed source handles reveal failures without leaking its sessio
       },
     };
   });
-  await gallery.evaluate((element: HTMLElement & { open(target: { index: number }): void }) =>
-    element.open({ index: 0 }),
+  await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
+    element.open(0),
   );
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-state",

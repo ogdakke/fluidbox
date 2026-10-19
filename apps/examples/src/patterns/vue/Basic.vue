@@ -1,0 +1,23 @@
+<!-- #region example -->
+<script setup lang="ts">
+import { Fluidbox } from "@ogdakke/fluidbox/vue";
+import { label, photos } from "../shared";
+</script>
+
+<template>
+  <!-- Without a Viewer, the viewer has the default Previous, Next and Close. -->
+  <Fluidbox.Root :items="photos">
+    <div class="pattern-grid">
+      <Fluidbox.Trigger
+        v-for="photo in photos"
+        :key="photo.id"
+        :item="photo"
+        class="pattern-thumb"
+        data-test="trigger"
+      >
+        <img :src="photo.src" :alt="label(photo)" />
+      </Fluidbox.Trigger>
+    </div>
+  </Fluidbox.Root>
+</template>
+<!-- #endregion example -->

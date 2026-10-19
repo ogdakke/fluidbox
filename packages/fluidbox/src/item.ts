@@ -1,211 +1,241 @@
-import { markedVisualOrigin } from "./origin-geometry";
 import type {
-  FluidboxImageResource,
-  FluidboxImageSource,
   FluidboxItem,
-  FluidboxOrigin,
+  FluidboxPictureSource,
   FluidboxRenderer,
+  FluidboxThumbnail,
 } from "./public-api";
 
 export interface DeclarativeFluidboxDefinition {
   readonly item: FluidboxItem;
-  readonly origin: FluidboxOrigin;
+  /** The trigger the item opens from, if it has one. */
+  readonly trigger: HTMLElement | null;
+  /** The renderer of markup content that is not an image, video or iframe. */
   readonly renderer?: readonly [string, FluidboxRenderer];
+  /** The item's own `<template slot="sheet">`. */
+  readonly sheet?: HTMLTemplateElement;
 }
 
-function positiveDimension(element: Element, name: "width" | "height") {
+function dimension(element: Element, name: "width" | "height") {
   const value = Number(element.getAttribute(name));
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-function imageSources(picture: HTMLPictureElement | null): FluidboxImageSource[] | undefined {
+function pictureSources(picture: HTMLPictureElement | null): FluidboxPictureSource[] | undefined {
   if (!picture) return undefined;
   const sources = Array.from(picture.querySelectorAll<HTMLSourceElement>(":scope > source")).map(
     (source) => ({
-      ...(source.media ? { media: source.media } : {}),
-      ...(source.type ? { type: source.type } : {}),
       srcset: source.getAttribute("srcset") ?? "",
       ...(source.sizes ? { sizes: source.sizes } : {}),
+      ...(source.media ? { media: source.media } : {}),
+      ...(source.type ? { type: source.type } : {}),
     }),
   );
   return sources.length ? sources : undefined;
 }
 
-function imageResource(image: HTMLImageElement): FluidboxImageResource {
-  const picture = image.parentElement instanceof HTMLPictureElement ? image.parentElement : null;
-  const sources = imageSources(picture);
+function thumbnailOf(image: HTMLImageElement): FluidboxThumbnail | undefined {
   const src = image.getAttribute("src");
-  if (!src) throw new TypeError("Declarative lightbox images require an img src attribute.");
+  if (!src) return undefined;
   const srcset = image.getAttribute("srcset");
-  const width = positiveDimension(image, "width");
-  const height = positiveDimension(image, "height");
+  const sizes = image.getAttribute("sizes");
+  const width = dimension(image, "width");
+  const height = dimension(image, "height");
   return {
     src,
+    ...(srcset ? { srcset } : {}),
+    ...(sizes ? { sizes } : {}),
     ...(width ? { width } : {}),
     ...(height ? { height } : {}),
-    ...(srcset ? { srcset } : {}),
-    ...(image.sizes ? { sizes: image.sizes } : {}),
-    ...(sources ? { sources } : {}),
   };
 }
 
-function firstContentElement(template: HTMLTemplateElement) {
-  const element = template.content.firstElementChild;
-  if (!(element instanceof HTMLElement)) {
-    throw new TypeError('<template slot="content"> must contain one root element.');
-  }
-  return element;
+function slotted<TElement extends Element>(
+  parent: Element,
+  slot: string,
+  type: abstract new () => TElement,
+): TElement | null {
+  return (
+    Array.from(parent.children).find(
+      (child): child is TElement => child instanceof type && child.getAttribute("slot") === slot,
+    ) ?? null
+  );
 }
 
-/** A declarative item definition. Its parent fluidbox-gallery owns the viewer controller. */
+/** What `<fluidbox-item>` dispatches before a close flight lands on a different item of its `returns`. */
+export type FluidboxPreviewChangeEvent = CustomEvent<{
+  readonly id: string;
+  readonly item: FluidboxItem;
+}>;
+
+/**
+ * An item of its `<fluidbox-gallery>`: a `slot="trigger"` element that opens
+ * it, and a `<template slot="content">` holding the `<img>`, `<picture>`,
+ * `<video>`, `<iframe>` or other markup the viewer shows.
+ *
+ * `returns="b c"` lists other items whose close flight returns to this trigger,
+ * as a "+3" teaser does for an album. The trigger opens the item it last
+ * showed. Before such a flight, the item dispatches `fluidbox-preview-change`
+ * with the id and item it lands on; update the trigger's preview synchronously
+ * there. Mark the trigger `data-fluidbox-dynamic-preview` so those updates
+ * are not read as changes to the gallery's items.
+ */
 export class FluidboxItemElement extends HTMLElement {
-  /** Override the item opened by this trigger without changing its own item identity. */
-  openItemId: string | null = null;
-
-  connectedCallback() {
-    queueMicrotask(() => {
-      if (!this.isConnected) return;
-      const trigger = this.trigger;
-      trigger.dataset.fluidboxTrigger = "";
-      trigger.setAttribute("aria-haspopup", "dialog");
-      trigger.setAttribute("aria-expanded", "false");
-    });
-  }
-
   get itemId() {
     const id = this.getAttribute("item-id")?.trim();
     if (!id) throw new TypeError("<fluidbox-item> requires a non-empty item-id attribute.");
     return id;
   }
 
-  get trigger(): HTMLElement {
-    const trigger = Array.from(this.children).find(
-      (child): child is HTMLElement =>
-        child instanceof HTMLElement && child.getAttribute("slot") === "trigger",
+  /** This item, then each id in `returns`. */
+  get originIds(): readonly string[] {
+    const returns = this.getAttribute("returns")?.split(/\s+/).filter(Boolean) ?? [];
+    return [...new Set([this.itemId, ...returns])];
+  }
+
+  /** @internal Called by the gallery before a close flight measures this trigger. */
+  previewChange(id: string, item: FluidboxItem) {
+    this.dispatchEvent(
+      new CustomEvent("fluidbox-preview-change", { detail: { id, item }, bubbles: true }),
     );
-    if (!trigger) {
-      throw new TypeError('<fluidbox-item> requires an element with slot="trigger".');
-    }
-    return trigger;
+  }
+
+  /**
+   * The `slot="trigger"` child. An item without one is in the gallery but has
+   * no thumbnail of its own, as the rest of an album behind a teaser.
+   */
+  get trigger(): HTMLElement | null {
+    return slotted(this, "trigger", HTMLElement);
   }
 
   get contentTemplate(): HTMLTemplateElement {
-    const template = Array.from(this.children).find(
-      (child): child is HTMLTemplateElement =>
-        child instanceof HTMLTemplateElement && child.getAttribute("slot") === "content",
-    );
-    if (!template) {
-      throw new TypeError('<fluidbox-item> requires a <template slot="content">.');
-    }
+    const template = slotted(this, "content", HTMLTemplateElement);
+    if (!template) throw new TypeError('<fluidbox-item> requires a <template slot="content">.');
     return template;
   }
 
   compile(): DeclarativeFluidboxDefinition {
     const id = this.itemId;
     const trigger = this.trigger;
-    const thumbnail = trigger.querySelector<HTMLImageElement>("img") ?? undefined;
-    const visual =
-      trigger.querySelector<HTMLElement>("[data-fluidbox-origin]") ??
-      markedVisualOrigin(trigger) ??
-      thumbnail ??
-      trigger;
-    const origin: FluidboxOrigin = { trigger, visual, thumbnail };
+    const triggerImage = trigger?.querySelector<HTMLImageElement>("img");
     const template = this.contentTemplate;
-    const content = firstContentElement(template);
+    const content = template.content.firstElementChild;
+    if (!(content instanceof HTMLElement)) {
+      throw new TypeError('<template slot="content"> must contain one root element.');
+    }
+    const sheet = slotted(this, "sheet", HTMLTemplateElement) ?? undefined;
+    const thumbnail = triggerImage ? thumbnailOf(triggerImage) : undefined;
+    const placeholder = this.getAttribute("placeholder");
+    const base = {
+      id,
+      ...(thumbnail ? { thumbnail } : {}),
+      ...(placeholder ? { placeholder } : {}),
+    };
+    const done = (item: FluidboxItem): DeclarativeFluidboxDefinition => ({
+      item,
+      trigger,
+      ...(sheet ? { sheet } : {}),
+    });
+    const sized = (element: Element, kind: string) => {
+      const width = dimension(element, "width");
+      const height = dimension(element, "height");
+      if (!width || !height) {
+        throw new TypeError(`The ${kind} of item ${id} needs width and height attributes.`);
+      }
+      return { width, height };
+    };
+    const source = (element: Element, kind: string) => {
+      const src = element.getAttribute("src");
+      if (!src) throw new TypeError(`The ${kind} of item ${id} needs a src attribute.`);
+      return src;
+    };
+
     const image =
       content instanceof HTMLPictureElement
         ? content.querySelector<HTMLImageElement>(":scope > img")
         : content instanceof HTMLImageElement
           ? content
           : null;
-    const caption = this.querySelector<HTMLElement>(":scope > [slot=caption]")?.textContent?.trim();
-    const description = this.querySelector<HTMLElement>(
-      ":scope > [slot=description]",
-    )?.textContent?.trim();
-    const metadata = {
-      ...(this.getAttribute("placeholder-src")
-        ? { placeholder: { src: this.getAttribute("placeholder-src")! } }
-        : {}),
-      ...(thumbnail
-        ? { thumbnail: imageResource(thumbnail), preview: imageResource(thumbnail) }
-        : {}),
-      ...(caption ? { caption } : {}),
-      ...(description ? { description } : {}),
-    };
-
     if (image) {
-      const resource = imageResource(image);
-      const width = resource.width ?? positiveDimension(content, "width");
-      const height = resource.height ?? positiveDimension(content, "height");
-      if (!width || !height) {
-        throw new TypeError(`Image item ${id} requires width and height on its content img.`);
-      }
-      return {
-        origin,
-        item: {
-          id,
-          media: {
-            ...resource,
-            type: "image",
-            alt: image.alt,
-            width,
-            height,
-          },
-          ...metadata,
-        },
-      };
+      const sources = pictureSources(content instanceof HTMLPictureElement ? content : null);
+      const srcset = image.getAttribute("srcset");
+      const sizes = image.getAttribute("sizes");
+      return done({
+        ...base,
+        type: "img",
+        src: source(image, "img"),
+        alt: image.alt,
+        ...sized(image, "img"),
+        ...(srcset ? { srcset } : {}),
+        ...(sizes ? { sizes } : {}),
+        ...(sources ? { sources } : {}),
+      });
     }
 
     if (content instanceof HTMLVideoElement) {
-      const width = positiveDimension(content, "width");
-      const height = positiveDimension(content, "height");
-      const src = content.getAttribute("src");
-      if (!src || !width || !height) {
-        throw new TypeError(`Video item ${id} requires src, width, and height attributes.`);
-      }
-      return {
-        origin,
-        item: {
-          id,
-          media: {
-            type: "video",
-            src,
-            title: content.getAttribute("aria-label") || content.title || id,
-            width,
-            height,
-            ...(content.poster ? { poster: { src: content.poster } } : {}),
-          },
-          ...metadata,
-        },
-      };
+      const preload = content.getAttribute("preload");
+      const poster = content.getAttribute("poster");
+      // HTML's own defaults: a boolean attribute is on when present.
+      return done({
+        ...base,
+        type: "video",
+        src: source(content, "video"),
+        title: content.getAttribute("aria-label") || content.title || id,
+        ...sized(content, "video"),
+        ...(poster ? { poster } : {}),
+        autoplay: content.hasAttribute("autoplay"),
+        loop: content.hasAttribute("loop"),
+        muted: content.hasAttribute("muted"),
+        playsInline: content.hasAttribute("playsinline"),
+        controls: content.hasAttribute("controls"),
+        ...(preload === "none" || preload === "metadata" || preload === "auto" ? { preload } : {}),
+      });
     }
 
-    const width = positiveDimension(content, "width") || thumbnail?.width || 1;
-    const height = positiveDimension(content, "height") || thumbnail?.height || 1;
-    const rendererKey = `fluidbox-item:${id}`;
+    // An iframe with a src is iframe media; one with only srcdoc stays custom content.
+    if (content instanceof HTMLIFrameElement && content.hasAttribute("src")) {
+      const allow = content.getAttribute("allow");
+      const referrerPolicy = content.getAttribute("referrerpolicy");
+      return done({
+        ...base,
+        type: "iframe",
+        src: source(content, "iframe"),
+        title: content.title || id,
+        ...sized(content, "iframe"),
+        ...(allow ? { allow } : {}),
+        ...(referrerPolicy ? { referrerPolicy: referrerPolicy as ReferrerPolicy } : {}),
+        ...(content.hasAttribute("sandbox")
+          ? { sandbox: content.getAttribute("sandbox") ?? "" }
+          : {}),
+      });
+    }
+
+    const key = `fluidbox-item:${id}`;
     return {
-      origin,
-      item: {
-        id,
-        media: {
-          type: "custom",
-          renderer: rendererKey,
-          title: this.getAttribute("aria-label") || id,
-          width,
-          height,
-        },
-        ...metadata,
-      },
+      ...done({
+        ...base,
+        type: "custom",
+        render: key,
+        title: this.getAttribute("aria-label") || id,
+        width: dimension(content, "width") || thumbnail?.width || 1,
+        height: dimension(content, "height") || thumbnail?.height || 1,
+      }),
       renderer: [
-        rendererKey,
-        {
-          mount({ target }) {
-            target.append(template.content.cloneNode(true));
-            return () => target.replaceChildren();
-          },
+        key,
+        ({ target }) => {
+          target.append(template.content.cloneNode(true));
+          return () => target.replaceChildren();
         },
       ],
     };
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "fluidbox-item": FluidboxItemElement;
+  }
+  interface HTMLElementEventMap {
+    "fluidbox-preview-change": FluidboxPreviewChangeEvent;
   }
 }
 

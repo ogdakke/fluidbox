@@ -1,8 +1,14 @@
-import type { FluidboxImageResource, FluidboxItem } from "./public-api";
+import type { FluidboxItem } from "./runtime-types";
+import { srcsetCandidates } from "./srcset";
 
-function appendResource(target: string[], resource: FluidboxImageResource | undefined) {
+/** The resource's width-described candidates, smallest first, then its src. */
+function appendResource(
+  target: string[],
+  resource: { readonly src: string; readonly srcset?: string } | undefined,
+) {
   if (!resource) return;
-  for (const candidate of [...(resource.candidates ?? [])].sort((a, b) => a.width - b.width)) {
+  const candidates = srcsetCandidates(resource.srcset).filter((candidate) => candidate.width > 0);
+  for (const candidate of candidates.sort((a, b) => a.width - b.width)) {
     if (!target.includes(candidate.src)) target.push(candidate.src);
   }
   if (!target.includes(resource.src)) target.push(resource.src);
@@ -11,9 +17,8 @@ function appendResource(target: string[], resource: FluidboxImageResource | unde
 export function filmstripThumbnailSources(item: FluidboxItem): readonly string[] {
   const sources: string[] = [];
   appendResource(sources, item.thumbnail);
-  appendResource(sources, item.preview);
-  if (item.media.type === "image") appendResource(sources, item.media);
-  else if (item.media.type === "video") appendResource(sources, item.media.poster);
+  if (item.type === "img") appendResource(sources, item);
+  else if (item.type === "video" && item.poster) appendResource(sources, { src: item.poster });
   return sources;
 }
 

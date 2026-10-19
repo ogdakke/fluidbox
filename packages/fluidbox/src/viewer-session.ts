@@ -1,35 +1,36 @@
+import { idOf } from "./items";
 import { OriginRegistry } from "./origin-registry";
 import type {
-  FluidboxBeforeCommandEvent,
-  FluidboxChangeReason,
-  FluidboxCommandOptions,
-  FluidboxCommandReason,
-  FluidboxCommandResult,
-  FluidboxController,
+  SessionBeforeCommandEvent,
+  SessionChangeReason,
+  SessionCommandOptions,
+  SessionReason,
+  SessionCommandResult,
+  SessionController,
   FluidboxDispose,
-  FluidboxEvent,
+  SessionEvent,
   FluidboxItem,
   FluidboxItemId,
-  FluidboxOptions,
+  SessionOptions,
   FluidboxOrigin,
   FluidboxSource,
-  FluidboxState,
-  FluidboxTarget,
+  SessionState,
+  SessionTarget,
   FluidboxThumbnailOverlayRegistration,
-} from "./public-api";
+} from "./runtime-types";
 
 export interface ViewerSessionMotionContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
   readonly index: number;
   readonly origin: FluidboxOrigin | null;
   readonly signal: AbortSignal;
-  readonly reason: FluidboxChangeReason;
+  readonly reason: SessionChangeReason;
 }
 
 export interface ViewerSessionCloseContext {
   readonly origin: FluidboxOrigin | null;
   readonly signal: AbortSignal;
-  readonly reason: FluidboxChangeReason;
+  readonly reason: SessionChangeReason;
 }
 
 /** DOM motion and portal ownership supplied by the runtime adapter. */
@@ -43,14 +44,16 @@ export interface ViewerSessionDriver<TItem extends FluidboxItem = FluidboxItem> 
     id: FluidboxItemId,
     registration: FluidboxThumbnailOverlayRegistration<TItem>,
   ): void | FluidboxDispose;
+  /** The page may have scrolled to reveal an origin; follow it before the next frame. */
+  revealed?(): void;
   destroy(): void;
 }
 
 interface PendingCommand {
   readonly key: string;
   readonly controller: AbortController;
-  readonly promise: Promise<FluidboxCommandResult>;
-  resolve(result: FluidboxCommandResult): void;
+  readonly promise: Promise<SessionCommandResult>;
+  resolve(result: SessionCommandResult): void;
   reject(error: unknown): void;
   settled: boolean;
   restore?: () => void;
@@ -63,32 +66,37 @@ interface OverlayRegistration<TItem extends FluidboxItem> {
   readonly disposeDriver?: FluidboxDispose;
 }
 
-const completed = (changed: boolean): FluidboxCommandResult => ({ status: "completed", changed });
-const prevented = (): FluidboxCommandResult => ({ status: "prevented" });
-const aborted = (): FluidboxCommandResult => ({ status: "aborted" });
+const completed = (changed: boolean): SessionCommandResult => ({ status: "completed", changed });
+const prevented = (): SessionCommandResult => ({ status: "prevented" });
+const aborted = (): SessionCommandResult => ({ status: "aborted" });
 
-export function viewerSelectionCommandOptions(reason: FluidboxCommandReason, settled: boolean) {
-  return { reason, __fluidboxSettled: settled };
+/** The strip asks with {@link ViewerSession.allows} first, so its commands skip the before-event. */
+export function viewerSelectionCommandOptions(reason: SessionReason, settled: boolean) {
+  return { reason, __fluidboxSettled: settled, __fluidboxApproved: true };
 }
 
-function selectionCommandSettled(options: FluidboxCommandOptions) {
-  return (options as FluidboxCommandOptions & { __fluidboxSettled?: boolean }).__fluidboxSettled;
+function selectionCommandApproved(options: SessionCommandOptions) {
+  return (options as SessionCommandOptions & { __fluidboxApproved?: boolean }).__fluidboxApproved;
+}
+
+function selectionCommandSettled(options: SessionCommandOptions) {
+  return (options as SessionCommandOptions & { __fluidboxSettled?: boolean }).__fluidboxSettled;
 }
 
 function stateFor<TItem extends FluidboxItem>(
   source: FluidboxSource<TItem>,
-  status: FluidboxState["status"],
+  status: SessionState["status"],
   activeIndex: number | null,
   requestedIndex: number | null,
-): FluidboxState {
+): SessionState {
   const active = activeIndex === null ? null : source.getItem(activeIndex);
   const requested = requestedIndex === null ? null : source.getItem(requestedIndex);
   return Object.freeze({
     status,
     count: source.count,
-    activeId: active?.id ?? null,
+    activeId: active ? idOf(active) : null,
     activeIndex,
-    requestedId: requested?.id ?? null,
+    requestedId: requested ? idOf(requested) : null,
     requestedIndex,
     canPrevious: activeIndex !== null && activeIndex > 0,
     canNext: activeIndex !== null && activeIndex < source.count - 1,
@@ -96,7 +104,7 @@ function stateFor<TItem extends FluidboxItem>(
 }
 
 function invalidState(): DOMException {
-  return new DOMException("The lightbox controller has been destroyed.", "InvalidStateError");
+  return new DOMException("The fluidbox has been destroyed.", "InvalidStateError");
 }
 
 /**
@@ -105,16 +113,16 @@ function invalidState(): DOMException {
  */
 export class ViewerSession<
   TItem extends FluidboxItem = FluidboxItem,
-> implements FluidboxController<TItem> {
+> implements SessionController<TItem> {
   #source: FluidboxSource<TItem>;
   readonly #driver: ViewerSessionDriver<TItem>;
   readonly #origins: OriginRegistry;
-  readonly #listeners = new Set<(state: FluidboxState) => void>();
+  readonly #listeners = new Set<(state: SessionState) => void>();
   readonly #overlays = new Map<FluidboxItemId, OverlayRegistration<TItem>>();
-  readonly #onBeforeCommand: FluidboxOptions<TItem>["onBeforeCommand"];
-  readonly #onEvent: FluidboxOptions<TItem>["onEvent"];
-  readonly #originAdapter: FluidboxOptions<TItem>["origins"];
-  #state: FluidboxState;
+  readonly #onBeforeCommand: SessionOptions<TItem>["onBeforeCommand"];
+  readonly #onEvent: SessionOptions<TItem>["onEvent"];
+  readonly #originAdapter: SessionOptions<TItem>["origins"];
+  #state: SessionState;
   #pending: PendingCommand | undefined;
   #revealController: AbortController | undefined;
   /** The item whose origin the user last saw: the one opened or last revealed. */
@@ -122,7 +130,7 @@ export class ViewerSession<
   #sourceRefreshPending = false;
   #destroyed = false;
 
-  constructor(options: FluidboxOptions<TItem>, driver: ViewerSessionDriver<TItem>) {
+  constructor(options: SessionOptions<TItem>, driver: ViewerSessionDriver<TItem>) {
     this.#validateSource(options.source);
     this.#source = options.source;
     this.#driver = driver;
@@ -134,27 +142,32 @@ export class ViewerSession<
     this.#driver.setSource?.(this.#source);
   }
 
-  get state(): FluidboxState {
+  get source(): FluidboxSource<TItem> {
+    return this.#source;
+  }
+
+  get state(): SessionState {
     return this.#state;
   }
 
-  prepare(target: FluidboxTarget): FluidboxDispose {
+  prepare(target: SessionTarget): FluidboxDispose {
     this.#assertAlive();
     const index = this.#resolveTarget(target);
     if (this.#state.status !== "closed") return () => {};
     const item = this.#source.getItem(index);
     return (
-      this.#driver.prepare?.({ item, index, origin: this.#origins.get(item.id) }) ?? (() => {})
+      this.#driver.prepare?.({ item, index, origin: this.#origins.get(idOf(item)) }) ?? (() => {})
     );
   }
 
-  open(target: FluidboxTarget, options: FluidboxCommandOptions = {}) {
+  open(target: SessionTarget, options: SessionCommandOptions = {}) {
     this.#assertAlive();
-    const index = this.#resolveTarget(target);
+    const index = this.#tryResolveTarget(target);
+    if (index instanceof Error) return Promise.reject(index);
     return this.#requestSelection("open", index, target, options);
   }
 
-  close(options: FluidboxCommandOptions = {}) {
+  close(options: SessionCommandOptions = {}) {
     this.#assertAlive();
     const reason = options.reason ?? "api";
     const pending = this.#samePending("close", options.signal);
@@ -176,10 +189,10 @@ export class ViewerSession<
     const activeItem = activeIndex === null ? null : this.#source.getItem(activeIndex);
     // A swipe reveals its slide's origin only once the strip settles. A close
     // that starts sooner still has to land on that origin, not the last one.
-    if (activeItem && this.#revealedId !== activeItem.id) {
-      this.#requestReveal(activeItem.id, activeIndex!, "selection");
+    if (activeItem && this.#revealedId !== idOf(activeItem)) {
+      this.#requestReveal(idOf(activeItem), activeIndex!, "selection");
     }
-    const origin = activeItem ? this.#origins.get(activeItem.id) : null;
+    const origin = activeItem ? this.#origins.get(idOf(activeItem)) : null;
     if (activeItem && origin?.prepareClose) {
       try {
         origin.prepareClose(activeItem, activeIndex!);
@@ -187,8 +200,8 @@ export class ViewerSession<
         // A host preview update must not prevent the viewer from closing.
       }
     }
-    if (activeItem) this.#origins.hideThumbnail(activeItem.id);
-    const closeOrigin = activeItem ? this.#origins.get(activeItem.id) : null;
+    if (activeItem) this.#origins.hideThumbnail(idOf(activeItem));
+    const closeOrigin = activeItem ? this.#origins.get(idOf(activeItem)) : null;
     void this.#run(operation, () =>
       this.#driver.close({ origin: closeOrigin, signal: operation.controller.signal, reason }),
     ).then((settled) => {
@@ -202,13 +215,19 @@ export class ViewerSession<
     return operation.promise;
   }
 
-  goTo(target: FluidboxTarget, options: FluidboxCommandOptions = {}) {
+  goTo(target: SessionTarget, options: SessionCommandOptions = {}) {
     this.#assertAlive();
-    const index = this.#resolveTarget(target);
+    const index = this.#tryResolveTarget(target);
+    if (index instanceof Error) return Promise.reject(index);
     return this.#requestSelection("goTo", index, target, options);
   }
 
-  next(options: FluidboxCommandOptions = {}) {
+  allows(target: SessionTarget, reason: SessionReason) {
+    this.#assertAlive();
+    return !this.#prevented("goTo", target, reason);
+  }
+
+  next(options: SessionCommandOptions = {}) {
     this.#assertAlive();
     if (this.#source.count === 0) return Promise.resolve(completed(false));
     const index = this.#state.activeIndex;
@@ -216,7 +235,7 @@ export class ViewerSession<
     return this.#requestSelection("next", target, { index: target }, options);
   }
 
-  previous(options: FluidboxCommandOptions = {}) {
+  previous(options: SessionCommandOptions = {}) {
     this.#assertAlive();
     if (this.#source.count === 0) return Promise.resolve(completed(false));
     const index = this.#state.activeIndex;
@@ -265,7 +284,7 @@ export class ViewerSession<
     const matchingIndex = previousId === null ? null : source.getIndex(previousId);
     const index = matchingIndex ?? Math.min(previousIndex, source.count - 1);
     const item = source.getItem(index);
-    const changed = item.id !== previousId || index !== previousIndex;
+    const changed = idOf(item) !== previousId || index !== previousIndex;
     this.#publish(this.#state.status, index, index);
     if (changed) this.#emitSelection("selection-change", index, "source-update");
 
@@ -306,7 +325,7 @@ export class ViewerSession<
     };
   }
 
-  subscribe(listener: (state: FluidboxState) => void): FluidboxDispose {
+  subscribe(listener: (state: SessionState) => void): FluidboxDispose {
     this.#assertAlive();
     this.#listeners.add(listener);
     let disposed = false;
@@ -335,26 +354,28 @@ export class ViewerSession<
   #requestSelection(
     command: "open" | "goTo" | "next" | "previous",
     index: number,
-    target: FluidboxTarget,
-    options: FluidboxCommandOptions,
-  ): Promise<FluidboxCommandResult> {
+    target: SessionTarget,
+    options: SessionCommandOptions,
+  ): Promise<SessionCommandResult> {
     this.#flushSourceRefresh();
     const item = this.#source.getItem(index);
     const reason = options.reason ?? "api";
-    const key = `${this.#state.status === "open" ? "select" : "open"}:${item.id}`;
+    const key = `${this.#state.status === "open" ? "select" : "open"}:${idOf(item)}`;
     const repeated = this.#samePending(key, options.signal);
     if (repeated) {
       if (selectionCommandSettled(options)) {
         return repeated.then((result) => {
-          if (result.status === "completed" && this.#state.activeId === item.id) {
-            this.#requestReveal(item.id, index, "selection");
+          if (result.status === "completed" && this.#state.activeId === idOf(item)) {
+            this.#requestReveal(idOf(item), index, "selection");
           }
           return result;
         });
       }
       return repeated;
     }
-    if (this.#prevented(command, target, reason)) return Promise.resolve(prevented());
+    if (!selectionCommandApproved(options) && this.#prevented(command, target, reason)) {
+      return Promise.resolve(prevented());
+    }
     this.#emit({ type: command === "open" ? "open-request" : "change-request", target, reason });
 
     if (options.signal?.aborted) return Promise.resolve(aborted());
@@ -366,7 +387,7 @@ export class ViewerSession<
     const changed = this.#state.activeIndex !== index || opening;
     if (!changed && this.#state.status === "open") {
       if (selectionCommandSettled(options)) {
-        this.#requestReveal(item.id, index, "selection");
+        this.#requestReveal(idOf(item), index, "selection");
       }
       return Promise.resolve(completed(false));
     }
@@ -382,12 +403,12 @@ export class ViewerSession<
     const context: ViewerSessionMotionContext<TItem> = {
       item,
       index,
-      origin: this.#origins.get(item.id),
+      origin: this.#origins.get(idOf(item)),
       signal: operation.controller.signal,
       reason,
     };
-    this.#origins.hideThumbnail(item.id);
-    if (opening) this.#revealedId = item.id;
+    this.#origins.hideThumbnail(idOf(item));
+    if (opening) this.#revealedId = idOf(item);
     void this.#run(operation, () =>
       opening ? this.#driver.open(context) : this.#driver.select(context),
     ).then((settled) => {
@@ -397,7 +418,7 @@ export class ViewerSession<
         this.#emit({ type: "status-change", status: "open" });
       }
       if (selectionCommandSettled(options) !== false) {
-        this.#requestReveal(item.id, index, opening ? "open" : "selection");
+        this.#requestReveal(idOf(item), index, opening ? "open" : "selection");
       }
       this.#emitSelection("selection-settle", index, reason);
       this.#finish(operation, completed(true));
@@ -413,7 +434,7 @@ export class ViewerSession<
 
   #reconcileSelection(index: number, changed: boolean) {
     const item = this.#source.getItem(index);
-    const operation = this.#begin(`source:${item.id}`);
+    const operation = this.#begin(`source:${idOf(item)}`);
     const opening = this.#state.status !== "open";
     if (opening && this.#state.status !== "opening") {
       this.#publish("opening", index, index);
@@ -422,11 +443,11 @@ export class ViewerSession<
     const context: ViewerSessionMotionContext<TItem> = {
       item,
       index,
-      origin: this.#origins.get(item.id),
+      origin: this.#origins.get(idOf(item)),
       signal: operation.controller.signal,
       reason: "source-update",
     };
-    this.#origins.hideThumbnail(item.id);
+    this.#origins.hideThumbnail(idOf(item));
     void this.#run(operation, () =>
       opening ? this.#driver.open(context) : this.#driver.select(context),
     ).then((settled) => {
@@ -435,7 +456,7 @@ export class ViewerSession<
         this.#publish("open", index, index);
         this.#emit({ type: "status-change", status: "open" });
       }
-      this.#requestReveal(item.id, index, "selection");
+      this.#requestReveal(idOf(item), index, "selection");
       if (changed) this.#emitSelection("selection-settle", index, "source-update");
       this.#finish(operation, completed(changed));
     });
@@ -461,9 +482,9 @@ export class ViewerSession<
   #begin(key: string, signal?: AbortSignal, restore?: () => void): PendingCommand {
     this.#supersede();
     const controller = new AbortController();
-    let resolve!: (result: FluidboxCommandResult) => void;
+    let resolve!: (result: SessionCommandResult) => void;
     let reject!: (error: unknown) => void;
-    const promise = new Promise<FluidboxCommandResult>((accept, fail) => {
+    const promise = new Promise<SessionCommandResult>((accept, fail) => {
       resolve = accept;
       reject = fail;
     });
@@ -512,7 +533,7 @@ export class ViewerSession<
     );
   }
 
-  #finish(operation: PendingCommand, result: FluidboxCommandResult) {
+  #finish(operation: PendingCommand, result: SessionCommandResult) {
     if (operation.settled) return;
     operation.settled = true;
     operation.removeExternalAbort?.();
@@ -541,12 +562,12 @@ export class ViewerSession<
   }
 
   #prevented(
-    command: FluidboxBeforeCommandEvent["command"],
-    target: FluidboxTarget | undefined,
-    reason: FluidboxCommandReason,
+    command: SessionBeforeCommandEvent["command"],
+    target: SessionTarget | undefined,
+    reason: SessionReason,
   ) {
     let defaultPrevented = false;
-    const event: FluidboxBeforeCommandEvent = {
+    const event: SessionBeforeCommandEvent = {
       command,
       target,
       reason,
@@ -564,23 +585,24 @@ export class ViewerSession<
   #requestReveal(id: string, index: number, reason: "open" | "selection") {
     this.#abortReveal();
     const adapter = this.#originAdapter;
-    if (!adapter) return;
     this.#revealedId = id;
     const controller = new AbortController();
     this.#revealController = controller;
     try {
-      const reveal = adapter.revealOrigin
+      // Without a revealOrigin, scroll the registered or adapted trigger into view.
+      const reveal = adapter?.revealOrigin
         ? adapter.revealOrigin(id, index, { signal: controller.signal, reason })
-        : (() => {
-            const origin = adapter.getOrigin(id);
-            origin?.trigger.scrollIntoView({
-              behavior: "instant",
-              block: "nearest",
-              inline: "nearest",
-            });
-          })();
+        : this.#origins.get(id)?.trigger.scrollIntoView({
+            behavior: "instant",
+            block: "nearest",
+            inline: "nearest",
+          });
+      // A page scroll event comes a frame late in iOS Safari, so a viewer that
+      // follows the page from it would ride the reveal for a frame.
+      this.#driver.revealed?.();
       void Promise.resolve(reveal)
         .then(() => {
+          this.#driver.revealed?.();
           if (!controller.signal.aborted && this.#state.activeId === id) {
             this.#origins.hideThumbnail(id);
           }
@@ -596,7 +618,7 @@ export class ViewerSession<
     this.#revealController = undefined;
   }
 
-  #restoreState(state: FluidboxState, reason: FluidboxChangeReason) {
+  #restoreState(state: SessionState, reason: SessionChangeReason) {
     const current = this.#state;
     this.#publish(state.status, state.activeIndex, state.requestedIndex);
     if (current.status !== state.status) {
@@ -607,10 +629,20 @@ export class ViewerSession<
     }
   }
 
-  #resolveTarget(target: FluidboxTarget) {
+  /** An unknown target rejects the command's promise rather than throwing. */
+  #tryResolveTarget(target: SessionTarget): number | RangeError {
+    try {
+      return this.#resolveTarget(target);
+    } catch (error) {
+      if (error instanceof RangeError) return error;
+      throw error;
+    }
+  }
+
+  #resolveTarget(target: SessionTarget) {
     if ("id" in target && target.id !== undefined) {
       const index = this.#source.getIndex(target.id);
-      if (index === null) throw new RangeError(`Unknown lightbox item id: ${target.id}`);
+      if (index === null) throw new RangeError(`Unknown fluidbox item id: ${target.id}`);
       return index;
     }
     const index = target.index;
@@ -621,7 +653,7 @@ export class ViewerSession<
   }
 
   #assertKnownId(id: string) {
-    if (this.#source.getIndex(id) === null) throw new RangeError(`Unknown lightbox item id: ${id}`);
+    if (this.#source.getIndex(id) === null) throw new RangeError(`Unknown fluidbox item id: ${id}`);
   }
 
   #validateSource(source: FluidboxSource<TItem>) {
@@ -635,7 +667,7 @@ export class ViewerSession<
   }
 
   #publish(
-    status: FluidboxState["status"],
+    status: SessionState["status"],
     activeIndex: number | null,
     requestedIndex: number | null,
   ) {
@@ -643,16 +675,16 @@ export class ViewerSession<
     for (const listener of this.#listeners) listener(this.#state);
   }
 
-  #emit(event: FluidboxEvent) {
+  #emit(event: SessionEvent) {
     this.#onEvent?.(event);
   }
 
   #emitSelection(
     type: "selection-change" | "selection-settle",
     index: number,
-    reason: FluidboxChangeReason,
+    reason: SessionChangeReason,
   ) {
     const item = this.#source.getItem(index);
-    this.#emit({ type, id: item.id, index, reason });
+    this.#emit({ type, id: idOf(item), index, reason });
   }
 }

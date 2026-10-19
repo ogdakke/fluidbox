@@ -6,7 +6,11 @@
   "exports": {
     "./index.css": "./index.css",
     "./chrome": "./chrome.ts",
-    "./art-scenes": "./art-scenes.ts"
+    "./art-scenes": "./art-scenes.ts",
+    "./highlight": "./highlight.ts"
+  },
+  "dependencies": {
+    "@pierre/highlights": "^0.1.3"
   },
   "peerDependencies": {
     "@ogdakke/fluidbox": "workspace:*"

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { arraySource } from "../src/array-source";
-import type { FluidboxCommandResult, FluidboxEvent, FluidboxItem } from "../src/public-api";
+import { toList, toSource } from "../src/items";
+import type { FluidboxItem } from "../src/public-api";
+import type { SessionCommandResult, SessionEvent } from "../src/runtime-types";
 import {
   ViewerSession,
   type ViewerSessionCloseContext,
@@ -11,17 +12,31 @@ import {
 const items = [
   {
     id: "one",
-    media: { type: "image", src: "/one.jpg", alt: "One", width: 1200, height: 800 },
+    type: "img",
+    src: "/one.jpg",
+    alt: "One",
+    width: 1200,
+    height: 800,
   },
   {
     id: "two",
-    media: { type: "image", src: "/two.jpg", alt: "Two", width: 1200, height: 800 },
+    type: "img",
+    src: "/two.jpg",
+    alt: "Two",
+    width: 1200,
+    height: 800,
   },
   {
     id: "three",
-    media: { type: "image", src: "/three.jpg", alt: "Three", width: 1200, height: 800 },
+    type: "img",
+    src: "/three.jpg",
+    alt: "Three",
+    width: 1200,
+    height: 800,
   },
 ] as const satisfies readonly FluidboxItem[];
+
+const source = (list: readonly FluidboxItem[]) => toSource(toList(list));
 
 interface Deferred {
   readonly promise: Promise<void>;
@@ -92,7 +107,7 @@ class TestDriver implements ViewerSessionDriver<(typeof items)[number]> {
   }
 }
 
-function eventLabel(event: FluidboxEvent) {
+function eventLabel(event: SessionEvent) {
   if (event.type === "status-change") return `${event.type}:${event.status}`;
   if (event.type === "selection-change" || event.type === "selection-settle") {
     return `${event.type}:${event.id}`;
@@ -103,7 +118,7 @@ function eventLabel(event: FluidboxEvent) {
 describe("ViewerSession", () => {
   it("prepares a valid closed target without publishing state", () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
 
     const dispose = session.prepare({ id: "two" });
 
@@ -120,7 +135,7 @@ describe("ViewerSession", () => {
     const revealOrigin = vi.fn();
     const session = new ViewerSession(
       {
-        source: arraySource(items),
+        source: source(items),
         origins: { getOrigin: () => null, revealOrigin },
         onBeforeCommand: () => order.push("before"),
         onEvent: (event) => order.push(eventLabel(event)),
@@ -169,7 +184,7 @@ describe("ViewerSession", () => {
 
   it("shares repeated pending commands and supersedes incompatible work", async () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
 
     const first = session.open({ id: "one" });
     const repeated = session.open({ id: "one" });
@@ -187,7 +202,7 @@ describe("ViewerSession", () => {
 
   it("restores committed state when a caller aborts a command", async () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
     const controller = new AbortController();
 
     const opening = session.open({ id: "one" }, { signal: controller.signal });
@@ -198,12 +213,12 @@ describe("ViewerSession", () => {
     expect(session.state).toMatchObject({ status: "closed", activeId: null });
   });
 
-  it("validates targets synchronously and prevents commands before events or motion", async () => {
+  it("rejects invalid targets and prevents commands before events or motion", async () => {
     const driver = new TestDriver();
-    const events: FluidboxEvent[] = [];
+    const events: SessionEvent[] = [];
     const session = new ViewerSession(
       {
-        source: arraySource(items),
+        source: source(items),
         onBeforeCommand(event) {
           event.preventDefault();
         },
@@ -212,8 +227,8 @@ describe("ViewerSession", () => {
       driver,
     );
 
-    expect(() => session.open({ id: "missing" })).toThrow(RangeError);
-    expect(() => session.open({ index: 20 })).toThrow(RangeError);
+    await expect(session.open({ id: "missing" })).rejects.toBeInstanceOf(RangeError);
+    await expect(session.open({ index: 20 })).rejects.toBeInstanceOf(RangeError);
     await expect(session.open({ id: "one" })).resolves.toEqual({ status: "prevented" });
     expect(events).toEqual([]);
     expect(driver.opens).toEqual([]);
@@ -227,7 +242,7 @@ describe("ViewerSession", () => {
       .fn()
       .mockReturnValueOnce(firstDriverDispose)
       .mockReturnValueOnce(secondDriverDispose);
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
     const element = {} as HTMLElement;
 
     const disposeFirst = session.registerThumbnailOverlay("one", { element });
@@ -242,7 +257,7 @@ describe("ViewerSession", () => {
 
   it("resolves a shared origin again after its close preview changes", async () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
     const trigger = { isConnected: true } as HTMLElement;
     const thumbnail = {
       src: "/one.jpg",
@@ -254,7 +269,7 @@ describe("ViewerSession", () => {
     const secondVisual = { isConnected: true } as HTMLElement;
     let dispose = () => {};
     const prepareClose = vi.fn((item: FluidboxItem) => {
-      thumbnail.src = item.media.type === "image" ? item.media.src : "";
+      thumbnail.src = item.type === "img" ? item.src : "";
       dispose();
       session.registerOrigin(["one", "two"], {
         trigger,
@@ -288,7 +303,7 @@ describe("ViewerSession", () => {
     const revealSignals: AbortSignal[] = [];
     const session = new ViewerSession(
       {
-        source: arraySource(items),
+        source: source(items),
         origins: {
           getOrigin: () => null,
           revealOrigin: (_id, _index, { signal }) => {
@@ -320,24 +335,24 @@ describe("ViewerSession", () => {
 
   it("reconciles source identity, clamps removal, and closes an empty source", async () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
     const opening = session.open({ id: "two" });
     driver.steps[0]!.resolve();
     await opening;
 
-    const reordered = arraySource([items[1], items[0], items[2]]);
+    const reordered = source([items[1], items[0], items[2]]);
     const preserving = session.setSource(reordered);
     driver.steps[1]!.resolve();
     await expect(preserving).resolves.toEqual({ status: "completed", changed: true });
     expect(session.state).toMatchObject({ activeId: "two", activeIndex: 0 });
 
-    const removed = arraySource([items[0], items[2]]);
+    const removed = source([items[0], items[2]]);
     const clamping = session.setSource(removed);
     driver.steps[2]!.resolve();
     await expect(clamping).resolves.toEqual({ status: "completed", changed: true });
     expect(session.state).toMatchObject({ activeId: "one", activeIndex: 0 });
 
-    const closing = session.setSource(arraySource([]));
+    const closing = session.setSource(source([]));
     expect(driver.closes).toHaveLength(1);
     driver.steps[3]!.resolve();
     await expect(closing).resolves.toEqual({ status: "completed", changed: true });
@@ -346,10 +361,10 @@ describe("ViewerSession", () => {
 
   it("restarts an unfinished open when its source is replaced", async () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
 
     const opening = session.open({ id: "two" });
-    const replacement = session.setSource(arraySource([items[1], items[0]]));
+    const replacement = session.setSource(source([items[1], items[0]]));
 
     await expect(opening).resolves.toEqual({ status: "superseded" });
     expect(driver.opens).toHaveLength(2);
@@ -361,13 +376,13 @@ describe("ViewerSession", () => {
 
   it("keeps a close in progress when its source refreshes", async () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
     const opening = session.open({ id: "two" });
     driver.steps[0]!.resolve();
     await opening;
 
     const closing = session.close();
-    const update = session.setSource(arraySource([...items]));
+    const update = session.setSource(source([...items]));
 
     await expect(update).resolves.toEqual({ status: "completed", changed: false });
     expect(driver.closes).toHaveLength(1);
@@ -388,7 +403,7 @@ describe("ViewerSession", () => {
       close: () => {},
       destroy: () => {},
     };
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
+    const session = new ViewerSession({ source: source(items) }, driver);
 
     await expect(session.open({ id: "one" })).rejects.toBe(failure);
     expect(session.state).toMatchObject({ status: "closed", activeId: null });
@@ -397,8 +412,8 @@ describe("ViewerSession", () => {
 
   it("aborts pending work and rejects further use after idempotent destruction", async () => {
     const driver = new TestDriver();
-    const session = new ViewerSession({ source: arraySource(items) }, driver);
-    const opening: Promise<FluidboxCommandResult> = session.open({ id: "one" });
+    const session = new ViewerSession({ source: source(items) }, driver);
+    const opening: Promise<SessionCommandResult> = session.open({ id: "one" });
 
     session.destroy();
     session.destroy();

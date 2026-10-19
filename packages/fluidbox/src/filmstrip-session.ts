@@ -5,11 +5,12 @@ import {
 } from "./filmstrip-runtime";
 import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
 import type {
-  FluidboxController,
+  SessionController,
   FluidboxDispose,
   FluidboxItem,
   FluidboxSource,
-} from "./public-api";
+} from "./runtime-types";
+import type { FluidboxLabels } from "./labels";
 
 export interface FluidboxFilmstripItemContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
@@ -23,6 +24,7 @@ export interface FluidboxFilmstripItemContext<TItem extends FluidboxItem = Fluid
 export interface FilmstripSessionOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Replaces the default thumbnail image. */
   readonly renderItem?: (context: FluidboxFilmstripItemContext<TItem>) => void | FluidboxDispose;
+  readonly labels: Pick<FluidboxLabels, "filmstrip" | "filmstripList">;
 }
 
 /** Plain DOM filmstrip, used by the custom-element adapter and the filmstrip() extension. */
@@ -45,9 +47,9 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   constructor(
     ownerDocument: Document,
     source: FluidboxSource<TItem>,
-    controller: FluidboxController<TItem>,
+    controller: SessionController<TItem>,
     index: number,
-    options: FilmstripSessionOptions<TItem> = {},
+    options: FilmstripSessionOptions<TItem>,
   ) {
     this.#source = source;
     this.#renderItem = options.renderItem;
@@ -58,10 +60,10 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     this.track = ownerDocument.createElement("div");
     this.dock.dataset.fluidboxFilmstripDock = "";
     this.element.dataset.fluidboxFilmstrip = "";
-    this.element.setAttribute("aria-label", "Gallery filmstrip");
+    this.element.setAttribute("aria-label", options.labels.filmstrip);
     this.scroller.dataset.fluidboxFilmstripScroll = "";
     this.scroller.setAttribute("role", "listbox");
-    this.scroller.setAttribute("aria-label", "Choose a gallery item");
+    this.scroller.setAttribute("aria-label", options.labels.filmstripList);
     this.track.dataset.fluidboxFilmstripTrack = "";
     this.scroller.append(this.track);
     this.element.append(this.scroller);
@@ -93,10 +95,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     button.dataset.fluidboxFilmstripItem = "";
     button.dataset.index = String(index);
     button.setAttribute("role", "option");
-    button.setAttribute(
-      "aria-label",
-      item.media.type === "image" ? item.media.alt : item.media.title,
-    );
+    button.setAttribute("aria-label", item.type === "img" ? item.alt : item.title);
     button.setAttribute("aria-posinset", String(index + 1));
     button.setAttribute("aria-setsize", String(this.#source.count));
     button.style.left = `${index * this.#step}px`;
@@ -108,7 +107,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     } else {
       const image = this.element.ownerDocument.createElement("img");
       const sources = filmstripThumbnailSources(item);
-      image.src = item.thumbnail?.src ?? item.preview?.src ?? sources[0] ?? "";
+      image.src = item.thumbnail?.src ?? sources[0] ?? "";
       image.alt = "";
       image.draggable = false;
       image.dataset.fluidboxFilmstripThumbnail = "";

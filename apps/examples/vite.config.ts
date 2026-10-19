@@ -1,8 +1,13 @@
 import { readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import react from "@vitejs/plugin-react";
 import solid from "vite-plugin-solid";
+import vue from "@vitejs/plugin-vue";
+import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
+import { highlight, highlightHtml } from "../design/highlight";
+import { packageSource, watchPackageSource } from "../design/package-source";
+import { exampleRegions } from "./src/patterns/regions";
 
 // Every HTML file is a page: index.html and */index.html are the site, the rest are test fixtures.
 function findPages(directory: string, prefix = ""): [string, string][] {
@@ -19,49 +24,40 @@ function findPages(directory: string, prefix = ""): [string, string][] {
 const pages = Object.fromEntries(findPages(import.meta.dirname));
 
 /**
- * While serving, load @ogdakke/fluidbox from source. The package build writes
- * new hashed chunk names on every change, so a browser holding the dev page
- * imports chunks that no longer exist (on iOS the tab keeps running old code),
- * and the watcher loses dist/styles.css after its first rebuild. Builds use the
- * built package as consumers do.
+ * `import html from "./basic.ts?highlighted"`: the file's example regions as
+ * highlighted HTML, made at build time so the page ships no highlighter.
  */
-function packageSource(command: "build" | "serve") {
-  if (command !== "serve") return [];
-  const source = (file: string) =>
-    resolve(import.meta.dirname, "../../packages/fluidbox/src", file);
-  return [
-    { find: "@ogdakke/fluidbox/styles.css", replacement: source("styles.css") },
-    { find: "@ogdakke/fluidbox/sheet.css", replacement: source("sheet.css") },
-    { find: "@ogdakke/fluidbox/filmstrip", replacement: source("filmstrip-extension.ts") },
-    { find: "@ogdakke/fluidbox/sheet", replacement: source("sheet.ts") },
-    ...["elements", "react", "solid", "vue", "angular"].map((entry) => ({
-      find: `@ogdakke/fluidbox/${entry}`,
-      replacement: source(`${entry}.ts`),
-    })),
-    { find: /^@ogdakke\/fluidbox$/, replacement: source("index.ts") },
-  ];
-}
-
-/**
- * Watch the package source as a folder. Vite watches files outside the app
- * one by one, and a file replaced on disk (an editor's atomic save, a git
- * checkout or stash) drops its watch, so the page would keep that file's old
- * code until the server restarts.
- */
-function watchPackageSource(): Plugin {
+function highlightedSource(): Plugin {
+  const query = "?highlighted";
   return {
-    name: "watch-package-source",
-    apply: "serve",
-    configureServer(server) {
-      server.watcher.add(resolve(import.meta.dirname, "../../packages/fluidbox/src"));
+    name: "highlighted-source",
+    enforce: "pre",
+    async resolveId(source, importer) {
+      if (!source.endsWith(query)) return null;
+      const resolved = await this.resolve(source.slice(0, -query.length), importer, {
+        skipSelf: true,
+      });
+      return resolved && `\0${resolved.id}${query}`;
+    },
+    load(id) {
+      if (!id.startsWith("\0") || !id.endsWith(query)) return null;
+      const file = id.slice(1, -query.length);
+      this.addWatchFile(file);
+      const extension = file.split(".").pop()!;
+      const lang = extension;
+      const code = exampleRegions(readFileSync(file, "utf8")).join("\n\n");
+      return `export default ${JSON.stringify(highlight(code, lang))};`;
     },
   };
 }
 
 export default defineConfig(({ command }) => ({
   plugins: [
-    react({ include: /(react|photo-library|social)\.tsx$/ }),
-    solid({ include: /solid\.tsx$/ }),
+    react({ include: [/(photo-library|social)\.tsx$/, /patterns\/react\/.*\.tsx$/] }),
+    solid({ include: [/patterns\/solid\/.*\.tsx$/] }),
+    vue(),
+    highlightedSource(),
+    highlightHtml(),
     watchPackageSource(),
   ],
   define: {

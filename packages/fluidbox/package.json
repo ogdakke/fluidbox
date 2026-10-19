@@ -12,9 +12,13 @@
     "./src/item.ts",
     "./src/gallery.ts",
     "./src/filmstrip.ts",
+    "./src/filmstrip-entry.ts",
+    "./src/sheet-entry.ts",
     "./src/styles.css",
     "./src/sheet.css",
     "./dist/elements.js",
+    "./dist/filmstrip.js",
+    "./dist/sheet.js",
     "./dist/styles.css",
     "./dist/sheet.css"
   ],
@@ -28,20 +32,20 @@
       "import": "./dist/elements.js"
     },
     "./react": {
-      "types": "./dist/react.d.ts",
-      "import": "./dist/react.js"
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
     },
     "./solid": {
-      "types": "./dist/solid.d.ts",
-      "import": "./dist/solid.js"
+      "types": "./dist/solid/index.d.ts",
+      "import": "./dist/solid/index.js"
     },
     "./vue": {
-      "types": "./dist/vue.d.ts",
-      "import": "./dist/vue.js"
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.js"
     },
     "./angular": {
-      "types": "./dist/angular.d.ts",
-      "import": "./dist/angular.js"
+      "types": "./dist/angular/index.d.ts",
+      "import": "./dist/angular/index.js"
     },
     "./filmstrip": {
       "types": "./dist/filmstrip.d.ts",
@@ -50,6 +54,10 @@
     "./sheet": {
       "types": "./dist/sheet.d.ts",
       "import": "./dist/sheet.js"
+    },
+    "./kit": {
+      "types": "./dist/kit.d.ts",
+      "import": "./dist/kit.js"
     },
     "./styles.css": {
       "types": "./dist/styles.css.d.ts",
@@ -61,14 +69,15 @@
     }
   },
   "scripts": {
-    "build": "tsdown"
+    "build": "bun run ../../scripts/build.ts",
+    "build:core": "tsdown"
   },
   "peerDependencies": {
-    "@angular/core": ">=20 <23",
-    "react": ">=18 <20",
-    "react-dom": ">=18 <20",
-    "solid-js": "^1.9.0",
-    "vue": "^3.5.0"
+    "@angular/core": ">=17",
+    "react": ">=18",
+    "react-dom": ">=18",
+    "solid-js": ">=1.8",
+    "vue": ">=3.3"
   },
   "peerDependenciesMeta": {
     "@angular/core": {

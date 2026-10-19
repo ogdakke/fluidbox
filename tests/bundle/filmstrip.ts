@@ -1,1 +1,1 @@
-export { filmstrip } from "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/filmstrip";

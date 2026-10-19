@@ -1,1 +1,1 @@
-export { useFluidboxGallery } from "@ogdakke/fluidbox/angular";
+export { FluidboxModule } from "@ogdakke/fluidbox/angular";

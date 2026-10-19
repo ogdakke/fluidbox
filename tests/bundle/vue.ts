@@ -1,1 +1,1 @@
-export { FluidboxGallery } from "@ogdakke/fluidbox/vue";
+export { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/vue";

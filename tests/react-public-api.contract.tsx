@@ -1,43 +1,76 @@
 import type { ReactElement } from "react";
-import { arraySource } from "../packages/fluidbox/src/index";
-import type { FluidboxItem } from "../packages/fluidbox/src/index";
-import { Fluidbox, useFluidbox, useFluidboxState } from "../packages/fluidbox/src/react";
+import type { FluidboxImageItem } from "@ogdakke/fluidbox";
+import {
+  Fluidbox,
+  useFluidbox,
+  useFluidboxSheet,
+  type FluidboxChangeEvent,
+  type FluidboxToggleEvent,
+} from "@ogdakke/fluidbox/react";
 
-const items = [
-  {
-    id: "one",
-    media: { type: "image", src: "/one.jpg", alt: "One", width: 1200, height: 800 },
-  },
-] as const satisfies readonly FluidboxItem[];
-const source = arraySource(items);
+interface Photo extends FluidboxImageItem {
+  readonly credit: string;
+}
+
+const items: readonly Photo[] = [
+  { type: "img", src: "/one.jpg", alt: "One", width: 1200, height: 800, credit: "A" },
+  { type: "img", src: "/two.jpg", alt: "Two", width: 1200, height: 800, credit: "B" },
+];
+
+function Caption(): ReactElement {
+  const fluidbox = useFluidbox<Photo>();
+  const credit: string | undefined = fluidbox.item?.credit;
+  const index = useFluidbox((state) => state.index);
+  const sheet = useFluidboxSheet();
+  const stop: number = sheet.stop;
+  void fluidbox.open("/one.jpg");
+  void fluidbox.open(1);
+  void fluidbox.setItems(items);
+  sheet.set(1, { animate: false });
+  return (
+    <p>
+      {credit} {index} {stop}
+    </p>
+  );
+}
 
 function ContractExample(): ReactElement {
-  const controller = useFluidbox<(typeof items)[number]>();
-  const activeId = useFluidboxState((state) => state.activeId);
-  void controller;
   return (
-    <Fluidbox.Root source={source} onEvent={(event) => void event.type}>
-      <Fluidbox.Item id="one">
+    <Fluidbox.Root
+      items={items}
+      labels={{ close: "Sulje" }}
+      zoom={{ step: 3, max: 6 }}
+      renderers={{ note: ({ item, index }) => <p>{`${item.credit} ${index}`}</p> }}
+      onBeforeToggle={(event: FluidboxToggleEvent) => event.preventDefault()}
+      onToggle={(event) => void event.newState}
+      onBeforeItemChange={(event: FluidboxChangeEvent<Photo>) => void event.item.credit}
+      onItemChange={(event) => void event.item.credit}
+      onSettle={(event) => void event.index}
+    >
+      <Fluidbox.Item item={items[0]!}>
         <Fluidbox.Trigger asChild>
           <button type="button">
             <img src="/thumb.jpg" alt="One" />
-            <Fluidbox.ThumbnailOverlay behavior="host" data-active={activeId === "one"}>
-              One
-            </Fluidbox.ThumbnailOverlay>
+            <Fluidbox.ThumbnailOverlay>One</Fluidbox.ThumbnailOverlay>
           </button>
         </Fluidbox.Trigger>
       </Fluidbox.Item>
-      <Fluidbox.Portal>
-        <Fluidbox.Content />
-        <Fluidbox.Filmstrip
-          renderItem={({ item, selected }) => (
-            <img src={item.thumbnail?.src} alt="" data-selected={selected} />
-          )}
-        />
+      <Fluidbox.Trigger item={1}>
+        <img src="/thumb-two.jpg" alt="Two" />
+      </Fluidbox.Trigger>
+      <Fluidbox.Filmstrip<Photo>>
+        {({ item, index }) => <img src={item.src} alt={`${item.credit} ${index}`} />}
+      </Fluidbox.Filmstrip>
+      <Fluidbox.Sheet snapPoints={["40%", "content"]} dismiss="scroll" className="details">
+        <Caption />
+      </Fluidbox.Sheet>
+      <Fluidbox.Viewer>
+        <Fluidbox.Controls />
+        <Fluidbox.SheetStop stop={1}>Details</Fluidbox.SheetStop>
         <Fluidbox.Previous>Previous</Fluidbox.Previous>
         <Fluidbox.Next>Next</Fluidbox.Next>
         <Fluidbox.Close>Close</Fluidbox.Close>
-      </Fluidbox.Portal>
+      </Fluidbox.Viewer>
     </Fluidbox.Root>
   );
 }
@@ -46,11 +79,12 @@ void ContractExample;
 function GroupedTrigger(): ReactElement {
   return (
     <Fluidbox.Root items={items}>
-      <Fluidbox.Trigger items={items} item={items[0]} asChild>
+      <Fluidbox.Trigger items={items}>
         {({ item, status }) => (
-          <button type="button" data-status={status}>
-            {item?.id}
-          </button>
+          <>
+            <img src={item?.src} alt={item?.credit} data-status={status} />
+            <Fluidbox.ThumbnailOverlay travel>+1</Fluidbox.ThumbnailOverlay>
+          </>
         )}
       </Fluidbox.Trigger>
     </Fluidbox.Root>
@@ -59,9 +93,17 @@ function GroupedTrigger(): ReactElement {
 void GroupedTrigger;
 
 // @ts-expect-error item identity is required
-const missingId = <Fluidbox.Item />;
-void missingId;
+const missingItem = <Fluidbox.Item />;
+void missingItem;
 
-// @ts-expect-error controlled state is not in the first locked Root contract
-const prematureControlledState = <Fluidbox.Root source={source} open />;
-void prematureControlledState;
+// @ts-expect-error the filmstrip is a part, not a Root prop
+const filmstripProp = <Fluidbox.Root items={items} filmstrip />;
+void filmstripProp;
+
+// @ts-expect-error the sheet is a part, not a Root prop
+const sheetProp = <Fluidbox.Root items={items} sheet />;
+void sheetProp;
+
+// @ts-expect-error a sheet stop needs its stop
+const missingStop = <Fluidbox.SheetStop />;
+void missingStop;

@@ -1,0 +1,39 @@
+import "@ogdakke/fluidbox/elements";
+import type { MountPattern } from "../page";
+import type { PatternName } from "../shared";
+import basic from "./basic.html?raw";
+import filmstripMarkup from "./filmstrip.html?raw";
+import { filmstrip } from "./filmstrip";
+import headlessMarkup from "./headless.html?raw";
+import { headless } from "./headless";
+import origins from "./origins.html?raw";
+import overlayMarkup from "./overlay.html?raw";
+import { overlay } from "./overlay";
+import programmaticMarkup from "./programmatic.html?raw";
+import { programmatic } from "./programmatic";
+import renderersMarkup from "./renderers.html?raw";
+import { renderers } from "./renderers";
+import sheetMarkup from "./sheet.html?raw";
+import { sheet } from "./sheet";
+import zoom from "./zoom.html?raw";
+
+const mount =
+  (markup: string, setup?: (root: HTMLElement) => unknown): MountPattern =>
+  (root) => {
+    root.innerHTML = markup;
+    setup?.(root);
+    // Removing the galleries tears their viewers down.
+    return () => root.replaceChildren();
+  };
+
+export const patterns: Record<PatternName, MountPattern> = {
+  basic: mount(basic),
+  overlay: mount(overlayMarkup, overlay),
+  origins: mount(origins),
+  renderers: mount(renderersMarkup, renderers),
+  programmatic: mount(programmaticMarkup, programmatic),
+  zoom: mount(zoom),
+  filmstrip: mount(filmstripMarkup, filmstrip),
+  sheet: mount(sheetMarkup, sheet),
+  headless: mount(headlessMarkup, headless),
+};

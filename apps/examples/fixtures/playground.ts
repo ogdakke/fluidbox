@@ -1,6 +1,7 @@
 import { mountSite } from "../src/site";
-import type { FluidboxGalleryElement, FluidboxItem, FluidboxSource } from "@ogdakke/fluidbox";
+import type { FluidboxItemList } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox/elements";
 import "./playground.css";
 
 mountSite("fixtures", {
@@ -10,28 +11,26 @@ mountSite("fixtures", {
 const gallery = document.querySelector<FluidboxGalleryElement>("#virtual-gallery")!;
 const origins = new Map<string, HTMLButtonElement>();
 const count = 100_000;
-const source: FluidboxSource<FluidboxItem> = {
+const items: FluidboxItemList = {
   count,
-  getItem(index) {
+  get(index) {
     const src = index % 2 ? "/second.svg" : "/first.svg";
     return {
       id: String(index),
-      media: {
-        type: "image",
-        src,
-        alt: `Gallery item ${index + 1}`,
-        width: 600,
-        height: 400,
-      },
+      type: "img",
+      src,
+      alt: `Gallery item ${index + 1}`,
+      width: 600,
+      height: 400,
       thumbnail: { src, width: 600, height: 400 },
     };
   },
-  getIndex(id) {
+  indexOf(id) {
     const index = Number(id);
-    return Number.isInteger(index) && index >= 0 && index < count ? index : null;
+    return Number.isInteger(index) && index >= 0 && index < count ? index : -1;
   },
 };
-gallery.source = source;
+gallery.items = items;
 gallery.origins = {
   getOrigin(id) {
     const trigger = origins.get(id);
@@ -57,7 +56,7 @@ function renderWindow(start: number) {
     const caption = document.createElement("span");
     caption.textContent = `Item ${index + 1}`;
     button.append(image, caption);
-    button.addEventListener("click", () => gallery.open({ index }));
+    button.addEventListener("click", () => gallery.open(index));
     gallery.insertBefore(button, gallery.querySelector("fluidbox-filmstrip"));
     origins.set(String(index), button);
   }
@@ -70,5 +69,5 @@ document.querySelector<HTMLFormElement>("#jump-form")!.addEventListener("submit"
   const index = Math.max(0, Math.min(count - 1, Number(input.value) - 1));
   if (!Number.isFinite(index)) return;
   renderWindow(Math.max(0, Math.min(count - 12, index)));
-  void gallery.open({ index });
+  void gallery.open(index);
 });

@@ -1,0 +1,214 @@
+/* Shared look of the pattern examples. Every framework uses these class names. */
+
+.pattern {
+  display: grid;
+  gap: 16px;
+  padding: 20px var(--fb-gutter);
+}
+
+/* A component host (Angular's) is a grid item too; let it shrink to the column. */
+.pattern > * {
+  min-width: 0;
+}
+
+.pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.pattern-thumb {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: var(--fb-image-radius, 6px);
+  overflow: hidden;
+  background: var(--fb-line);
+  cursor: zoom-in;
+}
+
+.pattern-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+
+.pattern-thumb:focus-visible,
+.pattern-card:focus-visible {
+  outline: 2px solid var(--fb-fg);
+  outline-offset: 2px;
+}
+
+/* A thumbnail with a badge or count over it. */
+.pattern-overlay {
+  position: absolute;
+  inset: auto 8px 8px auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: white;
+  background: #000a;
+  font: 600 13px / 1.6 var(--fb-font-sans);
+}
+
+.pattern-album {
+  position: relative;
+  width: min(100%, 360px);
+}
+
+.pattern-card {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: center;
+  gap: 16px;
+  width: min(100%, 420px);
+  padding: 10px;
+  border: 1px solid var(--fb-line);
+  border-radius: 10px;
+  color: inherit;
+  background: var(--fb-bg);
+  font: inherit;
+  text-align: start;
+  cursor: zoom-in;
+}
+
+.pattern-card [data-fluidbox-origin] {
+  display: block;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.pattern-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.pattern-scroller {
+  display: flex;
+  gap: 8px;
+  width: min(100%, 520px);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+
+.pattern-scroller > * {
+  flex: 0 0 160px;
+  scroll-snap-align: start;
+}
+
+.pattern-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  font: 13px / 1.4 var(--fb-font-mono);
+}
+
+.pattern-log {
+  max-height: 160px;
+  margin: 0;
+  padding: 8px 8px 8px 32px;
+  overflow: auto;
+  border: 1px solid var(--fb-line);
+  color: var(--fb-muted);
+  font: 12px / 1.5 var(--fb-font-mono);
+}
+
+.pattern-note {
+  display: grid;
+  place-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  color: #1d1d1f;
+  background: #f4efe6;
+  font: 600 clamp(18px, 3vw, 32px) / 1.2 var(--fb-font-sans);
+}
+
+.pattern-filmstrip-thumb {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: white;
+  background: #333;
+  font: 600 14px var(--fb-font-mono);
+}
+
+[data-fluidbox-selected] > .pattern-filmstrip-thumb {
+  color: #111;
+  background: white;
+}
+
+.pattern-sheet {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 16px 20px 24px;
+  font: 14px / 1.5 var(--fb-font-sans);
+}
+
+.pattern-sheet h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.pattern-sheet input {
+  padding: 8px 10px;
+  border: 1px solid #8886;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.pattern-caption {
+  position: fixed;
+  inset: auto 16px max(16px, env(safe-area-inset-bottom)) 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: white;
+  background: #000c;
+  font: 14px / 1.4 var(--fb-font-sans);
+  pointer-events: auto;
+}
+
+.pattern-caption > span {
+  flex: 1;
+  display: grid;
+}
+
+.pattern-caption button,
+.pattern-sheet button,
+.pattern-toolbar button {
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pattern-caption button:disabled {
+  opacity: 0.4;
+}
+
+/* The sheet pattern's button in the viewer, which raises the sheet. */
+.pattern-sheet-toggle {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 16px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  background: #000a;
+  font: 600 13px / 1.4 var(--fb-font-sans);
+  pointer-events: auto;
+  cursor: pointer;
+}

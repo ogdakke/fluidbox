@@ -1,72 +1,19 @@
 import type {
   FluidboxDispose,
-  FluidboxExtension,
   FluidboxExtensionContext,
   FluidboxExtensionInstance,
   FluidboxItem,
   FluidboxSource,
-} from "./public-api";
+} from "./runtime-types";
+import type { Addon } from "./addons";
 import { chromeReach } from "./chrome-reach";
+import type { FluidboxItem as PublicItem, FluidboxSheet, FluidboxSheetOptions } from "./public-api";
 import { PhotoRoom } from "./photo-room";
 
-/**
- * How much of the sheet shows at a stop: pixels, a percentage of the viewer's
- * height, or "content" for all of it, up to the space under the top inset.
- */
-export type FluidboxSheetSnapPoint = number | `${number}%` | "content";
+export type { FluidboxSheet, FluidboxSheetOptions, FluidboxSheetSnapPoint } from "./public-api";
+import type { FluidboxSheetSnapPoint } from "./public-api";
 
-/**
- * What a swipe down on the photo does with the sheet down. "flight" hands it to
- * the viewer's dismiss, which flies the photo home; "scroll" scrolls the photo
- * off the bottom of the screen and closes; "none" keeps the viewer open, as for a
- * caption that always peeks.
- */
-export type FluidboxSheetDismiss = "flight" | "scroll" | "none";
-
-export interface FluidboxSheetRenderContext<TItem extends FluidboxItem = FluidboxItem> {
-  readonly item: TItem;
-  readonly index: number;
-  /** The sheet element. Fill it with the item's details. */
-  readonly target: HTMLElement;
-  /** Aborted when the viewer moves to another item. */
-  readonly signal: AbortSignal;
-}
-
-export interface FluidboxSheetOptions<TItem extends FluidboxItem = FluidboxItem> {
-  /**
-   * The stops above the resting one, lowest first. Stop 0 is the sheet at rest:
-   * away, or showing `--fluidbox-sheet-peek`.
-   * @default ["60%", "content"]
-   */
-  readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
-  /** @default "flight" */
-  readonly dismiss?: FluidboxSheetDismiss;
-  /**
-   * Fills a runtime-made sheet for the active item. Leave it out and render your
-   * own element with `data-fluidbox-sheet` into `slot`, as framework components do.
-   */
-  readonly render?: (context: FluidboxSheetRenderContext<TItem>) => void | FluidboxDispose;
-  readonly onChange?: (stop: number) => void;
-}
-
-export interface FluidboxSheetSetOptions {
-  /** @default true */
-  readonly animate?: boolean;
-}
-
-/** The sheet extension. Pass it to createFluidbox, then drive and read it from here. */
-export interface FluidboxSheet<
-  TItem extends FluidboxItem = FluidboxItem,
-> extends FluidboxExtension<TItem> {
-  /** The stop the sheet rests at: 0 at rest, then one per snap point. */
-  readonly stop: number;
-  /** Where to render a `data-fluidbox-sheet` element, once the viewer is created. */
-  readonly slot: HTMLElement | null;
-  /** Move the sheet to a stop. Ignored while the viewer is not open or the sheet is off. */
-  set(stop: number, options?: FluidboxSheetSetOptions): void;
-  /** Called when the stop changes, and when the slot appears or goes. */
-  subscribe(listener: (stop: number) => void): FluidboxDispose;
-}
+type FluidboxSheetDismiss = NonNullable<FluidboxSheetOptions["dismiss"]>;
 
 const DEFAULT_SNAP_POINTS: readonly FluidboxSheetSnapPoint[] = ["60%", "content"];
 /** Stops closer than this are one stop. */
@@ -75,6 +22,14 @@ const MIN_STOP_GAP = 24;
 const AXIS_THRESHOLD = 4;
 /** How long the rest of a committed scroll dismiss fades, in milliseconds. */
 const DISMISS_FADE = 180;
+/** A trackpad's momentum has ended once no scroll or wheel comes for this long. */
+const MOMENTUM_QUIET = 100;
+/** The longest a close waits for that momentum to end. */
+const MOMENTUM_LIMIT = 1500;
+/** A wheel this much stronger than the last is a new swipe, not the momentum running down. */
+const WHEEL_GROWTH = 1.25;
+/** Since the last touch, a scroll dismiss counts as the wheel's. */
+const TOUCH_MEMORY = 1000;
 /** Below this share of the first stop, a lowering sheet takes a pull down as the flight. */
 const LANDING = 0.6;
 /** Pixels a sheet must come down, while a field has focus, before the keyboard goes. */
@@ -107,78 +62,93 @@ type ScrollTimelineConstructor = new (options: {
   axis?: "block" | "inline" | "x" | "y";
 }) => AnimationTimeline;
 
+/** A property that follows the scroll: `from` until `start` pixels, `to` from `end` on. */
+type Track = [
+  element: HTMLElement,
+  name: string,
+  from: number,
+  to: number,
+  start: number,
+  end: number,
+  write?: (value: number) => string,
+];
+
+const px = (value: number) => `${value}px`;
+
 /**
  * A sheet that rises over the photo, moved by the browser's own scrolling: the
  * photo and the sheet share one scroller with a snap point per stop, so swipes,
  * momentum and rubber-banding are native, and scroll-driven animations fit the
  * photo into the room above it.
- *
- * ```ts
- * import { sheet } from "@ogdakke/fluidbox/sheet";
- * import "@ogdakke/fluidbox/sheet.css";
- * const details = sheet({ render: ({ item, target }) => (target.textContent = item.id) });
- * createFluidbox({ source, sheet: details });
- * details.set(1);
- * ```
  */
-export function sheet<TItem extends FluidboxItem = FluidboxItem>(
-  options: FluidboxSheetOptions<TItem> = {},
-): FluidboxSheet<TItem> {
+export function createSheet(options: FluidboxSheetOptions<PublicItem>): Addon<FluidboxSheet> {
   const listeners = new Set<(stop: number) => void>();
   let stop = 0;
-  let instance: SheetRuntime<TItem> | undefined;
+  let instance: SheetRuntime | undefined;
   const notify = () => {
     for (const listener of listeners) listener(stop);
   };
   const announce = (next: number) => {
     if (next === stop) return;
     stop = next;
-    options.onChange?.(next);
     notify();
   };
   return {
-    get stop() {
-      return stop;
+    handle: {
+      get stop() {
+        return stop;
+      },
+      get slot() {
+        return instance?.slot ?? null;
+      },
+      set(next, setOptions) {
+        instance?.set(next, setOptions?.animate ?? true);
+      },
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
     },
-    get slot() {
-      return instance?.slot ?? null;
-    },
-    set(next, setOptions) {
-      instance?.set(next, setOptions?.animate ?? true);
-    },
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    mount(context) {
-      instance = new SheetRuntime(context, options, announce, () => {
-        instance = undefined;
+    extension: {
+      mount(context) {
+        instance = new SheetRuntime(context, options, announce, () => {
+          instance = undefined;
+          notify();
+        });
         notify();
-      });
-      notify();
-      return instance;
+        return instance;
+      },
     },
   };
 }
 
-class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInstance<TItem> {
+class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   readonly slot: HTMLDivElement;
   readonly #dialog: HTMLElement;
   readonly #overlay: HTMLElement;
   readonly #scroller: HTMLDivElement;
   readonly #stage: HTMLDivElement;
-  readonly #context: FluidboxExtensionContext<TItem>;
-  readonly #options: FluidboxSheetOptions<TItem>;
+  readonly #context: FluidboxExtensionContext<FluidboxItem>;
+  readonly #options: FluidboxSheetOptions<PublicItem>;
   readonly #dismiss: FluidboxSheetDismiss;
   readonly #announce: (stop: number) => void;
   readonly #onDestroy: () => void;
   readonly #lifetime = new AbortController();
   readonly #room: PhotoRoom;
   readonly #timeline: AnimationTimeline | undefined;
+  #stateAnimations: Animation[] = [];
+  #tracks: Track[] = [];
+  #stateFrame = 0;
+  #lastTouch = -Infinity;
+  #wheelDismiss = false;
+  /** The last wheel: when, how strong, and whether the sheet was raised. */
+  #wheel = { at: -Infinity, size: 0, raised: false };
+  #holding = false;
+  #holdTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #resize: ResizeObserver;
   readonly #unsubscribe: FluidboxDispose;
   #strip: HTMLElement | null = null;
-  #source: FluidboxSource<TItem>;
+  #source: FluidboxSource<FluidboxItem>;
   #owned: HTMLElement | undefined;
   #rendered: { index: number; controller: AbortController; dispose?: FluidboxDispose } | undefined;
   #stop = 0;
@@ -210,8 +180,8 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
   #typingTop: number | undefined;
 
   constructor(
-    context: FluidboxExtensionContext<TItem>,
-    options: FluidboxSheetOptions<TItem>,
+    context: FluidboxExtensionContext<FluidboxItem>,
+    options: FluidboxSheetOptions<PublicItem>,
     announce: (stop: number) => void,
     onDestroy: () => void,
   ) {
@@ -228,15 +198,22 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
 
     // One scroller holds the photos and the sheet: space to scroll the photo
     // away into, the stage the photos rest in, and the sheet's slot below it.
+    // The stage is sticky in a box that ends where the sheet meets the photo,
+    // so from there the sheet pushes it up in the same frame as the scroll.
     this.#scroller = document.createElement("div");
     this.#scroller.dataset.fluidboxSheetScroller = "";
+    const hold = document.createElement("div");
+    hold.dataset.fluidboxSheetHold = "";
     const space = document.createElement("div");
     space.dataset.fluidboxSheetSpace = "";
     this.#stage = document.createElement("div");
     this.#stage.dataset.fluidboxSheetStage = "";
+    const push = document.createElement("div");
+    push.dataset.fluidboxSheetPush = "";
+    hold.append(space, this.#stage, push);
     this.slot = document.createElement("div");
     this.slot.dataset.fluidboxSheetSlot = "";
-    this.#scroller.append(space, this.#stage, this.slot);
+    this.#scroller.append(hold, this.slot);
     this.#strip = this.#dialog.querySelector<HTMLElement>("[data-fluidbox-slides]");
     (this.#strip ?? this.#dialog.firstElementChild)?.before(this.#scroller);
     if (this.#strip) this.#stage.append(this.#strip);
@@ -249,7 +226,7 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
       this.#owned = document.createElement("section");
       this.#owned.dataset.fluidboxSheet = "";
       this.#owned.dataset.fluidboxChrome = "";
-      this.#owned.setAttribute("aria-label", "Details");
+      this.#owned.setAttribute("aria-label", context.labels.sheet);
       this.slot.append(this.#owned);
     }
 
@@ -262,13 +239,16 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
       {
         photo: "--fluidbox-sheet-photo",
         gap: "--fluidbox-sheet-gap",
+        inset: "--fluidbox-sheet-fit-inset",
         limit: "--fluidbox-sheet-fit-limit",
       },
       this.#stage,
     );
 
     // Nothing here runs while the sheet moves: the browser scrolls it, and
-    // scroll-driven animations move the photo. Only the end of a scroll is read.
+    // scroll-driven animations move the photo. Only the end of a scroll is read,
+    // and the wheel, to stop a trackpad's momentum at rest.
+    this.#scroller.addEventListener("wheel", this.#onWheel, { passive: false, signal });
     this.#scroller.addEventListener("scrollend", this.#onScrollEnd, { signal });
     if (!("onscrollend" in view)) {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -280,6 +260,9 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
         },
         { passive: true, signal },
       );
+    }
+    if (!this.#timeline) {
+      this.#scroller.addEventListener("scroll", this.#onScriptedScroll, { passive: true, signal });
     }
     view.addEventListener("resize", () => this.#remeasure(true), { signal });
     view.visualViewport?.addEventListener("resize", this.#onViewport, { signal });
@@ -372,7 +355,7 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
 
   // Extension hooks.
 
-  setSource(source: FluidboxSource<TItem>) {
+  setSource(source: FluidboxSource<FluidboxItem>) {
     if (source === this.#source) return;
     this.#source = source;
     this.#clearRender();
@@ -399,6 +382,7 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
 
   wheel(deltaY: number) {
     if (!this.#open || !this.#enabled) return false;
+    if (this.#holding) return true;
     if (this.#dismiss === "flight" && deltaY < 0 && !this.#raised) return false;
     return "native" as const;
   }
@@ -423,16 +407,41 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
         fill: "forwards",
       });
       this.#fade = fade;
-      return fade.finished.then(
-        () => undefined,
-        () => undefined,
-      );
+      return Promise.all([
+        fade.finished.catch(() => undefined),
+        this.#wheelDismiss ? this.#momentumEnd() : undefined,
+      ]).then(() => undefined);
     }
     if (!this.#raised) return;
     // The flight doesn't wait for the sheet: the photo holds the pose it has,
     // the flight takes it from there, and the sheet goes down as it flies.
     this.#room.freeze();
     this.#scrollTo(0, true);
+  }
+
+  /** Resolves once no scroll or wheel has come for a moment, or after a limit. */
+  #momentumEnd() {
+    return new Promise<void>((resolve) => {
+      const view = this.#dialog.ownerDocument.defaultView!;
+      const events = new AbortController();
+      let quiet: ReturnType<typeof setTimeout> | undefined;
+      const done = () => {
+        clearTimeout(quiet);
+        clearTimeout(limit);
+        events.abort();
+        resolve();
+      };
+      const wait = () => {
+        clearTimeout(quiet);
+        quiet = setTimeout(done, MOMENTUM_QUIET);
+      };
+      const limit = setTimeout(done, MOMENTUM_LIMIT);
+      const options = { passive: true, signal: events.signal };
+      this.#scroller.addEventListener("scroll", wait, options);
+      view.addEventListener("wheel", wait, options);
+      this.#lifetime.signal.addEventListener("abort", done, { once: true });
+      wait();
+    });
   }
 
   closesInPlace() {
@@ -442,11 +451,14 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
   destroy() {
     this.#lifetime.abort();
     clearTimeout(this.#stripTimer);
+    clearTimeout(this.#holdTimer);
     cancelAnimationFrame(this.#keyboardFrame);
+    cancelAnimationFrame(this.#stateFrame);
     this.#unlockPage?.();
     this.#resize.disconnect();
     this.#dismissObserver?.disconnect();
     this.#room.destroy();
+    this.#trackState(false, 0, 0, 0);
     this.#unsubscribe();
     this.#clearRender();
     if (this.#strip) this.#scroller.replaceWith(this.#strip);
@@ -530,12 +542,22 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
     const offsets = visible.map((shown, index) =>
       index ? Math.round(dismiss + lead + shown - peek) : dismiss,
     );
-    const layout = [enabled, height, reach, peek, dismiss, content, ...offsets].join();
+    const range = Math.max(offsets.at(-1)!, dismiss + lead + content - peek);
+    // With push, the stage holds until the sheet meets the active photo; with
+    // fit, through the sheet's whole rise, while the photo shrinks above it. A
+    // longer hold would lengthen the scroller.
+    const rise = range - dismiss;
+    const push = !enabled
+      ? 0
+      : this.#room.pushes
+        ? Math.min(this.#room.hold(lead, peek), rise)
+        : rise;
+    const layout = [enabled, height, reach, peek, dismiss, content, push, ...offsets].join();
     if (layout === this.#layout) return false;
     this.#layout = layout;
     this.#rest = dismiss;
     this.#offsets = offsets;
-    this.#range = Math.max(offsets.at(-1)!, dismiss + lead + content - peek);
+    this.#range = range;
     this.#dialog.toggleAttribute("data-sheet-off", !enabled);
     this.#dialog.toggleAttribute("data-sheet-peeking", peek > 0);
     const style = this.#overlay.style;
@@ -543,13 +565,13 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
     style.setProperty("--fluidbox-sheet-reach", px(reach));
     style.setProperty("--fluidbox-sheet-lead", px(lead));
     style.setProperty("--fluidbox-sheet-dismiss-distance", px(dismiss));
+    style.setProperty("--fluidbox-sheet-push", px(push));
+    style.setProperty("--fluidbox-sheet-stage-height", px(height));
     style.setProperty("--fluidbox-sheet-range", px(this.#range));
     style.setProperty("--fluidbox-sheet-height", px(content));
     style.setProperty("--fluidbox-sheet-min-height", px(enabled ? required : 0));
-    style.setProperty("--fluidbox-sheet-visible-start", px(peek - dismiss - lead));
-    style.setProperty("--fluidbox-sheet-first-offset", px(offsets[1] ?? dismiss + 1));
     this.#placeMarkers(enabled ? [...(dismiss ? [0] : []), ...offsets] : []);
-    this.#restartAnimations();
+    this.#trackState(enabled, dismiss, offsets[1] ?? dismiss + 1, peek - dismiss - lead);
     this.#room.track(
       enabled && this.#timeline
         ? { timeline: this.#timeline, range: this.#range, from: dismiss, lead }
@@ -559,17 +581,68 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
     return true;
   }
 
-  // Chromium keeps a scroll-driven animation's start from its first range, so
-  // one whose range moved with the layout starts over to pick up the new one.
-  #restartAnimations() {
-    void getComputedStyle(this.#overlay).animationRange;
-    for (const animation of this.#overlay.getAnimations({ subtree: true })) {
-      if (!(animation instanceof CSSAnimation) || animation.timeline === document.timeline)
-        continue;
-      animation.cancel();
-      animation.play();
+  /**
+   * The state variables on the overlay and the backdrop of a scroll dismiss
+   * follow the scroll: animations on the scroller's timeline,
+   * or, without ScrollTimeline, set in script as it scrolls. As CSS animations
+   * the variables would need timeline-scope, and a minifier that expands the
+   * shorthand with a 0s duration pins them all at their end.
+   */
+  #trackState(enabled: boolean, dismiss: number, first: number, visibleStart: number) {
+    for (const animation of this.#stateAnimations) animation.cancel();
+    for (const [element, name] of this.#tracks) element.style.removeProperty(name);
+    this.#stateAnimations = [];
+    const tracks: Track[] = (this.#tracks = []);
+    const range = this.#range;
+    if (!enabled || range <= 0) return;
+    const overlay = this.#overlay;
+    tracks.push(
+      [overlay, "--fluidbox-sheet-visible", visibleStart, visibleStart + range, 0, range, px],
+      [overlay, "--fluidbox-sheet-progress", 0, 1, dismiss, first],
+      [overlay, "--fluidbox-sheet-expand", 0, 1, first, range],
+      [overlay, "--fluidbox-sheet-dismiss", 1, 0, 0, dismiss],
+    );
+    const backdrop = overlay.querySelector<HTMLElement>(":scope > [data-fluidbox-backdrop]");
+    if (this.#dismiss === "scroll" && backdrop)
+      tracks.push([backdrop, "opacity", 0, 1, 0, dismiss]);
+    const timeline = this.#timeline;
+    if (!timeline) {
+      this.#applyState();
+      return;
+    }
+    const at = (pixels: number) => Math.min(1, Math.max(0, pixels / range));
+    for (const [element, name, from, to, start, end, write = String] of tracks) {
+      const frame = (offset: number, value: number) => ({ offset, [name]: write(value) });
+      // A track with no length, such as the expand of a sheet whose only stop
+      // is its top, steps from one value to the other at its start.
+      const keyframes =
+        end <= start
+          ? [frame(0, from), frame(at(start), from), frame(at(start), to), frame(1, to)]
+          : [frame(0, from), frame(at(start), from), frame(at(end), to), frame(1, to)];
+      this.#stateAnimations.push(
+        element.animate(keyframes, { timeline, fill: "both" } as KeyframeAnimationOptions),
+      );
     }
   }
+
+  #applyState() {
+    const top = this.#scroller.scrollTop;
+    for (const [element, name, from, to, start, end, write = String] of this.#tracks) {
+      const share =
+        end <= start
+          ? Number(top >= start)
+          : Math.min(1, Math.max(0, (top - start) / (end - start)));
+      element.style.setProperty(name, write(from + (to - from) * share));
+    }
+  }
+
+  #onScriptedScroll = () => {
+    if (this.#stateFrame) return;
+    this.#stateFrame = requestAnimationFrame(() => {
+      this.#stateFrame = 0;
+      this.#applyState();
+    });
+  };
 
   #placeMarkers(offsets: number[]) {
     const markers = [...this.#scroller.querySelectorAll<HTMLElement>("[data-fluidbox-sheet-snap]")];
@@ -603,7 +676,8 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
   #onStripRest = () => {
     clearTimeout(this.#stripTimer);
     this.#stripMoving = false;
-    if (!this.#measurePending) return;
+    // A pushed stage holds for the photo in view, so a new one remeasures.
+    if (!this.#measurePending && !this.#room.pushes) return;
     this.#measurePending = false;
     this.#remeasure(false);
   };
@@ -796,6 +870,44 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
     if (!smooth) this.#onScrollEnd();
   }
 
+  // A trackpad swipe that lowers the sheet goes on as momentum once the sheet
+  // is down. Left alone, it would scroll on into the dismiss, or start the
+  // viewer's wheel dismiss, only to spring back. So once a wheel lowers the
+  // sheet to rest, the sheet holds there while that momentum runs down, the
+  // way a wheel dismiss keeps the page from the momentum after it. A pause, a
+  // wheel back up, or a wheel growing stronger again is a new swipe, and goes
+  // through.
+
+  #onWheel = (event: WheelEvent) => {
+    const now = performance.now();
+    const size = Math.abs(event.deltaY);
+    const last = this.#wheel;
+    const momentum = now - last.at < MOMENTUM_QUIET && size <= last.size * WHEEL_GROWTH + 2;
+    const raised = this.#raised;
+    this.#wheel = { at: now, size, raised };
+    if (event.deltaY < 0 && momentum && (this.#holding || (last.raised && !raised))) {
+      this.#hold();
+      if (event.cancelable) event.preventDefault();
+    } else if (this.#holding) {
+      this.#release();
+    }
+  };
+
+  #hold() {
+    clearTimeout(this.#holdTimer);
+    this.#holdTimer = setTimeout(() => this.#release(), MOMENTUM_QUIET);
+    if (this.#holding) return;
+    this.#holding = true;
+    // Past rest already, into the dismiss space: back to rest.
+    if (this.#scroller.scrollTop < this.#rest) this.#scrollTo(0, true);
+  }
+
+  #release() {
+    clearTimeout(this.#holdTimer);
+    if (!this.#holding) return;
+    this.#holding = false;
+  }
+
   #onScrollEnd = () => {
     if (this.#dismissed || this.#context.controller.state.status === "closed") return;
     const stop = this.#nearestStop();
@@ -830,7 +942,9 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
     this.#stop = stop;
     this.#dialog.dataset.sheet = String(stop);
     this.#announce(stop);
-    this.#dialog.dispatchEvent(new CustomEvent("fluidbox-sheet-change", { detail: { stop } }));
+    this.#dialog.dispatchEvent(
+      new CustomEvent("fluidbox-sheet-change", { detail: { stop }, bubbles: true }),
+    );
   }
 
   #syncTriggers(stop = this.#stop) {
@@ -842,6 +956,9 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
   #reset() {
     this.#touch = undefined;
     this.#dismissed = false;
+    this.#wheelDismiss = false;
+    this.#wheel = { at: -Infinity, size: 0, raised: false };
+    this.#release();
     this.#entered = false;
     this.#overlay.removeAttribute("data-sheet-dismissed");
     this.#touching = this.#heading = false;
@@ -878,6 +995,7 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
   // touches there and then, and fades as the scroll goes on.
 
   #onDismissTouch = () => {
+    this.#lastTouch = performance.now();
     this.#touching = true;
     this.#heading = false;
   };
@@ -904,7 +1022,12 @@ class SheetRuntime<TItem extends FluidboxItem> implements FluidboxExtensionInsta
   #dismissNow() {
     if (this.#dismissed || !this.#open) return;
     this.#dismissed = true;
-    this.#overlay.toggleAttribute("data-sheet-dismissed", true);
+    // A trackpad's momentum goes on after the photo is gone. Handed to the page
+    // at once, it would scroll the page, so a wheel dismiss keeps the scroll
+    // until the momentum ends, as React Aria's sheet waits on macOS Safari. A
+    // touch dismiss hands touches back to the page straight away.
+    this.#wheelDismiss = !this.#touching && performance.now() - this.#lastTouch > TOUCH_MEMORY;
+    if (!this.#wheelDismiss) this.#overlay.toggleAttribute("data-sheet-dismissed", true);
     void this.#context.controller.close({ reason: "pointer" });
   }
 

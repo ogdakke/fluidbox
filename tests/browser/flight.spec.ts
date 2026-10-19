@@ -481,11 +481,12 @@ test("zooming leaves no unzoomed image behind", async ({ page }, testInfo) => {
 
 test("slides stay aligned and images fit their slide on a fractional width", async ({ page }) => {
   await page.goto("/react/");
+  await expect(page.locator("html")).toHaveAttribute("data-patterns-ready", "");
   // A fractional dialog width: rounded slide positions would drift per slide.
   await page.addStyleTag({
     content: "[data-fluidbox-dialog] { width: calc(100% - 0.4px) !important; }",
   });
-  const cover = page.locator(".cover");
+  const cover = page.locator('[data-pattern="overlay"] [data-test="trigger"]');
   await cover.scrollIntoViewIfNeeded();
   await cover.click();
   const dialog = page.locator("[data-fluidbox-dialog]");

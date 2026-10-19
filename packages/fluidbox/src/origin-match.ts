@@ -1,16 +1,20 @@
-import type {
-  FluidboxImageResource,
-  FluidboxImageSource,
-  FluidboxItem,
-  FluidboxOrigin,
-} from "./public-api";
+import type { FluidboxItem, FluidboxOrigin } from "./runtime-types";
+import { srcsetCandidates } from "./srcset";
 
-function collect(resource: FluidboxImageResource | undefined, add: (src: string) => void) {
+function collect(
+  resource:
+    | {
+        readonly src?: string;
+        readonly srcset?: string;
+        readonly sources?: readonly { readonly srcset: string }[];
+      }
+    | undefined,
+  add: (src: string) => void,
+) {
   if (!resource) return;
-  add(resource.src);
-  for (const set of [resource, ...(resource.sources ?? [])] as FluidboxImageSource[]) {
-    for (const candidate of set.candidates ?? []) add(candidate.src);
-    for (const part of set.srcset?.split(",") ?? []) add(part.trim().split(/\s+/)[0] ?? "");
+  if (resource.src) add(resource.src);
+  for (const set of [resource, ...(resource.sources ?? [])]) {
+    for (const candidate of srcsetCandidates(set.srcset)) add(candidate.src);
   }
 }
 
@@ -20,8 +24,10 @@ function collect(resource: FluidboxImageResource | undefined, add: (src: string)
  */
 export function originShowsItem(image: HTMLImageElement | undefined, item: FluidboxItem) {
   if (!image) return false;
-  // Without a declared thumbnail or preview, the origin is the only preview there is.
-  if (!item.thumbnail && !item.preview) return true;
+  // Without a declared thumbnail, the origin is the only preview there is: a
+  // trigger usually shows a smaller copy of the same picture. Declare the
+  // thumbnail when it shows something else, so the flight crossfades.
+  if (!item.thumbnail) return true;
   const declared = new Set<string>();
   const add = (src: string) => {
     if (!src) return;
@@ -32,9 +38,8 @@ export function originShowsItem(image: HTMLImageElement | undefined, item: Fluid
     }
   };
   collect(item.thumbnail, add);
-  collect(item.preview, add);
-  if (item.media.type === "image") collect(item.media, add);
-  else if (item.media.type === "video") collect(item.media.poster, add);
+  if (item.type === "img") collect(item, add);
+  else if (item.type === "video" && item.poster) add(item.poster);
   // A framework may have just written `src`; `currentSrc` updates once loading starts.
   return [image.currentSrc, image.src].some((src) => !!src && declared.has(src));
 }
@@ -45,7 +50,7 @@ export function originMatchesItem(origin: FluidboxOrigin | null | undefined, ite
   if (origin.thumbnail) return originShowsItem(origin.thumbnail, item);
   // A video origin shows the clip the viewer plays, whichever encoding it picked.
   return (
-    item.media.type === "video" &&
+    item.type === "video" &&
     (origin.visual instanceof HTMLVideoElement || !!origin.visual.querySelector("video"))
   );
 }

@@ -1,353 +1,108 @@
 # Public API contract
 
-This document is the implementation contract for the headless Fluidbox beta. The plain JavaScript
-runtime and composed React binding described here are implemented. Solid, Vue, and Angular still
-use compatibility adapters and are not part of the locked composed-binding contract yet.
+The rules every entry point of `@ogdakke/fluidbox` keeps. The types and doc comments in
+`packages/fluidbox/src/public-api.ts` and `labels.ts` are the source of truth; the user
+documentation is in `apps/docs/content` ([API reference](../apps/docs/content/api.md)).
+
+## Principles
+
+- Platform words: item fields are HTML attribute names by DOM property name (`src`, `srcset`,
+  `sizes`, `poster`, `referrerPolicy`), and the events follow a popover's (`beforetoggle`,
+  `toggle`, `oldState`, `newState`).
+- One word per idea: **item**, **trigger**, **viewer** (the body-level layer), **controls**,
+  **filmstrip**, **sheet**, **thumbnail overlay**.
+- The same shape in every entry point: plain JavaScript, the custom elements and the four
+  framework bindings support the same nine patterns (`apps/examples/src/patterns/CONTRACT.md`).
 
 ## Package exports
 
-`@ogdakke/fluidbox` is SSR-safe. Importing it does not read `window`, `document`, `HTMLElement`, or
-register custom elements.
-
-The stable headless root exports:
-
-- `arraySource()` and the source, media, origin, controller, event, renderer, and overlay types in
-  `src/public-api.ts`.
-- `createFluidbox()`. Calling it requires a DOM; importing it does not.
-
-`registerFluidboxElements`, `FluidboxGalleryElement`, and `FluidboxItemElement` expose the custom-element adapter.
-Declarative items compile directly to `FluidboxItem`; indexed galleries accept `FluidboxSource` and
-`FluidboxOriginAdapter`. `@ogdakke/fluidbox/elements` remains the only eager custom-element
-registration entry.
-
-Framework bindings remain subpath exports. React is the first composed binding. Solid, Vue, and
-Angular keep their current adapters until equivalent composed bindings pass their own ownership and
-hydration tests.
-
-`@ogdakke/fluidbox/styles.css` continues to provide behavior and default appearance during the
-migration. A later split may add `structural.css` and `theme.css`; it will not remove `styles.css`
-without a migration release.
-
-## Source snapshots
-
-`FluidboxSource` is pure synchronous metadata. It never contains DOM nodes or framework children.
-The runtime may load media asynchronously, but `count`, `getItem(index)`, and `getIndex(id)` are
-synchronous for a source revision.
-
-```ts
-const source = arraySource([
-  {
-    id: "photo-1",
-    media: {
-      type: "image",
-      src: "/full/photo-1.jpg",
-      alt: "A footpath through tall grass",
-      width: 2400,
-      height: 1600,
-      candidates: [
-        { src: "/full/photo-1-1200.jpg", width: 1200 },
-        { src: "/full/photo-1-2400.jpg", width: 2400 },
-      ],
-    },
-    placeholder: { src: "data:image/png;base64,..." },
-    preview: { src: "/thumb/photo-1-480.jpg", width: 480, height: 320 },
-    thumbnail: { src: "/thumb/photo-1.jpg", width: 480, height: 320 },
-    caption: "Late summer",
-  },
-]);
-```
-
-For images, `placeholder` stays painted beneath the media while the preview and the browser-selected
-full resource decode. The runtime loads the selected image and its immediate neighbors eagerly; it
-never moves the strip to prefetch them. A decoded preview can replace the placeholder, and a failed
-full resource leaves the fallback visible with a retry control.
-
-IDs are non-empty and unique within a snapshot. `arraySource()` copies the input array, builds its ID
-map once, and throws for an empty or duplicate item ID. An empty source is valid. `getItem()` throws
-`RangeError` for an invalid index. `getIndex()` returns `null` when the ID is absent.
-
-Image, video, iframe, and custom descriptors use the same bounded strip. A custom descriptor stores
-a renderer key, never a React, Vue, Solid, or Angular node. Automated lifecycle checks cover mount,
-eviction, teardown, native interaction ownership, and live-content close flight. Physical mobile
-video/fullscreen behavior remains a release check.
-
-`setSource(snapshot)` creates a new source revision. It preserves the active ID if present. If the ID
-was removed, it selects the old index clamped to the new range. An empty source closes with reason
-`source-empty`. Reordering preserves identity. Pending loads and origin reveals from the old revision
-are aborted and cannot commit into the new revision.
-
-Unknown-length sources, asynchronous metadata lookup, and mutation of a live snapshot are outside
-the beta contract.
-
-## Origins and virtualized hosts
-
-DOM ownership is separate from source metadata. `FluidboxOriginAdapter` resolves and reveals host
-elements. `FluidboxOrigin` names three roles explicitly:
-
-| Field       | Purpose                                                              |
-| ----------- | -------------------------------------------------------------------- |
-| `trigger`   | Activation semantics and focus return                                |
-| `visual`    | Visible clipped box, transition geometry, and corner radius          |
-| `thumbnail` | Optional decoded preview while the selected media is becoming usable |
-
-Composed `Item` and `Trigger` parts call `registerOrigin()`. Unregistering removes only the exact
-registration represented by its returned disposer, so a stale virtualizer cleanup cannot remove a
-new node for the same ID. A live registered origin takes precedence over `origins.getOrigin()`;
-unregistering it exposes the adapter result again.
-
-`revealOrigin(id, index, { signal, reason })` asks a host virtualizer to scroll or mount an origin.
-The runtime calls it after the opening pose is captured and after selection settles. A new accepted
-selection aborts the previous signal immediately, even before the new selection settles. Source
-replacement, close, and destroy also abort it.
-
-Viewer motion never waits for reveal. Close reads the current origin once and starts immediately. It
-uses a connected origin that intersects the window and each clipping ancestor, or uses the fallback
-transition and gallery focus target. Host callbacks must check `signal.aborted` before deferred
-scrolling; the runtime cannot undo arbitrary host work performed after cancellation.
-
-## Controller
-
-The root package exports the plain runtime through the `CreateFluidbox` signature:
-
-```ts
-const viewer = createFluidbox({
-  source,
-  origins,
-  portal: {
-    mount({ target, controller, signal }) {
-      const close = document.createElement("button");
-      close.textContent = "Close";
-      close.addEventListener("click", () => void controller.close(), { signal });
-      target.append(close);
-      return () => close.remove();
-    },
-  },
-  onBeforeCommand(event) {
-    if (event.command === "close" && formIsDirty) event.preventDefault();
-  },
-  onEvent(event) {
-    analytics.record(event);
-  },
-});
-
-const cancelPreparation = viewer.prepare({ id: "photo-1" });
-await viewer.open({ id: "photo-1" });
-cancelPreparation();
-await viewer.next({ reason: "api" });
-await viewer.close();
-viewer.destroy();
-```
-
-`prepare(target)` is the optional pointer-down latency path. It synchronously validates the target,
-mounts and measures a hidden portal, prepares the opening preview, and pauses the opening animations
-at time zero. It does not publish state, hide the thumbnail, isolate the document, or claim active
-viewer ownership. Its disposer cancels unused preparation; calling it after `open()` has consumed the
-preparation is a no-op. Bindings should prepare only for a primary activation pointer and discard on
-pointer cancellation. `open()` works identically without prior preparation.
-
-Commands validate their target before returning a promise. An invalid or missing target throws
-`RangeError`; a destroyed controller throws `InvalidStateError`. A valid command resolves only when
-it settles or loses ownership:
-
-| Result       | Meaning                                                                     |
-| ------------ | --------------------------------------------------------------------------- |
-| `completed`  | The requested state settled; `changed` is false for an accepted no-op       |
-| `superseded` | A newer incompatible command took ownership                                 |
-| `prevented`  | `onBeforeCommand` synchronously prevented the application/user request      |
-| `aborted`    | Its `AbortSignal`, source replacement, or destruction cancelled the command |
-
-Repeated requests for the same pending destination share the pending operation. A newer
-incompatible command resolves the earlier result as `superseded` and continues from the painted
-pose. `destroy()` is synchronous and idempotent. It cannot be prevented and leaves no command
-pending. An unexpected runtime or renderer failure rejects the command promise; it is not reported
-as `aborted`, because cancellation and implementation failure require different recovery.
-
-The default reason for direct controller calls is `api`. Runtime input uses `trigger`, `keyboard`,
-`pointer`, `wheel`, or `filmstrip`. Source reconciliation uses `source-update`, `source-empty`, or
-`teardown`.
-
-### State and event order
-
-`controller.state` is an immutable snapshot. `subscribe(listener)` calls the listener only after a
-new snapshot commits and returns an idempotent disposer. State publishes discrete semantic changes;
-per-frame gesture and transition values stay in CSS variables.
-
-For an accepted open or navigation, event order is:
-
-1. `onBeforeCommand` runs synchronously and may prevent the request.
-2. `open-request` or `change-request` is emitted.
-3. Requested ID/index enters state.
-4. `selection-change` is emitted when the active identity commits.
-5. `selection-settle` is emitted after navigation and reveal scheduling settle.
-6. The command resolves `completed`.
-
-Status changes emit `status-change`. Opening changes `closed → opening → open`; closing changes
-`open → closing → closed`. Reversal changes direction from the current painted pose and supersedes
-the incompatible pending command. A prevented command emits no request or state event. A completed
-no-op emits its request but no selection or status event.
-
-## Renderer ownership
-
-The runtime owns the body portal, measured frame, transforms, clipping, native slide track, gesture
-surfaces, focus containment, inert background, and accessibility status. Applications own controls,
-captions, thumbnail decorations, and every framework-created descendant.
-
-An indexed `FluidboxSource` is also the gallery API. The runtime renders a bounded native-scrolling
-window around the active item, so callers do not create a second gallery object or mount every item.
-
-`FluidboxOptions.portal` mounts application controls and captions once into a stable target inside the
-body portal. It receives the controller and a lifetime signal and may return an idempotent disposer.
-The runtime calls the disposer before removing the target. Plain JavaScript appends DOM there; React,
-Vue, Solid, and Angular bindings use their native portal or teleport mechanism.
-
-`FluidboxRenderer.mount()` receives a stable target, item, index, and abort signal. It may return a
-disposer. The adapter invokes the disposer before removing the target. Framework adapters use their
-native portal/teleport mechanism; the runtime never manually reparents a framework-owned node.
-
-Custom content can be evicted outside the bounded slide window. Eviction disposes it, and revisiting
-may mount a new instance. Persisted component state belongs in application state unless a later
-bounded retention policy explicitly says otherwise.
-
-## Thumbnail overlays
-
-`ThumbnailOverlay` is the composed part for a badge, play icon, count, caption, or other content over
-a thumbnail. The plain controller uses `registerThumbnailOverlay()`.
-
-Two behaviors are supported:
-
-- `host` keeps the overlay on its thumbnail card. The runtime publishes phase/progress to its element
-  so it can hide or transform while the viewer moves.
-- `travel` renders an application-owned copy into a runtime transition target. It requires a
-  renderer. This supports content that follows the image without moving framework-owned DOM.
-  Pass `frameLayer` when a mask or other layer must remain clipped by the animated image frame;
-  the runtime moves that element into the frame and restores it to its card on close.
-
-The overlay target exposes `data-fluidbox-phase="preview|opening|open|dragging|closing"` and
-`--fluidbox-progress`, where `1` is the preview pose and `0` is fully open. This supports both
-immediate and continuous behavior:
-
-```css
-.photo-badge {
-  opacity: var(--fluidbox-progress, 1);
-}
-
-.photo-caption[data-fluidbox-phase="opening"] {
-  visibility: hidden;
-}
-```
-
-Progress reverses from its painted value when motion reverses. Framework state does not update per
-frame. Overlay content is non-interactive during flight by default. A host overlay keeps the
-semantics it had on the card; decorative content should use `aria-hidden="true"`.
-
-If virtualization unmounts the source card, its origin and host overlay unregister. A mounted travel
-renderer may finish the active transition, but closing uses the newly resolved selected origin or
-the fallback. Selecting another item disposes the old traveling renderer once it no longer paints.
-
-## React composition
-
-The first composed React contract is:
-
-```tsx
-<Fluidbox.Root source={source} origins={origins}>
-  <Fluidbox.Item id="photo-1">
-    <Fluidbox.Trigger asChild>
-      <button>
-        <img src="/thumb/photo-1.jpg" alt="A footpath through tall grass" />
-        <Fluidbox.ThumbnailOverlay behavior="host" className="photo-badge">
-          1 of 20
-        </Fluidbox.ThumbnailOverlay>
-      </button>
-    </Fluidbox.Trigger>
-  </Fluidbox.Item>
-
-  <Fluidbox.Portal>
-    <Fluidbox.Content />
-    <Fluidbox.Previous>Previous</Fluidbox.Previous>
-    <Fluidbox.Next>Next</Fluidbox.Next>
-    <Fluidbox.Close>Close</Fluidbox.Close>
-  </Fluidbox.Portal>
-</Fluidbox.Root>
-```
-
-`useFluidbox()` returns stable controller commands. `useFluidboxState(selector)` uses stable external
-store snapshots. `asChild` accepts one element, composes its ref and event handler, and does not run
-the part action when the consumer prevents the event. `Previous` and `Next` expose native disabled
-state at finite ends.
-
-For an in-memory gallery, `Root` accepts `items` and creates its indexed source. A trigger can map
-several item IDs to one origin. `item` selects the slide opened by a click, while `items` lists slides
-that can close to that trigger. The render callback receives the selected item and viewer status, so
-the host preview can follow navigation without a separate `Origin` component:
-
-```tsx
-<Fluidbox.Root items={photos}>
-  <Fluidbox.Trigger item={photos[0]} items={photos} asChild>
-    {({ item }) => (
-      <button type="button">
-        <img src={item?.thumbnail?.src} alt="" data-fluidbox-origin />
-        <Fluidbox.ThumbnailOverlay>+{photos.length - 1}</Fluidbox.ThumbnailOverlay>
-      </button>
-    )}
-  </Fluidbox.Trigger>
-  <Fluidbox.Portal>
-    <Fluidbox.Close />
-  </Fluidbox.Portal>
-</Fluidbox.Root>
-```
-
-`ThumbnailOverlay` inherits all IDs from its trigger; host overlays receive `--fluidbox-progress`
-through opening and closing. The runtime uses a matching single-item origin before a shared gallery origin. If neither is mounted
-and visible, close uses the existing scale and fade fallback. A trigger with plain element children
-also works; the callback is only needed when its preview changes with selection. Keep the visual node
-mounted while its content changes so the handoff geometry stays stable.
-
-Plain JavaScript can register the same origin for several IDs with
-`controller.registerOrigin(ids, origin)`. `origin.prepareClose(item, index)` is a synchronous hook for
-updating an authored preview before the runtime measures the close target. It must not depend on
-asynchronous rendering. The controller calls it again for each close attempt, including interrupted
-motion; an exception in the hook does not block closing.
-
-```js
-const preview = card.querySelector("img");
-const dispose = controller.registerOrigin(
-  photos.map((photo) => photo.id),
-  {
-    trigger: card,
-    visual: preview,
-    thumbnail: preview,
-    prepareClose(item) {
-      preview.src = item.thumbnail?.src ?? item.media.src;
-    },
-  },
-);
-```
-
-Dispose the registration when the card unmounts. If its preview element is replaced, register the
-new element during `prepareClose`; the runtime resolves the origin again after the hook returns.
-
-Controlled `open` and `activeId` props are intentionally absent from the first locked React surface.
-They will be added only after delayed acceptance, rejection, interrupted motion, and teardown tests
-define their callback order. The controller and source replacement APIs cover the initial beta.
-
-## Public styling hooks
-
-The supported public selectors during migration are the parts listed in `FLUIDBOX.md`: trigger,
-preview, target, overlay, container, backdrop, dialog, slides, slide, frame, media, content, close,
-filmstrip, filmstrip item, transition layer, and transition content. `data-fluidbox-state`,
-`data-fluidbox-phase`, `data-open`, `data-closed`, `data-starting-style`, `data-ending-style`,
-`data-dragging`, `data-dismissing`, `data-zoomed`, `aria-hidden`, and `aria-selected` are public state
-hooks where that document lists them.
-
-The documented custom properties in `FLUIDBOX.md` are public with their listed owner, units, and
-lifetime. Undocumented generated nodes, attributes, inline properties, class names, and internal
-CSS variables are not extension points. Required geometry, scrolling, clipping, touch behavior,
-focus visibility, and modal isolation remain structural behavior even when appearance is replaced.
-
-## Compatibility and versioning
-
-`createFluidbox()` and the composed React binding are the implemented beta contract. Changes to
-command results, source semantics, event ordering, renderer ownership, public selectors, or
-custom-property meaning require a documented migration. Additive media descriptor fields and new
-optional parts may ship in a minor release. Internal DOM, animation objects, and unlisted styling
-hooks may change without notice.
+| Entry                           | Contract                                                                                                                     |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `@ogdakke/fluidbox`             | `createFluidbox`, `FluidboxToggleEvent`, `FluidboxChangeEvent` and the types. No side effects, no browser globals on import. |
+| `@ogdakke/fluidbox/elements`    | Defines the custom elements on import. Browser only. The only entry that registers elements.                                 |
+| `@ogdakke/fluidbox/filmstrip`   | Registers the filmstrip add-on on import. Exports its types only. SSR-safe.                                                  |
+| `@ogdakke/fluidbox/sheet`       | Registers the sheet add-on on import. Exports its types only. SSR-safe. Styles in `sheet.css`.                               |
+| `@ogdakke/fluidbox/kit`         | The binding kit for framework bindings. Not needed by app code.                                                              |
+| `@ogdakke/fluidbox/<framework>` | `react`, `solid`, `vue`, `angular`: built on the plain API and the kit only, never the custom elements.                      |
+
+Add-ons register into one registry per page (`Symbol.for`), however many copies a bundler makes.
+Turning `filmstrip` or `sheet` on without its import throws an `Error` that names the import.
+
+## Items and lists
+
+Items are flat: `{ type: "img" | "video" | "iframe" | "custom", ... }`, with `id` (default: `src`),
+`thumbnail` and `placeholder` on every type. Users add their own fields; `TItem extends FluidboxItem`
+flows through options, state, events and callbacks, which always hand back the original object.
+
+`items` is an array or a lazy list `{ count, get(index), indexOf?(id) }`. Arrays are copied and
+checked: an empty or duplicate id throws a `TypeError`. Lazy lists are read synchronously and keep
+their ids unique themselves; without `indexOf`, ids are found by scanning. A list is a snapshot:
+`setItems` replaces it, keeping an open viewer on the same id when it survives.
+
+## The fluidbox
+
+`createFluidbox(options)` returns a `Fluidbox`, an `EventTarget` with `state`, `items`, `sheet`,
+`filmstrip`, `open`, `close`, `next`, `previous`, `setItems`, `preload`, `bind`, `bindOverlay`,
+`subscribe` and `destroy`.
+
+- A target is an index or an id. `open(target?)` opens, or moves while open; without a target it
+  uses the current item, else the first.
+- Commands return `Promise<boolean>`: `true` once the command happened and its motion settled,
+  `false` when it was prevented, superseded, aborted, or had nothing to do. An unknown target
+  rejects with a `RangeError`. After `destroy()` the commands resolve `false`, and `setItems`,
+  `preload`, `bind`, `bindOverlay` and `subscribe` throw an `InvalidStateError`.
+- `destroy()` releases every `bind` and `bindOverlay`.
+- Options are read once, except `renderers` (read when a slide mounts) and `origins` (read on each
+  use).
+
+## State and events
+
+`state` is a frozen snapshot: `status`, `id`, `index`, `item`, `count`, `hasPrevious`,
+`hasNext`. `id`, `index` and `item` are where the viewer is or is going, `null` while closed.
+`subscribe` is called after each new snapshot, never per animation frame; per-frame values stay in
+CSS variables.
+
+| Event              | Class                 | Cancelable | When                                               |
+| ------------------ | --------------------- | ---------- | -------------------------------------------------- |
+| `beforetoggle`     | `FluidboxToggleEvent` | yes        | Before an open or a close.                         |
+| `toggle`           | `FluidboxToggleEvent` | no         | The opening or closing motion starts.              |
+| `beforeitemchange` | `FluidboxChangeEvent` | yes        | Before the open viewer moves to another item.      |
+| `itemchange`       | `FluidboxChangeEvent` | no         | The active item changes, the opening one included. |
+| `settle`           | `FluidboxChangeEvent` | no         | The viewer comes to rest on an item.               |
+
+Every event has a `reason`: `api`, `trigger`, `keyboard`, `pointer`, `wheel`, `filmstrip` or
+`items`. The before-events run synchronously for every command, whatever its source; a prevented
+command resolves `false`. `<fluidbox-gallery>` re-dispatches the same events, non-bubbling; the
+framework bindings expose them as event props, emits or outputs.
+
+## Ownership
+
+The runtime owns the body-level viewer, measured frames, transforms, clipping, the native slide
+track, gesture surfaces, focus containment, the inert background and the live status. It is never
+replaced with a native `dialog`. Applications own controls, captions, thumbnail decorations and
+every framework-created descendant.
+
+One renderer type, `({ item, index, target, signal }) => void | (() => void)`, draws everything an
+application owns inside the viewer: custom slides, filmstrip thumbnails, the sheet and travelling
+overlays. The runtime calls the returned disposer, then empties `target`; framework bindings use
+their own portal or teleport mechanism and the runtime never reparents a framework-owned node.
+Custom content outside the bounded slide window is disposed and may mount again as a new instance.
+
+## Labels
+
+Every string the viewer shows or announces is in `FluidboxLabels` (`viewer`, `close`, `previous`,
+`next`, `position`, `slides`, `filmstrip`, `filmstripList`, `zoomed`, `sheet`), with English
+defaults, overridden through `labels`.
+
+## Styling hooks
+
+The public selectors, state attributes and custom properties are the ones listed in the
+[CSS reference](../apps/docs/content/css-reference.md). Undocumented generated nodes, attributes,
+inline properties and internal CSS variables are not extension points. Geometry, scrolling,
+clipping, touch behaviour, focus visibility and modal isolation stay structural even when the
+appearance is replaced.
+
+## Versioning
+
+The package is private at `0.0.0` and has no consumers outside this repository and
+`portfolio-v4`. Until a release, the API changes in place: old names are deleted, not deprecated.

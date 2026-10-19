@@ -1,0 +1,57 @@
+<!-- #region example -->
+<fluidbox-gallery class="pattern-grid">
+  <fluidbox-item item-id="photo-aurora">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/aurora.svg" alt="Aurora over the tundra" />
+    </button>
+    <template slot="content">
+      <img src="/art/aurora.svg" alt="Aurora over the tundra" width="1100" height="1650" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="photo-ridge">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/ridge.svg" alt="Night ridge" />
+    </button>
+    <template slot="content">
+      <img src="/art/ridge.svg" alt="Night ridge" width="1200" height="1500" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="photo-fjord">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/fjord.svg" alt="Fjord in the blue hour" />
+    </button>
+    <template slot="content">
+      <img src="/art/fjord.svg" alt="Fjord in the blue hour" width="1200" height="1600" />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item item-id="photo-lagoon">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/art/lagoon.svg" alt="Lagoon after sunset" />
+    </button>
+    <template slot="content">
+      <img src="/art/lagoon.svg" alt="Lagoon after sunset" width="1800" height="1200" />
+    </template>
+  </fluidbox-item>
+  <template slot="viewer">
+    <fluidbox-controls></fluidbox-controls>
+    <button
+      type="button"
+      class="pattern-sheet-toggle"
+      data-fluidbox-sheet-stop="1"
+      data-test="peek"
+    >
+      Details
+    </button>
+  </template>
+  <fluidbox-sheet snap-points="40% 90%">
+    <template>
+      <div class="pattern-sheet">
+        <h3 data-test="sheet-title"></h3>
+        <p>Stop <output name="stop" data-test="stop">0</output></p>
+        <button type="button" data-fluidbox-sheet-stop="2" data-test="expand">Expand</button>
+        <input type="text" aria-label="Note" placeholder="Add a note" data-test="field" />
+      </div>
+    </template>
+  </fluidbox-sheet>
+</fluidbox-gallery>
+<!-- #endregion example -->

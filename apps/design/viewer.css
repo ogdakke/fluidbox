@@ -1,8 +1,18 @@
 /* Viewer chrome in the shared language: square hairline controls on a near-opaque backdrop. */
 
 [data-fluidbox-overlay] {
-  --fluidbox-filmstrip-dock-background: color-mix(in srgb, var(--fb-bg) 88%, transparent);
   font-family: var(--fb-font-sans);
+}
+
+[data-fluidbox-dialog] {
+  --fluidbox-sheet-background: var(--fb-bg);
+  --fluidbox-sheet-color: var(--fb-fg);
+}
+
+/* Hairline focus rings on the trigger and the dialog; the controls use --fluidbox-focus-color. */
+fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible,
+[data-fluidbox-overlay] [data-fluidbox-dialog]:focus-visible {
+  outline-color: var(--fb-line-strong);
 }
 
 :where([data-fluidbox-overlay])
@@ -33,10 +43,6 @@
   :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]):hover:not(:disabled) {
   border-color: var(--fb-fg);
   background: var(--fb-surface-2);
-}
-
-:where([data-fluidbox-overlay]) [data-fluidbox-filmstrip-item] {
-  border-radius: 2px;
 }
 
 /* Gallery arrows are styled by a dialog-qualified package rule, so match its weight. */

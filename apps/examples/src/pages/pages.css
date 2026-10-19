@@ -31,6 +31,13 @@ main.fb-shell {
   letter-spacing: -0.04em;
 }
 
+.hero__package {
+  margin: 0;
+  color: var(--fb-muted);
+  font-family: var(--fb-font-mono);
+  font-size: 12.5px;
+}
+
 .hero__lede {
   max-width: 560px;
   margin: 0;
@@ -127,8 +134,13 @@ main.fb-shell {
 
 .section__head {
   display: grid;
+  justify-items: start;
   gap: 10px;
   padding: 40px var(--fb-gutter) 24px;
+}
+
+.section__head > .fb-rule-title {
+  justify-self: stretch;
 }
 
 .section__head > p {
@@ -181,8 +193,17 @@ main.fb-shell {
   font-size: 13.5px;
 }
 
-/* 01 · Mosaic: justified rows that keep every image's aspect ratio. */
+/* Playground: the gallery with a sticky panel of options beside it. */
 
+.playground {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  align-items: start;
+  gap: 24px;
+  padding: 24px var(--fb-gutter) 40px;
+}
+
+/* Justified rows that keep every image's aspect ratio. */
 .mosaic {
   display: flex;
   flex-wrap: wrap;
@@ -196,12 +217,13 @@ main.fb-shell {
 
 .mosaic fluidbox-item {
   position: relative;
-  flex: var(--ratio) 1 calc(var(--ratio) * clamp(120px, 18vw, 210px));
+  flex: var(--ratio) 1 calc(var(--ratio) * clamp(120px, 16vw, 200px));
 }
 
 .mosaic [slot="trigger"] {
   overflow: hidden;
   border-radius: var(--fb-image-radius);
+  background: var(--fb-surface-2);
 }
 
 .mosaic img {
@@ -212,30 +234,185 @@ main.fb-shell {
   object-fit: cover;
 }
 
-.mosaic__label {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  padding: 3px 7px;
+/* Sticks below the header while the gallery scrolls past, and stops with the section. */
+.controls {
+  position: sticky;
+  top: calc(var(--fb-header-height) + 16px);
+  display: grid;
+  gap: 18px;
+  padding: 16px;
   border: 1px solid var(--fb-line);
   background: var(--fb-bg);
-  color: var(--fb-fg);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.06);
+  accent-color: var(--fb-fg);
+  font-size: 13.5px;
+}
+
+.controls fieldset {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.controls legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 500;
+}
+
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls input:is([type="radio"], [type="checkbox"]) {
+  margin: 0;
+}
+
+.controls .controls__field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 8px;
+  color: var(--fb-muted);
+}
+
+.controls__field select {
+  min-width: 0;
+  font: inherit;
+}
+
+.controls__field input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+}
+
+.controls__field:has(:disabled) {
+  opacity: 0.5;
+}
+
+.controls output {
   font-family: var(--fb-font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0;
-  transition: opacity 150ms ease-out;
+  font-size: 12px;
+}
+
+/* Viewer options the panel turns on. The viewer sits in a body-level portal, so these hang off the root. */
+
+:root[data-backdrop="blur"] {
+  --fluidbox-backdrop-background: color-mix(in srgb, var(--fb-bg) 55%, transparent);
+  --fluidbox-backdrop-filter: blur(24px) saturate(1.6);
+}
+
+/* The sheet reads its photo mode off the dialog, so the override goes there. */
+:root:is([data-sheet-photo="fit"], [data-sheet-photo="round"]) [data-fluidbox-dialog] {
+  --fluidbox-sheet-photo: fit;
+}
+
+/* The corners round in step with the sheet, so they ride its scroll timeline,
+   and the photo keeps clear of the top and sides to show them. */
+:root[data-sheet-photo="round"] [data-fluidbox-dialog] {
+  --fluidbox-sheet-fit-inset: 16px;
+}
+
+:root[data-sheet-photo="round"] [data-fluidbox-dialog] [data-fluidbox-frame] {
+  border-radius: calc(var(--fluidbox-sheet-progress, 0) * 24px);
+}
+
+.info-toggle {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  translate: -50% 0;
+  min-height: var(--fb-control-height);
+  padding: 0 16px;
+  border: 1px solid var(--fb-line-strong);
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  pointer-events: auto;
+  /* Gives way as the sheet comes in, as the filmstrip does. */
+  opacity: calc(1 - var(--fluidbox-sheet-progress, 0) * 3 - var(--fluidbox-sheet-dismiss, 0) * 3);
+}
+
+[data-fluidbox-dialog][data-sheet-raised] .info-toggle {
   pointer-events: none;
 }
 
-.mosaic fluidbox-item:hover .mosaic__label,
-.mosaic fluidbox-item:focus-within .mosaic__label {
-  opacity: 1;
+[data-fluidbox-dialog][data-filmstrip] .info-toggle {
+  bottom: calc(var(--fluidbox-filmstrip-space) + 4px);
 }
 
-.mosaic fluidbox-item:not([data-fluidbox-state="closed"]) .mosaic__label {
-  opacity: 0;
+/* A floating sheet: the runtime's sheet is a clear frame and the card inside
+   keeps clear of every edge, so no sheet colour runs under the toolbar. */
+[data-fluidbox-dialog]:has(.info-card) {
+  --fluidbox-sheet-background: transparent;
+  --fluidbox-sheet-max-width: 520px;
+  /* The card covers little of the photo, so the photo stays, as in iOS Photos. */
+  --fluidbox-sheet-fade: 0;
+}
+
+[data-fluidbox-sheet]:has(> .info-card) {
+  overflow: visible;
+  padding-inline: 12px;
+  box-shadow: none;
+}
+
+.info-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 20px 20px;
+  background: var(--fb-bg);
+  color: var(--fb-fg);
+  box-shadow:
+    0 0 0 1px var(--fb-line),
+    0 12px 40px rgb(0 0 0 / 0.28);
+}
+
+.info-card__grabber {
+  justify-self: center;
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--fb-line-strong);
+}
+
+.info-card h3 {
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+.info-card__credit {
+  margin: 0;
+  color: var(--fb-muted);
+}
+
+.info-card__credit a {
+  color: var(--fb-fg);
+}
+
+.info-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.info-card dt {
+  color: var(--fb-faint);
+}
+
+.info-card dd {
+  margin: 0;
+  font-family: var(--fb-font-mono);
 }
 
 /* Indexed source */
@@ -691,6 +868,14 @@ main.fb-shell {
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
+  }
+  .playground {
+    grid-template-columns: 1fr;
+  }
+  .controls {
+    position: static;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    box-shadow: none;
   }
   .hero__copy {
     border-right: 0;

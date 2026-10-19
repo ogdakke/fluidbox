@@ -1,6 +1,6 @@
 import { mountSite } from "../src/site";
-import type { FluidboxGalleryElement, FluidboxItemElement } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
+import type { FluidboxGalleryElement, FluidboxItemElement } from "@ogdakke/fluidbox/elements";
 import "./site.css";
 
 mountSite("fixtures", {
@@ -16,7 +16,11 @@ for (let index = 0; index < 10; index++) {
   const item = document.createElement("fluidbox-item") as FluidboxItemElement;
   item.setAttribute("item-id", `item-${index}`);
   item.dataset.index = String(index);
-  if (index === 2) item.dataset.previewMore = "";
+  // The teaser stands in for the items behind it, which have no trigger of their own.
+  if (index === 2) {
+    item.dataset.previewMore = "";
+    item.setAttribute("returns", Array.from({ length: 7 }, (_, i) => `item-${i + 3}`).join(" "));
+  }
   if (index > 2) item.dataset.previewHidden = "";
   const trigger = document.createElement("button");
   trigger.type = "button";
@@ -27,7 +31,7 @@ for (let index = 0; index < 10; index++) {
   image.width = 600;
   image.height = 400;
   trigger.append(image);
-  item.append(trigger);
+  if (index <= 2) item.append(trigger);
   if (index === 2) {
     const overlay = document.createElement("span");
     overlay.dataset.fluidboxTransitionLayer = "";
@@ -61,59 +65,44 @@ style.textContent = `
 `;
 document.head.append(style);
 
-void gallery.whenReady().then((controller) => {
+void gallery.whenReady().then((fluidbox) => {
   const teaser = gallery.querySelector<FluidboxItemElement>("[data-preview-more]")!;
   teaser.dataset.fluidboxDynamicPreview = "";
-  const preview = teaser.trigger.querySelector("img")!;
+  const preview = teaser.trigger!.querySelector("img")!;
   const initialSrc = preview.src;
   const hidden = [...gallery.querySelectorAll<FluidboxItemElement>("[data-preview-hidden]")];
   const hiddenSources = new Map(
-    hidden.map((item) => [item.itemId, item.trigger.querySelector("img")!.src]),
+    hidden.map((item) => [item.itemId, imageSource(Number(item.dataset.index))]),
   );
   const hiddenIds = new Set(hiddenSources.keys());
-  const showPreview = (id: string, updateOpenItem = true) => {
+  const showPreview = (id: string) => {
     preview.src = hiddenSources.get(id) ?? initialSrc;
-    if (updateOpenItem) teaser.openItemId = id;
   };
-  controller.registerOrigin([teaser.itemId, ...hiddenIds], {
-    trigger: teaser.trigger,
-    visual: teaser.trigger,
-    thumbnail: preview,
-    prepareClose: (item) => {
-      if (hiddenIds.has(item.id)) showPreview(item.id, false);
+  teaser.addEventListener("fluidbox-preview-change", (event) => showPreview(event.detail.id));
+  const overlay = teaser.querySelector<HTMLElement>("[data-fluidbox-transition-layer]")!;
+  fluidbox.bindOverlay(overlay, [teaser.itemId, ...hiddenIds], {
+    frameLayer: overlay,
+    travel({ target }) {
+      target.style.setProperty("--fluidbox-transition-content-opacity", "1");
+      const label = overlay.querySelector<HTMLElement>("[data-collapsed-label]")!;
+      const marker = document.createComment("collapsed-label");
+      label.before(marker);
+      label.dataset.fluidboxCounterScale = "";
+      target.append(label);
+      return () => {
+        delete label.dataset.fluidboxCounterScale;
+        marker.replaceWith(label);
+      };
     },
   });
-  const overlay = teaser.querySelector<HTMLElement>("[data-fluidbox-transition-layer]")!;
-  for (const id of [teaser.itemId, ...hiddenIds]) {
-    controller.registerThumbnailOverlay(id, {
-      behavior: "travel",
-      element: overlay,
-      frameLayer: overlay,
-      renderer: {
-        mount({ target }) {
-          target.style.setProperty("--fluidbox-transition-content-opacity", "1");
-          const label = overlay.querySelector<HTMLElement>("[data-collapsed-label]")!;
-          const marker = document.createComment("collapsed-label");
-          label.before(marker);
-          label.dataset.fluidboxCounterScale = "";
-          target.append(label);
-          return () => {
-            delete label.dataset.fluidboxCounterScale;
-            marker.replaceWith(label);
-          };
-        },
-      },
-    });
-  }
   let closingId: string | null = null;
   let lastClosedId = teaser.itemId;
-  controller.subscribe((state) => {
-    const id = state.requestedId ?? state.activeId;
+  fluidbox.subscribe((state) => {
+    const id = state.id;
     if (state.status === "closing" && id && hiddenIds.has(id)) closingId = id;
     if (state.status === "closed") {
       if (closingId) {
         lastClosedId = closingId;
-        showPreview(lastClosedId);
         closingId = null;
       }
       delete teaser.dataset.previewConcealed;

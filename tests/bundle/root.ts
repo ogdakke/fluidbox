@@ -1,16 +1,14 @@
-import { arraySource } from "@ogdakke/fluidbox";
+import { createFluidbox, type FluidboxItem } from "@ogdakke/fluidbox";
 
-export { createFluidbox, registerFluidboxElements } from "@ogdakke/fluidbox";
+export { createFluidbox };
 
-export const source = arraySource([
+export const items: FluidboxItem[] = [
   {
     id: "bundle-fixture",
-    media: {
-      type: "image",
-      src: "/fixture.jpg",
-      alt: "Bundle fixture",
-      width: 1,
-      height: 1,
-    },
+    type: "img",
+    src: "/fixture.jpg",
+    alt: "Bundle fixture",
+    width: 1,
+    height: 1,
   },
-]);
+];

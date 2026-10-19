@@ -482,6 +482,12 @@ kbd,
   line-height: 1.7;
 }
 
+/* The highlighter writes an inline background; code sits on the panel's surface. */
+.fb-code pre.highlights,
+.landing-install.highlights {
+  background: var(--fb-surface) !important;
+}
+
 /* Images used as gallery thumbnails keep the shared image radius. */
 
 .fb-thumb {
