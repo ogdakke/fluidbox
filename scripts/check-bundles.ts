@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { frameworkPeers, measureEntry, peerFor, sizeOf, type Size } from "./bundle-size";
+import { measureEntry, peerFor, sizeOf, type frameworkPeers, type Size } from "./bundle-size";
 
 const entrypoints = [
   "root",

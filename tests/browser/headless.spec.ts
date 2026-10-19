@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 
 test("plain runtime opens, navigates, composes controls, and closes without custom elements", async ({
   page,
@@ -469,7 +469,7 @@ test("plain runtime keeps the preview available while a failed full image is ret
 }) => {
   const fullImageRoute = "**/retry-full.svg";
   await page.route(fullImageRoute, (route) => route.abort("failed"));
-  const serveFullImage = (route: import("@playwright/test").Route) =>
+  const serveFullImage = (route: Route) =>
     route.fulfill({
       contentType: "image/svg+xml",
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="green"/></svg>',

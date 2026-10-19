@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { FluidboxGalleryElement, FluidboxItemElement } from "@ogdakke/fluidbox/elements";
 
 test("custom gallery exposes fluidbox readiness and cancels a disconnected waiter", async ({
   page,
@@ -6,14 +7,9 @@ test("custom gallery exposes fluidbox readiness and cancels a disconnected waite
   await page.goto("/harness.html");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   const result = await page.evaluate(async () => {
-    const existing =
-      document.querySelector<import("@ogdakke/fluidbox/elements").FluidboxGalleryElement>(
-        "fluidbox-gallery",
-      )!;
+    const existing = document.querySelector<FluidboxGalleryElement>("fluidbox-gallery")!;
     const fluidbox = await existing.whenReady();
-    const pending = document.createElement(
-      "fluidbox-gallery",
-    ) as import("@ogdakke/fluidbox/elements").FluidboxGalleryElement;
+    const pending = document.createElement("fluidbox-gallery") as FluidboxGalleryElement;
     document.body.append(pending);
     const cancelled = pending.whenReady().catch((error: DOMException) => error.name);
     pending.remove();
@@ -28,10 +24,7 @@ test("changes inside a trigger don't re-read the items; changes to an item do", 
   await page.goto("/harness.html");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   const calls = await page.evaluate(async () => {
-    const gallery =
-      document.querySelector<import("@ogdakke/fluidbox/elements").FluidboxGalleryElement>(
-        "fluidbox-gallery",
-      )!;
+    const gallery = document.querySelector<FluidboxGalleryElement>("fluidbox-gallery")!;
     const fluidbox = await gallery.whenReady();
     const original = fluidbox.setItems.bind(fluidbox);
     let refreshes = 0;
@@ -39,10 +32,7 @@ test("changes inside a trigger don't re-read the items; changes to an item do", 
       refreshes++;
       return original(items);
     };
-    const preview =
-      gallery.querySelector<import("@ogdakke/fluidbox/elements").FluidboxItemElement>(
-        "fluidbox-item",
-      )!;
+    const preview = gallery.querySelector<FluidboxItemElement>("fluidbox-item")!;
     // An album cover swapping its picture, as a close flight lands on another item.
     const image = preview.trigger!.querySelector("img")!;
     image.src = "/art/canyon.svg";

@@ -26,12 +26,15 @@ import type {
   FluidboxExtension,
   FluidboxExtensionInstance,
   FluidboxItem,
+  FluidboxItemId,
   FluidboxOrigin,
   FluidboxPortalRenderer,
   FluidboxRenderer,
   FluidboxSource,
+  FluidboxThumbnailOverlayRegistration,
   FluidboxZoomOptions,
 } from "./runtime-types";
+import type { FluidboxZoom } from "./fluidbox-zoom";
 import type {
   ViewerSessionCloseContext,
   ViewerSessionDriver,
@@ -192,8 +195,8 @@ export class DomViewerDriver<
     () => this.#commitWheelDismiss(),
   );
   #zoomOptions: Required<FluidboxZoomOptions> | undefined;
-  #zoom: import("./fluidbox-zoom").FluidboxZoom | undefined;
-  #zoomLoad: Promise<import("./fluidbox-zoom").FluidboxZoom | undefined> | undefined;
+  #zoom: FluidboxZoom | undefined;
+  #zoomLoad: Promise<FluidboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
   #returnFocusFallback: HTMLElement | null = null;
   #viewportWidth = 0;
@@ -428,8 +431,8 @@ export class DomViewerDriver<
   }
 
   registerThumbnailOverlay(
-    id: import("./runtime-types").FluidboxItemId,
-    registration: import("./runtime-types").FluidboxThumbnailOverlayRegistration<TItem>,
+    id: FluidboxItemId,
+    registration: FluidboxThumbnailOverlayRegistration<TItem>,
   ) {
     return this.#thumbnailOverlays.register(id, registration);
   }
