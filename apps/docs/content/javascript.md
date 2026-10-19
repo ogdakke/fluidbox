@@ -71,9 +71,9 @@ Returns a `Fluidbox`. Only `items` is required.
 | `renderers` | `Record<string, FluidboxRenderer<TItem>>`                 | `{}`                                  | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                   |
 | `zoom`      | `false \| { step?: number; max?: number }`                | `{ step: 2, max: 4 }`                 | `step` is the scale of a double-tap or double-click; `max` the largest scale. `false` turns zoom off.                                       |
 | `labels`    | `Partial<FluidboxLabels>`                                 | English                               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                       |
-| `filmstrip` | `boolean \| { render?, slots? }`                          | `false`                               | A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"` and `filmstrip.css`.                                                        |
+| `filmstrip` | `boolean \| { render? }`                                  | `false`                               | A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"` and `filmstrip.css`.                                                        |
 | `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and `sheet.css`.                                                           |
-| `origins`   | `FluidboxOriginAdapter`                                   |                                       | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
+| `origins`   | `FluidboxOriginAdapter<TItem>`                            |                                       | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
 
 To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip` or `sheet`, call `update`; the open viewer stays open. To change the items, call `setItems`. `renderers` is looked up by name each time a custom slide mounts, and `origins` on each use.
 

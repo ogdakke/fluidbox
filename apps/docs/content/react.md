@@ -169,7 +169,7 @@ The viewer makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.s
 </Fluidbox.Sheet>
 ```
 
-`Fluidbox.SheetStop` takes `stop` and button attributes, and moves the sheet to that stop. It is a button with `data-fluidbox-sheet-stop`, which works anywhere in the viewer.
+`Fluidbox.SheetStop` takes `stop` and button attributes, and moves the sheet to that stop, or back to 0 when it is there. It is a button with `data-fluidbox-sheet-stop`, which works anywhere in the viewer.
 
 ## Hooks
 

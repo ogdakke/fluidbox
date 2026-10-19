@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Binding live options</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/fixtures/binding-live.ts"></script>
+  </head>
+  <body>
+    <main class="fb-shell binding-live-page">
+      <header class="page-head">
+        <p class="fb-label">Binding live options</p>
+        <h1>Live labels, a viewer part and a frame layer</h1>
+        <p>
+          One album cover per framework (<code>?framework=react</code>, <code>solid</code>,
+          <code>vue</code>, <code>angular</code>, <code>javascript</code> or <code>elements</code>).
+          Its count flies with a frame layer, and <code>window.__live</code> changes the labels and
+          the viewer part while it is open.
+        </p>
+      </header>
+      <div id="live"></div>
+    </main>
+  </body>
+</html>

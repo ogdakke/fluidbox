@@ -113,11 +113,11 @@ The default slot gets the `useFluidbox()` object: the state and the commands. Us
 
 ### `Fluidbox.Trigger`
 
-| Prop       | Type                                     | Default | Purpose                                                                                  |
-| ---------- | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------- |
-| `item`     | `TItem \| number \| string`              |         | Required. The item to open, or its index or id. It closes back onto this trigger.        |
-| `returns`  | `readonly (TItem \| number \| string)[]` |         | More items that close back onto this trigger, as for an album cover. May include `item`. |
-| `as-child` | `boolean`                                | `false` | Decorate the one child of the slot instead of rendering a `<button>`.                    |
+| Prop       | Type                               | Default | Purpose                                                                                  |
+| ---------- | ---------------------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `item`     | `FluidboxTarget<TItem>`            |         | Required. The item to open, or its index or id. It closes back onto this trigger.        |
+| `returns`  | `readonly FluidboxTarget<TItem>[]` |         | More items that close back onto this trigger, as for an album cover. May include `item`. |
+| `as-child` | `boolean`                          | `false` | Decorate the one child of the slot instead of rendering a `<button>`.                    |
 
 An item's id is its `id`, else its `src`. Other attributes and listeners go to the button, or to the child with `as-child`. The rendered button gets `type="button"` unless you set `type`.
 
@@ -167,10 +167,10 @@ No props. Being there turns the filmstrip on. Without a slot, each thumbnail is 
 
 ### `Fluidbox.Sheet` and `Fluidbox.SheetStop`
 
-| Prop          | Type                                               | Default              | Purpose                                                  |
-| ------------- | -------------------------------------------------- | -------------------- | -------------------------------------------------------- |
-| `snap-points` | `readonly (number \| "${number}%" \| "content")[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
-| `dismiss`     | `"flight" \| "scroll" \| "none"`                   | `"flight"`           | What a swipe down on the photo does with the sheet down. |
+| Prop          | Type                                | Default              | Purpose                                                  |
+| ------------- | ----------------------------------- | -------------------- | -------------------------------------------------------- |
+| `snap-points` | `readonly FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
+| `dismiss`     | `"flight" \| "scroll" \| "none"`    | `"flight"`           | What a swipe down on the photo does with the sheet down. |
 
 Being there turns the sheet on. The runtime makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`, and the part's own attributes (`class`, `style`, `data-*`, `aria-*`) go on that section. Its default slot is the section's content for the active item, and gets `{ item, index }` (`FluidboxItemContext`). To read or move the sheet, listen for `@sheetchange` on Root, use a `SheetStop`, or call `useFluidboxSheet()` in a component inside Root: its `stop` is where the sheet rests, 0 at rest and then one per snap point, and `set(stop)` moves it. Import `@ogdakke/fluidbox/sheet.css` once. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
 

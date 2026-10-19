@@ -239,5 +239,8 @@ export function bindTrigger<TItem extends FluidboxItem = FluidboxItem>(
 export function frameLayerOf(overlay: HTMLElement): HTMLElement | undefined {
   return overlay.matches("[data-fluidbox-frame-layer]")
     ? overlay
-    : (overlay.querySelector<HTMLElement>("[data-fluidbox-frame-layer]") ?? undefined);
+    : // The still copy a flight leaves on the card is never the layer itself.
+      (overlay.querySelector<HTMLElement>(
+        "[data-fluidbox-frame-layer]:not([data-fluidbox-ghost])",
+      ) ?? undefined);
 }

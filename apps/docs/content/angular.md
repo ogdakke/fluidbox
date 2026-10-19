@@ -129,16 +129,16 @@ The events are the plain API's: see [Events](./javascript.md#events) for their f
 
 Exported as `fluidboxTrigger`.
 
-| Input             | Type                                     | Purpose                                                                                           |
-| ----------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `fluidboxTrigger` | `TItem \| number \| string`              | Required. The item to open: the item, its index or its id.                                        |
-| `fluidboxReturns` | `readonly (TItem \| number \| string)[]` | More items that close back onto this trigger, as for an album cover. The opened item always does. |
+| Input             | Type                               | Purpose                                                                                           |
+| ----------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `fluidboxTrigger` | `FluidboxTarget<TItem>`            | Required. The item to open: the item, its index or its id.                                        |
+| `fluidboxReturns` | `readonly FluidboxTarget<TItem>[]` | More items that close back onto this trigger, as for an album cover. The opened item always does. |
 
-| Member    | Type                                             | Purpose                                                                                                                                                                                               |
-| --------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preview` | `Signal<FluidboxTriggerPreview<TItem>>`          | `{ item, index, status }`: the item the trigger shows. That is the item the viewer is on while it is open, then the last one it showed. `item` is `null` when the trigger's items have left the list. |
-| `target`  | `Signal<TItem \| number \| string>`              | The item it opens.                                                                                                                                                                                    |
-| `returns` | `Signal<readonly (TItem \| number \| string)[]>` | The other items that return here.                                                                                                                                                                     |
+| Member    | Type                                       | Purpose                                                                                                                                                                                               |
+| --------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preview` | `Signal<FluidboxTriggerPreview<TItem>>`    | `{ item, index, status }`: the item the trigger shows. That is the item the viewer is on while it is open, then the last one it showed. `item` is `null` when the trigger's items have left the list. |
+| `target`  | `Signal<FluidboxTarget<TItem>>`            | The item it opens.                                                                                                                                                                                    |
+| `returns` | `Signal<readonly FluidboxTarget<TItem>[]>` | The other items that return here.                                                                                                                                                                     |
 
 The directive adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to its element, gives a `<button>` without a `type` `type="button"`, and starts loading the item on pointer down. Put it on an element that can take focus, such as a `<button>` or `<a href>`. A trigger that shows the last viewed item opens on it again, so the flight starts from the picture on it.
 
@@ -203,7 +203,7 @@ No inputs. `<ng-container fluidboxFilmstrip />` turns on the strip with its defa
 | `snapPoints` | `readonly FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
 | `dismiss`    | `"flight" \| "scroll" \| "none"`    | `"flight"`           | What a swipe down on the photo does with the sheet down. |
 
-The template renders into the sheet, the viewer's `<section data-fluidbox-sheet>` named by `labels.sheet`, for the active item, with the context `let-item let-index="index"` (`FluidboxItemContext`). It renders again when the item changes. `(sheetChange)` on the root, and the `stop` signal of `injectFluidboxSheet()`, follow its stop. `<button fluidboxSheetStop="1">`, in the viewer or in the sheet, moves the sheet to stop 1. [Filmstrip and sheet](./filmstrip-and-sheet.md) has the details of both add-ons.
+The template renders into the sheet, the viewer's `<section data-fluidbox-sheet>` named by `labels.sheet`, for the active item, with the context `let-item let-index="index"` (`FluidboxItemContext`). It renders again when the item changes. `(sheetChange)` on the root, and the `stop` signal of `injectFluidboxSheet()`, follow its stop. `<button fluidboxSheetStop="1">`, in the viewer or in the sheet, moves the sheet to stop 1, and back to 0 when it is there. An `ng-template` has no attributes to pass on, so style the sheet through `[data-fluidbox-sheet]`, or put your class on an element in the template. [Filmstrip and sheet](./filmstrip-and-sheet.md) has the details of both add-ons.
 
 ## Inject functions
 

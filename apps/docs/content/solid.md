@@ -108,8 +108,8 @@ All parts are properties of the `Fluidbox` object.
 
 | Prop       | Type                                                                         | Default    | Purpose                                                                                  |
 | ---------- | ---------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
-| `item`     | `TItem \| string \| number`                                                  |            | Required. The item to open, its id or its index.                                         |
-| `returns`  | `readonly (TItem \| string \| number)[]`                                     |            | More items that close back onto this trigger, as for an album cover. `item` always does. |
+| `item`     | `FluidboxTarget<TItem>`                                                      |            | Required. The item to open, its id or its index.                                         |
+| `returns`  | `readonly FluidboxTarget<TItem>[]`                                           |            | More items that close back onto this trigger, as for an album cover. `item` always does. |
 | `as`       | `ValidComponent`                                                             | `"button"` | The element or component to render instead of a button, such as `"a"`.                   |
 | `ref`      | `HTMLElement \| (element: HTMLElement) => void`                              |            | The rendered element.                                                                    |
 | `children` | `JSX.Element \| (preview: Accessor<{ item, index, status }>) => JSX.Element` |            | Content, or a function of the preview that follows the viewer.                           |
@@ -134,7 +134,9 @@ The trigger adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-exp
 
 It must be inside a `Fluidbox.Trigger`, and registers for that trigger's `item` and `returns`. It gets `data-fluidbox-phase` as the viewer opens and closes. With `travel`, the children render again, live, in the flying frame, under the same context.
 
-`Fluidbox.FrameLayer` goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbox-frame-layer>` with its children and span attributes. For the flight the element itself moves into the flying frame and scales with it, as a scrim or a border does, then goes back; the frame's live copy of the overlay leaves it out, so it never shows twice.
+### `Fluidbox.FrameLayer`
+
+It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbox-frame-layer>` with its children and span attributes. For the flight the element itself moves into the flying frame and scales with it, as a scrim or a border does, then goes back; the frame's live copy of the overlay leaves it out, so it never shows twice.
 
 ```tsx
 <Fluidbox.ThumbnailOverlay travel class="badge">

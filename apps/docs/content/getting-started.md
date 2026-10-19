@@ -52,7 +52,7 @@ One viewer for the whole list, and a trigger for each thumbnail. Pick your frame
 
 <!-- pattern: basic -->
 
-The examples import `photos` and `label` from a local `./data` module; see [the example data](./patterns/index.md#the-example-data). Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own; then the `controls` option, the `Controls` part or `<fluidbox-controls>` keeps them.
+The examples import `photos` from a local `./data` module, see [the example data](./patterns/index.md#the-example-data), and `itemLabel` (an item's `alt` or `title`) from `@ogdakke/fluidbox`. Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own; then the `controls` option, the `Controls` part or `<fluidbox-controls>` keeps them.
 
 ## Framework setup
 
@@ -65,14 +65,14 @@ The examples import `photos` and `label` from a local `./data` module; see [the 
 | Custom elements  | `@ogdakke/fluidbox/elements` | none                                |
 | Plain JavaScript | `@ogdakke/fluidbox`          | none                                |
 
-Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Filmstrip` and `Sheet` turn those add-ons on by being there. `useFluidbox()` reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md).
+Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Filmstrip` and `Sheet` turn those add-ons on by being there. `useFluidbox()` (`injectFluidbox()` in Angular) reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md).
 
 - **Custom elements.** `<fluidbox-gallery>` with `<fluidbox-item>` children. See [Custom elements](./custom-elements.md).
 - **Plain JavaScript.** `createFluidbox()`, and `fluidbox.bind()` for each trigger. See [JavaScript](./javascript.md).
 
 ## Add-ons
 
-The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. Import the entry once, anywhere in the browser bundle, before you turn the add-on on:
+The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. The framework `Filmstrip` and `Sheet` parts load their entry themselves, and so does `<fluidbox-gallery>` for a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child. With `createFluidbox()`, import the entry once, anywhere in the browser bundle, before you turn the add-on on:
 
 ```ts
 import "@ogdakke/fluidbox/filmstrip";
@@ -81,7 +81,7 @@ import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
 ```
 
-Turning one on without its import throws an `Error` that names the import. `<fluidbox-gallery>` loads the entries itself for a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child; each still needs its stylesheet, `filmstrip.css` or `sheet.css`. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
+Turning one on in `createFluidbox()` without its import throws an `Error` that names the import. Each needs its stylesheet, `filmstrip.css` or `sheet.css`, whichever way you turn it on. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
 
 ## Server rendering
 

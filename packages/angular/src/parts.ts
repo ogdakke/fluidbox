@@ -183,6 +183,8 @@ export class FluidboxThumbnailOverlayComponent<TItem extends FluidboxItem = Flui
   #bound: readonly unknown[] = [];
   #release: (() => void) | undefined;
   #stop: (() => void) | undefined;
+  /** The fluidboxFrameLayer inside, which stays the same while it flies. */
+  #layer: HTMLElement | undefined;
 
   /** Renders the content into the flying frame, without its frame layer. */
   readonly #travel: FluidboxRenderer<TItem> = ({ target }) =>
@@ -218,13 +220,22 @@ export class FluidboxThumbnailOverlayComponent<TItem extends FluidboxItem = Flui
     this.#release?.();
   }
 
+  /** For fluidboxFrameLayer: the element that flies, or `undefined` when it goes. */
+  setFrameLayer(layer: HTMLElement | undefined): void {
+    this.#layer = layer;
+  }
+
   #bind(): void {
     const trigger = this.#trigger!;
     const element = this.#element.nativeElement;
     const target = trigger.target();
     const returns = trigger.returns();
     const travel = !this.travel ? false : this.content ? this.#travel : true;
-    const frameLayer = this.travel ? frameLayerOf(element) : undefined;
+    // While the layer flies it is out of the overlay, so a lookup finds nothing;
+    // the bound one, still in the page, is in the flying frame and stays.
+    const bound = this.#bound[1];
+    const flying = bound instanceof HTMLElement && bound.isConnected ? bound : undefined;
+    const frameLayer = this.travel ? (this.#layer ?? frameLayerOf(element) ?? flying) : undefined;
     // Overlays are found by id when they bind, so new items bind them again.
     const key = [travel, frameLayer, this.#root.fluidbox.items, ...targetKeys(target, returns)];
     if (sameKeys(key, this.#bound)) return;
@@ -251,9 +262,19 @@ export class FluidboxThumbnailOverlayComponent<TItem extends FluidboxItem = Flui
     "[style.display]": "travelling ? 'none' : null",
   },
 })
-export class FluidboxFrameLayerDirective {
+export class FluidboxFrameLayerDirective implements OnInit, OnDestroy {
   /** In the flying copy, where the moved original stands in for it. */
   protected readonly travelling = inject(TRAVELLING, { optional: true }) ?? false;
+  readonly #overlay = inject(FluidboxThumbnailOverlayComponent, { optional: true });
+  readonly #element = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  ngOnInit(): void {
+    if (!this.travelling) this.#overlay?.setFrameLayer(this.#element.nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    if (!this.travelling) this.#overlay?.setFrameLayer(undefined);
+  }
 }
 
 /**
