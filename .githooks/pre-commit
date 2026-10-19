@@ -1,14 +1,38 @@
 #!/usr/bin/env bash
 set -eu
 
+# Formats the staged content, not the working files, so a commit of some hunks
+# keeps the others out of the index.
 cd "$(git rev-parse --show-toplevel)"
+root=$PWD
 mapfile -d '' staged_files < <(git diff --cached --name-only -z --diff-filter=ACMR)
 
 if ((${#staged_files[@]} == 0)); then
   exit 0
 fi
 
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+
+# Copy the staged blobs, with the formatter's config and ignore files, into a
+# scratch tree and format them there.
+git checkout-index --prefix="$scratch/" -- "${staged_files[@]}"
+for config in .oxfmtrc.json .gitignore .prettierignore; do
+  [[ -f $config ]] && cp "$config" "$scratch/$config"
+done
+
 echo "Formatting staged files..."
-./node_modules/.bin/oxfmt "${staged_files[@]}"
-git add -- "${staged_files[@]}"
+(cd "$scratch" && "$root/node_modules/.bin/oxfmt" --no-error-on-unmatched-pattern "${staged_files[@]}")
+
+for file in "${staged_files[@]}"; do
+  read -r mode staged_blob _ < <(git ls-files -s -- "$file")
+  formatted_blob=$(git hash-object -w -- "$scratch/$file")
+  [[ $formatted_blob == "$staged_blob" ]] && continue
+
+  git update-index --cacheinfo "$mode,$formatted_blob,$file"
+  # A fully staged file also gets the formatting in the working tree.
+  if [[ $(git hash-object -- "$file") == "$staged_blob" ]]; then
+    cp "$scratch/$file" "$file"
+  fi
+done
 echo "Code formatted and staged."
