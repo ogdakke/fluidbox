@@ -1,5 +1,6 @@
 import "@ogdakke/fluidbox/elements";
 import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/filmstrip.css";
 import { mountChrome } from "@ogdakke/fluidbox-design/chrome";
 import { loaders, pages } from "virtual:docs-pages";
 import "./docs.css";

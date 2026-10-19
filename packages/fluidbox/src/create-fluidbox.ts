@@ -370,7 +370,7 @@ class FluidboxRuntime<TItem extends FluidboxItem> extends EventTarget implements
     // A part still holding a destroyed fluidbox, as after a rebuild, does nothing.
     if (this.#lifetime.signal.aborted) return Promise.resolve(false);
     const session = this.#session;
-    const settings = { reason, signal: options.signal };
+    const settings = { reason, signal: options.signal, scrub: options.scrub };
     if (name !== "open") return session[name](settings).then(happened);
     const goal = this.#target(target ?? this.state.index ?? 0);
     const status = session.state.status;

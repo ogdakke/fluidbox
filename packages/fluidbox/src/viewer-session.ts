@@ -25,6 +25,8 @@ export interface ViewerSessionMotionContext<TItem extends FluidboxItem = Fluidbo
   readonly origin: FluidboxOrigin | null;
   readonly signal: AbortSignal;
   readonly reason: SessionChangeReason;
+  /** The move follows a continuous input, so the slide jumps rather than glides. */
+  readonly scrub?: boolean;
 }
 
 export interface ViewerSessionCloseContext {
@@ -72,15 +74,11 @@ const aborted = (): SessionCommandResult => ({ status: "aborted" });
 
 /** The strip asks with {@link ViewerSession.allows} first, so its commands skip the before-event. */
 export function viewerSelectionCommandOptions(reason: SessionReason, settled: boolean) {
-  return { reason, __fluidboxSettled: settled, __fluidboxApproved: true };
+  return { reason, scrub: !settled, __fluidboxApproved: true };
 }
 
 function selectionCommandApproved(options: SessionCommandOptions) {
   return (options as SessionCommandOptions & { __fluidboxApproved?: boolean }).__fluidboxApproved;
-}
-
-function selectionCommandSettled(options: SessionCommandOptions) {
-  return (options as SessionCommandOptions & { __fluidboxSettled?: boolean }).__fluidboxSettled;
 }
 
 function stateFor<TItem extends FluidboxItem>(
@@ -363,7 +361,7 @@ export class ViewerSession<
     const key = `${this.#state.status === "open" ? "select" : "open"}:${idOf(item)}`;
     const repeated = this.#samePending(key, options.signal);
     if (repeated) {
-      if (selectionCommandSettled(options)) {
+      if (options.scrub === false) {
         return repeated.then((result) => {
           if (result.status === "completed" && this.#state.activeId === idOf(item)) {
             this.#requestReveal(idOf(item), index, "selection");
@@ -386,7 +384,7 @@ export class ViewerSession<
     const enteringOpening = this.#state.status !== "opening";
     const changed = this.#state.activeIndex !== index || opening;
     if (!changed && this.#state.status === "open") {
-      if (selectionCommandSettled(options)) {
+      if (options.scrub === false) {
         this.#requestReveal(idOf(item), index, "selection");
       }
       return Promise.resolve(completed(false));
@@ -406,6 +404,7 @@ export class ViewerSession<
       origin: this.#origins.get(idOf(item)),
       signal: operation.controller.signal,
       reason,
+      scrub: options.scrub,
     };
     this.#origins.hideThumbnail(idOf(item));
     if (opening) this.#revealedId = idOf(item);
@@ -417,7 +416,7 @@ export class ViewerSession<
         this.#publish("open", index, index);
         this.#emit({ type: "status-change", status: "open" });
       }
-      if (selectionCommandSettled(options) !== false) {
+      if (!options.scrub) {
         this.#requestReveal(idOf(item), index, opening ? "open" : "selection");
       }
       this.#emitSelection("selection-settle", index, reason);

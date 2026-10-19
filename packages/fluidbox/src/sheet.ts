@@ -225,6 +225,8 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     this.#owned = document.createElement("section");
     this.#owned.dataset.fluidboxSheet = "";
     this.#owned.dataset.fluidboxChrome = "";
+    // Its text scrolls and selects natively, and its keys are its own.
+    this.#owned.dataset.fluidboxOwnsInput = "";
     this.#label = context.labels.sheet;
     this.#owned.setAttribute("aria-label", this.#label);
     this.slot.append(this.#owned);
@@ -1114,7 +1116,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     if (
       this.#raised &&
       !this.slot.contains(target) &&
-      !target?.closest("button, a[href], input, select, textarea, [data-fluidbox-filmstrip]")
+      !target?.closest("button, a[href], input, select, textarea, [data-fluidbox-owns-input]")
     ) {
       event.preventDefault();
       event.stopPropagation();

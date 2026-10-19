@@ -63,7 +63,7 @@ interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
 | `renderers` | `{}`                    | Draws `custom` items, by the name in their `render`.                                                                                                                 |
 | `viewer`    |                         | Draws your own controls and captions into the viewer, once.                                                                                                          |
 | `controls`  | `true` without `viewer` | Adds the default buttons: `true` for all, or a list of `"previous"`, `"next"` and `"close"`.                                                                         |
-| `filmstrip` | `false`                 | A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"`.                                                                                                     |
+| `filmstrip` | `false`                 | A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"` and `filmstrip.css`.                                                                                 |
 | `sheet`     | `false`                 | A panel over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and `@ogdakke/fluidbox/sheet.css`.                                                                  |
 | `origins`   |                         | Finds origins for items no trigger is bound to. See [Origins](#origins).                                                                                             |
 
@@ -101,6 +101,9 @@ interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends EventTarge
 type FluidboxTarget<TItem extends FluidboxItem = FluidboxItem> = number | string | TItem;
 interface FluidboxCommandOptions {
   readonly signal?: AbortSignal;
+  // A move that follows a continuous input: no glide, and the page isn't
+  // scrolled to the trigger until a move with scrub: false.
+  readonly scrub?: boolean;
 }
 ```
 
@@ -215,10 +218,10 @@ class FluidboxSheetEvent extends Event {
   readonly reason: FluidboxReason;
 }
 
-type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "filmstrip" | "items";
+type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items";
 ```
 
-The before-events fire synchronously for every command that would do something, whether it comes from a key, a gesture or your code; `preventDefault()` cancels it, and its promise resolves `false`. For an open, the order is `beforetoggle`, `toggle`, `itemchange`, then after the flight `settle`. `"items"` is a move made by `setItems`. A `sheetchange` from a swipe or a scroll of the sheet has the reason `"pointer"`, from a wheel `"wheel"`, from Escape or a key on a stop button `"keyboard"`, and from `sheet.set` or the viewer opening and closing `"api"`. [Events](./javascript.md#events) lists what each reason comes from.
+The before-events fire synchronously for every command that would do something, whether it comes from a key, a gesture or your code; `preventDefault()` cancels it, and its promise resolves `false`. For an open, the order is `beforetoggle`, `toggle`, `itemchange`, then after the flight `settle`. `"items"` is a move made by `setItems`. A move from the filmstrip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`. A `sheetchange` from a swipe or a scroll of the sheet has the reason `"pointer"`, from a wheel `"wheel"`, from Escape or a key on a stop button `"keyboard"`, and from `sheet.set` or the viewer opening and closing `"api"`. [Events](./javascript.md#events) lists what each reason comes from.
 
 ## Items
 
@@ -400,11 +403,13 @@ The framework roots take the same object as a `labels` prop, and `<fluidbox-gall
 
 ## Add-ons
 
-Import an add-on's entry once to make its option work. Each entry exports only its types.
+Import an add-on's entry once to make its option work, and its stylesheet. Each entry exports only its types.
 
 ```ts
 import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/filmstrip.css";
 import "@ogdakke/fluidbox/sheet";
+import "@ogdakke/fluidbox/sheet.css";
 ```
 
 ```ts

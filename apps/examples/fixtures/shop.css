@@ -689,11 +689,13 @@
 
 @media (min-width: 900px) {
   /* No side insets: those narrow the slide strip, and the slides should
-     cross the whole window. The filmstrip's band along the bottom is the
-     room the arrows sit in. */
+     cross the whole window. The bottom inset is the band the arrows sit in.
+     The filmstrip runs as a column down the left, over the slides. */
   [data-fluidbox-dialog]:has(.shop-viewer) {
     --fluidbox-stage-top: 32px;
+    --fluidbox-stage-bottom: 80px;
     --fluidbox-slide-gap: 48px;
+    --fluidbox-filmstrip-axis: y;
     --fluidbox-filmstrip-item-size: 56px;
     --fluidbox-filmstrip-gap: 10px;
     --fluidbox-filmstrip-item-radius: 2px;

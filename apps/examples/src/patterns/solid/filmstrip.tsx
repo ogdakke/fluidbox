@@ -3,6 +3,7 @@
 import { For } from "solid-js";
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/solid";
+import "@ogdakke/fluidbox/filmstrip.css";
 import { photos } from "../shared";
 
 function Thumbnails() {

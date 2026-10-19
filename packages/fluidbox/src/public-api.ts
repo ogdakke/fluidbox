@@ -187,14 +187,7 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
 }
 
 /** What made something happen. "items" is a change of the item list. */
-export type FluidboxReason =
-  | "api"
-  | "trigger"
-  | "keyboard"
-  | "pointer"
-  | "wheel"
-  | "filmstrip"
-  | "items";
+export type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items";
 
 export type FluidboxToggleState = "open" | "closed";
 
@@ -352,6 +345,12 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
 
 export interface FluidboxCommandOptions {
   readonly signal?: AbortSignal;
+  /**
+   * A move that follows a continuous input, as a thumbnail strip being
+   * scrubbed: the slide jumps rather than glides, and the page is not
+   * scrolled to the item's trigger. End the scrub with `scrub: false`.
+   */
+  readonly scrub?: boolean;
 }
 
 export interface FluidboxBindOptions<TItem extends FluidboxItem = FluidboxItem> {

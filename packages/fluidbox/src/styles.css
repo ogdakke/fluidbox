@@ -68,15 +68,6 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   transition: opacity 180ms linear;
 }
 
-@keyframes fluidbox-filmstrip-appear {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 @keyframes fluidbox-gallery-controls-appear {
   from {
     opacity: 0;
@@ -409,16 +400,6 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: none;
 }
 
-/* Filmstrip defaults. :where() keeps them at zero specificity, so a rule of
-   yours on the dialog wins in any order. The strip is the thumbnails plus 6px
-   above and below; the space adds 10px either side of it and the safe area. */
-:where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
-  --fluidbox-filmstrip-item-size: 52px;
-  --fluidbox-filmstrip-gap: 5px;
-  --fluidbox-filmstrip-space: calc(
-    var(--fluidbox-filmstrip-item-size) + 32px + env(safe-area-inset-bottom, 0px)
-  );
-}
 /* Every dialog fills the viewport. A dialog that shrinks to its media would
    clip the opening and closing flights to the media's column. */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog] {
@@ -431,14 +412,6 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   height: 100%;
   max-width: none;
   max-height: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery][data-filmstrip] {
-  --fluidbox-content-height: calc(
-    var(--fluidbox-height, 100svh) - var(--fluidbox-filmstrip-space) - var(--fluidbox-stage-top) -
-      var(--fluidbox-stage-bottom)
-  );
-  position: relative;
 }
 /* Optional space between slides (--fluidbox-slide-gap, 0 by default). Each
    slide carries half the gap on both sides; the strip is one gap wider than
@@ -495,160 +468,6 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   [data-fluidbox-slide][aria-hidden="true"] {
   opacity: 0;
   visibility: hidden;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery][data-filmstrip]
-  [data-fluidbox-slides] {
-  height: var(--fluidbox-content-height);
-  min-height: 0;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery][data-filmstrip][data-dismissing]
-  [data-fluidbox-slides] {
-  height: 100%;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-dock] {
-  position: absolute;
-  z-index: 5;
-  inset-inline: 0;
-  bottom: 0;
-  height: var(--fluidbox-filmstrip-space);
-  min-width: 0;
-  overflow: hidden;
-  background: transparent;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
-  position: relative;
-  inset-inline: 0;
-  align-self: start;
-  margin-block-start: 10px;
-  height: calc(var(--fluidbox-filmstrip-item-size) + 12px);
-  overflow: hidden;
-  touch-action: pan-x;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  will-change: transform, opacity;
-  opacity: 1;
-  transform: none;
-  transition:
-    opacity var(--fluidbox-filmstrip-zoom-duration, 180ms) linear,
-    transform var(--fluidbox-filmstrip-zoom-duration, 180ms) ease-out;
-}
-:where([data-fluidbox-overlay][data-fluidbox-prepared]) [data-fluidbox-filmstrip] {
-  visibility: hidden;
-  pointer-events: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery][data-opening]
-  [data-fluidbox-filmstrip] {
-  opacity: 0;
-  transition-property: transform;
-  pointer-events: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery][data-opening][data-filmstrip-revealing]
-  [data-fluidbox-filmstrip] {
-  visibility: visible;
-  animation: fluidbox-filmstrip-appear 180ms linear var(--fluidbox-filmstrip-reveal-delay, 210ms)
-    both;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery]:is([data-dismissing], [data-fluidbox-status="closing"])
-  [data-fluidbox-filmstrip] {
-  opacity: 0;
-  transform: translateY(var(--fluidbox-filmstrip-zoom-travel, 18px));
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
-    transition-duration: 0ms;
-    animation-duration: 0ms;
-    animation-delay: 0ms;
-  }
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery][data-zoomed]
-  [data-fluidbox-filmstrip] {
-  /* these override the inline styles. todo: find better way */
-  opacity: 0 !important;
-  transform: translateY(var(--fluidbox-filmstrip-zoom-travel, 18px)) !important;
-  pointer-events: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery][data-zoomed]
-  [data-fluidbox-filmstrip-dock] {
-  pointer-events: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-scroll] {
-  display: flex;
-  gap: var(--fluidbox-filmstrip-gap);
-  height: 100%;
-  /* Half the window less half a thumbnail, so the first and last centre. */
-  padding-inline: calc(50vw - var(--fluidbox-filmstrip-item-size) / 2);
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scroll-padding-inline: calc(50vw - var(--fluidbox-filmstrip-item-size) / 2);
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-  touch-action: pan-x;
-  overflow-anchor: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-filmstrip-scroll]::-webkit-scrollbar {
-  display: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-track] {
-  position: relative;
-  flex: 0 0 auto;
-  height: 100%;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] {
-  all: unset;
-  position: absolute;
-  box-sizing: border-box;
-  width: var(--fluidbox-filmstrip-item-size);
-  height: var(--fluidbox-filmstrip-item-size);
-  margin-block: 6px;
-  overflow: hidden;
-  border-radius: var(--fluidbox-filmstrip-item-radius, 3px);
-  opacity: 0.58;
-  scroll-snap-align: center;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  transition: opacity 120ms linear;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-filmstrip-item][aria-selected="true"] {
-  opacity: 1;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-filmstrip-item]:focus-visible {
-  outline: 2px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: -2px;
-}
-@media (hover: none) and (pointer: coarse) {
-  :where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
-    --fluidbox-filmstrip-item-size: 38px;
-    --fluidbox-filmstrip-gap: 3px;
-    --fluidbox-filmstrip-space: calc(
-      var(--fluidbox-filmstrip-item-size) + 30px + env(safe-area-inset-bottom, 0px)
-    );
-  }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
-    margin-block-start: 8px;
-  }
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-frame] {
   position: relative;

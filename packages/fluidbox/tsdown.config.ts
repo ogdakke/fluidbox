@@ -20,6 +20,8 @@ export default defineConfig({
     { from: "src/styles.css.d.ts", to: "dist", rename: "styles.css.d.ts" },
     { from: "src/sheet.css", to: "dist", rename: "sheet.css" },
     { from: "src/styles.css.d.ts", to: "dist", rename: "sheet.css.d.ts" },
+    { from: "src/filmstrip.css", to: "dist", rename: "filmstrip.css" },
+    { from: "src/styles.css.d.ts", to: "dist", rename: "filmstrip.css.d.ts" },
   ],
   // publint and attw run in scripts/build.ts once the framework bindings are copied in.
 });

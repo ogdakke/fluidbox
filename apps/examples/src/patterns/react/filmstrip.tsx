@@ -1,6 +1,7 @@
 // #region example
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
+import "@ogdakke/fluidbox/filmstrip.css";
 import { photos } from "../shared";
 
 function Thumbnails() {

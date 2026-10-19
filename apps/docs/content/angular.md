@@ -20,7 +20,7 @@ import { FluidboxModule, injectFluidbox, injectFluidboxSheet } from "@ogdakke/fl
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Add `@ogdakke/fluidbox/styles.css` once, either as an import or in the `styles` array of `angular.json`. Put `FluidboxModule` in a component's `imports` to get every part, or import the directives you use one by one. The filmstrip and sheet parts load their add-ons the first time a root uses them, so there is nothing else to import for them, except the sheet's stylesheet, `@ogdakke/fluidbox/sheet.css`.
+Add `@ogdakke/fluidbox/styles.css` once, either as an import or in the `styles` array of `angular.json`. Put `FluidboxModule` in a component's `imports` to get every part, or import the directives you use one by one. The filmstrip and sheet parts load their add-ons the first time a root uses them, so there is nothing else to import for them except their stylesheets, `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 

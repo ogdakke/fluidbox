@@ -219,8 +219,8 @@
   opacity: 0.25;
 }
 
-/* Choreography: the arrows go once the sheet is up, the filmstrip gives way,
-   and the photo fades rather than shrink to a stamp past the first stop. Set
+/* Choreography: the arrows go once the sheet is up, and the photo fades
+   rather than shrink to a stamp past the first stop. Set
    --fluidbox-sheet-fade: 0 to keep it. */
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host]
@@ -258,18 +258,13 @@
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-sheet-raised]
-  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-filmstrip-dock]) {
+  :is([data-fluidbox-previous], [data-fluidbox-next]) {
   pointer-events: none;
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host]
   [data-fluidbox-slide] {
   opacity: calc(1 - var(--fluidbox-sheet-expand) * var(--fluidbox-sheet-fade, 1));
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-fluidbox-sheet-host]
-  [data-fluidbox-filmstrip-dock] {
-  opacity: calc(1 - var(--fluidbox-sheet-progress) * 3 - var(--fluidbox-sheet-dismiss) * 3);
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host]

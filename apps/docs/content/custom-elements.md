@@ -184,7 +184,7 @@ The viewer's layer is filled by the first of these that exists:
 
 ## Filmstrip and sheet
 
-A `<fluidbox-filmstrip>` child turns the filmstrip on, and a `<fluidbox-sheet>` child the sheet. The gallery loads their add-on code itself, so you don't import `@ogdakke/fluidbox/filmstrip` or `/sheet`; the sheet still needs `@ogdakke/fluidbox/sheet.css`.
+A `<fluidbox-filmstrip>` child turns the filmstrip on, and a `<fluidbox-sheet>` child the sheet. The gallery loads their add-on code itself, so you don't import `@ogdakke/fluidbox/filmstrip` or `/sheet`; each still needs its stylesheet, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
 
 | `<fluidbox-sheet>` attribute | What it does                                                                           |
 | ---------------------------- | -------------------------------------------------------------------------------------- |

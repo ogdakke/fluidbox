@@ -20,7 +20,7 @@ import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/react
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. The filmstrip and the sheet are parts of the binding: render `Fluidbox.Filmstrip` or `Fluidbox.Sheet` and they are on. The sheet also needs `@ogdakke/fluidbox/sheet.css`.
+Import `@ogdakke/fluidbox/styles.css` once in your app. The filmstrip and the sheet are parts of the binding: render `Fluidbox.Filmstrip` or `Fluidbox.Sheet` and they are on. Each needs its stylesheet too: `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 

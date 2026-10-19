@@ -97,7 +97,7 @@ The overlay and the dialog both carry the viewer's state:
 | `data-dragging`                       | A drag to dismiss is under way.             |
 | `data-dismissing`                     | Closing, or a drag to dismiss is under way. |
 
-The dialog alone also has `data-zoomed` while an image is zoomed, `data-gallery` when there is more than one item, and `data-filmstrip` while a filmstrip is docked.
+The dialog alone also has `data-zoomed` while an image is zoomed, and `data-gallery` when there is more than one item. Style a dialog that holds a filmstrip with `[data-fluidbox-dialog]:has([data-fluidbox-filmstrip])`.
 
 ```css
 [data-fluidbox-dialog][data-zoomed] .caption {

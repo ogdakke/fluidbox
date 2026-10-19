@@ -16,11 +16,13 @@
     "./src/sheet-entry.ts",
     "./src/styles.css",
     "./src/sheet.css",
+    "./src/filmstrip.css",
     "./dist/elements.js",
     "./dist/filmstrip.js",
     "./dist/sheet.js",
     "./dist/styles.css",
-    "./dist/sheet.css"
+    "./dist/sheet.css",
+    "./dist/filmstrip.css"
   ],
   "exports": {
     ".": {
@@ -66,6 +68,10 @@
     "./sheet.css": {
       "types": "./dist/sheet.css.d.ts",
       "default": "./dist/sheet.css"
+    },
+    "./filmstrip.css": {
+      "types": "./dist/filmstrip.css.d.ts",
+      "default": "./dist/filmstrip.css"
     }
   },
   "scripts": {

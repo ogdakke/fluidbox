@@ -2,6 +2,7 @@
 import { Component } from "@angular/core";
 import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
+import "@ogdakke/fluidbox/filmstrip.css";
 import { photos } from "../shared";
 
 @Component({

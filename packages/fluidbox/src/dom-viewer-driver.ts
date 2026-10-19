@@ -60,6 +60,10 @@ const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
 const WHEEL_HANDOFF_TIMEOUT = 1200;
+/** Keys that close a gallery when pressed outside content that owns its input. */
+const verticalKeys = new Set(["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown"]);
+/** Keys that move through items: the viewer's own, or a strip's that owns its input. */
+const navigationKeys = new Set([...verticalKeys, "ArrowLeft", "ArrowRight"]);
 const FOCUSABLE_HOST_SELECTOR =
   "[tabindex], a[href], button, input, select, textarea, summary, video[controls], audio[controls], iframe";
 
@@ -231,7 +235,7 @@ export class DomViewerDriver<
           event.target === this.#portal.container ||
           (event.target instanceof Element &&
             !!event.target.closest("[data-fluidbox-slide]") &&
-            !event.target.closest("[data-fluidbox-frame], [data-fluidbox-filmstrip]"))
+            !event.target.closest("[data-fluidbox-frame]"))
         ) {
           void this.#controller?.close({ reason: "pointer" });
         }
@@ -600,13 +604,6 @@ export class DomViewerDriver<
       `${controlsRevealDelay}ms`,
     );
     this.#portal.dialog.dataset.chromeRevealing = "";
-    if (this.#portal.dialog.hasAttribute("data-filmstrip")) {
-      this.#portal.dialog.style.setProperty(
-        "--fluidbox-filmstrip-reveal-delay",
-        `${controlsRevealDelay}ms`,
-      );
-      this.#portal.dialog.dataset.filmstripRevealing = "";
-    }
     this.#synchronizeStart(animations);
     delete this.#portal.overlay.dataset.fluidboxPrepared;
     // Safari can paint a freshly shown image a frame late. The opening starts
@@ -619,7 +616,6 @@ export class DomViewerDriver<
     );
     if (context.signal.aborted) return;
     await Promise.all([
-      this.#waitForFilmstripReveal(context.signal),
       this.#waitForGalleryControlsReveal(context.signal),
       this.#waitForChromeReveal(context.signal),
       this.#waitForAnimation(controlsReveal, context.signal),
@@ -632,8 +628,6 @@ export class DomViewerDriver<
     this.#thumbnailOverlays.finishControlsReveal();
     delete this.#portal.dialog.dataset.galleryControlsRevealing;
     this.#portal.dialog.style.removeProperty("--fluidbox-gallery-controls-reveal-delay");
-    delete this.#portal.dialog.dataset.filmstripRevealing;
-    this.#portal.dialog.style.removeProperty("--fluidbox-filmstrip-reveal-delay");
     delete this.#portal.dialog.dataset.chromeRevealing;
     this.#portal.dialog.style.removeProperty("--fluidbox-chrome-reveal-delay");
     this.#focusUnlessInside();
@@ -659,17 +653,15 @@ export class DomViewerDriver<
     // touch gesture to its midpoint and discard the browser's momentum.
     if (!selected) {
       const smooth =
-        !this.#prefersReducedMotion() &&
-        context.reason !== "source-update" &&
-        context.reason !== "filmstrip";
+        !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
       await this.#strip?.select(context.index, smooth);
     }
     this.#render(context.item, context.index);
     // The overlay is invisible while open. Moving it between slide frames
     // during native scrolling can invalidate the browser's painted snap.
-    // Filmstrip movement is a direct preview scrub. The full-size image swaps
-    // immediately while native scrolling continues under the user's finger.
-    if (selected || context.reason === "filmstrip") return;
+    // A scrub is a direct preview. The full-size image swaps immediately
+    // while native scrolling continues under the user's finger.
+    if (selected || context.scrub) return;
   }
 
   async close(context: ViewerSessionCloseContext) {
@@ -1066,16 +1058,6 @@ export class DomViewerDriver<
       this.#portal.overlay.style.setProperty(property, value);
       this.#themeProperties.add(property);
     }
-  }
-
-  async #waitForFilmstripReveal(signal: AbortSignal) {
-    const filmstrip = this.#portal.dialog.querySelector<HTMLElement>("[data-fluidbox-filmstrip]");
-    const animation = filmstrip
-      ?.getAnimations()
-      .find(
-        (candidate) => (candidate as CSSAnimation).animationName === "fluidbox-filmstrip-appear",
-      );
-    await this.#waitForAnimation(animation, signal);
   }
 
   async #waitForGalleryControlsReveal(signal: AbortSignal) {
@@ -1801,8 +1783,6 @@ export class DomViewerDriver<
     if (state === "closed") {
       delete this.#portal.dialog.dataset.galleryControlsRevealing;
       this.#portal.dialog.style.removeProperty("--fluidbox-gallery-controls-reveal-delay");
-      delete this.#portal.dialog.dataset.filmstripRevealing;
-      this.#portal.dialog.style.removeProperty("--fluidbox-filmstrip-reveal-delay");
       delete this.#portal.dialog.dataset.chromeRevealing;
       this.#portal.dialog.style.removeProperty("--fluidbox-chrome-reveal-delay");
     }
@@ -1821,6 +1801,13 @@ export class DomViewerDriver<
     if (this.#extensions.some((extension) => extension.keydown?.(event))) {
       event.preventDefault();
       event.stopPropagation();
+    } else if (
+      navigationKeys.has(event.key) &&
+      event.target instanceof Element &&
+      event.target.closest("[data-fluidbox-owns-input]")
+    ) {
+      // Content that owns its input, as a filmstrip, moves with these itself.
+      return;
     } else if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
@@ -1857,10 +1844,7 @@ export class DomViewerDriver<
       const next = controls[nextIndex];
       if (next) next.focus({ preventScroll: true });
       else this.#focus();
-    } else if (
-      (this.#controller?.state.count ?? 0) > 1 &&
-      ["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown"].includes(event.key)
-    ) {
+    } else if ((this.#controller?.state.count ?? 0) > 1 && verticalKeys.has(event.key)) {
       void this.#controller?.close({ reason: "keyboard" });
     } else if (
       event.key === "ArrowRight" &&
@@ -1905,7 +1889,7 @@ export class DomViewerDriver<
         (target) =>
           target instanceof HTMLElement &&
           target.matches(
-            `${includeMedia ? "video, audio, " : ""}iframe, input, select, textarea, button, summary, a[href], [contenteditable], [data-fluidbox-filmstrip], [data-fluidbox-sheet]`,
+            `${includeMedia ? "video, audio, " : ""}iframe, input, select, textarea, button, summary, a[href], [contenteditable], [data-fluidbox-owns-input]`,
           ),
       );
   }

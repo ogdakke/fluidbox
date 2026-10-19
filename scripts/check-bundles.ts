@@ -39,11 +39,11 @@ const initialGzipLimits: Record<Entry, number> = {
   solid: 36_300,
   vue: 32_900,
   angular: 33_100,
-  filmstrip: 3_300,
+  filmstrip: 3_600,
   sheet: 7_400,
   kit: 2_600,
 };
-const cssGzipLimit = 5_600;
+const cssGzipLimit = 4_800;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 36_800,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
@@ -52,7 +52,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   solid: 40_700,
   vue: 37_300,
   angular: 37_500,
-  filmstrip: 3_300,
+  filmstrip: 3_600,
   sheet: 7_400,
   kit: 2_600,
 };
@@ -63,7 +63,7 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   solid: 46_100,
   vue: 42_700,
   angular: 42_900,
-  filmstrip: 8_750,
+  filmstrip: 5_700,
   sheet: 10_550,
   kit: 8_000,
 };
@@ -92,8 +92,9 @@ if (
 }
 const jsonPath = jsonIndex === -1 ? null : process.argv[jsonIndex + 1];
 const css = sizeOf(await readFile("packages/fluidbox/dist/styles.css"));
-// The sheet ships its own stylesheet on top of the base one.
+// The sheet and the filmstrip ship their own stylesheets on top of the base one.
 const sheetCss = sizeOf(await readFile("packages/fluidbox/dist/sheet.css"));
+const filmstripCss = sizeOf(await readFile("packages/fluidbox/dist/filmstrip.css"));
 const tsdownInfo = JSON.parse(await readFile("node_modules/tsdown/package.json", "utf8")) as {
   version: string;
 };
@@ -194,7 +195,7 @@ for (const name of entrypoints) {
     }),
     { rawBytes: 0, gzipBytes: 0 },
   );
-  const entryCss = name === "sheet" ? sheetCss : css;
+  const entryCss = name === "sheet" ? sheetCss : name === "filmstrip" ? filmstripCss : css;
   const activationWithCss = {
     rawBytes: activationJs.rawBytes + entryCss.rawBytes,
     gzipBytes: activationJs.gzipBytes + entryCss.gzipBytes,

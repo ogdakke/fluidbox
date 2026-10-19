@@ -34,11 +34,17 @@ test.describe("shop fixture, wide screen", () => {
     await expect.poll(() => shownSlide(page)).toBe(5);
   });
 
-  test("the filmstrip moves the viewer, and the close lands on that card", async ({ page }) => {
+  test("the filmstrip column moves the viewer, and the close lands on that card", async ({
+    page,
+  }) => {
     await load(page);
     await page.locator(".shop-slide").first().click();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
-    await expect(page.locator(dialog)).toHaveAttribute("data-filmstrip");
+    const strip = page.locator("[data-fluidbox-filmstrip-scroll]");
+    await expect(strip).toHaveAttribute("aria-orientation", "vertical");
+    const box = (await strip.boundingBox())!;
+    expect(box.x).toBeLessThan(40);
+    expect(box.height).toBeGreaterThan(box.width * 4);
     await expect(page.locator(".shop-dots")).toBeHidden();
     await page.locator('[data-fluidbox-filmstrip-item][data-index="3"]').click();
     await expect(
@@ -47,6 +53,31 @@ test.describe("shop fixture, wide screen", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
     await expect.poll(() => shownSlide(page)).toBe(3);
+  });
+
+  test("a vertical wheel scrolls the column, and up and down step through it", async ({ page }) => {
+    await load(page);
+    await page.locator(".shop-slide").first().click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    const strip = page.locator("[data-fluidbox-filmstrip-scroll]");
+    const selected = page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]');
+    await expect(selected).toHaveAttribute("data-index", "0");
+    const box = (await strip.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    for (let step = 0; step < 6; step++) await page.mouse.wheel(0, 40);
+    await expect.poll(() => strip.evaluate((element) => element.scrollTop)).toBeGreaterThan(100);
+    await expect(selected).not.toHaveAttribute("data-index", "0");
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    const from = Number(await selected.getAttribute("data-index"));
+    await selected.focus();
+    await page.keyboard.press("ArrowUp");
+    await expect(selected).toHaveAttribute("data-index", String(from - 1));
+    await expect(selected).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(selected).toHaveAttribute("data-index", String(from));
+    await page.keyboard.press("End");
+    await expect(selected).toHaveAttribute("data-index", "6");
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   });
 });
 

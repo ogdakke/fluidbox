@@ -71,7 +71,7 @@ Returns a `Fluidbox`. Only `items` is required.
 | `renderers` | `Record<string, FluidboxRenderer<TItem>>`                 | `{}`                                  | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                   |
 | `zoom`      | `false \| { step?: number; max?: number }`                | `{ step: 2, max: 4 }`                 | `step` is the scale of a double-tap or double-click; `max` the largest scale. `false` turns zoom off.                                       |
 | `labels`    | `Partial<FluidboxLabels>`                                 | English                               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                       |
-| `filmstrip` | `boolean \| { render?, slots? }`                          | `false`                               | A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"`.                                                                            |
+| `filmstrip` | `boolean \| { render?, slots? }`                          | `false`                               | A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"` and `filmstrip.css`.                                                        |
 | `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and `sheet.css`.                                                           |
 | `origins`   | `FluidboxOriginAdapter`                                   |                                       | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
 
@@ -114,7 +114,7 @@ Labels and zoom apply in place. A change of `controls`, `viewer` or the labels d
 
 ### Commands
 
-A target, `FluidboxTarget`, is an index or an id: `open(2)` or `open("photo-fjord")`. `options` is `{ signal?: AbortSignal }`.
+A target, `FluidboxTarget`, is an index or an id: `open(2)` or `open("photo-fjord")`. `options` is `{ signal?: AbortSignal, scrub?: boolean }`. `scrub: true` is for a move that follows a continuous input, as your own scrubber or a dragged row of dots: the slide jumps to the item rather than glide, and the page isn't scrolled to its trigger until you end with a move with `scrub: false`.
 
 Each command returns a promise that settles when the motion has: `open` once the viewer is open, `close` once it is closed, `next` once the slide has moved. It resolves `true` when the command happened, and `false` when it didn't: a listener prevented it, a later command took over, its signal aborted, or there was nothing to do, as `next()` on the last item or `close()` while closed.
 
@@ -151,15 +151,14 @@ Listen with `addEventListener`. The events are typed, so `event.reason` and `eve
 
 `oldState` and `newState` are `"open"` or `"closed"`, as on a popover's toggle events. `reason`, a `FluidboxReason`, says what asked:
 
-| Reason        | From                                                                               |
-| ------------- | ---------------------------------------------------------------------------------- |
-| `"api"`       | Your code: a command, or a default control.                                        |
-| `"trigger"`   | A click on a trigger.                                                              |
-| `"keyboard"`  | The arrow keys and Escape. The page-scrolling keys close the viewer with this too. |
-| `"pointer"`   | A swipe or scroll through the slides, a drag to dismiss, a tap on the backdrop.    |
-| `"wheel"`     | A wheel or trackpad scroll that dismisses the viewer.                              |
-| `"filmstrip"` | A tap or a scrub on the filmstrip.                                                 |
-| `"items"`     | `setItems`, when the new list moved the viewer to another item.                    |
+| Reason       | From                                                                               |
+| ------------ | ---------------------------------------------------------------------------------- |
+| `"api"`      | Your code: a command, or a default control.                                        |
+| `"trigger"`  | A click on a trigger.                                                              |
+| `"keyboard"` | The arrow keys and Escape. The page-scrolling keys close the viewer with this too. |
+| `"pointer"`  | A swipe or scroll through the slides, a drag to dismiss, a tap on the backdrop.    |
+| `"wheel"`    | A wheel or trackpad scroll that dismisses the viewer.                              |
+| `"items"`    | `setItems`, when the new list moved the viewer to another item.                    |
 
 The before-events fire for every command that would do something, whether it comes from a key, a gesture or your code; `close()` while closed or `next()` on the last item fires nothing. For an open, the order is `beforetoggle`, `toggle`, `itemchange`, then after the flight `settle`, and the promise resolves.
 
@@ -269,6 +268,7 @@ The filmstrip and the sheet have their own entries. Import the entry once in the
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/filmstrip.css";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
 

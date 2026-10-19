@@ -78,7 +78,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    double-click the slide image → dialog has `data-zoomed`; Escape twice; open trigger 5 (zoom
    off), double-click → no `data-zoomed`.
 7. **filmstrip** — two galleries of `photos`, in this order: the first with the default
-   filmstrip, the second with your own thumbnails (`filmstrip: { render }`, or the framework's
+   filmstrip (the example imports `@ogdakke/fluidbox/filmstrip.css`, the strip's stylesheet), the second with your own thumbnails (`filmstrip: { render }`, or the framework's
    Filmstrip part with a child) holding
    `<span class="pattern-filmstrip-thumb" data-test="thumb">N</span>` (N = index + 1). The
    strip marks the selected thumbnail button `data-fluidbox-selected`, which patterns.css styles,

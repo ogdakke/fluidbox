@@ -14,6 +14,7 @@ import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/filmstrip";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/filmstrip.css";
 import "@ogdakke/fluidbox/sheet.css";
 
 const fluidbox = createFluidbox({
@@ -31,7 +32,19 @@ The entries register the add-ons on import and are safe to import on the server.
 
 ## Filmstrip
 
-The filmstrip docks a row of thumbnails along the bottom of the viewer when there is more than one item. A tap moves to that item, a drag scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its styles are in `styles.css`.
+The filmstrip is a strip of thumbnails for a gallery of more than one item. A tap moves to that item, a drag or a wheel scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its styles are in `@ogdakke/fluidbox/filmstrip.css`.
+
+The strip is viewer content like your own. It mounts in the viewer's layer, `[data-fluidbox-portal]`, reveals and dismisses with the rest of that layer, and floats over the slides. `filmstrip.css` runs it along the bottom and keeps the photo above it by `--fluidbox-filmstrip-space`; your CSS on `[data-fluidbox-filmstrip-dock]` puts it anywhere else, over the photo or beside it. Set `--fluidbox-filmstrip-space: 0px` when the photo should run under it.
+
+`--fluidbox-filmstrip-axis: y` on the dialog runs it as a column, down the left unless you move it. The add-on reads the axis from CSS, so a media query can turn a phone's row into a wide screen's column. Its listbox carries `aria-orientation`, and a wheel turned either way scrolls it along.
+
+```css
+@media (min-width: 900px) {
+  [data-fluidbox-dialog] {
+    --fluidbox-filmstrip-axis: y;
+  }
+}
+```
 
 `filmstrip: true` draws each item's thumbnail. An object, `FluidboxFilmstripOptions`, changes that:
 
@@ -55,7 +68,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-Each button is a `role="option"` in a listbox named by the `filmstripList` [label](./api.md#labels). It has `data-fluidbox-filmstrip-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name. The dialog gets `data-filmstrip` while a strip is docked. A move from the strip has the reason `"filmstrip"`.
+Each button is a `role="option"` in a listbox named by the `filmstripList` [label](./api.md#labels). It has `data-fluidbox-filmstrip-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name. The strip is a listbox: with a thumbnail focused, the arrow keys along it step through the items, Home and End go to the ends, and focus follows the selection. It is marked `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
 
 `render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Filmstrip` parts render through it: put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
 

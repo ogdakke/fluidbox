@@ -9,7 +9,7 @@ import { Avatar, compact, type Person } from "./social-ui";
 import "./safari-chrome.css";
 import "./shop.css";
 
-mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a filmstrip" });
+mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a filmstrip column" });
 
 // The product: one print in seven photos. Frame options jump to their photo, as in Shop.
 
@@ -715,9 +715,9 @@ function Findings() {
           Instagram and Shop.
         </li>
         <li>
-          <strong>Thumbnail column: gap.</strong> Shop runs its thumbnails down the left. The
-          filmstrip docks only along the bottom, and the library places it, so the viewer keeps the
-          strip there for now.
+          <strong>Thumbnail column: CSS.</strong> The filmstrip is viewer content that the page's
+          CSS places. --fluidbox-filmstrip-axis: y runs it as a column down the left, over slides
+          that cross the whole window; a vertical wheel scrolls it, and up and down step through it.
         </li>
         <li>
           <strong>Placeholders: fits.</strong> Each photo carries a 25-byte ThumbHash, decoded to a

@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
+import "@ogdakke/fluidbox/filmstrip.css";
 import { photos } from "../shared";
 </script>
 

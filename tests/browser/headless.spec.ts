@@ -1162,7 +1162,10 @@ test("the filmstrip option docks thumbnails that navigate the viewer", async ({ 
   await page.evaluate(() => void window.headlessFilmstripViewer.open("one"));
 
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-filmstrip", /.*/);
+  // The strip is viewer content: it mounts in the viewer's layer.
+  await expect(
+    dialog.locator("[data-fluidbox-portal] > [data-fluidbox-filmstrip-dock]"),
+  ).toHaveCount(1);
   const items = page.locator("[data-fluidbox-filmstrip-item]");
   await expect(items.first()).toBeVisible();
   await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveAttribute(

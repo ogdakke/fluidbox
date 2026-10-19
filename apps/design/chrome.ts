@@ -1,5 +1,6 @@
 // Package CSS first so the shared overrides in index.css win on equal specificity.
 import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/filmstrip.css";
 import "./index.css";
 
 export type NavLink = { readonly href: string; readonly label: string; readonly key?: string };

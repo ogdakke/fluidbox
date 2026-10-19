@@ -345,7 +345,7 @@ main.fb-shell {
   pointer-events: none;
 }
 
-[data-fluidbox-dialog][data-filmstrip] .info-toggle {
+[data-fluidbox-dialog]:has([data-fluidbox-filmstrip]) .info-toggle {
   bottom: calc(var(--fluidbox-filmstrip-space) + 4px);
 }
 

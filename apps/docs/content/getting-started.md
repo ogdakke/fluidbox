@@ -23,7 +23,7 @@ The viewer's layout and default look are in one stylesheet. Import it once, in a
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-The sheet add-on has its own stylesheet, `@ogdakke/fluidbox/sheet.css`. Import it only if you use the sheet.
+The filmstrip and sheet add-ons have their own stylesheets, `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`. Import each only if you use that add-on.
 
 ## Describe your items
 
@@ -76,11 +76,12 @@ The filmstrip and the sheet are add-ons with their own entries, so their code lo
 
 ```ts
 import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/filmstrip.css";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
 ```
 
-Turning one on without its import throws an `Error` that names the import. `<fluidbox-gallery>` loads the entries itself for a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child; the sheet still needs `sheet.css`. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
+Turning one on without its import throws an `Error` that names the import. `<fluidbox-gallery>` loads the entries itself for a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child; each still needs its stylesheet, `filmstrip.css` or `sheet.css`. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
 
 ## Server rendering
 

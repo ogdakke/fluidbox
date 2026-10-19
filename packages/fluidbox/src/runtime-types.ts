@@ -29,7 +29,7 @@ export type {
 } from "./public-api";
 import type { FluidboxOrigin, FluidboxOriginAdapter, FluidboxStatus } from "./public-api";
 
-export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "filmstrip";
+export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel";
 
 export type SessionChangeReason = SessionReason | "source-update" | "source-empty";
 
@@ -40,6 +40,8 @@ export type SessionTarget =
 export interface SessionCommandOptions {
   readonly signal?: AbortSignal;
   readonly reason?: SessionReason;
+  /** A move that follows a continuous input; see FluidboxCommandOptions. */
+  readonly scrub?: boolean;
 }
 
 export type SessionCommandResult =

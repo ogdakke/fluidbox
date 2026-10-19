@@ -1,0 +1,215 @@
+/* The filmstrip. It is viewer content like your own: it mounts in the
+   viewer's layer, reveals and dismisses with the rest of it, and floats over
+   the slides. By default it runs along the bottom and keeps the photo clear
+   of itself; move [data-fluidbox-filmstrip-dock] anywhere with your own CSS,
+   and set --fluidbox-filmstrip-axis: y on the dialog to run it as a column.
+   :where() keeps every rule here at zero specificity, so yours win. */
+:where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
+  --fluidbox-filmstrip-axis: x;
+  --fluidbox-filmstrip-item-size: 52px;
+  --fluidbox-filmstrip-gap: 5px;
+  /* The strip is the thumbnails plus 6px either side; the space adds 10px
+     around it and the bottom safe area. */
+  --fluidbox-filmstrip-space: calc(
+    var(--fluidbox-filmstrip-item-size) + 32px + env(safe-area-inset-bottom, 0px)
+  );
+}
+@media (hover: none) and (pointer: coarse) {
+  :where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
+    --fluidbox-filmstrip-item-size: 38px;
+    --fluidbox-filmstrip-gap: 3px;
+    --fluidbox-filmstrip-space: calc(
+      var(--fluidbox-filmstrip-item-size) + 30px + env(safe-area-inset-bottom, 0px)
+    );
+  }
+}
+/* A row keeps the photo above it, by --fluidbox-filmstrip-space; set that to
+   0px to let the photo run under a row you moved. The slides still reach
+   under it, so a swipe or a dismiss is never cut at its edge. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog]:has([data-fluidbox-filmstrip-scroll][aria-orientation="horizontal"]) {
+  --fluidbox-content-height: calc(
+    var(--fluidbox-height, 100svh) - var(--fluidbox-filmstrip-space) - var(--fluidbox-stage-top) -
+      var(--fluidbox-stage-bottom)
+  );
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-dock] {
+  position: absolute;
+  z-index: 5;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--fluidbox-filmstrip-space);
+  min-width: 0;
+  overflow: hidden;
+  background: transparent;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+  /* Where the strip goes as it hides: down off the bottom, or aside. */
+  --fluidbox-filmstrip-hide: translateY(var(--fluidbox-filmstrip-zoom-travel, 18px));
+  position: relative;
+  inset-inline: 0;
+  align-self: start;
+  margin-block-start: 10px;
+  height: calc(var(--fluidbox-filmstrip-item-size) + 12px);
+  overflow: hidden;
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  will-change: transform, opacity;
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--fluidbox-filmstrip-zoom-duration, 180ms) linear,
+    transform var(--fluidbox-filmstrip-zoom-duration, 180ms) ease-out;
+}
+:where([data-fluidbox-overlay][data-fluidbox-prepared]) [data-fluidbox-filmstrip] {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* It gives way as the photo is dismissed, fading with the rest of the
+   viewer's content, and as it is zoomed. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog]:is([data-dismissing], [data-fluidbox-status="closing"])
+  [data-fluidbox-filmstrip] {
+  transform: var(--fluidbox-filmstrip-hide);
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-zoomed]
+  [data-fluidbox-filmstrip] {
+  opacity: 0;
+  transform: var(--fluidbox-filmstrip-hide);
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-zoomed]
+  [data-fluidbox-filmstrip-dock] {
+  pointer-events: none;
+}
+/* And to a sheet as it rises. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-fluidbox-sheet-host]
+  [data-fluidbox-filmstrip-dock] {
+  opacity: calc(1 - var(--fluidbox-sheet-progress) * 3 - var(--fluidbox-sheet-dismiss) * 3);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-sheet-raised]
+  [data-fluidbox-filmstrip-dock] {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+    transition-duration: 0ms;
+  }
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-scroll] {
+  display: flex;
+  gap: var(--fluidbox-filmstrip-gap);
+  height: 100%;
+  /* Half the window less half a thumbnail, so the first and last centre. */
+  padding-inline: calc(50vw - var(--fluidbox-filmstrip-item-size) / 2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: calc(50vw - var(--fluidbox-filmstrip-item-size) / 2);
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  overflow-anchor: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-scroll]::-webkit-scrollbar {
+  display: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-track] {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] {
+  all: unset;
+  position: absolute;
+  box-sizing: border-box;
+  width: var(--fluidbox-filmstrip-item-size);
+  height: var(--fluidbox-filmstrip-item-size);
+  margin-block: 6px;
+  overflow: hidden;
+  border-radius: var(--fluidbox-filmstrip-item-radius, 3px);
+  opacity: 0.58;
+  scroll-snap-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  transition: opacity 120ms linear;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-item][aria-selected="true"] {
+  opacity: 1;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-item]:focus-visible {
+  outline: 2px solid var(--fluidbox-focus-color, currentColor);
+  outline-offset: -2px;
+}
+@media (hover: none) and (pointer: coarse) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
+    margin-block-start: 8px;
+  }
+}
+
+/* A column (--fluidbox-filmstrip-axis: y), down the left by default. It floats
+   over the slides, which still cross the whole window. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-dock]:has([aria-orientation="vertical"]) {
+  inset-block: 0;
+  inset-inline: 0 auto;
+  width: calc(var(--fluidbox-filmstrip-item-size) + 32px);
+  height: auto;
+  padding-inline-start: env(safe-area-inset-left, 0px);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip]:has([aria-orientation="vertical"]) {
+  --fluidbox-filmstrip-hide: translateX(calc(-1 * var(--fluidbox-filmstrip-zoom-travel, 18px)));
+  width: calc(var(--fluidbox-filmstrip-item-size) + 12px);
+  height: 100%;
+  margin: 0 auto;
+  touch-action: pan-y;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-scroll][aria-orientation="vertical"] {
+  flex-direction: column;
+  padding-inline: 0;
+  padding-block: calc(var(--fluidbox-height, 100svh) / 2 - var(--fluidbox-filmstrip-item-size) / 2);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-inline: 0;
+  scroll-padding-block: calc(
+    var(--fluidbox-height, 100svh) / 2 - var(--fluidbox-filmstrip-item-size) / 2
+  );
+  scroll-snap-type: y proximity;
+  touch-action: pan-y;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-scroll][aria-orientation="vertical"]
+  [data-fluidbox-filmstrip-track] {
+  width: 100%;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-scroll][aria-orientation="vertical"]
+  [data-fluidbox-filmstrip-item] {
+  margin-block: 0;
+  margin-inline: 6px;
+}

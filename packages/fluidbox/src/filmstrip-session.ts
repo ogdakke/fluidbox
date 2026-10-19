@@ -1,8 +1,4 @@
-import {
-  FilmstripRuntime,
-  filmstripCommandOptions,
-  type FilmstripLayout,
-} from "./filmstrip-runtime";
+import { FilmstripRuntime, type FilmstripLayout } from "./filmstrip-runtime";
 import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
 import type {
   SessionController,
@@ -27,7 +23,7 @@ export interface FilmstripSessionOptions<TItem extends FluidboxItem = FluidboxIt
   readonly labels: Pick<FluidboxLabels, "filmstrip" | "filmstripList">;
 }
 
-/** Plain DOM filmstrip, used by the custom-element adapter and the filmstrip() extension. */
+/** Plain DOM filmstrip, used by the filmstrip() add-on for every binding and the custom elements. */
 export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   readonly dock: HTMLDivElement;
   readonly element: HTMLDivElement;
@@ -43,6 +39,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   #last = -1;
   #index: number;
   #step = 57;
+  #vertical = false;
 
   constructor(
     ownerDocument: Document,
@@ -60,9 +57,12 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     this.track = ownerDocument.createElement("div");
     this.dock.dataset.fluidboxFilmstripDock = "";
     this.element.dataset.fluidboxFilmstrip = "";
+    // Its touches, wheel and keys scrub the strip, not the viewer.
+    this.element.dataset.fluidboxOwnsInput = "";
     this.element.setAttribute("aria-label", options.labels.filmstrip);
     this.scroller.dataset.fluidboxFilmstripScroll = "";
     this.scroller.setAttribute("role", "listbox");
+    this.scroller.setAttribute("aria-orientation", "horizontal");
     this.scroller.setAttribute("aria-label", options.labels.filmstripList);
     this.track.dataset.fluidboxFilmstripTrack = "";
     this.scroller.append(this.track);
@@ -73,19 +73,31 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
       scroller: this.scroller,
       count: source.count,
       index,
-      onSelect: (nextIndex, settled) => {
+      onSelect: (nextIndex, settled, input) => {
         if (!settled && controller.state.requestedIndex === nextIndex) return;
-        void controller.goTo({ index: nextIndex }, filmstripCommandOptions(settled));
+        void controller.goTo({ index: nextIndex }, { reason: input, scrub: !settled });
       },
       onWindowChange: (center, layout, force) => this.#applyWindow(center, layout, force),
+      onAxisChange: (vertical) => {
+        this.scroller.setAttribute("aria-orientation", vertical ? "vertical" : "horizontal");
+      },
     });
   }
 
   #applyWindow(center: number, layout: FilmstripLayout, force: boolean) {
-    force ||= layout.step !== this.#step;
+    force ||= layout.step !== this.#step || layout.vertical !== this.#vertical;
     this.#step = layout.step;
-    this.track.style.width = `${Math.max(0, this.#source.count * layout.step - (layout.step - layout.size))}px`;
+    this.#vertical = layout.vertical;
+    const length = `${Math.max(0, this.#source.count * layout.step - (layout.step - layout.size))}px`;
+    this.track.style.removeProperty(this.#vertical ? "width" : "height");
+    this.track.style.setProperty(this.#vertical ? "height" : "width", length);
     this.#renderWindow(center, force);
+  }
+
+  /** Put a thumbnail at its place along the strip. */
+  #place(button: HTMLButtonElement, index: number) {
+    button.style.removeProperty(this.#vertical ? "left" : "top");
+    button.style.setProperty(this.#vertical ? "top" : "left", `${index * this.#step}px`);
   }
 
   #makeButton(index: number) {
@@ -98,7 +110,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     button.setAttribute("aria-label", item.type === "img" ? item.alt : item.title);
     button.setAttribute("aria-posinset", String(index + 1));
     button.setAttribute("aria-setsize", String(this.#source.count));
-    button.style.left = `${index * this.#step}px`;
+    this.#place(button, index);
     const request = new AbortController();
     this.#requests.set(index, request);
     if (this.#renderItem) {
@@ -120,7 +132,8 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #renderWindow(center: number, force = false) {
-    const radius = Math.ceil((this.scroller.clientWidth || 800) / this.#step) + 4;
+    const extent = this.#vertical ? this.scroller.clientHeight : this.scroller.clientWidth;
+    const radius = Math.ceil((extent || 800) / this.#step) + 4;
     const first = Math.max(0, center - radius);
     const last = Math.min(this.#source.count - 1, center + radius);
     if (!force && first === this.#first && last === this.#last) return;
@@ -143,7 +156,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     for (let index = first; index <= last; index++) {
       const existing = force ? undefined : previous.get(index);
       const button = existing ?? this.#makeButton(index);
-      button.style.left = `${index * this.#step}px`;
+      this.#place(button, index);
       if (!existing) this.track.insertBefore(button, insertionPoint);
       else insertionPoint = button.nextSibling;
       this.#visible.set(index, button);
@@ -168,6 +181,14 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     if (old) this.#paintButton(old, false);
     const current = this.#visible.get(index);
     if (current) this.#paintButton(current, true);
+    // Focus follows the selection, as in a listbox, while it is in the strip.
+    if (
+      current &&
+      old !== current &&
+      this.element.contains(this.element.ownerDocument.activeElement)
+    ) {
+      current.focus({ preventScroll: true });
+    }
   }
 
   destroy() {

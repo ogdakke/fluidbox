@@ -5,7 +5,10 @@ import type { FluidboxItem, FluidboxSource } from "./runtime-types";
 
 export type { FluidboxFilmstripOptions } from "./public-api";
 
-/** A scrubbable thumbnail strip along the bottom of the viewer, for more than one item. */
+/**
+ * A scrubbable thumbnail strip, for more than one item. It mounts in the
+ * viewer's layer like your own content, and its CSS places it.
+ */
 export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): Addon<null> {
   const renderItem: FilmstripSessionOptions<FluidboxItem>["renderItem"] = options.render;
   return {
@@ -17,9 +20,7 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
         const build = () => {
           session?.destroy();
           session = undefined;
-          const wanted = current.count > 1;
-          dialog.toggleAttribute("data-filmstrip", wanted);
-          if (!wanted) return;
+          if (current.count < 2) return;
           const { requestedIndex, activeIndex } = controller.state;
           session = new FilmstripSession(
             dialog.ownerDocument,
@@ -28,7 +29,7 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
             requestedIndex ?? activeIndex ?? 0,
             { renderItem, labels },
           );
-          dialog.append(session.dock);
+          (dialog.querySelector("[data-fluidbox-portal]") ?? dialog).append(session.dock);
           session.mount();
         };
         build();
@@ -46,7 +47,6 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
           destroy() {
             unsubscribe();
             session?.destroy();
-            dialog.removeAttribute("data-filmstrip");
           },
         };
       },

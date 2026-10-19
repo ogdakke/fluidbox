@@ -20,7 +20,7 @@ import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/solid
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. `Fluidbox.Filmstrip` and `Fluidbox.Sheet` turn their add-ons on themselves; the sheet also needs `@ogdakke/fluidbox/sheet.css`.
+Import `@ogdakke/fluidbox/styles.css` once in your app. `Fluidbox.Filmstrip` and `Fluidbox.Sheet` turn their add-ons on themselves; each needs its stylesheet too, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 

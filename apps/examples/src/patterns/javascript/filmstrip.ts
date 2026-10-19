@@ -1,6 +1,7 @@
 // #region example
 import { createFluidbox, itemLabel, type FluidboxOptions } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/filmstrip.css";
 import { photos } from "../shared";
 
 function gallery(root: HTMLElement, filmstrip: FluidboxOptions["filmstrip"]) {

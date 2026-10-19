@@ -197,12 +197,9 @@ void fluidbox.filmstrip;
 assert<Equal<ReturnType<typeof fluidbox.open>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.close>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.setItems>, Promise<boolean>>>();
-assert<
-  Equal<
-    FluidboxReason,
-    "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "filmstrip" | "items"
-  >
->();
+assert<Equal<FluidboxReason, "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items">>();
+// A scrub is a kind of move, not a source of one.
+void fluidbox.open(1, { scrub: true });
 
 createFluidbox({ items: lazy, controls: true, filmstrip: true, sheet: true, zoom: false });
 // @ts-expect-error items, not a source

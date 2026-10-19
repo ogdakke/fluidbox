@@ -849,20 +849,25 @@ test("native slide swiping survives the browser pointer-cancel handoff", async (
   );
 });
 
-test("opening remains active until the delayed filmstrip reveal settles", async ({ page }) => {
+test("opening remains active until the delayed chrome reveal settles", async ({ page }) => {
   await page.goto("/photo-library.html");
   await page.locator("[data-photo-index]").first().click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  const filmstrip = page.locator("[data-fluidbox-filmstrip]");
-  const paused = await filmstrip.evaluate(async (element) => {
+  // The filmstrip is viewer content, so it reveals with the rest of the chrome.
+  const paused = await page.evaluate(async () => {
     for (let frame = 0; frame < 60; frame += 1) {
-      const animation = element
+      const animations = document
         .getAnimations()
-        .find(
-          (candidate) => (candidate as CSSAnimation).animationName === "fluidbox-filmstrip-appear",
+        .filter(
+          (candidate) =>
+            (candidate as CSSAnimation).animationName === "fluidbox-gallery-controls-appear",
         );
-      if (animation) {
-        animation.pause();
+      const dock = document.querySelector("[data-fluidbox-filmstrip-dock]");
+      if (
+        dock &&
+        animations.some((animation) => (animation.effect as KeyframeEffect | null)?.target === dock)
+      ) {
+        for (const animation of animations) animation.pause();
         return true;
       }
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -872,13 +877,12 @@ test("opening remains active until the delayed filmstrip reveal settles", async 
   expect(paused).toBe(true);
   await page.waitForTimeout(600);
   await expect(dialog).toHaveAttribute("data-fluidbox-status", "opening");
-  await filmstrip.evaluate((element) => {
-    element
-      .getAnimations()
-      .find(
-        (candidate) => (candidate as CSSAnimation).animationName === "fluidbox-filmstrip-appear",
-      )
-      ?.finish();
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) {
+      if ((animation as CSSAnimation).animationName === "fluidbox-gallery-controls-appear") {
+        animation.finish();
+      }
+    }
   });
   await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 });
@@ -891,7 +895,10 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
     document.addEventListener(
       "animationstart",
       (event) => {
-        if ((event as AnimationEvent).animationName === "fluidbox-filmstrip-appear") {
+        if (
+          (event as AnimationEvent).animationName === "fluidbox-gallery-controls-appear" &&
+          (event.target as Element).matches("[data-fluidbox-filmstrip-dock]")
+        ) {
           measurements.starts += 1;
         }
       },
@@ -900,10 +907,10 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
     // The fade is a CSS animation that starts with the reveal attribute, and
     // a stalled frame can play it out unseen, so pause it in that same task.
     new MutationObserver(() => {
-      if (document.querySelector("[data-filmstrip-revealing]")) window.__motion.freeze();
+      if (document.querySelector("[data-chrome-revealing]")) window.__motion.freeze();
     }).observe(document.body, {
       attributes: true,
-      attributeFilter: ["data-filmstrip-revealing"],
+      attributeFilter: ["data-chrome-revealing"],
       subtree: true,
     });
   });
@@ -911,11 +918,12 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
   await page.locator("[data-photo-index]").first().click();
   const measurements = await page.evaluate(async () => {
     const end = await window.__motion.ready();
-    const filmstrip = document.querySelector<HTMLElement>("[data-fluidbox-filmstrip]")!;
+    const filmstrip = document.querySelector<HTMLElement>("[data-fluidbox-filmstrip-dock]")!;
     const fade = filmstrip
       .getAnimations()
       .find(
-        (candidate) => (candidate as CSSAnimation).animationName === "fluidbox-filmstrip-appear",
+        (candidate) =>
+          (candidate as CSSAnimation).animationName === "fluidbox-gallery-controls-appear",
       )!;
     const fadeEnd = Number(fade.effect!.getComputedTiming().endTime);
     const opacity: number[] = [];

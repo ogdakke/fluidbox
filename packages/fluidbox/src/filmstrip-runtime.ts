@@ -2,22 +2,22 @@ export interface FilmstripLayout {
   readonly size: number;
   readonly step: number;
   readonly visibleCount: number;
+  /** The strip runs as a column, from --fluidbox-filmstrip-axis: y. */
+  readonly vertical: boolean;
 }
 
-export function filmstripCommandOptions(settled: boolean) {
-  return {
-    reason: "filmstrip" as const,
-    __fluidboxSettled: settled,
-  };
-}
+/** The input that moved the strip. */
+export type FilmstripInput = "pointer" | "wheel" | "keyboard";
 
 interface FilmstripRuntimeOptions {
   readonly element: HTMLElement;
   readonly scroller: HTMLElement;
   readonly count: number;
   readonly index: number;
-  readonly onSelect: (index: number, settled: boolean) => void;
+  readonly onSelect: (index: number, settled: boolean, input: FilmstripInput) => void;
   readonly onWindowChange: (center: number, layout: FilmstripLayout, force: boolean) => void;
+  /** The axis changed: mark the scroller, so its CSS lays it out that way. */
+  readonly onAxisChange: (vertical: boolean) => void;
   readonly deferActivation?: boolean;
 }
 
@@ -30,6 +30,7 @@ export class FilmstripRuntime {
   readonly #count: number;
   readonly #onSelect: FilmstripRuntimeOptions["onSelect"];
   readonly #onWindowChange: FilmstripRuntimeOptions["onWindowChange"];
+  readonly #onAxisChange: FilmstripRuntimeOptions["onAxisChange"];
   readonly #controller = new AbortController();
   readonly #observer: ResizeObserver;
   #index: number;
@@ -37,6 +38,8 @@ export class FilmstripRuntime {
   #step = 57;
   #padding = 0;
   #viewportWidth = 0;
+  #vertical = false;
+  #input: FilmstripInput = "pointer";
   #mode: ScrollMode = "idle";
   #touching = false;
   #userScrolled = false;
@@ -57,6 +60,7 @@ export class FilmstripRuntime {
     this.#index = options.index;
     this.#onSelect = options.onSelect;
     this.#onWindowChange = options.onWindowChange;
+    this.#onAxisChange = options.onAxisChange;
     this.#deferActivation = options.deferActivation ?? false;
     const { signal } = this.#controller;
     this.#scroller.addEventListener("scroll", this.#onScroll, { passive: true, signal });
@@ -82,11 +86,7 @@ export class FilmstripRuntime {
       passive: true,
       signal,
     });
-    this.#scroller.addEventListener("keydown", this.#onKeyDown, {
-      capture: true,
-      passive: true,
-      signal,
-    });
+    this.#scroller.addEventListener("keydown", this.#onKeyDown, { signal });
     this.#scroller.addEventListener("wheel", this.#onWheel, {
       capture: true,
       passive: false,
@@ -125,11 +125,11 @@ export class FilmstripRuntime {
     return true;
   }
 
-  choose(index: number, settled = true) {
+  choose(index: number, settled = true, input: FilmstripInput = "pointer") {
     this.#index = index;
     this.#publishWindow(index);
     this.#center(index);
-    this.#onSelect(index, settled);
+    this.#onSelect(index, settled, input);
   }
 
   get controlling() {
@@ -177,13 +177,30 @@ export class FilmstripRuntime {
     });
   }
 
+  /** The scroller's length along the strip. */
+  get #extent() {
+    return this.#vertical ? this.#scroller.clientHeight : this.#scroller.clientWidth;
+  }
+
+  get #scrolled() {
+    return this.#vertical ? this.#scroller.scrollTop : this.#scroller.scrollLeft;
+  }
+
   #readGeometry() {
-    this.#viewportWidth = this.#scroller.clientWidth;
     const elementStyle = getComputedStyle(this.#element);
+    // Read from CSS, so a media query can turn the strip into a column.
+    const vertical = elementStyle.getPropertyValue("--fluidbox-filmstrip-axis").trim() === "y";
+    if (vertical !== this.#vertical) {
+      this.#vertical = vertical;
+      this.#onAxisChange(vertical);
+    }
     const scrollerStyle = getComputedStyle(this.#scroller);
+    this.#viewportWidth = this.#extent;
     this.#size = parseFloat(elementStyle.getPropertyValue("--fluidbox-filmstrip-item-size")) || 52;
-    this.#step = this.#size + (parseFloat(scrollerStyle.columnGap) || 0);
-    this.#padding = parseFloat(scrollerStyle.paddingLeft) || 0;
+    const gap = vertical ? scrollerStyle.rowGap : scrollerStyle.columnGap;
+    this.#step = this.#size + (parseFloat(gap) || 0);
+    this.#padding =
+      parseFloat(vertical ? scrollerStyle.paddingTop : scrollerStyle.paddingLeft) || 0;
   }
 
   #publishWindow(center: number, force = false) {
@@ -194,7 +211,8 @@ export class FilmstripRuntime {
       {
         size: this.#size,
         step: this.#step,
-        visibleCount: Math.ceil(this.#scroller.clientWidth / this.#step) * 2 + 9,
+        visibleCount: Math.ceil(this.#extent / this.#step) * 2 + 9,
+        vertical: this.#vertical,
       },
       force,
     );
@@ -226,20 +244,17 @@ export class FilmstripRuntime {
   }
 
   #position(index: number, smooth: boolean) {
-    const left =
-      this.#padding + index * this.#step + this.#size / 2 - this.#scroller.clientWidth / 2;
-    const target = Math.max(
-      0,
-      Math.min(left, this.#scroller.scrollWidth - this.#scroller.clientWidth),
-    );
+    const start = this.#padding + index * this.#step + this.#size / 2 - this.#extent / 2;
+    const length = this.#vertical ? this.#scroller.scrollHeight : this.#scroller.scrollWidth;
+    const target = Math.max(0, Math.min(start, length - this.#extent));
     this.#scroller.scrollTo({
-      left: target,
+      [this.#vertical ? "top" : "left"]: target,
       behavior: smooth ? "smooth" : "instant",
     });
   }
 
   #nearestIndex() {
-    const center = this.#scroller.scrollLeft + this.#scroller.clientWidth / 2;
+    const center = this.#scrolled + this.#extent / 2;
     return Math.max(
       0,
       Math.min(this.#count - 1, Math.round((center - this.#padding - this.#size / 2) / this.#step)),
@@ -250,9 +265,9 @@ export class FilmstripRuntime {
     if (index !== this.#index) {
       this.#index = index;
       this.#publishWindow(index);
-      this.#onSelect(index, false);
+      this.#onSelect(index, false, this.#input);
     }
-    if (settled) this.#onSelect(index, true);
+    if (settled) this.#onSelect(index, true, this.#input);
   }
 
   #onResize = () => {
@@ -314,7 +329,8 @@ export class FilmstripRuntime {
     this.#settleTimer = setTimeout(this.#onSettled, 160);
   };
 
-  #takeControl = () => {
+  #takeControl = (event?: Event) => {
+    this.#input = event?.type === "wheel" ? "wheel" : "pointer";
     this.#clearSettle();
     if (this.#mode !== "user") this.#userScrolled = false;
     this.#mode = "user";
@@ -330,18 +346,37 @@ export class FilmstripRuntime {
     this.#settleTimer = setTimeout(this.#onSettled, 160);
   };
 
+  /** A listbox's keys: the arrows along the strip step, Home and End go to the ends. */
   #onKeyDown = (event: KeyboardEvent) => {
-    if (!/^(Arrow(Left|Right)|Home|End|Page(Up|Down))$/.test(event.key)) return;
-    this.#takeControl();
-    this.#settleAfterFrame();
+    const back = this.#vertical ? "ArrowUp" : "ArrowLeft";
+    const forward = this.#vertical ? "ArrowDown" : "ArrowRight";
+    const target =
+      event.key === back
+        ? this.#index - 1
+        : event.key === forward
+          ? this.#index + 1
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? this.#count - 1
+              : null;
+    if (target === null || event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    const index = Math.max(0, Math.min(this.#count - 1, target));
+    if (index !== this.#index) this.choose(index, true, "keyboard");
   };
 
   #onWheel = (event: WheelEvent) => {
     if (!event.deltaX && !event.deltaY) return;
-    this.#takeControl();
-    if (Math.abs(event.deltaY) > Math.abs(event.deltaX) && event.cancelable) {
+    this.#takeControl(event);
+    // A wheel turned across the strip scrolls it along; one turned along it
+    // scrolls it natively.
+    const across = this.#vertical ? event.deltaX : event.deltaY;
+    const along = this.#vertical ? event.deltaY : event.deltaX;
+    if (Math.abs(across) > Math.abs(along) && event.cancelable) {
       event.preventDefault();
-      this.#scroller.scrollLeft += event.deltaY;
+      if (this.#vertical) this.#scroller.scrollTop += across;
+      else this.#scroller.scrollLeft += across;
     }
     this.#settleAfterFrame();
   };

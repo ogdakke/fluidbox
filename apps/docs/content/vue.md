@@ -20,7 +20,7 @@ import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/vue";
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. Every component is a property of the `Fluidbox` object, so a `<script setup>` template uses `<Fluidbox.Root>`, `<Fluidbox.Trigger>` and so on. To register them globally, name them yourself: `app.component("FluidboxRoot", Fluidbox.Root)`. The `Filmstrip` and `Sheet` parts turn their add-ons on, so there is nothing else to import, except `@ogdakke/fluidbox/sheet.css` for the sheet.
+Import `@ogdakke/fluidbox/styles.css` once in your app. Every component is a property of the `Fluidbox` object, so a `<script setup>` template uses `<Fluidbox.Root>`, `<Fluidbox.Trigger>` and so on. To register them globally, name them yourself: `app.component("FluidboxRoot", Fluidbox.Root)`. The `Filmstrip` and `Sheet` parts turn their add-ons on, so there is nothing else to import except their stylesheets, `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 
