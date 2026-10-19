@@ -1,6 +1,11 @@
 /* The viewer's layout and default look. */
 
-/* Stage insets; registered so zoom reads them as pixels. */
+/**
+ * Insets of the stage the media fits into. Registered `<length>`s, so zoom
+ * reads them as pixels and they can transition.
+ * @input --fluidbox-stage-top --fluidbox-stage-right --fluidbox-stage-bottom --fluidbox-stage-left
+ * @on Dialog
+ */
 @property --fluidbox-stage-top {
   syntax: "<length>";
   inherits: true;
@@ -23,7 +28,9 @@
 }
 
 :root {
+  /** The overlay's `z-index`. @on Overlay */
   --layer-fluidbox: 7;
+  /** The `z-index` of flights and travelling overlays. @on Flight */
   --layer-fluidbox-flight: 8;
 }
 
@@ -39,6 +46,8 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: none;
 }
 
+/** The closed trigger's width. @input --fluidbox-preview-width @on `<fluidbox-item>` trigger */
+/** The closed trigger's height. @input --fluidbox-preview-height @on `<fluidbox-item>` trigger */
 :where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger])) {
   appearance: none;
   box-sizing: border-box;
@@ -100,6 +109,12 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   pointer-events: none;
 }
 
+/**
+ * The copy's opacity during a flight.
+ * @input --fluidbox-transition-content-opacity
+ * @default fades in near the thumbnail
+ * @on Travelling overlay copy
+ */
 [data-fluidbox-transition-content] {
   position: absolute;
   top: var(--fluidbox-transition-top, 0);
@@ -241,6 +256,25 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   opacity: 0 !important;
 }
 
+/**
+ * The backdrop (through `--fluidbox-backdrop-background`), the close button,
+ * error messages.
+ * @input --fluidbox-background
+ * @default `#111`
+ * @theme
+ */
+/** Text and icons. @input --fluidbox-color @default `white` @theme */
+/**
+ * The Previous and Next buttons; the close button on hover.
+ * @input --fluidbox-control-background
+ * @theme
+ */
+/**
+ * Focus rings on the controls, filmstrip items, the dialog and
+ * `<fluidbox-item>` triggers.
+ * @input --fluidbox-focus-color
+ * @theme
+ */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-container] {
   /* At the page's scroll position, never sticky: iOS 26 tints its bars from sticky layers. */
   position: absolute;
@@ -257,6 +291,9 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   color: var(--fluidbox-color, white);
 }
 
+/** The backdrop's `background`. @input --fluidbox-backdrop-background @on Backdrop */
+/** The backdrop's `backdrop-filter`, such as `blur(24px)`. @input --fluidbox-backdrop-filter @on Backdrop */
+/** The backdrop's resting opacity. @input --fluidbox-backdrop-opacity @on Backdrop */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-backdrop] {
   position: absolute;
   inset: 0;
@@ -415,9 +452,9 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   max-width: none;
   max-height: none;
 }
-/* Optional space between slides (--fluidbox-slide-gap, 0 by default). Each
-   slide carries half the gap on both sides; the strip is one gap wider than
-   the dialog, which clips it. */
+/* Each slide carries half the gap on both sides; the strip is one gap wider
+   than the dialog, which clips it. */
+/** Space between slides, seen only while swiping. @input --fluidbox-slide-gap @on Slides */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slides] {
   display: flex;
   width: calc(
@@ -485,6 +522,11 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   z-index: 3;
   transform-origin: top left;
 }
+/**
+ * Shown behind an image before anything has loaded.
+ * @input --fluidbox-image-placeholder-background
+ * @on Image frames
+ */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-image-frame] {
   background: var(--fluidbox-image-placeholder-background, rgb(127 127 127 / 0.12));
 }
@@ -541,6 +583,13 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   [data-fluidbox-media][data-fluidbox-image-pending] {
   visibility: hidden;
 }
+/**
+ * The layer's opacity during a flight.
+ * @input --fluidbox-transition-layer-opacity
+ * @on `[data-fluidbox-transition-layer]`
+ */
+/** A colour behind the layer's content. @input --fluidbox-layer-color @on `[data-fluidbox-transition-layer]` */
+/** The opacity of that colour. @input --fluidbox-layer-mask-opacity @on `[data-fluidbox-transition-layer]` */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-transition-layer] {
   --fluidbox-closed: 1;
   position: absolute;
@@ -625,6 +674,11 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
+  /**
+   * The default controls' opacity.
+   * @default `1`; `0.35` when disabled
+   * @on Previous, Next, Close
+   */
   --fluidbox-gallery-control-opacity: 0.35;
   cursor: default;
 }
@@ -781,6 +835,20 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 }
 /* Reaches under the stage insets and the browser's bars, and pads by the same,
    so pan maths ignore the reach. */
+/**
+ * How far a zoomed image pans past the window's top and bottom. `0px` keeps
+ * it inside.
+ * @input --fluidbox-zoom-bleed
+ * @default the browser's bar height on touch screens, else `0px`
+ * @on Zoom viewport
+ */
+/**
+ * Keeps a zoomed image inside the stage insets: `stage`, or sides such as
+ * `right` or `top bottom`. The runtime reads it.
+ * @input --fluidbox-zoom-clip
+ * @default none
+ * @on Dialog
+ */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport] {
   --fluidbox-zoom-reach: var(--fluidbox-zoom-bleed, var(--fluidbox-zoom-chrome, 0px));
 

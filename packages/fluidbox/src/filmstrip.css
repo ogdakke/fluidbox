@@ -7,11 +7,28 @@
    and set --fluidbox-filmstrip-axis: y on the dialog to run it as a column.
    :where() keeps every rule here at zero specificity, so yours win. */
 :where(:is([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
+  /**
+   * `y` runs the filmstrip as a column. The add-on reads it, so a media query
+   * can change it.
+   * @on Dialog
+   */
   --fluidbox-filmstrip-axis: x;
+  /**
+   * The thumbnails' size. The strip's height and its end padding follow it,
+   * so the first and last thumbnails centre.
+   * @default `52px`; `38px` on touch
+   * @on Dialog
+   */
   --fluidbox-filmstrip-item-size: 52px;
+  /** Space between thumbnails. @default `5px`; `3px` on touch @on Dialog */
   --fluidbox-filmstrip-gap: 5px;
   /* The strip is the thumbnails plus 6px either side; the space adds 10px
      around it and the bottom safe area. */
+  /**
+   * The room a row keeps below the photo. `0px` lets the photo run under it.
+   * @default the item size plus `32px` (`30px` on touch) and the bottom safe area
+   * @on Dialog
+   */
   --fluidbox-filmstrip-space: calc(
     var(--fluidbox-filmstrip-item-size) + 32px + env(safe-area-inset-bottom, 0px)
   );
@@ -46,6 +63,8 @@
   overflow: hidden;
   background: transparent;
 }
+/** How fast the strip hides and returns, as on zoom. @input --fluidbox-filmstrip-zoom-duration @on Filmstrip */
+/** How far the strip drops as it hides. @input --fluidbox-filmstrip-zoom-travel @on Filmstrip */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {
   /* Where the strip goes as it hides: down off the bottom, or aside. */
   --fluidbox-filmstrip-hide: translateY(var(--fluidbox-filmstrip-zoom-travel, 18px));
@@ -131,6 +150,7 @@
   flex: 0 0 auto;
   height: 100%;
 }
+/** The corners of filmstrip thumbnails. @input --fluidbox-filmstrip-item-radius @theme */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] {
   all: unset;
   position: absolute;

@@ -4,7 +4,7 @@
    share one native scroller with a snap point per stop, so the browser moves
    both; animations on its scroll timeline do the rest.
    Every length here is a custom property on the dialog; override any of them in
-   your own CSS. The runtime reads the ones marked "read". */
+   your own CSS. */
 @property --fluidbox-sheet-peek {
   syntax: "<length>";
   inherits: true;
@@ -62,21 +62,40 @@
   :is([data-fluidbox-overlay], [data-fluidbox-flight])
     [data-fluidbox-dialog][data-fluidbox-sheet-host]
 ) {
-  /* Read: 0 turns the sheet off, as for wide screens with a sidebar instead. */
+  /** `0` turns the sheet off, as for wide screens with a sidebar instead. The runtime reads it. */
   --fluidbox-sheet-enabled: 1;
-  /* Read: push slides the photo up ahead of the sheet; fit shrinks it into the room above. */
+  /**
+   * `push` slides the photo up ahead of the sheet; `fit` shrinks it into the
+   * room above. The runtime reads it.
+   */
   --fluidbox-sheet-photo: push;
-  /* Read: the sheet showing at rest. */
+  /**
+   * How much of the sheet shows at rest. Also sets `--fluidbox-stage-bottom`.
+   * The runtime reads it.
+   */
   --fluidbox-sheet-peek: 0px;
-  /* Read: space between the photo and the sheet. */
+  /** Space between the photo and the sheet. The runtime reads it. */
   --fluidbox-sheet-gap: 12px;
-  /* Read: with fit, space the photo keeps clear above and beside it as it shrinks. */
+  /**
+   * With `fit`, space the photo keeps clear above and beside it as it shrinks.
+   * The runtime reads it.
+   */
   --fluidbox-sheet-fit-inset: 0px;
-  /* Space above the sheet when it shows all of itself. */
+  /**
+   * With `fit`, how much the sheet covers before the photo stops shrinking and
+   * rises: a length, or a percentage of the stage. The runtime reads it.
+   * @input --fluidbox-sheet-fit-limit
+   * @default `55%`
+   */
+  /** Space above the sheet at its tallest. */
   --fluidbox-sheet-top: calc(env(safe-area-inset-top, 0px) + 56px);
+  /** The sheet's top corners. */
   --fluidbox-sheet-radius: 18px;
+  /** The sheet's widest. */
   --fluidbox-sheet-max-width: 640px;
+  /** The sheet's background. */
   --fluidbox-sheet-background: Canvas;
+  /** The sheet's text colour. */
   --fluidbox-sheet-color: CanvasText;
   /* The photo keeps clear of the peeking sheet. */
   --fluidbox-stage-bottom: var(--fluidbox-sheet-peek);
@@ -222,8 +241,11 @@
 }
 
 /* Choreography: the arrows go once the sheet is up, and the photo fades
-   rather than shrink to a stamp past the first stop. Set
-   --fluidbox-sheet-fade: 0 to keep it. */
+   rather than shrink to a stamp past the first stop. */
+/**
+ * How much the photo fades between the first stop and the top one. `0` keeps it.
+ * @input --fluidbox-sheet-fade
+ */
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host]
   :is([data-fluidbox-previous], [data-fluidbox-next]) {

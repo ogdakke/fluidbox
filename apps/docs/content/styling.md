@@ -41,18 +41,7 @@ The package declares the filmstrip's and the sheet's variables on the dialog wit
 
 While it is open, the viewer is one element, `[data-fluidbox-overlay]`, at the end of `<body>`. It is not inside your component, so it doesn't inherit your component's styles or CSS variables. Inside it:
 
-| Selector                    | Part                                                                |
-| --------------------------- | ------------------------------------------------------------------- |
-| `[data-fluidbox-overlay]`   | The viewer's root, at the end of `<body>` while open.               |
-| `[data-fluidbox-backdrop]`  | The backdrop. A click on it closes the viewer.                      |
-| `[data-fluidbox-container]` | The viewport-sized box the dialog sits in.                          |
-| `[data-fluidbox-dialog]`    | `role="dialog"`, `aria-modal="true"`. Carries the state attributes. |
-| `[data-fluidbox-slides]`    | The horizontal scroller of slides.                                  |
-| `[data-fluidbox-slide]`     | One slide. `aria-hidden="false"` on the current one.                |
-| `[data-fluidbox-frame]`     | The box that crops and rounds the media during flights.             |
-| `[data-fluidbox-media]`     | The `<img>`, `<video>`, `<iframe>` or custom content element.       |
-| `[data-fluidbox-portal]`    | The viewer's layer: where your controls and captions go.            |
-| `[data-fluidbox-addons]`    | Beside the layer: where the filmstrip goes. It takes no box.        |
+<!-- css: parts data-fluidbox-overlay data-fluidbox-backdrop data-fluidbox-container data-fluidbox-dialog data-fluidbox-slides data-fluidbox-slide data-fluidbox-frame data-fluidbox-media data-fluidbox-portal data-fluidbox-addons -->
 
 While the viewer is open, every other child of `<body>` is `inert`. The overlay's z-index is `var(--layer-fluidbox, 7)` and the flight's is `var(--layer-fluidbox-flight, 8)`. Set both on `:root` if your page has higher layers.
 
@@ -62,13 +51,7 @@ The container is `position: absolute` at the page's scroll position. Don't make 
 
 When the viewer opens, it reads the trigger's computed styles and copies every `--fluidbox-*` property onto the overlay. Set them on `:root`, on a section, or on one trigger, and the viewer uses what that trigger inherits:
 
-| Variable                           | Used for                                                  | Default                |
-| ---------------------------------- | --------------------------------------------------------- | ---------------------- |
-| `--fluidbox-background`            | The backdrop, the close button, error messages.           | `#111`                 |
-| `--fluidbox-color`                 | Text and icons.                                           | `white`                |
-| `--fluidbox-control-background`    | The Previous and Next buttons, the close button on hover. | `rgb(20 20 20 / 0.72)` |
-| `--fluidbox-focus-color`           | Focus rings on the controls, the filmstrip and triggers.  | `currentColor`         |
-| `--fluidbox-filmstrip-item-radius` | Filmstrip thumbnails' corners.                            | `3px`                  |
+<!-- css: theme -->
 
 ```css
 .gallery {
@@ -89,14 +72,7 @@ Attribute names follow one rule. Parts of the viewer, and the markers you put on
 
 The overlay and the dialog both carry the viewer's state:
 
-| Attribute                             | When                                        |
-| ------------------------------------- | ------------------------------------------- |
-| `data-fluidbox-status`                | `closed`, `opening`, `open` or `closing`.   |
-| `data-open`, `data-closed`            | Open (any status but `closed`), or closed.  |
-| `data-starting-style`, `data-opening` | Opening.                                    |
-| `data-ending-style`                   | Closing.                                    |
-| `data-dragging`                       | A drag to dismiss is under way.             |
-| `data-dismissing`                     | Closing, or a drag to dismiss is under way. |
+<!-- css: states data-fluidbox-status data-open data-closed data-starting-style data-opening data-ending-style data-dragging data-dismissing -->
 
 The dialog alone also has `data-zoomed` while an image is zoomed, and `data-gallery` when there is more than one item. Style a dialog that holds a filmstrip with `[data-fluidbox-dialog]:has([data-fluidbox-filmstrip])`.
 

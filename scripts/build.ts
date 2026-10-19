@@ -4,7 +4,7 @@
  * ./react, ./solid, ./vue and ./angular entries. Each binding imports the core
  * by its public name, so a consumer loads one copy of the runtime.
  */
-import { cp, rm } from "node:fs/promises";
+import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -19,6 +19,20 @@ async function run(command: string[], cwd: string) {
 }
 
 await run(["bun", "run", "build:core"], core);
+// The stylesheets' comments document them for the CSS reference; consumers get
+// the rules alone.
+for (const name of ["styles.css", "filmstrip.css", "sheet.css"]) {
+  const path = resolve(core, "dist", name);
+  const css = await readFile(path, "utf8");
+  await writeFile(
+    path,
+    `${css
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/[ \t]+$/gm, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()}\n`,
+  );
+}
 await Promise.all(
   bindings.map((name) => run(["bun", "run", "build"], resolve(root, "packages", name))),
 );

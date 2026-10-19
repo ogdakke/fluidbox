@@ -127,10 +127,7 @@ The sheet is a `<section data-fluidbox-sheet data-fluidbox-chrome>` that the run
 
 Put these inside the sheet element:
 
-| Attribute                    | Effect                                                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `data-fluidbox-sheet-handle` | Draws a grab bar. Make it the sheet's first child.                                          |
-| `data-fluidbox-sheet-scroll` | The part that scrolls once the sheet is at its top stop. Without one, the whole sheet does. |
+<!-- css: sheet-parts data-fluidbox-sheet-handle data-fluidbox-sheet-scroll -->
 
 Below the top stop, a swipe anywhere on the sheet moves the sheet. At the top stop its content scrolls, and a pull down from the top of the content carries on into the sheet. Put padding on an inner element, not on `[data-fluidbox-sheet]`.
 
@@ -148,31 +145,13 @@ With the sheet raised, Escape and a tap above the sheet lower it instead of clos
 
 ### sheet.css
 
-`@ogdakke/fluidbox/sheet.css` holds the sheet's layout and its variables. Set them on `[data-fluidbox-dialog]`. The defaults have no weight, so any selector wins. The runtime reads the first five, so they can change in a media query.
+`@ogdakke/fluidbox/sheet.css` holds the sheet's layout and its variables. Set them on `[data-fluidbox-dialog]`. The defaults have no weight, so any selector wins. The runtime reads the ones that say so as they change, so a media query can set them too.
 
-| Variable                      | Default                                      | What it does                                                                                                             |
-| ----------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `--fluidbox-sheet-enabled`    | `1`                                          | `0` turns the sheet off, as for a wide screen with a sidebar instead.                                                    |
-| `--fluidbox-sheet-photo`      | `push`                                       | `push` slides the photo up ahead of the sheet; `fit` shrinks it into the room above, with a scroll-driven animation.     |
-| `--fluidbox-sheet-peek`       | `0px`                                        | How much of the sheet shows at rest. Also the stage's bottom inset.                                                      |
-| `--fluidbox-sheet-gap`        | `12px`                                       | Space between the photo and the sheet.                                                                                   |
-| `--fluidbox-sheet-fit-inset`  | `0px`                                        | With `fit`, space the photo keeps clear above and beside it.                                                             |
-| `--fluidbox-sheet-fit-limit`  | `55%`                                        | With `fit`, how much the sheet covers before the photo stops shrinking and rises. A length or a percentage of the stage. |
-| `--fluidbox-sheet-top`        | `calc(env(safe-area-inset-top, 0px) + 56px)` | Space above the sheet at its tallest.                                                                                    |
-| `--fluidbox-sheet-radius`     | `18px`                                       | The top corners.                                                                                                         |
-| `--fluidbox-sheet-max-width`  | `640px`                                      | The sheet's widest.                                                                                                      |
-| `--fluidbox-sheet-background` | `Canvas`                                     | The sheet's background.                                                                                                  |
-| `--fluidbox-sheet-color`      | `CanvasText`                                 | The sheet's text colour.                                                                                                 |
-| `--fluidbox-sheet-fade`       | `1`                                          | How much the photo fades between the first and the top stop. `0` keeps it.                                               |
+<!-- css: sheet -->
 
 As the sheet moves, these variables on the overlay follow its scroll. Use them for your own effects:
 
-| Variable                    | Value                                                            |
-| --------------------------- | ---------------------------------------------------------------- |
-| `--fluidbox-sheet-visible`  | Pixels of the sheet showing.                                     |
-| `--fluidbox-sheet-progress` | `0` at rest to `1` at the first stop.                            |
-| `--fluidbox-sheet-expand`   | `0` at the first stop to `1` at the top stop.                    |
-| `--fluidbox-sheet-dismiss`  | `1` with the photo scrolled away to `0` at rest, for `"scroll"`. |
+<!-- css: published --fluidbox-sheet-visible --fluidbox-sheet-progress --fluidbox-sheet-expand --fluidbox-sheet-dismiss -->
 
 The dialog gets `data-sheet` with the stop number, `data-sheet-raised` above stop `0`, `data-sheet-expanded` at the top stop, `data-sheet-peeking` while the peek is above zero and `data-sheet-off` while the sheet is turned off. The overlay gets `data-sheet-dismiss` with the `dismiss` option.
 

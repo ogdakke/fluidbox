@@ -1,11 +1,12 @@
 // Builds the docs from content/**/*.md: one route per page under /docs/, framework tabs for
 // every pattern (code from apps/examples/src/patterns), prerendered HTML for each route, and
-// plain Markdown copies plus llms.txt for agents. The API reference's code is read from the
-// package source (see api-source.ts).
+// plain Markdown copies plus llms.txt for agents. The API and CSS references are read from the
+// package source (see api-source.ts and css-source.ts).
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, posix, relative } from "node:path";
 import MarkdownIt from "markdown-it";
 import { apiSources, checkApiCoverage, expandApi, isApiSource } from "./api-source";
+import { checkCss, cssSources, expandCss } from "./css-source";
 import { highlight } from "../design/highlight";
 import { frameworkIcon } from "../design/icons";
 import type { Plugin, ViteDevServer } from "vite";
@@ -225,7 +226,7 @@ function createRenderer() {
 
 function renderPage(md: MarkdownIt, slug: string, source: string): DocPage {
   const [data, written] = frontmatter(source);
-  const body = expandApi(written, slug);
+  const body = expandCss(expandApi(written, slug), slug);
   const tokens = md.parse(body, { slug });
   const headings: DocHeading[] = [];
   let title = data.title ?? slug;
@@ -401,6 +402,7 @@ export function docsPlugin(): Plugin {
     try {
       const loaded = loadPages();
       checkApiCoverage(loaded);
+      checkCss();
       pages = loaded;
       problem = null;
     } catch (error) {
@@ -443,7 +445,7 @@ export function docsPlugin(): Plugin {
     },
     configureServer(dev) {
       server = dev;
-      dev.watcher.add([contentDir, patternsDir, ...apiSources]);
+      dev.watcher.add([contentDir, patternsDir, ...apiSources, ...cssSources]);
       // Drift shows as the error overlay, and the last good pages stay up, until
       // the docs and the source agree again.
       const showProblem = () => {
@@ -454,7 +456,7 @@ export function docsPlugin(): Plugin {
       showProblem();
       dev.ws.on("connection", showProblem);
       const reload = (file: string) => {
-        const api = isApiSource(file);
+        const api = isApiSource(file) || cssSources.some((dir) => file.startsWith(dir));
         if (!file.startsWith(contentDir) && !file.startsWith(patternsDir) && !api) return;
         refresh();
         if (problem) {
