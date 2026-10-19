@@ -482,6 +482,19 @@
   margin: 0;
 }
 
+.landing .hero__size {
+  max-width: 460px;
+  margin: 0;
+  color: var(--fb-muted);
+  font-size: 13.5px;
+}
+
+.landing .hero__size strong {
+  color: var(--fb-fg);
+  font-family: var(--fb-font-mono);
+  font-weight: 500;
+}
+
 .landing .roadmap-teaser {
   --fb-columns: 3;
 }

@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  * Every framework page implements the same nine patterns (apps/examples/src/patterns/CONTRACT.md).
  * Set PATTERNS=react,vue to run some of them.
  */
-const all = ["elements", "javascript", "react", "solid", "vue", "angular"] as const;
+const all = ["react", "vue", "solid", "angular", "elements", "javascript"] as const;
 const frameworks = process.env.PATTERNS
   ? all.filter((name) => process.env.PATTERNS!.split(",").includes(name))
   : all;

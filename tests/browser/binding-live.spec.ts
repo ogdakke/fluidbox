@@ -7,7 +7,7 @@ import { holdMotion } from "./support/hold-motion";
  * filmstrip stays through each of those redraws.
  * The fixture is binding-live.html; see fixtures/binding-live/shared.ts.
  */
-const frameworks = ["react", "solid", "vue", "angular", "javascript", "elements"] as const;
+const frameworks = ["react", "vue", "solid", "angular", "elements", "javascript"] as const;
 
 declare global {
   interface Window {

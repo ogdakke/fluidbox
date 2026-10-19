@@ -1,6 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { gzipSync } from "node:zlib";
-import { build } from "tsdown";
+import { frameworkPeers, measureEntry, peerFor, sizeOf, type Size } from "./bundle-size";
 
 const entrypoints = [
   "root",
@@ -14,7 +13,6 @@ const entrypoints = [
   "kit",
 ] as const;
 type Entry = (typeof entrypoints)[number];
-const frameworkPeers = ["react", "react-dom", "solid-js", "vue", "@angular/core"] as const;
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
   root: [],
   elements: [],
@@ -28,10 +26,6 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 };
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
-/** A chunk that is the sheet's or the filmstrip's entry. */
-const isAddon = (chunk: { facadeModuleId?: string | null } | undefined) =>
-  !!chunk?.facadeModuleId && /[/\\](sheet|filmstrip)(-entry)?\.[jt]s$/.test(chunk.facadeModuleId);
-
 const initialGzipLimits: Record<Entry, number> = {
   root: 28_800,
   elements: 32_500,
@@ -67,21 +61,6 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   sheet: 10_550,
   kit: 8_000,
 };
-
-type Chunk = Extract<
-  Awaited<ReturnType<typeof build>>["bundles"][number]["chunks"][number],
-  { type: "chunk" }
->;
-type Size = { rawBytes: number; gzipBytes: number };
-
-const sizeOf = (code: string | Uint8Array): Size => ({
-  rawBytes: Buffer.byteLength(code),
-  gzipBytes: gzipSync(code).byteLength,
-});
-const isFrameworkImport = (specifier: string, peer: string): boolean =>
-  specifier === peer || specifier.startsWith(`${peer}/`);
-const peerFor = (specifier: string): (typeof frameworkPeers)[number] | undefined =>
-  frameworkPeers.find((peer) => isFrameworkImport(specifier, peer));
 
 const jsonIndex = process.argv.indexOf("--json");
 if (
@@ -129,72 +108,8 @@ const report = {
 
 let failed = false;
 for (const name of entrypoints) {
-  const result = await build({
-    entry: `tests/bundle/${name}.ts`,
-    format: "esm",
-    platform: "browser",
-    target: "es2022",
-    minify: true,
-    dts: false,
-    sourcemap: false,
-    report: false,
-    clean: false,
-    write: false,
-    deps: { neverBundle: [...frameworkPeers, /^react-dom(?:\/.*)?$/] },
-  });
-
-  const chunks = result.bundles
-    .flatMap((bundle) => bundle.chunks)
-    .filter((chunk): chunk is Chunk => chunk.type === "chunk");
-  const byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
-  const entry = chunks.find((chunk) => chunk.isEntry);
-  if (!entry) throw new Error(`tsdown did not emit an entry for ${name}`);
-
-  const visited = new Set<string>();
-  const initial = new Set<string>();
-  const externals = new Set<string>();
-  const unresolved = new Set<string>();
-  const visitInitial = (fileName: string): void => {
-    if (initial.has(fileName)) return;
-    initial.add(fileName);
-    const chunk = byName.get(fileName);
-    if (!chunk) throw new Error(`${name}: missing emitted chunk ${fileName}`);
-    for (const imported of chunk.imports) {
-      if (byName.has(imported)) visitInitial(imported);
-    }
-  };
-  const visitActivation = (fileName: string): void => {
-    if (visited.has(fileName)) return;
-    visited.add(fileName);
-    const chunk = byName.get(fileName);
-    if (!chunk) throw new Error(`${name}: missing emitted chunk ${fileName}`);
-    for (const imported of [...chunk.imports, ...chunk.dynamicImports]) {
-      // An add-on loads only for a viewer that uses it; it has its own budget.
-      if (chunk.dynamicImports.includes(imported) && isAddon(byName.get(imported))) continue;
-      if (byName.has(imported)) visitActivation(imported);
-      else if (peerFor(imported)) externals.add(imported);
-      else unresolved.add(imported);
-    }
-  };
-  visitInitial(entry.fileName);
-  visitActivation(entry.fileName);
-
-  const initialChunks = [...initial].map((fileName) => byName.get(fileName)!);
-  const activationChunks = [...visited].map((fileName) => byName.get(fileName)!);
-  // Preserve the concatenated static-graph calculation used by earlier reports.
-  const initialJs = sizeOf(initialChunks.map((chunk) => chunk.code).join("\n"));
-  const chunkSizes = activationChunks.map((chunk) => ({
-    fileName: chunk.fileName,
-    phase: (initial.has(chunk.fileName) ? "initial" : "lazy") as "initial" | "lazy",
-    ...sizeOf(chunk.code),
-  }));
-  const activationJs = chunkSizes.reduce<Size>(
-    (total, chunk) => ({
-      rawBytes: total.rawBytes + chunk.rawBytes,
-      gzipBytes: total.gzipBytes + chunk.gzipBytes,
-    }),
-    { rawBytes: 0, gzipBytes: 0 },
-  );
+  const { initialJs, activationJs, chunks, externals, unresolved, initialCode, activationCode } =
+    await measureEntry(name);
   const entryCss = name === "sheet" ? sheetCss : name === "filmstrip" ? filmstripCss : css;
   const activationWithCss = {
     rawBytes: activationJs.rawBytes + entryCss.rawBytes,
@@ -204,11 +119,9 @@ for (const name of entrypoints) {
     const peer = peerFor(specifier);
     return !peer || !expectedFramework[name].includes(peer);
   });
-  const initialCode = initialChunks.map((chunk) => chunk.code).join("\n");
   const registersFluidbox = /customElements\.define\([`"']fluidbox-item[`"']/.test(initialCode);
   // Add-ons cost nothing until used: no core entry may carry their code, only
   // load it lazily for a viewer that turns them on.
-  const activationCode = activationChunks.map((chunk) => chunk.code).join("\n");
   const carriesExtension =
     name !== "filmstrip" && name !== "sheet" && /fluidboxSheetHost/.test(activationCode);
   const errors = [
@@ -229,7 +142,7 @@ for (const name of entrypoints) {
     initialJs,
     activationJs,
     activationWithCss,
-    chunks: chunkSizes,
+    chunks,
     frameworkExternals: [...externals].sort(),
     errors,
   };

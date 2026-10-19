@@ -6,7 +6,7 @@
     <title>Fluidbox · a fluid lightbox for the web</title>
     <meta
       name="description"
-      content="Photos open from their thumbnails and close back into them. Pinch to zoom, swipe between slides, drag down to close. Custom elements, plain JavaScript, React, Solid, Vue and Angular."
+      content="Photos open from their thumbnails and close back into them. Pinch to zoom, swipe between slides, drag down to close. React, Vue, Solid, Angular, custom elements and plain JavaScript."
     />
     <link rel="icon" href="/favicon.svg" />
     <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
@@ -20,14 +20,22 @@
           <h1>Finally, a fluid lightbox for the web.</h1>
           <p class="hero__lede">
             Photos open from their thumbnails and close back into them. Pinch to zoom, swipe between
-            slides, drag down to close. One runtime behind the custom elements, plain JavaScript and
-            every framework binding.
+            slides, drag down to close. One runtime behind the React, Vue, Solid and Angular
+            bindings, the custom elements and plain JavaScript.
           </p>
           <div class="hero__actions">
             <a class="fb-button fb-button--primary" href="/docs/getting-started/">Get started</a>
             <a class="fb-button" href="#playground">Try the playground</a>
           </div>
           <!-- install: @ogdakke/fluidbox -->
+          <p class="hero__size">
+            <strong><!-- bundle-size: initial --></strong> gzipped with the React binding, not
+            counting React. Opening the viewer loads
+            <!-- bundle-size: viewer -->
+            more, and the stylesheet is
+            <!-- bundle-size: css -->. The sheet and the filmstrip load only when a viewer uses
+            them.
+          </p>
           <ul class="hints" aria-label="Controls">
             <li><kbd>←</kbd><kbd>→</kbd>&nbsp;swipe</li>
             <li><kbd>pinch</kbd><kbd>wheel</kbd>&nbsp;zoom</li>
@@ -63,7 +71,7 @@
           <div class="fb-cell feature">
             <span class="fb-number">06</span>
             <h3>Framework support</h3>
-            <p>React, Solid, Vue and Angular, plus custom elements and plain JavaScript.</p>
+            <p>React, Vue, Solid and Angular, plus custom elements and plain JavaScript.</p>
           </div>
         </div>
       </section>
@@ -133,45 +141,8 @@
           <p>Every binding runs the same nine patterns on the same runtime.</p>
         </header>
         <div class="fb-grid integrations">
-          <a class="fb-cell integration" href="/docs/custom-elements/"
-            ><span class="fb-number">01</span>
-            <h3>
-              <span class="integration__name"
-                ><img
-                  class="fb-framework-icon"
-                  src="/icons/elements.svg"
-                  alt=""
-                  width="16"
-                  height="16"
-                />Elements</span
-              >
-              <span>→</span>
-            </h3>
-            <p>
-              <code>&lt;fluidbox-gallery&gt;</code> markup with properties for sources, renderers
-              and extensions.
-            </p></a
-          >
-          <a class="fb-cell integration" href="/docs/javascript/"
-            ><span class="fb-number">02</span>
-            <h3>
-              <span class="integration__name"
-                ><img
-                  class="fb-framework-icon"
-                  src="/icons/javascript.svg"
-                  alt=""
-                  width="16"
-                  height="16"
-                />JavaScript</span
-              >
-              <span>→</span>
-            </h3>
-            <p>
-              <code>createFluidbox()</code> and <code>fluidbox.bind()</code> on your own elements.
-            </p></a
-          >
           <a class="fb-cell integration" href="/docs/react/"
-            ><span class="fb-number">03</span>
+            ><span class="fb-number">01</span>
             <h3>
               <span class="integration__name"
                 ><img
@@ -194,24 +165,8 @@
               <code>Fluidbox.Root</code>, triggers and portal parts; renderers keep your context.
             </p></a
           >
-          <a class="fb-cell integration" href="/docs/solid/"
-            ><span class="fb-number">04</span>
-            <h3>
-              <span class="integration__name"
-                ><img
-                  class="fb-framework-icon"
-                  src="/icons/solid.svg"
-                  alt=""
-                  width="16"
-                  height="16"
-                />Solid</span
-              >
-              <span>→</span>
-            </h3>
-            <p>The same parts as Solid components, with accessors for state.</p></a
-          >
           <a class="fb-cell integration" href="/docs/vue/"
-            ><span class="fb-number">05</span>
+            ><span class="fb-number">02</span>
             <h3>
               <span class="integration__name"
                 ><img
@@ -228,8 +183,24 @@
               Components and composables; the root slot gives you the state and the commands.
             </p></a
           >
+          <a class="fb-cell integration" href="/docs/solid/"
+            ><span class="fb-number">03</span>
+            <h3>
+              <span class="integration__name"
+                ><img
+                  class="fb-framework-icon"
+                  src="/icons/solid.svg"
+                  alt=""
+                  width="16"
+                  height="16"
+                />Solid</span
+              >
+              <span>→</span>
+            </h3>
+            <p>The same parts as Solid components, with accessors for state.</p></a
+          >
           <a class="fb-cell integration" href="/docs/angular/"
-            ><span class="fb-number">06</span>
+            ><span class="fb-number">04</span>
             <h3>
               <span class="integration__name"
                 ><img
@@ -243,6 +214,43 @@
               <span>→</span>
             </h3>
             <p>Standalone <code>fluidbox*</code> directives, zoneless and signal-based.</p></a
+          >
+          <a class="fb-cell integration" href="/docs/custom-elements/"
+            ><span class="fb-number">05</span>
+            <h3>
+              <span class="integration__name"
+                ><img
+                  class="fb-framework-icon"
+                  src="/icons/elements.svg"
+                  alt=""
+                  width="16"
+                  height="16"
+                />Elements</span
+              >
+              <span>→</span>
+            </h3>
+            <p>
+              <code>&lt;fluidbox-gallery&gt;</code> markup with properties for sources, renderers
+              and extensions.
+            </p></a
+          >
+          <a class="fb-cell integration" href="/docs/javascript/"
+            ><span class="fb-number">06</span>
+            <h3>
+              <span class="integration__name"
+                ><img
+                  class="fb-framework-icon"
+                  src="/icons/javascript.svg"
+                  alt=""
+                  width="16"
+                  height="16"
+                />JavaScript</span
+              >
+              <span>→</span>
+            </h3>
+            <p>
+              <code>createFluidbox()</code> and <code>fluidbox.bind()</code> on your own elements.
+            </p></a
           >
         </div>
       </section>

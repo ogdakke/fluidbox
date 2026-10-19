@@ -1,6 +1,6 @@
 // Package-manager tabs on install commands: one choice for every switcher on every page,
 // remembered across visits, as the framework tabs are.
-const managers = ["npm", "pnpm", "yarn", "bun"] as const;
+const managers = ["pnpm", "npm", "yarn", "bun"] as const;
 type PackageManager = (typeof managers)[number];
 
 const STORAGE_KEY = "fluidbox-docs-package-manager";
@@ -12,9 +12,9 @@ function stored(): PackageManager {
     const value = localStorage.getItem(STORAGE_KEY);
     if (isManager(value)) return value;
   } catch {
-    // Storage can be unavailable; npm is the default.
+    // Storage can be unavailable; pnpm is the default.
   }
-  return "npm";
+  return "pnpm";
 }
 
 function store(manager: PackageManager) {

@@ -3,8 +3,10 @@
 // plain Markdown copies plus llms.txt for agents. The API and CSS references are read from the
 // package source (see api-source.ts and css-source.ts).
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import { dirname, join, posix, relative } from "node:path";
 import MarkdownIt from "markdown-it";
+import { measureEntry } from "../../scripts/bundle-size";
 import { apiSources, checkApiCoverage, expandApi, isApiSource } from "./api-source";
 import { checkCss, cssSources, expandCss } from "./css-source";
 import { highlight } from "../design/highlight";
@@ -54,8 +56,8 @@ const codeBlock = (code: string, lang: string, label = lang || "text") =>
 
 /** The package managers an install command is shown for, in tab order. */
 const packageManagers = [
-  { key: "npm", add: "npm install" },
   { key: "pnpm", add: "pnpm add" },
+  { key: "npm", add: "npm install" },
   { key: "yarn", add: "yarn add" },
   { key: "bun", add: "bun add" },
 ] as const;
@@ -81,6 +83,29 @@ export function installTabs(code: string, lang = "bash"): string | null {
 }
 
 const INSTALL_DIRECTIVE = /<!--\s*install:\s*([^>]+?)\s*-->/g;
+const BUNDLE_SIZE_DIRECTIVE = /<!--\s*bundle-size:\s*(initial|viewer|css)\s*-->/g;
+
+type BundleSizes = Record<"initial" | "viewer" | "css", string>;
+const kilobytes = (bytes: number) => `${(bytes / 1000).toFixed(1)} kB`;
+
+/**
+ * The React binding's cost, gzipped and without React itself: `initial` loads with the page,
+ * `viewer` loads when a viewer first opens, `css` is the stylesheet. `bun run test:bundle`
+ * measures the same bundle, though Bun's gzip comes out a few hundred bytes larger than Node's.
+ * Reads the built package, so it needs `bun run build`.
+ */
+let bundleSizes: Promise<BundleSizes> | undefined;
+function measureBundleSizes(): Promise<BundleSizes> {
+  const root = join(import.meta.dirname, "../..");
+  bundleSizes ??= measureEntry("react", root).then(({ initialJs, activationJs }) => ({
+    initial: kilobytes(initialJs.gzipBytes),
+    viewer: kilobytes(activationJs.gzipBytes - initialJs.gzipBytes),
+    css: kilobytes(
+      gzipSync(readFileSync(join(root, "packages/fluidbox/dist/styles.css"))).byteLength,
+    ),
+  }));
+  return bundleSizes;
+}
 
 /**
  * Shared example data reads as a local module (shown in the patterns overview); the tests'
@@ -326,7 +351,7 @@ function llmsTxt(pages: DocPage[]): string {
   const lines = [
     "# Fluidbox",
     "",
-    "> A lightbox for the web (`@ogdakke/fluidbox`): media flies out of its thumbnail, follows gestures, and lands back where it came from. Custom elements, a plain JavaScript API, and bindings for React, Solid, Vue and Angular share one runtime.",
+    "> A lightbox for the web (`@ogdakke/fluidbox`): media flies out of its thumbnail, follows gestures, and lands back where it came from. Bindings for React, Vue, Solid and Angular, custom elements and a plain JavaScript API share one runtime.",
     "",
     "Every page is also available as Markdown at the same path with `.md`. The pattern pages show the same example in every framework. `llms-full.txt` holds all pages in one file, with each pattern's code linked rather than inlined.",
   ];
@@ -494,8 +519,12 @@ export function docsPlugin(): Plugin {
     },
     transformIndexHtml: {
       order: "post",
-      handler(html, context) {
+      async handler(html, context) {
         // The landing page shows pattern tabs too.
+        if (html.includes("bundle-size:")) {
+          const sizes = await measureBundleSizes();
+          html = html.replace(BUNDLE_SIZE_DIRECTIVE, (_, key: keyof BundleSizes) => sizes[key]);
+        }
         html = html
           .replace(PATTERN_DIRECTIVE, (_, pattern: string) => patternTabs(pattern))
           .replace(

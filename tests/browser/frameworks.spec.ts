@@ -1,28 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { holdMotion } from "./support/hold-motion";
 
-test("the overview page mounts its gallery and opens a viewer", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  await page.goto("/");
-  const opener = page.locator("#mosaic fluidbox-item [slot=trigger]").first();
-  await opener.scrollIntoViewIfNeeded();
-  await opener.click();
-  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-status",
-    "open",
-  );
-  await page.keyboard.press("Escape");
-  await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
-
 // Every binding updates the album cover before the close flight measures it,
 // so the flight lands on the photo the viewer last showed, with its badge.
-for (const framework of ["elements", "javascript", "react", "solid", "vue", "angular"]) {
+for (const framework of ["react", "vue", "solid", "angular", "elements", "javascript"]) {
   test(`${framework}: a shared trigger closes to its current preview`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto(`/${framework}/`);

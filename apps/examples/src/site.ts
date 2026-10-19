@@ -1,7 +1,6 @@
 import { mountChrome, type NavLink } from "@ogdakke/fluidbox-design/chrome";
 
 export type PageKey =
-  | "overview"
   | "elements"
   | "javascript"
   | "react"
@@ -15,14 +14,13 @@ const env = (import.meta as { env?: Record<string, string | undefined> }).env ??
 export const docsUrl = env.VITE_DOCS_URL ?? "https://docs.fluidbox.local";
 
 const links: NavLink[] = [
-  { key: "overview", href: "/", label: "Overview" },
+  { key: "react", href: "/react/", label: "React" },
+  { key: "vue", href: "/vue/", label: "Vue" },
+  { key: "solid", href: "/solid/", label: "Solid" },
+  { key: "angular", href: "/angular/", label: "Angular" },
   { key: "elements", href: "/elements/", label: "Elements" },
   { key: "javascript", href: "/javascript/", label: "JavaScript" },
-  { key: "react", href: "/react/", label: "React" },
-  { key: "solid", href: "/solid/", label: "Solid" },
-  { key: "vue", href: "/vue/", label: "Vue" },
-  { key: "angular", href: "/angular/", label: "Angular" },
-  { key: "fixtures", href: "/fixtures/", label: "Fixtures" },
+  { key: "fixtures", href: "/", label: "Fixtures" },
   { href: docsUrl, label: "Docs ↗" },
 ];
 
@@ -34,7 +32,7 @@ export function mountSite(active: PageKey, options: { fixture?: string } = {}): 
     fixture: options.fixture,
     footer: [
       { href: docsUrl, label: "Docs" },
-      { href: "/fixtures/", label: "Fixtures" },
+      { href: "/", label: "Fixtures" },
       { href: "/react/", label: "React" },
     ],
   });

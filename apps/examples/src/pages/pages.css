@@ -132,6 +132,11 @@ main.fb-shell {
   border-bottom: 1px solid var(--fb-line);
 }
 
+/* The footer's top border closes the page. */
+.section:last-child {
+  border-bottom: 0;
+}
+
 .section__head {
   display: grid;
   justify-items: start;
@@ -161,7 +166,7 @@ main.fb-shell {
   margin: 0 var(--fb-gutter) 32px;
 }
 
-/* Integrations grid on the overview */
+/* Integrations grid on the docs landing */
 
 .integration {
   display: grid;

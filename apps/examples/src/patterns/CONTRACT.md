@@ -1,7 +1,7 @@
 # Pattern examples contract
 
 Every framework implements the same nine patterns in `src/patterns/<framework>/`, where
-`<framework>` is `elements`, `javascript`, `react`, `solid`, `vue` or `angular`. The page
+`<framework>` is `react`, `vue`, `solid`, `angular`, `elements` or `javascript`. The page
 `/<framework>/` mounts them through `mountPatternPage` (`src/patterns/page.ts`), and
 `tests/browser/patterns.spec.ts` checks every page against the hooks below. The docs show the same
 files, so they are what a consumer would write: idiomatic for the framework, typed, small, with
