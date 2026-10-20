@@ -560,11 +560,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     name: "open" | "close" | "next" | "previous",
     target: FluidboxTarget | undefined,
     reason: SessionReason,
-    options: FluidboxCommandOptions = {},
+    options: FluidboxCommandOptions & { readonly instant?: boolean } = {},
   ): Promise<boolean> {
     // A part still holding a destroyed fluidbox, as after a rebuild, does nothing.
     if (this.#lifetime.signal.aborted) return Promise.resolve(false);
-    const settings = { reason, signal: options.signal, scrub: options.scrub };
+    const settings = {
+      reason,
+      signal: options.signal,
+      scrub: options.scrub,
+      instant: options.instant,
+    };
     if (name === "close") return this.#close(settings).then(happened);
     if (name !== "open") return this.#step(name, settings).then(happened);
     // A viewer opens with the add-ons it was given.
@@ -592,6 +597,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       },
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
+      takeOver: (index) => this.#command("open", index, "api", { instant: true }),
       // Drop the viewer, keeping what it needs, so the next press or open makes a new one.
       unload: () => {
         this.#reset();
@@ -809,6 +815,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return this.#move(operation, index, opening, reason, {
       scrub: options.scrub,
       step: options.step,
+      instant: opening && options.instant,
       phase: opening ? "open" : "selection",
     });
   }
@@ -838,9 +845,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     {
       scrub,
       step,
+      instant,
       phase = "selection",
       changed = true,
-    }: { scrub?: boolean; step?: 1 | -1; phase?: "open" | "selection"; changed?: boolean },
+    }: {
+      scrub?: boolean;
+      step?: 1 | -1;
+      instant?: boolean;
+      phase?: "open" | "selection";
+      changed?: boolean;
+    },
   ) {
     const item = this.#source.getItem(index);
     const context: ViewerSessionMotionContext<TItem> = {
@@ -851,6 +865,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       reason,
       scrub,
       step,
+      instant,
     };
     this.#origins.hideThumbnail(idOf(item));
     void this.#run(operation, () =>

@@ -14,6 +14,11 @@ export interface FluidboxHost {
     target: FluidboxTarget | undefined,
     reason: FluidboxReason,
   ): Promise<boolean>;
+  /**
+   * Open at `index` with no motion, showing the viewer once its image has
+   * decoded, to take over from a copy of it that the server rendered.
+   */
+  takeOver(index: number): Promise<boolean>;
   /** Drop the viewer and close at once, keeping the bindings, as a binding's unmount does. */
   unload(): void;
 }

@@ -49,6 +49,11 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly onIndexChange?: (index: number, details: FluidboxChangeDetails) => void;
   /** Go round: past the last item comes the first. A single item never loops. */
   readonly loop?: boolean;
+  /**
+   * Where the viewer's controls lead before JavaScript runs, when the server
+   * renders it open: `null` for Close, an index for Previous and Next.
+   */
+  readonly href?: (index: number | null) => string | undefined;
   /** Your strings for the viewer. They change the open viewer in place. */
   readonly labels?: Partial<FluidboxLabels>;
   /** Zoom steps, or `false` to turn zoom off. Compared by value. */

@@ -48,6 +48,8 @@ import {
   latestOrigins,
   resolveLabels,
   createFluidboxSync,
+  fluidboxStaticViewer,
+  takeOverFluidbox,
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
@@ -137,6 +139,14 @@ interface FluidboxContextValue {
   readonly mount: (target: HTMLElement, node: ReactNode) => () => void;
   readonly setAddon: <K extends keyof Addons>(name: K, value: Addons[K]) => void;
   readonly addViewer: () => () => void;
+  /** What the server's copy of an open viewer needs to know, set as the parts render. */
+  readonly serverHints: ServerHints;
+}
+
+interface ServerHints {
+  filmstrip: boolean;
+  sheet: boolean;
+  viewer: boolean;
 }
 
 const FluidboxContext = createContext<FluidboxContextValue | null>(null);
@@ -175,12 +185,17 @@ const eventProps = {
 } as const satisfies Record<(typeof fluidboxEventTypes)[number], keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
-  const { items, open, index, labels, zoom, loop, loading, children } = props;
+  const { items, open, index, labels, zoom, loop, loading, href, children } = props;
   const slotsRef = useRef<{ filmstrip: FluidboxSlots<TItem>; sheet: FluidboxSlots<TItem> } | null>(
     null,
   );
   slotsRef.current ??= { filmstrip: createSlots(), sheet: createSlots() };
   const slots = slotsRef.current;
+  const serverHints = useRef<ServerHints>({
+    filmstrip: false,
+    sheet: false,
+    viewer: false,
+  }).current;
   const latest = useLatest(props);
   const [viewerTarget, setViewerTarget] = useState<HTMLElement | null>(null);
   const [mounts, setMounts] = useState<readonly Mount[]>([]);
@@ -242,8 +257,6 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     ) as FluidboxOriginAdapter<TItem>,
   });
   const fluidbox = fluidboxRef.current;
-  // An unmount, or StrictMode's rehearsal of one, drops the viewer; the next open makes another.
-  useIsomorphicLayoutEffect(() => () => unloadFluidbox(fluidbox), [fluidbox]);
 
   // The Viewer, Filmstrip and Sheet parts register in their layout effects.
   // Changes go to the viewer once the commit is done.
@@ -319,12 +332,38 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     return () => events.abort();
   }, [fluidbox, latest]);
 
+  // An unmount, or StrictMode's rehearsal of one, drops the viewer; the next
+  // open makes another. React runs cleanups in order, so the events above
+  // stop first and the drop never reaches onOpenChange as a close.
+  useIsomorphicLayoutEffect(() => () => unloadFluidbox(fluidbox), [fluidbox]);
+
   // Your open and index win whenever they change. The triggers have
   // registered by now, so an open flies from the item's own.
   // A remount, StrictMode's included, starts afresh, as the viewer it dropped did.
+  // A Root that renders open draws the viewer's copy on its first render, so
+  // the server's HTML shows the photo, and the viewer takes it over.
+  const serverIndex = useRef<number | null | undefined>(undefined);
+  if (serverIndex.current === undefined) {
+    serverIndex.current =
+      open && Array.isArray(items) && Number.isInteger(index) && items[index!]?.type === "img"
+        ? index!
+        : null;
+  }
+  const [takenOver, setTakenOver] = useState(false);
+  const serverViewer = useRef<HTMLDivElement>(null);
+  const attempt = useRef(0);
   const sync = useRef<ReturnType<typeof createFluidboxSync>>(null);
   useIsomorphicLayoutEffect(() => () => void (sync.current = null), [fluidbox]);
   useIsomorphicLayoutEffect(() => {
+    const copy = serverViewer.current;
+    const taken = serverIndex.current;
+    if (!sync.current && copy && taken != null) {
+      const current = ++attempt.current;
+      const done = () => {
+        if (attempt.current === current) setTakenOver(true);
+      };
+      void takeOverFluidbox(fluidbox, copy, taken).then(done, done);
+    }
     sync.current ??= createFluidboxSync(fluidbox);
     sync.current(open, index);
   }, [fluidbox, open, index]);
@@ -366,15 +405,78 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       mount,
       setAddon,
       addViewer,
+      serverHints,
     }),
-    [fluidbox, commands, items, resolvedLabels, viewerTarget, slots, mount, setAddon, addViewer],
+    [
+      fluidbox,
+      commands,
+      items,
+      resolvedLabels,
+      viewerTarget,
+      slots,
+      mount,
+      setAddon,
+      addViewer,
+      serverHints,
+    ],
   );
   return createElement(
     FluidboxContext.Provider,
     { value },
     children,
+    serverIndex.current != null && !takenOver
+      ? createElement(ServerViewer, {
+          viewerRef: serverViewer,
+          items: items as readonly FluidboxItem[],
+          index: serverIndex.current,
+          labels: resolvedLabels,
+          loop,
+          href,
+          hints: serverHints,
+        })
+      : null,
     mounts.map(({ key, target, node }) => createPortal(node, target, String(key))),
   );
+}
+
+/**
+ * The open viewer's copy, rendered after the Root's children so the parts
+ * among them have said what it needs. React leaves its inner HTML alone.
+ */
+function ServerViewer({
+  viewerRef,
+  items,
+  index,
+  labels,
+  loop,
+  href,
+  hints,
+}: {
+  viewerRef: Ref<HTMLDivElement>;
+  items: readonly FluidboxItem[];
+  index: number;
+  labels: FluidboxLabels;
+  loop: boolean | undefined;
+  href: FluidboxRootProps<any>["href"];
+  hints: ServerHints;
+}): ReactElement | null {
+  const html = fluidboxStaticViewer({
+    items,
+    index,
+    labels,
+    loop,
+    href,
+    filmstrip: hints.filmstrip,
+    sheet: hints.sheet,
+    controls: !hints.viewer,
+  });
+  if (!html) return null;
+  return createElement("div", {
+    ref: viewerRef,
+    "data-fluidbox-server-viewer": "",
+    style: { display: "contents" },
+    dangerouslySetInnerHTML: { __html: html },
+  });
 }
 
 type ChildHandler<E> = ((event: E) => void) | undefined;
@@ -486,7 +588,9 @@ function Trigger<TItem extends FluidboxItem>({
 
 /** Renders your controls and captions into the viewer. Without one, the viewer has the default controls. */
 function Viewer({ children }: FluidboxViewerProps): ReactElement | null {
-  const { viewerTarget, addViewer } = useFluidboxContext();
+  const { viewerTarget, addViewer, serverHints } = useFluidboxContext();
+  // Read by the server's copy of the open viewer, which renders after this.
+  serverHints.viewer = true;
   useIsomorphicLayoutEffect(addViewer, [addViewer]);
   return viewerTarget ? createPortal(children, viewerTarget) : null;
 }
@@ -580,7 +684,9 @@ const slotKey = (slot: FluidboxSlot<any>) => {
 function Filmstrip<TItem extends FluidboxItem>({
   children,
 }: FluidboxFilmstripProps<TItem>): ReactElement | null {
-  const { setAddon, filmstripSlots } = useFluidboxContext();
+  const { setAddon, filmstripSlots, serverHints } = useFluidboxContext();
+  // Read by the server's copy of the open viewer, which renders after this.
+  serverHints.filmstrip = true;
   const custom = children !== undefined;
   useIsomorphicLayoutEffect(() => {
     setAddon("filmstrip", { custom });
@@ -610,7 +716,9 @@ function Sheet<TItem extends FluidboxItem>({
   children,
   ...attributes
 }: FluidboxSheetProps<TItem>): ReactElement {
-  const { setAddon, sheetSlots } = useFluidboxContext();
+  const { setAddon, sheetSlots, serverHints } = useFluidboxContext();
+  // Read by the server's copy of the open viewer, which renders after this.
+  serverHints.sheet = true;
   const pointsKey = JSON.stringify(snapPoints ?? null);
   useIsomorphicLayoutEffect(() => {
     setAddon("sheet", { snapPoints, dismiss });

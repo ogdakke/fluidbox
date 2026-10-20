@@ -31,7 +31,7 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 const initialGzipLimits: Record<Entry, number> = {
   root: 7_800,
   elements: 11_500,
-  react: 11_850,
+  react: 13_350,
   solid: 11_000,
   vue: 11_750,
   angular: 12_000,
@@ -39,30 +39,30 @@ const initialGzipLimits: Record<Entry, number> = {
   sheet: 7_350,
   kit: 1_450,
 };
-const cssGzipLimit = 3_200;
+const cssGzipLimit = 3_300;
 // Right-to-left support added about 200 B to every core entry's viewer chunk.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 32_250,
+  root: 32_350,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
   elements: 35_500,
-  react: 36_100,
-  solid: 35_200,
-  vue: 35_950,
-  angular: 36_200,
+  react: 37_650,
+  solid: 35_300,
+  vue: 36_050,
+  angular: 36_300,
   filmstrip: 3_700,
   sheet: 7_350,
   kit: 1_450,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 35_350,
-  elements: 38_600,
-  react: 39_200,
-  solid: 38_300,
-  vue: 39_050,
-  angular: 39_300,
+  root: 35_550,
+  elements: 38_800,
+  react: 40_900,
+  solid: 38_550,
+  vue: 39_300,
+  angular: 39_550,
   filmstrip: 4_950,
   sheet: 8_700,
-  kit: 4_550,
+  kit: 4_650,
 };
 
 const jsonIndex = process.argv.indexOf("--json");

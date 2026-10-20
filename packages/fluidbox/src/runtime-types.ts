@@ -52,6 +52,8 @@ export interface SessionCommandOptions {
   readonly approved?: boolean;
   /** Next or previous: which way a looping strip goes round. */
   readonly step?: 1 | -1;
+  /** Open with no motion, once the image has decoded, as over a viewer the server rendered. */
+  readonly instant?: boolean;
 }
 
 export type SessionCommandResult =
@@ -171,6 +173,8 @@ export interface ViewerSessionMotionContext<TItem extends FluidboxItem = Fluidbo
   readonly scrub?: boolean;
   /** Next or previous: which way a looping strip goes round. */
   readonly step?: 1 | -1;
+  /** Open with no motion, once the image has decoded. */
+  readonly instant?: boolean;
 }
 
 export interface ViewerSessionCloseContext {

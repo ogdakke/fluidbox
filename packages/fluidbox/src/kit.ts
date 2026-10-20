@@ -46,6 +46,48 @@ export function unloadFluidbox(fluidbox: Fluidbox<any>) {
 export { indexIn };
 
 export { createFluidboxSync, watchFluidbox, type FluidboxChangeDetails } from "./controlled";
+export { fluidboxStaticViewer, type FluidboxStaticViewerOptions } from "./static-viewer";
+
+/** The newest takeover of each fluidbox, so a stale one never hides the copy. */
+const takeovers = new WeakMap<Fluidbox<any>, object>();
+
+/**
+ * Take over the open viewer the server rendered inside `element`: open at
+ * `index` with no motion, and hide the server's copy in the frame the viewer
+ * first paints. Resolves whether the viewer opened. A takeover that fails
+ * hides the copy too, unless a newer one is under way, as after StrictMode's
+ * remount.
+ */
+export function takeOverFluidbox(
+  fluidbox: Fluidbox<any>,
+  element: HTMLElement,
+  index: number,
+): Promise<boolean> {
+  const copy = element.matches("[data-fluidbox-static]")
+    ? element
+    : element.querySelector<HTMLElement>("[data-fluidbox-static]");
+  // The copy paints at the top of the page; a restored scroll or a #hash
+  // moved the page since, so move it, backdrop and all, to the view.
+  const view = element.ownerDocument.defaultView;
+  if (copy) copy.style.top = `${view?.scrollY ?? 0}px`;
+  const token = {};
+  takeovers.set(fluidbox, token);
+  const hide = () => {
+    if (copy && takeovers.get(fluidbox) === token) copy.hidden = true;
+  };
+  return hostOf(fluidbox)
+    .takeOver(index)
+    .then(
+      (opened) => {
+        hide();
+        return opened;
+      },
+      (error: unknown) => {
+        hide();
+        throw error;
+      },
+    );
+}
 
 /** Where a framework draws one piece of rendered content, as a portal. */
 export interface FluidboxSlot<TItem extends FluidboxItem = FluidboxItem> {

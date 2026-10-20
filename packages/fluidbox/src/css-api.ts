@@ -51,6 +51,11 @@ export const publishedValues: readonly CssName[] = [
 export const parts: readonly CssName[] = [
   /** The viewer's root, at the end of `<body>` while open. */
   { names: ["data-fluidbox-overlay"] },
+  /**
+   * On the overlay's copy a server renders when the page starts open. It sits
+   * absolute at the top of the page until the viewer takes over, then hides.
+   */
+  { names: ["data-fluidbox-static"] },
   /** The backdrop. A click on it closes the viewer. */
   { names: ["data-fluidbox-backdrop"] },
   /** The viewport-sized box at the page's scroll position. */
@@ -242,6 +247,7 @@ export const internal: readonly string[] = [
   "--fluidbox-zoom-stage-right",
   "--fluidbox-zoom-stage-top",
   "data-fluidbox-content",
+  "data-fluidbox-server-viewer",
   "data-fluidbox-controls-revealing",
   "data-fluidbox-filmstrip-thumbnail",
   "data-fluidbox-filmstrip-track",

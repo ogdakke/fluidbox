@@ -191,8 +191,11 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   z-index: var(--layer-fluidbox, 7);
 }
 
+/* A press prepares the viewer over its card. A descendant can set visibility
+   back to visible, as a ready slide preview does, so opacity hides it too. */
 [data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-prepared] {
   visibility: hidden;
+  opacity: 0;
   pointer-events: none;
 }
 
@@ -849,7 +852,10 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   color: var(--fluidbox-color, black);
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-announcer] {
+  /* At the top: left in the flow, it sat a pixel past a short page's end. */
   position: absolute;
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   overflow: hidden;
@@ -865,4 +871,16 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close]:focus-visible {
   outline: 2px solid var(--fluidbox-focus-color, currentColor);
   outline-offset: 2px;
+}
+
+/* A viewer the server rendered covers the page until the runtime takes it over.
+   Like the runtime's, it is absolute at the top of the page, never fixed: iOS 26
+   tints its bars from fixed layers. The takeover moves it to the scroll position. */
+[data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-static][hidden] {
+  display: none;
+}
+:where([data-fluidbox-overlay][data-fluidbox-static])
+  a:is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+  color: var(--fluidbox-color, white);
+  text-decoration: none;
 }

@@ -505,6 +505,7 @@ export class DomViewerDriver<
     void this.#loadZoom();
     this.#cancelAnimations(true);
     const prepared =
+      !context.instant &&
       this.#preparedOpen &&
       idOf(this.#preparedOpen.item) === idOf(context.item) &&
       this.#preparedOpen.index === context.index
@@ -516,7 +517,9 @@ export class DomViewerDriver<
     this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
       await this.#strip?.select(context.index, false);
-      this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
+      if (!context.instant) {
+        this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
+      }
     }
     this.#render(context.item, context.index);
     this.#setActiveTrigger(context.origin?.trigger ?? null);
@@ -532,8 +535,25 @@ export class DomViewerDriver<
     }
     this.#strip?.mount();
     for (const extension of this.#extensions) extension.attach?.();
-    this.#isolation.activate();
+    // An instant open waits for its image while the server's copy, inside the
+    // page, stays usable; the page goes inert once the viewer shows.
+    if (!context.instant) this.#isolation.activate();
     this.#setState("opening");
+    if (context.instant) {
+      // Hidden until the image can paint, so it replaces the server's copy in one frame.
+      this.#keepThumbnailVisible(undefined);
+      this.#strip?.completeOpening(context.index);
+      await this.#mediaReady();
+      if (context.signal.aborted) return;
+      this.#clearMotionStyles();
+      this.#thumbnailOverlays?.prepare(context.item, context.index, this.#frame, "open", 0);
+      this.#isolation.activate();
+      delete this.#portal.overlay.dataset.fluidboxPrepared;
+      this.#setState("open");
+      // No one pressed anything yet, so focus the dialog without a ring on Close.
+      this.#portal.dialog.focus({ preventScroll: true, focusVisible: false } as FocusOptions);
+      return;
+    }
     if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (context.signal.aborted) return;
     if (this.#prefersReducedMotion()) {
@@ -817,6 +837,20 @@ export class DomViewerDriver<
     this.#strip?.destroy();
     this.#strip = undefined;
     this.#finishClose();
+  }
+
+  /** Wait until the active image has decoded and the strip shows it, for at most three seconds. */
+  async #mediaReady() {
+    const media = this.#media;
+    if (!(media instanceof HTMLImageElement)) return;
+    const shown = (async () => {
+      await media.decode().catch(() => {});
+      // The strip reveals an image a frame or so after it decodes.
+      for (let frame = 0; frame < 10 && media.dataset.fluidboxImagePending !== undefined; frame++) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+    })();
+    await Promise.race([shown, new Promise((resolve) => setTimeout(resolve, 3000))]);
   }
 
   get #frame() {
