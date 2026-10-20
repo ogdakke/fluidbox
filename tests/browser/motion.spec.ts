@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { holdMotion } from "./support/hold-motion";
+import { viewerLoaded } from "./support/viewer-loaded";
 
 test.use({ trace: "on", video: "on" });
 
@@ -389,6 +390,8 @@ test("direct React gallery carries clipped-origin geometry through opening and c
   });
   const originBounds = await origin.boundingBox();
   expect(originBounds).not.toBeNull();
+  // The click stages the overlay at once only when the viewer's code is in.
+  await viewerLoaded(origin);
   await holdMotion(page);
   const corners = await origin.evaluate(async (element: HTMLElement) => {
     const rect = (target: HTMLElement) => {
@@ -984,7 +987,9 @@ test("close-flight handoff hides every painted layer of the source frame", async
 
 test("opening crop transforms the fallback and media together", async ({ page }) => {
   await page.goto("/headless.html");
-  const transforms = await page.evaluate(() => {
+  const transforms = await page.evaluate(async () => {
+    // A preload prepares the viewer only once its code is in.
+    await window.headlessViewer.load();
     const dispose = window.headlessViewer.preload("one");
     const frame = document.querySelector<HTMLElement>(
       '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]',
