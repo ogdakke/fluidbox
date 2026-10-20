@@ -8,6 +8,7 @@ import Origins from "./Origins.vue";
 import Overlay from "./Overlay.vue";
 import Programmatic from "./Programmatic.vue";
 import Renderers from "./Renderers.vue";
+import Rtl from "./Rtl.vue";
 import Sheet from "./Sheet.vue";
 import Zoom from "./Zoom.vue";
 
@@ -27,6 +28,7 @@ export const patterns: Record<PatternName, MountPattern> = {
   programmatic: mount(Programmatic),
   zoom: mount(Zoom),
   filmstrip: mount(Filmstrip),
+  rtl: mount(Rtl),
   sheet: mount(Sheet),
   headless: mount(Headless),
 };

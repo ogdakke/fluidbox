@@ -1,9 +1,9 @@
 /**
  * Data and styles shared by every framework's pattern examples. Each framework
- * implements the same nine patterns in `src/patterns/<framework>/`, against the
+ * implements the same ten patterns in `src/patterns/<framework>/`, against the
  * hooks listed in CONTRACT.md, so one browser spec checks them all.
  */
-import type { FluidboxImageItem, FluidboxItem } from "@ogdakke/fluidbox";
+import type { FluidboxImageItem, FluidboxItem, FluidboxLabels } from "@ogdakke/fluidbox";
 import { artItem, artSrc, sceneById, scenes } from "../art";
 import { mapEmbedUrl, mapView } from "../map-view";
 import "./patterns.css";
@@ -13,7 +13,7 @@ export { artSrc, sceneById, scenes };
 const art = (prefix: string, ids: string[]) =>
   ids.map((id) => artItem(sceneById(id), `${prefix}-${id}`));
 
-/** 1 basic, 5 programmatic, 6 zoom, 7 filmstrip, 8 sheet, 9 headless. */
+/** 1 basic, 5 programmatic, 6 zoom, 7 filmstrip, 8 sheet, 9 headless, 10 rtl. */
 export const photos: FluidboxImageItem[] = art("photo", ["aurora", "ridge", "fjord", "lagoon"]);
 
 /** 2 overlay: an album behind one trigger. */
@@ -99,6 +99,25 @@ export const thumbnailSrc = (item: FluidboxItem) =>
   item.thumbnail?.src ??
   (item.type === "video" ? item.poster : item.type === "img" ? item.src : "");
 
+/** 10 rtl: the viewer's words in Arabic, with Arabic-Indic digits in the position. */
+// Plain "ar" now formats with Western digits; nu-arab asks for Arabic-Indic ones.
+const arabicNumber = new Intl.NumberFormat("ar-u-nu-arab");
+export const arabic: Partial<FluidboxLabels> = {
+  viewer: "عارض الوسائط",
+  close: "إغلاق",
+  previous: "السابق",
+  next: "التالي",
+  position: (index, count) =>
+    `العنصر ${arabicNumber.format(index + 1)} من ${arabicNumber.format(count)}`,
+  slides: "عناصر المعرض",
+  filmstrip: "شريط الصور المصغّرة",
+  filmstripList: "اختر عنصرًا من المعرض",
+  zoomed: "صورة مكبّرة",
+  sheet: "التفاصيل",
+  error: "تعذّر تحميل الوسائط.",
+  retry: "إعادة المحاولة",
+};
+
 export type PatternName =
   | "basic"
   | "overlay"
@@ -108,7 +127,8 @@ export type PatternName =
   | "zoom"
   | "filmstrip"
   | "sheet"
-  | "headless";
+  | "headless"
+  | "rtl";
 
 export const patternNames: readonly PatternName[] = [
   "basic",
@@ -120,4 +140,5 @@ export const patternNames: readonly PatternName[] = [
   "filmstrip",
   "sheet",
   "headless",
+  "rtl",
 ];

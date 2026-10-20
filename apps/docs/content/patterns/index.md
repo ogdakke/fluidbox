@@ -2,7 +2,7 @@
 title: Overview
 section: Patterns
 order: 0
-description: Nine common lightbox setups, each live and in every framework.
+description: Ten common lightbox setups, each live and in every framework.
 ---
 
 # Patterns
@@ -20,13 +20,14 @@ Each pattern is a small, complete example. Pick your framework in any tab, and e
 | [Filmstrip](./filmstrip.md)               | The default strip, and your own thumbnails                    |
 | [Sheet](./sheet.md)                       | A panel under the photo with snap points                      |
 | [Headless controls](./headless.md)        | Your own caption bar and buttons                              |
+| [Right to left](./rtl.md)                 | An Arabic gallery: the viewer reads right to left             |
 
 ## The example data
 
 The examples import their items from `./data`. Each item is a plain object. Here is that module, with the longer lists cut short:
 
 ```ts
-import type { FluidboxImageItem, FluidboxItem } from "@ogdakke/fluidbox";
+import type { FluidboxImageItem, FluidboxItem, FluidboxLabels } from "@ogdakke/fluidbox";
 
 /** An image with its own id. The thumbnails on the page show the same file. */
 const image = (
@@ -37,7 +38,7 @@ const image = (
   height: number,
 ): FluidboxImageItem => ({ id, type: "img", src, alt, width, height });
 
-/** Gallery, programmatic control, zoom, filmstrip, sheet and headless controls. */
+/** Gallery, programmatic control, zoom, filmstrip, sheet, headless controls and right to left. */
 export const photos: FluidboxImageItem[] = [
   image("photo-aurora", "/art/aurora.svg", "Aurora over the tundra", 1100, 1650),
   image("photo-ridge", "/art/ridge.svg", "Night ridge", 1200, 1500),
@@ -122,6 +123,25 @@ export const theme = "dusk";
 export const thumbnailSrc = (item: FluidboxItem) =>
   item.thumbnail?.src ??
   (item.type === "video" ? item.poster : item.type === "img" ? item.src : "");
+
+/** Right to left: the viewer's words in Arabic, with Arabic-Indic digits in the position. */
+// Plain "ar" now formats with Western digits; nu-arab asks for Arabic-Indic ones.
+const arabicNumber = new Intl.NumberFormat("ar-u-nu-arab");
+export const arabic: Partial<FluidboxLabels> = {
+  viewer: "عارض الوسائط",
+  close: "إغلاق",
+  previous: "السابق",
+  next: "التالي",
+  position: (index, count) =>
+    `العنصر ${arabicNumber.format(index + 1)} من ${arabicNumber.format(count)}`,
+  slides: "عناصر المعرض",
+  filmstrip: "شريط الصور المصغّرة",
+  filmstripList: "اختر عنصرًا من المعرض",
+  zoomed: "صورة مكبّرة",
+  sheet: "التفاصيل",
+  error: "تعذّر تحميل الوسائط.",
+  retry: "إعادة المحاولة",
+};
 ```
 
 Import `@ogdakke/fluidbox/styles.css` once in your app (see [Getting started](../getting-started.md)). The class names (`pattern-grid`, `pattern-thumb`, …) belong to the examples. Use your own.

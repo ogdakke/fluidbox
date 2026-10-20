@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
- * Every framework page implements the same nine patterns (apps/examples/src/patterns/CONTRACT.md).
+ * Every framework page implements the same ten patterns (apps/examples/src/patterns/CONTRACT.md).
  * Set PATTERNS=react,vue to run some of them.
  */
 const all = ["react", "vue", "solid", "angular", "elements", "javascript"] as const;
@@ -199,6 +199,58 @@ for (const framework of frameworks) {
       await expect(caption.locator('[data-test="counter"]')).toHaveText("2 / 4");
       await caption.locator('[data-test="close"]').click();
       await expect(dialog(page)).toHaveCount(0);
+    });
+
+    test("rtl", async ({ page }, testInfo) => {
+      const root = pattern(page, "rtl");
+      const triggers = root.locator('[data-test="trigger"]');
+      await expect(triggers).toHaveCount(4);
+      await open(page, triggers.nth(0), "العنصر ١ من ٤");
+      const overlay = page.locator("[data-fluidbox-overlay]");
+      await expect(overlay).toHaveAttribute("dir", "rtl");
+      await expect(overlay).toHaveAttribute("lang", "ar");
+      const slides = page.locator("[data-fluidbox-slides]");
+      const inPlace = () =>
+        slides.evaluate((element) => {
+          const active = element.querySelector('[data-fluidbox-slide][aria-hidden="false"]')!;
+          return Math.abs(
+            active.getBoundingClientRect().right - element.getBoundingClientRect().right,
+          );
+        });
+      // Forward is to the left: the key, the button and the swipe.
+      await page.keyboard.press("ArrowLeft");
+      await expectSlide(page, "العنصر ٢ من ٤");
+      await expect
+        .poll(inPlace, { message: "the slide on show is the current one" })
+        .toBeLessThan(2);
+      const next = dialog(page).locator("[data-fluidbox-next]");
+      await expect(next).toHaveAttribute("aria-label", "التالي");
+      const [nextBox, slidesBox] = await Promise.all([next.boundingBox(), slides.boundingBox()]);
+      expect(nextBox!.x + nextBox!.width / 2).toBeLessThan(slidesBox!.x + slidesBox!.width / 2);
+      await page.keyboard.press("ArrowRight");
+      await expectSlide(page, "العنصر ١ من ٤");
+      await next.click();
+      await expectSlide(page, "العنصر ٢ من ٤");
+      if (!testInfo.project.use.isMobile) {
+        await slides.hover();
+        await page.mouse.wheel(-900, 0);
+        await expectSlide(page, "العنصر ٣ من ٤");
+        await expect.poll(inPlace).toBeLessThan(2);
+      } else {
+        await page.keyboard.press("ArrowLeft");
+        await expectSlide(page, "العنصر ٣ من ٤");
+      }
+      const selected = dialog(page).locator("[data-fluidbox-filmstrip-item][aria-selected=true]");
+      await expect(selected).toHaveAttribute("data-index", "2");
+      // The filmstrip runs right to left too: the first thumbnail is on the right.
+      const thumbs = dialog(page).locator("[data-fluidbox-filmstrip-item]");
+      const [first, second] = await Promise.all([
+        thumbs.nth(0).boundingBox(),
+        thumbs.nth(1).boundingBox(),
+      ]);
+      expect(first!.x).toBeGreaterThan(second!.x);
+      await close(page);
+      await expect(triggers.nth(2)).toBeFocused();
     });
 
     test("headless controls fade when a dismiss starts", async ({ page }) => {

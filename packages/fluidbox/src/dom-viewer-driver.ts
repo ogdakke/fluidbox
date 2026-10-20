@@ -1053,7 +1053,21 @@ export class DomViewerDriver<
     this.#viewportWidth = view.innerWidth;
     this.#sizeContainer(view);
     this.#applyTheme(theme);
+    this.#applyLocale(theme ?? this.#portal.overlay.ownerDocument.documentElement);
     this.#syncPageHeight();
+  }
+
+  /**
+   * The viewer lives at the end of the body, so it takes its direction and
+   * language from the trigger instead: a right-to-left gallery on a
+   * left-to-right page opens a right-to-left viewer.
+   */
+  #applyLocale(source: HTMLElement) {
+    const overlay = this.#portal.overlay;
+    overlay.dir = getComputedStyle(source).direction === "rtl" ? "rtl" : "ltr";
+    const lang = source.closest<HTMLElement>("[lang]")?.lang;
+    if (lang) overlay.lang = lang;
+    else overlay.removeAttribute("lang");
   }
 
   #applyTheme(source: HTMLElement | null) {
@@ -1800,7 +1814,9 @@ export class DomViewerDriver<
     ) {
       event.preventDefault();
       this.#zoom?.suspend();
-      void this.#controller?.[event.key === "ArrowRight" ? "next" : "previous"]({
+      // The next slide sits on the left when the viewer reads right to left.
+      const forward = (event.key === "ArrowRight") !== (this.#portal.overlay.dir === "rtl");
+      void this.#controller?.[forward ? "next" : "previous"]({
         reason: "keyboard",
       });
     }

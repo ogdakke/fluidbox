@@ -43,6 +43,10 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
     note: "A panel under the photo with snap points, stop buttons and a text field.",
   },
   headless: { title: "Headless controls", note: "Your own caption bar and buttons." },
+  rtl: {
+    title: "Right to left",
+    note: "A gallery in an Arabic, right-to-left section: the viewer reads its direction and language from there.",
+  },
 };
 
 /** Build the page: one section per pattern, its live example, and the code that made it. */

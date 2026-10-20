@@ -70,6 +70,8 @@ createFluidbox({
 });
 ```
 
+[Languages and direction](./languages.md) covers translating with an i18n library and running the viewer right to left.
+
 ## Add-ons
 
 <!-- api: FluidboxFilmstripOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->

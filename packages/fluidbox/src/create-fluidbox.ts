@@ -242,9 +242,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       (event) => {
         const options = { reason: "keyboard" } as const;
         if (event.key === "Escape") void this.#close(options);
-        else if (event.key === "ArrowRight") void this.#step("next", options);
-        else if (event.key === "ArrowLeft") void this.#step("previous", options);
-        else return;
+        else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+          // The viewer reads in the direction of whatever holds focus, the trigger.
+          const source = event.target instanceof Element ? event.target : document.documentElement;
+          const rtl = getComputedStyle(source).direction === "rtl";
+          void this.#step((event.key === "ArrowRight") !== rtl ? "next" : "previous", options);
+        } else return;
         event.preventDefault();
       },
       { capture: true, signal: waiting.signal },

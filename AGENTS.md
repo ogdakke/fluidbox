@@ -9,6 +9,6 @@ This is a Bun workspace. The only published package is `packages/fluidbox` (`@og
 - Keep gesture, zoom, transition, gallery, and portal behavior in the runtime package. Bindings use only the plain JS API, the add-on entries and the binding kit (`@ogdakke/fluidbox/kit`, `src/kit.ts`), never the custom elements. Every binding, the custom elements and the plain JS API support the same patterns.
 - Preserve the body-level custom portal. Do not replace it with a native `dialog`.
 - `portfolio-v4` consumes this package through a sibling `file:` link and retains its own Markdown plugins and media registry.
-- Every framework implements the nine patterns in `apps/examples/src/patterns/<framework>/` against `CONTRACT.md` there; `tests/browser/patterns.spec.ts` checks them, and the docs show the `#region example` parts.
+- Every framework implements the ten patterns in `apps/examples/src/patterns/<framework>/` against `CONTRACT.md` there; `tests/browser/patterns.spec.ts` checks them, and the docs show the `#region example` parts.
 - `apps/examples` is the example site and the Playwright fixture server; `apps/docs` is the docs site (Markdown in `apps/docs/content`, highlighted with `@pierre/highlights`). Both use the shared design system in `apps/design`; every page, fixtures included, uses it.
 - Serve with portless: `bun run dev:share` (examples as `fluidbox`) and `bun run docs:share` (docs as `docs.fluidbox`), both with `--lan --tailscale`.

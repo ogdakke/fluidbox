@@ -98,8 +98,12 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
 
   /** Put a thumbnail at its place along the strip. */
   #place(button: HTMLButtonElement, index: number) {
-    button.style.removeProperty(this.#vertical ? "left" : "top");
-    button.style.setProperty(this.#vertical ? "top" : "left", `${index * this.#step}px`);
+    // From the strip's start, so a right-to-left strip runs from the right.
+    button.style.removeProperty(this.#vertical ? "inset-inline-start" : "top");
+    button.style.setProperty(
+      this.#vertical ? "top" : "inset-inline-start",
+      `${index * this.#step}px`,
+    );
   }
 
   #makeButton(index: number) {

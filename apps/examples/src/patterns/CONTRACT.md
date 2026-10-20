@@ -1,6 +1,6 @@
 # Pattern examples contract
 
-Every framework implements the same nine patterns in `src/patterns/<framework>/`, where
+Every framework implements the same ten patterns in `src/patterns/<framework>/`, where
 `<framework>` is `react`, `vue`, `solid`, `angular`, `elements` or `javascript`. The page
 `/<framework>/` mounts them through `mountPatternPage` (`src/patterns/page.ts`), and
 `tests/browser/patterns.spec.ts` checks every page against the hooks below. The docs show the same
@@ -104,3 +104,11 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    own `button[data-test="prev"]`, `button[data-test="next"]`, `button[data-test="close"]` that
    call `close()`, `previous()` and `next()`. Test: open trigger 1 → counter `1 / 4`; click next → `2 / 4`; click
    close → dialog gone.
+10. **rtl** — a gallery of `photos` with the default filmstrip inside `<div dir="rtl" lang="ar">`,
+    with `labels` set to `arabic` from shared.ts (a property on the gallery for elements). One
+    `button.pattern-thumb[data-test="trigger"]` per photo. Test: open trigger 1 → the overlay has
+    `dir="rtl"` and `lang="ar"`, the slide is `"العنصر ١ من ٤"`; ArrowLeft → `"العنصر ٢ من ٤"` with that
+    slide on show; `[data-fluidbox-next]` is labelled `"التالي"` and sits left of centre; ArrowRight →
+    back to 1; Next → 2; a horizontal wheel to the left (or ArrowLeft on touch devices) → 3; the
+    selected filmstrip thumbnail is `data-index="2"` and the first thumbnail is right of the
+    second; Escape returns focus to trigger 3.

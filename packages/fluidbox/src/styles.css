@@ -364,8 +364,9 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   width: calc(
     100% - var(--fluidbox-stage-left) - var(--fluidbox-stage-right) + var(--fluidbox-slide-gap, 0px)
   );
-  margin-inline: calc(var(--fluidbox-stage-left) - var(--fluidbox-slide-gap, 0px) / 2)
-    calc(var(--fluidbox-stage-right) - var(--fluidbox-slide-gap, 0px) / 2);
+  /* Physical sides: the stage insets are, and a right-to-left strip keeps them. */
+  margin-left: calc(var(--fluidbox-stage-left) - var(--fluidbox-slide-gap, 0px) / 2);
+  margin-right: calc(var(--fluidbox-stage-right) - var(--fluidbox-slide-gap, 0px) / 2);
   height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
@@ -524,6 +525,17 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   top: calc(var(--fluidbox-stage-top) + 16px);
   right: calc(var(--fluidbox-stage-right) + 16px);
 }
+/* Right to left, Close takes the top-left corner. */
+:where([data-fluidbox-overlay][dir="rtl"]) [data-fluidbox-close] {
+  right: auto;
+  left: -12px;
+}
+:where([data-fluidbox-overlay][dir="rtl"])
+  [data-fluidbox-dialog]:is([data-gallery], [data-fluidbox-headless])
+  [data-fluidbox-close] {
+  right: auto;
+  left: calc(var(--fluidbox-stage-left) + 16px);
+}
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-headless]:not([data-gallery])
   [data-fluidbox-close] {
@@ -574,6 +586,23 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-next] {
   right: calc(var(--fluidbox-stage-right) + 16px);
+}
+
+/* Right to left, the next slide comes from the left, so Next sits there. */
+:where([data-fluidbox-overlay][dir="rtl"]) [data-fluidbox-previous] {
+  right: calc(var(--fluidbox-stage-right) + 16px);
+  left: auto;
+}
+
+:where([data-fluidbox-overlay][dir="rtl"]) [data-fluidbox-next] {
+  left: calc(var(--fluidbox-stage-left) + 16px);
+  right: auto;
+}
+
+:where([data-fluidbox-overlay][dir="rtl"])
+  :is([data-fluidbox-previous], [data-fluidbox-next])
+  > [data-fluidbox-icon] {
+  transform: scaleX(-1);
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
@@ -744,6 +773,8 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
  * @on Dialog
  */
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport] {
+  /* Panning a picture has no reading direction, and the pan maths counts from the left. */
+  direction: ltr;
   --fluidbox-zoom-reach: var(--fluidbox-zoom-bleed, var(--fluidbox-zoom-chrome, 0px));
 
   --fluidbox-zoom-reach-start: var(--fluidbox-zoom-reach-top, var(--fluidbox-zoom-reach));

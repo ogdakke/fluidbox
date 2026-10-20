@@ -9,6 +9,7 @@ import { Origins } from "./origins";
 import { Overlay } from "./overlay";
 import { Programmatic } from "./programmatic";
 import { Renderers } from "./renderers";
+import { Rtl } from "./rtl";
 import { Sheet } from "./sheet";
 import { Zoom } from "./zoom";
 
@@ -34,4 +35,5 @@ export const patterns: Record<PatternName, MountPattern> = {
   filmstrip: mount(Filmstrip),
   sheet: mount(Sheet),
   headless: mount(Headless),
+  rtl: mount(Rtl),
 };

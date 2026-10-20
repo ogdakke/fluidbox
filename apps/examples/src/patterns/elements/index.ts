@@ -12,6 +12,8 @@ import { overlay } from "./overlay";
 import programmaticMarkup from "./programmatic.html?raw";
 import { programmatic } from "./programmatic";
 import renderersMarkup from "./renderers.html?raw";
+import rtlMarkup from "./rtl.html?raw";
+import { rtl } from "./rtl";
 import { renderers } from "./renderers";
 import sheetMarkup from "./sheet.html?raw";
 import { sheet } from "./sheet";
@@ -36,4 +38,5 @@ export const patterns: Record<PatternName, MountPattern> = {
   filmstrip: mount(filmstripMarkup, filmstrip),
   sheet: mount(sheetMarkup, sheet),
   headless: mount(headlessMarkup, headless),
+  rtl: mount(rtlMarkup, rtl),
 };

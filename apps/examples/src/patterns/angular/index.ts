@@ -5,6 +5,7 @@ import type { MountPattern } from "../page";
 import type { PatternName } from "../shared";
 import { Basic } from "./basic";
 import { Filmstrip } from "./filmstrip";
+import { Rtl } from "./rtl";
 import { Headless } from "./headless";
 import { Origins } from "./origins";
 import { Overlay } from "./overlay";
@@ -33,6 +34,7 @@ export const patterns: Record<PatternName, MountPattern> = {
   programmatic: mount(Programmatic),
   zoom: mount(Zoom),
   filmstrip: mount(Filmstrip),
+  rtl: mount(Rtl),
   sheet: mount(Sheet),
   headless: mount(Headless),
 };

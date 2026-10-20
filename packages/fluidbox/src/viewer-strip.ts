@@ -59,6 +59,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #index = 0;
   #base = 0;
   #width = 0;
+  /** -1 when the strip runs right to left, where `scrollLeft` counts down from 0. */
+  #sign = 1;
   #mounted = false;
   #rebasing = false;
   #rebaseFrame = 0;
@@ -137,8 +139,20 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return this.#source.getItem(this.#index);
   }
 
+  /** How far the frozen strip sits from its slide, in screen pixels. */
   get snapOffset() {
-    return this.#frozen ? this.#frozenLeft - (this.#index - this.#base) * this.#width : 0;
+    return this.#frozen
+      ? this.#sign * (this.#frozenLeft - (this.#index - this.#base) * this.#width)
+      : 0;
+  }
+
+  /** The scroll position from the strip's start, positive in either direction. */
+  get #left() {
+    return this.#sign * this.element.scrollLeft;
+  }
+
+  #scrollTo(left: number, behavior: ScrollBehavior) {
+    this.element.scrollTo({ left: this.#sign * left, behavior });
   }
 
   setSource(source: FluidboxSource<TItem>) {
@@ -161,6 +175,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#mounted = true;
       this.#observer.observe(this.element);
     }
+    this.#sign = getComputedStyle(this.element).direction === "rtl" ? -1 : 1;
     // The exact width, as the resize observer reports it. clientWidth rounds,
     // and index × rounded width drifts off the slides on a fractional viewport.
     this.#width = this.element.getBoundingClientRect().width;
@@ -194,15 +209,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#jump(index);
       return Promise.resolve();
     }
-    this.element.scrollTo({ left: (index - this.#base) * this.#width, behavior: "smooth" });
+    this.#scrollTo((index - this.#base) * this.#width, "smooth");
     return new Promise<void>((resolve) => {
       // The fallback lands the slide only once the smooth scroll has stalled.
       // Safari takes well over half a second to cross a wide viewport, and
       // jumping while it still glides snaps the last stretch into place.
       const started = performance.now();
-      let last = this.element.scrollLeft;
+      let last = this.#left;
       const check = () => {
-        const left = this.element.scrollLeft;
+        const left = this.#left;
         const moving = Math.abs(left - last) > 1;
         last = left;
         if (moving && performance.now() - started < 2000 && this.#selection) {
@@ -230,15 +245,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   freeze() {
     if (this.#frozen) return;
-    this.#frozenLeft = this.element.scrollLeft;
+    this.#frozenLeft = this.#left;
     this.#frozen = true;
     this.element.dataset.fluidboxFrozen = "";
-    this.element.scrollTo({ left: this.#frozenLeft, behavior: "instant" });
+    this.#scrollTo(this.#frozenLeft, "instant");
   }
 
   resume() {
     if (!this.#frozen) return;
-    this.element.scrollTo({ left: this.#frozenLeft, behavior: "instant" });
+    this.#scrollTo(this.#frozenLeft, "instant");
     this.element.style.removeProperty("--fluidbox-scroll-compensation");
     this.#frozen = false;
     delete this.element.dataset.fluidboxFrozen;
@@ -552,8 +567,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const index = this.#instantTarget;
     if (index === null) return;
     const left = (index - this.#base) * this.#width;
-    if (Math.abs(this.element.scrollLeft - left) > 1) {
-      this.element.scrollTo({ left, behavior: "instant" });
+    if (Math.abs(this.#left - left) > 1) {
+      this.#scrollTo(left, "instant");
       this.#instantFrame = requestAnimationFrame(this.#alignInstant);
       return;
     }
@@ -571,7 +586,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (!this.#width) return;
     // A fence on the previous side hides the slides before the current one.
     const first = this.#fence < 0 ? this.#index : this.#base;
-    this.element.scrollTo({ left: (index - first) * this.#width, behavior: "instant" });
+    this.#scrollTo((index - first) * this.#width, "instant");
   }
 
   /**
@@ -580,7 +595,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * and rubber-bands there. The slides come back when the gesture settles.
    */
   #askAhead() {
-    const offset = this.element.scrollLeft - (this.#index - this.#base) * this.#width;
+    const offset = this.#left - (this.#index - this.#base) * this.#width;
     const direction = offset > 2 ? 1 : offset < -2 ? -1 : 0;
     const target = this.#index + direction;
     if (!direction || target < 0 || target >= this.#source.count) return true;
@@ -615,7 +630,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   #sync(forcedIndex?: number, notify = true) {
     if (!this.#source.count) return;
-    const left = this.#frozen ? this.#frozenLeft : this.element.scrollLeft;
+    const left = this.#frozen ? this.#frozenLeft : this.#left;
     const index =
       forcedIndex ??
       Math.max(
@@ -909,13 +924,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   #onScroll = () => {
     if (this.#frozen) {
-      const offset = this.element.scrollLeft - this.#frozenLeft;
-      this.element.style.setProperty("--fluidbox-scroll-compensation", `${offset}px`);
+      const offset = this.#left - this.#frozenLeft;
+      this.element.style.setProperty("--fluidbox-scroll-compensation", `${this.#sign * offset}px`);
       return;
     }
     if (this.#instantTarget !== null) {
       const left = (this.#instantTarget - this.#base) * this.#width;
-      if (Math.abs(this.element.scrollLeft - left) > 1) return;
+      if (Math.abs(this.#left - left) > 1) return;
       this.#endInstant();
     }
     if (this.#rebasing || !this.#width) return;
@@ -955,8 +970,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#refused = null;
     // A refused move the fence did not catch snapped to the neighbour. Go back.
     const left = (this.#index - this.#base) * this.#width;
-    if (refused && Math.abs(this.element.scrollLeft - left) > 1) {
-      this.element.scrollTo({ left, behavior: "smooth" });
+    if (refused && Math.abs(this.#left - left) > 1) {
+      this.#scrollTo(left, "smooth");
     }
     if (this.#selection?.index === this.#index) this.#resolveSelection();
     if (this.#index - this.#base < 8 || this.#index - this.#base >= this.#slides.size - 8) {

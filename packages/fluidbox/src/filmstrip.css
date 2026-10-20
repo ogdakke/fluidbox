@@ -191,7 +191,7 @@
   }
 }
 
-/* A column (--fluidbox-filmstrip-axis: y), down the left by default. It floats
+/* A column (--fluidbox-filmstrip-axis: y), down the start side by default. It floats
    over the slides, which still cross the whole window. */
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-filmstrip-dock]:has([aria-orientation="vertical"]) {
@@ -201,6 +201,10 @@
   height: auto;
   padding-inline-start: env(safe-area-inset-left, 0px);
 }
+:where([data-fluidbox-overlay][dir="rtl"])
+  [data-fluidbox-filmstrip-dock]:has([aria-orientation="vertical"]) {
+  padding-inline-start: env(safe-area-inset-right, 0px);
+}
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-filmstrip]:has([aria-orientation="vertical"]) {
   --fluidbox-filmstrip-hide: translateX(calc(-1 * var(--fluidbox-filmstrip-zoom-travel, 18px)));
@@ -208,6 +212,10 @@
   height: 100%;
   margin: 0 auto;
   touch-action: pan-y;
+}
+:where([data-fluidbox-overlay][dir="rtl"])
+  [data-fluidbox-filmstrip]:has([aria-orientation="vertical"]) {
+  --fluidbox-filmstrip-hide: translateX(var(--fluidbox-filmstrip-zoom-travel, 18px));
 }
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-filmstrip-scroll][aria-orientation="vertical"] {

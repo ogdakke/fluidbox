@@ -38,25 +38,26 @@ const initialGzipLimits: Record<Entry, number> = {
   kit: 1_450,
 };
 const cssGzipLimit = 3_200;
+// Right-to-left support added about 200 B to every core entry's viewer chunk.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 31_650,
+  root: 31_850,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
-  elements: 34_650,
-  react: 35_200,
-  solid: 34_350,
-  vue: 35_100,
-  angular: 35_300,
+  elements: 34_850,
+  react: 35_400,
+  solid: 34_550,
+  vue: 35_300,
+  angular: 35_500,
   filmstrip: 3_600,
   sheet: 7_350,
   kit: 1_450,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 34_750,
-  elements: 37_750,
-  react: 38_300,
-  solid: 37_450,
-  vue: 38_200,
-  angular: 38_400,
+  root: 34_950,
+  elements: 37_950,
+  react: 38_500,
+  solid: 37_650,
+  vue: 38_400,
+  angular: 38_600,
   filmstrip: 4_850,
   sheet: 8_700,
   kit: 4_550,

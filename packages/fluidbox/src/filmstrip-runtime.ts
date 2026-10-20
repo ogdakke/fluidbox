@@ -39,6 +39,8 @@ export class FilmstripRuntime {
   #padding = 0;
   #viewportWidth = 0;
   #vertical = false;
+  /** -1 for a right-to-left row, where `scrollLeft` counts down from 0. */
+  #sign = 1;
   #input: FilmstripInput = "pointer";
   #mode: ScrollMode = "idle";
   #touching = false;
@@ -194,7 +196,7 @@ export class FilmstripRuntime {
   }
 
   get #scrolled() {
-    return this.#vertical ? this.#scroller.scrollTop : this.#scroller.scrollLeft;
+    return this.#vertical ? this.#scroller.scrollTop : this.#sign * this.#scroller.scrollLeft;
   }
 
   #readGeometry() {
@@ -206,6 +208,7 @@ export class FilmstripRuntime {
       this.#onAxisChange(vertical);
     }
     const scrollerStyle = getComputedStyle(this.#scroller);
+    this.#sign = !vertical && scrollerStyle.direction === "rtl" ? -1 : 1;
     this.#viewportWidth = this.#extent;
     this.#size = parseFloat(elementStyle.getPropertyValue("--fluidbox-filmstrip-item-size")) || 52;
     const gap = vertical ? scrollerStyle.rowGap : scrollerStyle.columnGap;
@@ -259,7 +262,7 @@ export class FilmstripRuntime {
     const length = this.#vertical ? this.#scroller.scrollHeight : this.#scroller.scrollWidth;
     const target = Math.max(0, Math.min(start, length - this.#extent));
     this.#scroller.scrollTo({
-      [this.#vertical ? "top" : "left"]: target,
+      [this.#vertical ? "top" : "left"]: this.#sign * target,
       behavior: smooth ? "smooth" : "instant",
     });
   }
@@ -361,8 +364,9 @@ export class FilmstripRuntime {
 
   /** A listbox's keys: the arrows along the strip step, Home and End go to the ends. */
   #onKeyDown = (event: KeyboardEvent) => {
-    const back = this.#vertical ? "ArrowUp" : "ArrowLeft";
-    const forward = this.#vertical ? "ArrowDown" : "ArrowRight";
+    const rtl = this.#sign < 0;
+    const back = this.#vertical ? "ArrowUp" : rtl ? "ArrowRight" : "ArrowLeft";
+    const forward = this.#vertical ? "ArrowDown" : rtl ? "ArrowLeft" : "ArrowRight";
     const target =
       event.key === back
         ? this.#index - 1
@@ -389,7 +393,7 @@ export class FilmstripRuntime {
     if (Math.abs(across) > Math.abs(along) && event.cancelable) {
       event.preventDefault();
       if (this.#vertical) this.#scroller.scrollTop += across;
-      else this.#scroller.scrollLeft += across;
+      else this.#scroller.scrollLeft += this.#sign * across;
     }
     this.#settleAfterFrame();
   };
