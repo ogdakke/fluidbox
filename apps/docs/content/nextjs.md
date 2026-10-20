@@ -17,13 +17,15 @@ pnpm add @ogdakke/fluidbox
 
 ## The stylesheets
 
-Import them once, in the root layout. A server component can import CSS.
+Import them once, in the root layout. A server component can import CSS. The filmstrip and the sheet each need their own stylesheet on top of the base one.
 
 ```tsx
 // app/layout.tsx
 import "@ogdakke/fluidbox/styles.css";
 // Only with <Fluidbox.Filmstrip />:
 import "@ogdakke/fluidbox/filmstrip.css";
+// Only with <Fluidbox.Sheet>:
+import "@ogdakke/fluidbox/sheet.css";
 ```
 
 ## The items, from the optimizer
@@ -125,6 +127,7 @@ The same `Gallery` works in `pages/`. Import the stylesheets in `pages/_app.tsx`
 // pages/_app.tsx
 import "@ogdakke/fluidbox/styles.css";
 import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/sheet.css";
 import type { AppProps } from "next/app";
 
 export default function App({ Component, pageProps }: AppProps) {
