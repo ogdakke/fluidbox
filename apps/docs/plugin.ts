@@ -62,9 +62,9 @@ const packageManagers = [
   { key: "bun", add: "bun add" },
 ] as const;
 
-/** A one-line `npm install …` as tabs, one per package manager; anything else is null. */
+/** A one-line install, as `npm install …` or `pnpm add …`, as tabs, one per package manager; anything else is null. */
 export function installTabs(code: string, lang = "bash"): string | null {
-  const match = /^npm install ([^\n]+?)\s*$/.exec(code);
+  const match = /^(?:npm install|pnpm add|yarn add|bun add) ([^\n]+?)\s*$/.exec(code);
   if (!match || !["bash", "sh", "shell"].includes(lang)) return null;
   const packages = match[1]!;
   const tabs = packageManagers
