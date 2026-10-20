@@ -109,6 +109,27 @@ test.describe("sheet on a phone", () => {
     await expect(sheet).toBeFocused();
   });
 
+  test("a scroll dismiss keeps the thumbnail in view while open; a flight dismiss hides it", async ({
+    page,
+  }) => {
+    await page.goto("/social.html");
+    for (const [grid, visibility] of [
+      [".ig-grid", "visible"],
+      [".x-grid", "hidden"],
+    ] as const) {
+      const trigger = page.locator(`${grid} button`).first();
+      await trigger.scrollIntoViewIfNeeded();
+      await trigger.click();
+      await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+      const thumbnail = page.locator("img[data-fluidbox-thumbnail-hidden]");
+      await expect(thumbnail).toHaveCount(1);
+      await expect(thumbnail).toHaveCSS("visibility", visibility);
+      await page.keyboard.press("Escape");
+      await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+      await expect(trigger.locator("img")).toHaveCSS("visibility", "visible");
+    }
+  });
+
   test("a wheel scroll dismiss keeps the momentum from the page until it ends", async ({
     page,
     browserName,

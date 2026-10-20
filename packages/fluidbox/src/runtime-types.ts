@@ -143,6 +143,11 @@ export interface FluidboxExtensionInstance<TItem extends FluidboxItem = Fluidbox
    * sheet's scroll dismiss does; the viewer then closes without a flight.
    */
   closesInPlace?(): boolean;
+  /**
+   * True when the page's thumbnail stays in view while the viewer is open, as
+   * with a sheet's scroll dismiss, where the photo never flies home.
+   */
+  keepsThumbnail?(): boolean;
   destroy(): void;
 }
 

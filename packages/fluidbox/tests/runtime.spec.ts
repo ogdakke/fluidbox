@@ -49,6 +49,9 @@ class TestDriver {
   setPortal() {}
   setExtensions() {}
   revealed() {}
+  keepsThumbnail() {
+    return false;
+  }
   unload() {}
 
   setSource(source: unknown) {

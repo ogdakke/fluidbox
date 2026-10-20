@@ -427,6 +427,11 @@ export class DomViewerDriver<
     this.#onPageScroll();
   }
 
+  /** Whether an extension keeps the page's thumbnail in view while the viewer is open. */
+  keepsThumbnail() {
+    return this.#extensions.some((extension) => extension.keepsThumbnail?.());
+  }
+
   registerThumbnailOverlay(
     id: FluidboxItemId,
     registration: FluidboxThumbnailOverlayRegistration<TItem>,
@@ -1119,11 +1124,16 @@ export class DomViewerDriver<
     }
     this.#themeProperties.clear();
     if (!source) return;
+    // Read them all before writing any. The overlay may already be in the page,
+    // and a read after each write would restyle it once per property.
     const style = getComputedStyle(source);
+    const theme: [property: string, value: string][] = [];
     for (const property of style) {
       if (!property.startsWith("--fluidbox-")) continue;
       const value = style.getPropertyValue(property);
-      if (!value) continue;
+      if (value) theme.push([property, value]);
+    }
+    for (const [property, value] of theme) {
       this.#portal.overlay.style.setProperty(property, value);
       this.#themeProperties.add(property);
     }

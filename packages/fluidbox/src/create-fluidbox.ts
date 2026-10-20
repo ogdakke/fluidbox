@@ -1110,6 +1110,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   #publish(status: FluidboxStatus, index: number | null) {
+    this.#origins.keepThumbnail(status === "open" && !!this.#viewer?.keepsThumbnail());
     this.#state = this.#stateFor(status, index);
     for (const listener of this.#listeners) listener(this.#state);
   }

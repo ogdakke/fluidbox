@@ -463,6 +463,11 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     return this.#dismissed;
   }
 
+  // The photo leaves by scrolling, not by flying home, so its thumbnail stays in view.
+  keepsThumbnail() {
+    return this.#dismiss === "scroll";
+  }
+
   destroy() {
     this.#lifetime.abort();
     clearTimeout(this.#stripTimer);

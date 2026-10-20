@@ -18,6 +18,7 @@ export class OriginRegistry {
   readonly #shared = new Map<FluidboxItemId, OriginRegistration[]>();
   #hiddenId: FluidboxItemId | null = null;
   #hiddenThumbnail: HTMLImageElement | null = null;
+  #kept = false;
 
   constructor(adapter?: FluidboxOriginAdapter) {
     this.#adapter = adapter;
@@ -82,6 +83,16 @@ export class OriginRegistry {
     };
   }
 
+  /**
+   * Keep the hidden thumbnail in view, as under an open viewer whose sheet
+   * dismisses by scrolling. Only a flight then needs the card's image hidden.
+   */
+  keepThumbnail(kept: boolean) {
+    if (kept === this.#kept) return;
+    this.#kept = kept;
+    this.#hiddenThumbnail?.toggleAttribute("data-fluidbox-thumbnail-kept", kept);
+  }
+
   hideThumbnail(id: FluidboxItemId) {
     this.#hiddenId = id;
     this.#restoreThumbnail();
@@ -111,11 +122,13 @@ export class OriginRegistry {
     this.#restoreThumbnail();
     this.#hiddenThumbnail = thumbnail;
     thumbnail.dataset.fluidboxThumbnailHidden = "";
+    if (this.#kept) thumbnail.dataset.fluidboxThumbnailKept = "";
   }
 
   #restoreThumbnail() {
     if (!this.#hiddenThumbnail) return;
     delete this.#hiddenThumbnail.dataset.fluidboxThumbnailHidden;
+    delete this.#hiddenThumbnail.dataset.fluidboxThumbnailKept;
     this.#hiddenThumbnail = null;
   }
 }

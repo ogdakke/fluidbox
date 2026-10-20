@@ -268,6 +268,7 @@ export const internal: readonly string[] = [
   "data-fluidbox-sheet-snap",
   "data-fluidbox-sheet-space",
   "data-fluidbox-thumbnail-crossfade",
+  "data-fluidbox-thumbnail-kept",
   "data-fluidbox-transition-host",
   "data-fluidbox-travel-layer",
   "data-fluidbox-video-actions",

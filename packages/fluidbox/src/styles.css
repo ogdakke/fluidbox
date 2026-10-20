@@ -173,8 +173,14 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   visibility: hidden !important;
 }
 
-/* A crossfading flight fades over the card, so the card keeps its image. */
-[data-fluidbox-thumbnail-hidden][data-fluidbox-thumbnail-crossfade] {
+/* A crossfading flight fades over the card, so the card keeps its image, and
+   so does an open viewer whose sheet dismisses by scrolling: only a flight
+   hides it. The thumbnail carries both marks itself; a :root:has() rule on
+   the viewer's status would restyle the whole page each time it changed. */
+[data-fluidbox-thumbnail-hidden]:is(
+  [data-fluidbox-thumbnail-crossfade],
+  [data-fluidbox-thumbnail-kept]
+) {
   visibility: visible !important;
 }
 

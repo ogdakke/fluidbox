@@ -44,13 +44,6 @@
   initial-value: 0;
 }
 
-/* With the scroll dismiss the photo leaves by scrolling, not by flying home,
-   so its thumbnail on the page stays in view while the viewer is open; only a
-   flight, opening or closing, hides it. */
-:root:has([data-fluidbox-overlay][data-sheet-dismiss="scroll"][data-fluidbox-status="open"])
-  [data-fluidbox-thumbnail-hidden] {
-  visibility: visible !important;
-}
 /* A committed scroll dismiss hands touches straight back to the page. */
 :where([data-fluidbox-overlay][data-sheet-dismissed]),
 :where([data-fluidbox-overlay][data-sheet-dismissed]) * {
