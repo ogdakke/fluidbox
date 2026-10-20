@@ -41,5 +41,6 @@ export const mount: MountLive = (root) => {
   return {
     setLabels: (labels) => fluidbox.update({ labels }),
     setViewer: (on) => fluidbox.update({ viewer: on ? viewer : undefined }),
+    setLoop: (on) => fluidbox.update({ loop: on }),
   };
 };

@@ -3,7 +3,7 @@ import { holdMotion } from "./support/hold-motion";
 
 /**
  * What every binding does live: a travelling overlay's frame layer flies as
- * itself, labels and the viewer part change an open viewer in place, and a
+ * itself, labels, loop and the viewer part change an open viewer in place, and a
  * filmstrip stays through each of those redraws.
  * The fixture is binding-live.html; see fixtures/binding-live/shared.ts.
  */
@@ -150,6 +150,31 @@ for (const framework of frameworks) {
       await page.evaluate(() => window.__live.setLabels(undefined));
       await expect(close).toHaveAttribute("aria-label", "Close");
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
+      expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);
+
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+      expect(errors).toEqual([]);
+    });
+
+    test("loop turns on and off in the open viewer", async ({ page }) => {
+      const errors = watchErrors(page);
+      await load(page, framework);
+      const dialog = await openViewer(page);
+      const slide = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
+      const previous = page.locator("[data-fluidbox-previous]");
+      await expect(slide).toHaveAttribute("aria-label", "Item 1 of 5");
+      await expect(previous).toBeDisabled();
+
+      await page.evaluate(() => window.__live.setLoop(true));
+      await expect(previous).toBeEnabled();
+      await page.keyboard.press("ArrowLeft");
+      await expect(slide).toHaveAttribute("aria-label", "Item 5 of 5");
+      await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
+
+      await page.evaluate(() => window.__live.setLoop(false));
+      await expect(page.locator("[data-fluidbox-next]")).toBeDisabled();
+      await expect(slide).toHaveAttribute("aria-label", "Item 5 of 5");
       expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);
 
       await page.keyboard.press("Escape");

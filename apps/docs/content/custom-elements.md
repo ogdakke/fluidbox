@@ -1,7 +1,7 @@
 ---
 title: Custom elements
 section: Frameworks
-order: 5
+order: 6
 description: The fluidbox custom elements, with every element, attribute, property, method and event, and how markup becomes gallery items.
 ---
 
@@ -110,7 +110,10 @@ The gallery reads the boolean attributes of a `<video>` as HTML does, so an attr
 | `nozoom`    | Turns zoom off.                                                                                                                                                                 |
 | `zoom-step` | The scale of a double-tap or double-click zoom. Default `2`.                                                                                                                    |
 | `zoom-max`  | The largest zoom scale. Default `4`.                                                                                                                                            |
+| `loop`      | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                                                                   |
 | `loading`   | When the viewer's code loads: `hover` (the default), `press` or `eager`. The `loading` property reflects it. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
+| `open`      | Opens the viewer on `index` as it is added, and closes it as it is removed. Leave it off to let the triggers own the viewer.                                                    |
+| `index`     | The item the viewer shows while `open` is set, as an index. Changing it moves the open viewer. An index out of range is ignored.                                                |
 
 The properties are the [`createFluidbox` options](./javascript.md#createfluidboxoptions) the markup can't say, and the [fluidbox's](./javascript.md#the-fluidbox) state and handles:
 
@@ -215,6 +218,8 @@ strip.render = ({ index, target }) => {
 | [Filmstrip](./patterns/filmstrip.md)               | A `<fluidbox-filmstrip>` child, with a `render` of your own.                                                     |
 | [Sheet](./patterns/sheet.md)                       | A `<fluidbox-sheet snap-points>` child, and a `data-fluidbox-sheet-stop` button in `<template slot="viewer">`.   |
 | [Headless controls](./patterns/headless.md)        | `gallery.viewer`, or `<template slot="viewer">`.                                                                 |
+| [Right to left](./patterns/rtl.md)                 | A `dir="rtl"` ancestor, and the `labels` property.                                                               |
+| [Photo in the address](./patterns/url.md)          | The `open` and `index` attributes, set from `?photo=` and from `toggle` and `itemchange`.                        |
 
 ## Notes
 

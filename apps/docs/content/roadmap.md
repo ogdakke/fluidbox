@@ -42,10 +42,6 @@ The test suite emulates phones in desktop browsers. Emulation doesn't reproduce 
 
 This is where help counts most. Sponsorship buys devices and device-cloud time. If you own one of these, an hour of testing or a good bug report from it helps as much.
 
-### Looping galleries
-
-An option to loop a gallery. Swiping past the last item brings the first, and swiping back from the first brings the last. The arrow keys and the Previous and Next buttons wrap the same way.
-
 ### Bugs and edge cases
 
 - One gesture starting during another, like a pinch mid-swipe or a drag during the opening animation.

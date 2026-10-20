@@ -1,6 +1,6 @@
 /**
  * The binding live-options fixture: one album cover whose travelling count
- * holds a frame layer, with handles to change the labels and the viewer part.
+ * holds a frame layer, with handles to change the labels, the viewer part and loop.
  *
  * Hooks: `[data-test=trigger]` the cover, `[data-test=count]` the overlay,
  * `[data-test=layer]` its frame layer, `[data-test=custom-viewer]` the custom
@@ -19,6 +19,8 @@ export interface LiveControls {
   setLabels(labels: Partial<FluidboxLabels> | undefined): void;
   /** Mount or unmount the viewer part with custom content. */
   setViewer(on: boolean): void;
+  /** Turn looping on or off. */
+  setLoop(on: boolean): void;
 }
 
 /** Mount the fixture into `root` and hand back its controls once it renders. */

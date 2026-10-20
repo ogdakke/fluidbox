@@ -85,7 +85,7 @@ bun run lint:all
 bun run format:check
 ```
 
-Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the example site in `apps/examples`. It has a page of the ten patterns for each entry point, and an index of test fixtures at its root. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
+Run `bun run dev` (or `bun run dev:share` to expose it through portless as `fluidbox`) to open the example site in `apps/examples`. It has a page of the eleven patterns for each entry point, and an index of test fixtures at its root. See [browser testing](docs/TESTING.md) for device coverage and visual baselines.
 
 The documentation site lives in `apps/docs`. Run `bun run docs`, or `bun run docs:share` to expose it through portless as `docs.fluidbox`. Both sites share the design tokens and chrome in `apps/design`.
 

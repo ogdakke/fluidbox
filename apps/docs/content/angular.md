@@ -1,7 +1,7 @@
 ---
 title: Angular
 section: Frameworks
-order: 4
+order: 5
 description: The Angular binding for fluidbox, with every directive, input, output, template context and inject function, and the Angular-specific behaviour.
 ---
 
@@ -91,14 +91,17 @@ Without a `fluidboxViewer` template, the viewer has the default Previous, Next a
 
 Exported as `fluidbox`: `<div fluidboxRoot #fb="fluidbox">`.
 
-| Input       | Type                                           | Default               | Purpose                                                                                          |
-| ----------- | ---------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------ |
-| `items`     | `readonly TItem[] \| FluidboxItemList<TItem>`  | `[]`                  | The gallery's items, or a list read on demand (see [Items and origins](./items-and-origins.md)). |
-| `labels`    | `Partial<FluidboxLabels>`                      | English               | Your strings for the viewer and the control parts.                                               |
-| `zoom`      | `false \| { step?: number; max?: number }`     | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                         |
-| `renderers` | `Record<string, TemplateRef \| Type<unknown>>` | `{}`                  | Draw `custom` items, by the name in their `render`: a template or a component. See below.        |
-| `origins`   | `FluidboxOriginAdapter<TItem>`                 | triggers              | Finds origins for items without a mounted trigger, and `revealOrigin` scrolls one into view.     |
-| `loading`   | `"hover" \| "press" \| "eager"`                | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
+| Input       | Type                                           | Default               | Purpose                                                                                                                              |
+| ----------- | ---------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `items`     | `readonly TItem[] \| FluidboxItemList<TItem>`  | `[]`                  | The gallery's items, or a list read on demand (see [Items and origins](./items-and-origins.md)).                                     |
+| `open`      | `boolean`                                      |                       | Whether the viewer is open, for `[(open)]`. It opens on `index` and closes as this changes. Leave it out to let the triggers own it. |
+| `index`     | `number`                                       |                       | The item the viewer shows, for `[(index)]`. An index out of range is ignored.                                                        |
+| `labels`    | `Partial<FluidboxLabels>`                      | English               | Your strings for the viewer and the control parts.                                                                                   |
+| `zoom`      | `false \| { step?: number; max?: number }`     | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                             |
+| `loop`      | `boolean`                                      | `false`               | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                        |
+| `renderers` | `Record<string, TemplateRef \| Type<unknown>>` | `{}`                  | Draw `custom` items, by the name in their `render`: a template or a component. See below.                                            |
+| `origins`   | `FluidboxOriginAdapter<TItem>`                 | triggers              | Finds origins for items without a mounted trigger, and `revealOrigin` scrolls one into view.                                         |
+| `loading`   | `"hover" \| "press" \| "eager"`                | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                     |
 
 | Output               | Payload                          | When                                                                                    |
 | -------------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
@@ -108,6 +111,8 @@ Exported as `fluidbox`: `<div fluidboxRoot #fb="fluidbox">`.
 | `(itemChange)`       | `FluidboxItemChangeEvent<TItem>` | The viewer moves to an item, including the one it opens on.                             |
 | `(settle)`           | `FluidboxItemChangeEvent<TItem>` | The viewer comes to rest on an item.                                                    |
 | `(sheetChange)`      | `FluidboxSheetEvent`             | The sheet comes to rest at another stop: `$event.stop` and `$event.reason`.             |
+| `(openChange)`       | `boolean`                        | The viewer opens or closes, from any input. Half of `[(open)]`.                         |
+| `(indexChange)`      | `number`                         | The viewer moves to another item, opening included. Half of `[(index)]`.                |
 
 The events are the plain API's. See [Events](./javascript.md#events) for their fields and reasons.
 
@@ -254,6 +259,8 @@ The entry exports `FluidboxApi`, `FluidboxSheetApi`, `FluidboxItemContext` (the 
 | [Filmstrip](./patterns/filmstrip.md)               | `<ng-container fluidboxFilmstrip />`, or `<ng-template fluidboxFilmstrip let-index="index">`.                                                              |
 | [Sheet](./patterns/sheet.md)                       | `<ng-template fluidboxSheet [snapPoints]>`, `injectFluidboxSheet()` and `fluidboxSheetStop`.                                                               |
 | [Headless controls](./patterns/headless.md)        | Your own component in `fluidboxViewer`, using `injectFluidbox()`.                                                                                          |
+| [Right to left](./patterns/rtl.md)                 | `[labels]` on the root, inside a `dir="rtl"` element.                                                                                                      |
+| [Photo in the address](./patterns/url.md)          | `[open]`, `[index]`, `(openChange)` and `(indexChange)` with a signal that follows `?photo=`.                                                              |
 
 ## Angular notes
 

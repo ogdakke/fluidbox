@@ -13,9 +13,9 @@ import type {
   FluidboxTarget,
   FluidboxToggleEvent,
 } from "@ogdakke/fluidbox";
-import type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+import type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
-export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
 export interface FluidboxSolidRenderContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
@@ -32,6 +32,19 @@ export type FluidboxSolidRenderer<TItem extends FluidboxItem = FluidboxItem> = (
 export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   /** The gallery's items: an array or a lazy list. Tracked: pass a new one to change the gallery. */
   readonly items: FluidboxItems<TItem>;
+  /**
+   * Whether the viewer is open, when your state owns it. The viewer opens on
+   * `index` and closes when this changes. Leave it out to let triggers own it.
+   */
+  readonly open?: boolean;
+  /** The item the viewer shows, when your state owns it. */
+  readonly index?: number;
+  /** As the viewer opens or closes, from any input. Set `open` to follow it. */
+  readonly onOpenChange?: (open: boolean, details: FluidboxChangeDetails) => void;
+  /** As the viewer moves to another item, opening included. Set `index` to follow it. */
+  readonly onIndexChange?: (index: number, details: FluidboxChangeDetails) => void;
+  /** Go round: past the last item comes the first. A single item never loops. */
+  readonly loop?: boolean;
   /** Your strings for the viewer. Changes apply to an open viewer. */
   readonly labels?: Partial<FluidboxLabels>;
   /** Pinch, double-tap, wheel and keyboard zoom of images. `false` turns it off. Changes apply to an open viewer. */

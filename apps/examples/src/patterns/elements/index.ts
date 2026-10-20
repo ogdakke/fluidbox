@@ -17,15 +17,20 @@ import { rtl } from "./rtl";
 import { renderers } from "./renderers";
 import sheetMarkup from "./sheet.html?raw";
 import { sheet } from "./sheet";
+import urlMarkup from "./url.html?raw";
+import { url } from "./url";
 import zoom from "./zoom.html?raw";
 
 const mount =
-  (markup: string, setup?: (root: HTMLElement) => unknown): MountPattern =>
+  (markup: string, setup?: (root: HTMLElement) => void | (() => void)): MountPattern =>
   (root) => {
     root.innerHTML = markup;
-    setup?.(root);
-    // Removing the galleries tears their viewers down.
-    return () => root.replaceChildren();
+    const cleanup = setup?.(root);
+    return () => {
+      cleanup?.();
+      // Removing the galleries tears their viewers down.
+      root.replaceChildren();
+    };
   };
 
 export const patterns: Record<PatternName, MountPattern> = {
@@ -39,4 +44,5 @@ export const patterns: Record<PatternName, MountPattern> = {
   sheet: mount(sheetMarkup, sheet),
   headless: mount(headlessMarkup, headless),
   rtl: mount(rtlMarkup, rtl),
+  url: mount(urlMarkup, url),
 };

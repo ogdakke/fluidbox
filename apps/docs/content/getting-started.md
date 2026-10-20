@@ -65,7 +65,7 @@ The examples import `photos` from a local `./data` module, described in [the exa
 | Custom elements  | `@ogdakke/fluidbox/elements` | none                                |
 | Plain JavaScript | `@ogdakke/fluidbox`          | none                                |
 
-Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Filmstrip` and `Sheet` turn those add-ons on by being there. `useFluidbox()` (`injectFluidbox()` in Angular) reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md).
+Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Filmstrip` and `Sheet` turn those add-ons on by being there. `useFluidbox()` (`injectFluidbox()` in Angular) reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md). [Next.js](./nextjs.md) covers the React binding with server components and `next/image`.
 
 - **Custom elements.** `<fluidbox-gallery>` with `<fluidbox-item>` children. See [Custom elements](./custom-elements.md).
 - **Plain JavaScript.** `createFluidbox()`, and `fluidbox.bind()` for each trigger. See [JavaScript](./javascript.md).
@@ -105,7 +105,7 @@ Each needs its stylesheet, `filmstrip.css` or `sheet.css`, whichever way you tur
 
 ## Server rendering
 
-The package root, `@ogdakke/fluidbox`, is safe to import on the server. It has no side effects and touches no browser globals until you call `createFluidbox()`. The add-on entries are safe there too. The framework bindings create the viewer only in the browser, after mount, so they render on the server as plain markup.
+The package root, `@ogdakke/fluidbox`, is safe to import on the server. It has no side effects and touches no browser globals until you call `createFluidbox()`. The add-on entries are safe there too. The framework bindings create the viewer only in the browser, after mount, so they render on the server as plain markup. [Next.js](./nextjs.md) walks through one server-rendered setup end to end.
 
 Importing `@ogdakke/fluidbox/elements` defines the custom elements, so that entry is browser only. In a server-rendered app, import it after hydration:
 

@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
- * Every framework page implements the same ten patterns (apps/examples/src/patterns/CONTRACT.md).
+ * Every framework page implements the same eleven patterns (apps/examples/src/patterns/CONTRACT.md).
  * Set PATTERNS=react,vue to run some of them.
  */
 const all = ["react", "vue", "solid", "angular", "elements", "javascript"] as const;
@@ -251,6 +251,32 @@ for (const framework of frameworks) {
       expect(first!.x).toBeGreaterThan(second!.x);
       await close(page);
       await expect(triggers.nth(2)).toBeFocused();
+    });
+
+    test("url", async ({ page }) => {
+      const triggers = pattern(page, "url").locator('[data-test="trigger"]');
+      const photo = () => new URL(page.url()).searchParams.get("photo");
+      await expect(triggers).toHaveCount(4);
+      await open(page, triggers.nth(1), "Item 2 of 4");
+      await expect.poll(photo).toBe("2");
+      await page.keyboard.press("ArrowRight");
+      await expectSlide(page, "Item 3 of 4");
+      await expect.poll(photo).toBe("3");
+      // Opening added one entry and moving replaced it: Back closes, Forward reopens.
+      await page.goBack();
+      await expect(dialog(page)).toHaveCount(0);
+      expect(photo()).toBeNull();
+      await page.goForward();
+      await expectSlide(page, "Item 3 of 4");
+      await close(page);
+      await expect.poll(photo).toBeNull();
+      // A link with the photo in it opens it, and closing drops it from the address.
+      await page.goto(`/${framework}/?photo=4`);
+      await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+      await expectSlide(page, "Item 4 of 4");
+      await close(page);
+      await expect.poll(photo).toBeNull();
+      await expect(triggers.nth(3)).toBeFocused();
     });
 
     test("headless controls fade when a dismiss starts", async ({ page }) => {

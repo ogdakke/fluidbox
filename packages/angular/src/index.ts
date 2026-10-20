@@ -64,7 +64,7 @@ export type {
   FluidboxTarget,
   FluidboxVideoItem,
 } from "@ogdakke/fluidbox";
-export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
 const parts = [
   FluidboxRootDirective,

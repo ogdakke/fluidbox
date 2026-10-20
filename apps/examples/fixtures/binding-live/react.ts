@@ -17,10 +17,11 @@ const test = (name: string) => ({ "data-test": name }) as {};
 function Live({ ready }: { ready: (controls: LiveControls) => void }) {
   const [labels, setLabels] = useState<Partial<FluidboxLabels> | undefined>();
   const [viewer, setViewer] = useState(false);
-  useLayoutEffect(() => ready({ setLabels, setViewer }), [ready]);
+  const [loop, setLoop] = useState(false);
+  useLayoutEffect(() => ready({ setLabels, setViewer, setLoop }), [ready]);
   return h(
     Fluidbox.Root,
-    { items: album, labels },
+    { items: album, labels, loop },
     h(Fluidbox.Trigger, {
       item: album[0]!,
       className: "pattern-thumb pattern-album",

@@ -16,6 +16,7 @@ It ships as one package, `@ogdakke/fluidbox`. One runtime does the gestures, fli
 | You build with                  | Read                                    | Import from                  |
 | ------------------------------- | --------------------------------------- | ---------------------------- |
 | React                           | [React](./react.md)                     | `@ogdakke/fluidbox/react`    |
+| Next.js                         | [Next.js](./nextjs.md)                  | `@ogdakke/fluidbox/react`    |
 | Vue                             | [Vue](./vue.md)                         | `@ogdakke/fluidbox/vue`      |
 | Solid                           | [Solid](./solid.md)                     | `@ogdakke/fluidbox/solid`    |
 | Angular                         | [Angular](./angular.md)                 | `@ogdakke/fluidbox/angular`  |

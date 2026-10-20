@@ -1,7 +1,7 @@
 ---
 title: JavaScript
 section: Frameworks
-order: 6
+order: 7
 description: The plain JavaScript API of fluidbox, with createFluidbox, the fluidbox's state, commands and events, bind and bindOverlay, and viewer content, for apps without a framework binding.
 ---
 
@@ -70,6 +70,7 @@ Returns a `Fluidbox`. Only `items` is required.
 | `viewer`    | `({ target, fluidbox, signal }) => void \| (() => void)`  |                                       | Draw your own controls and captions into the viewer. See [Viewer content](#viewer-content).                                                 |
 | `renderers` | `Record<string, FluidboxRenderer<TItem>>`                 | `{}`                                  | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                   |
 | `zoom`      | `false \| { step?: number; max?: number }`                | `{ step: 2, max: 4 }`                 | `step` is the scale of a double-tap or double-click; `max` the largest scale. `false` turns zoom off.                                       |
+| `loop`      | `boolean`                                                 | `false`                               | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops. `update` changes it live.     |
 | `labels`    | `Partial<FluidboxLabels>`                                 | English                               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                       |
 | `filmstrip` | `boolean \| { render? }`                                  | `false`                               | A thumbnail strip. Loads its entry; needs `filmstrip.css`.                                                                                  |
 | `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Loads its entry; needs `sheet.css`.                                                                                 |
@@ -80,23 +81,23 @@ To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip`, `sheet` or `loadi
 
 ## The fluidbox
 
-| Member                                   | Returns                   | What it does                                                                                                   |
-| ---------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `state`                                  | `FluidboxState<TItem>`    | The current state, a frozen snapshot. See [State](#state).                                                     |
-| `items`                                  | `FluidboxItemList<TItem>` | The items the viewer reads, as a list: the ones it was made with, or the last `setItems`.                      |
-| `open(target?, options?)`                | `Promise<boolean>`        | Opens the viewer on an item, or moves to it while open. Without a target: the current item, else the first.    |
-| `close(options?)`                        | `Promise<boolean>`        | Closes the viewer.                                                                                             |
-| `next(options?)`                         | `Promise<boolean>`        | Moves to the next item while open.                                                                             |
-| `previous(options?)`                     | `Promise<boolean>`        | Moves to the previous item while open.                                                                         |
-| `update(options)`                        | `void`                    | Changes `labels`, `zoom`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading` live. See [update](#update). |
-| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there.                                |
-| `preload(target)`                        | `() => void`              | Starts loading an item a press is likely to open, while the viewer is closed. Call the result to let go.       |
-| `load()`                                 | `Promise<boolean>`        | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                |
-| `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                         |
-| `bindOverlay(element, target, options?)` | `() => void`              | Makes an element on a trigger a thumbnail overlay. See [Thumbnail overlays](#thumbnail-overlays).              |
-| `subscribe(listener)`                    | `() => void`              | Calls `listener(state)` after every state change.                                                              |
-| `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                      |
-| `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.           |
+| Member                                   | Returns                   | What it does                                                                                                           |
+| ---------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `state`                                  | `FluidboxState<TItem>`    | The current state, a frozen snapshot. See [State](#state).                                                             |
+| `items`                                  | `FluidboxItemList<TItem>` | The items the viewer reads, as a list: the ones it was made with, or the last `setItems`.                              |
+| `open(target?, options?)`                | `Promise<boolean>`        | Opens the viewer on an item, or moves to it while open. Without a target: the current item, else the first.            |
+| `close(options?)`                        | `Promise<boolean>`        | Closes the viewer.                                                                                                     |
+| `next(options?)`                         | `Promise<boolean>`        | Moves to the next item while open.                                                                                     |
+| `previous(options?)`                     | `Promise<boolean>`        | Moves to the previous item while open.                                                                                 |
+| `update(options)`                        | `void`                    | Changes `labels`, `zoom`, `loop`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading` live. See [update](#update). |
+| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there.                                        |
+| `preload(target)`                        | `() => void`              | Starts loading an item a press is likely to open, while the viewer is closed. Call the result to let go.               |
+| `load()`                                 | `Promise<boolean>`        | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                        |
+| `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                                 |
+| `bindOverlay(element, target, options?)` | `() => void`              | Makes an element on a trigger a thumbnail overlay. See [Thumbnail overlays](#thumbnail-overlays).                      |
+| `subscribe(listener)`                    | `() => void`              | Calls `listener(state)` after every state change.                                                                      |
+| `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                              |
+| `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.                   |
 
 A target is an item, its index or its id. The fluidbox matches an item object by its id, so a copy of it works too. The fluidbox is an `EventTarget`, with the events listed below.
 
@@ -118,7 +119,7 @@ Labels and zoom apply in place. A change of `controls`, `viewer` or the labels d
 
 A target, `FluidboxTarget`, is an item, its index or its id: `open(photo)`, `open(2)` or `open("photo-fjord")`. `options` is `{ signal?: AbortSignal, scrub?: boolean }`. Use `scrub: true` for a move that follows a continuous input, such as your own scrubber or a dragged row of dots. The slide jumps to the item instead of gliding. The fluidbox doesn't scroll the page to the item's trigger until the next move without `scrub`, which ends the scrub.
 
-Each command returns a promise that settles when the motion has: `open` once the viewer is open, `close` once it is closed, `next` once the slide has moved. It resolves `true` when the command happened. It resolves `false` when a listener prevented it, a later command took over, its signal aborted, or there was nothing to do, as with `next()` on the last item or `close()` while closed.
+Each command returns a promise that settles when the motion has: `open` once the viewer is open, `close` once it is closed, `next` once the slide has moved. It resolves `true` when the command happened. It resolves `false` when a listener prevented it, a later command took over, its signal aborted, or there was nothing to do, as with `next()` on the last item of a gallery that doesn't loop, or `close()` while closed.
 
 An unknown id or an index out of range rejects with a `RangeError`, and `preload` throws one. After `destroy()`, the commands and `load()` resolve `false`, so a part of your app still holding the old fluidbox does nothing. `setItems`, `preload`, `bind`, `bindOverlay` and `subscribe` throw an `InvalidStateError` `DOMException`.
 
@@ -136,7 +137,7 @@ interface FluidboxState<TItem> {
 }
 ```
 
-`id`, `index` and `item` are the item the viewer shows, or is on its way to while a move runs, and `null` while closed. `item` is your own object, the one you passed in. `subscribe` sees status and selection changes. It doesn't see motion, which runs frame by frame in CSS variables. [Styling](./styling.md) lists them.
+`id`, `index` and `item` are the item the viewer shows, or is on its way to while a move runs, and `null` while closed. `item` is your own object, the one you passed in. `hasPrevious` and `hasNext` say whether `previous()` and `next()` have somewhere to go. With `loop`, both are true in a gallery of two or more. `subscribe` sees status and selection changes. It doesn't see motion, which runs frame by frame in CSS variables. [Styling](./styling.md) lists them.
 
 ### Events
 
@@ -301,6 +302,8 @@ An open waits for an entry that is still loading. [Filmstrip and sheet](./filmst
 | [Filmstrip](./patterns/filmstrip.md)               | `filmstrip: true`, or `filmstrip: { render }`.                                        |
 | [Sheet](./patterns/sheet.md)                       | `sheet: { snapPoints, render }`, `fluidbox.sheet.set(stop)` and `sheetchange`.        |
 | [Headless controls](./patterns/headless.md)        | A `viewer` renderer that builds your buttons and subscribes to the state.             |
+| [Right to left](./patterns/rtl.md)                 | A `dir="rtl"` ancestor of the triggers, and the `labels` option.                      |
+| [Photo in the address](./patterns/url.md)          | `open()` and `close()` from `?photo=`, and `toggle` and `itemchange` writing it back. |
 
 ## Notes
 

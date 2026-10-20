@@ -19,6 +19,8 @@ interface FilmstripRuntimeOptions {
   /** The axis changed: mark the scroller, so its CSS lays it out that way. */
   readonly onAxisChange: (vertical: boolean) => void;
   readonly deferActivation?: boolean;
+  /** Whether the arrows go round from one end to the other, as a looping gallery does. */
+  readonly loops?: () => boolean;
 }
 
 type ScrollMode = "idle" | "user";
@@ -31,6 +33,7 @@ export class FilmstripRuntime {
   readonly #onSelect: FilmstripRuntimeOptions["onSelect"];
   readonly #onWindowChange: FilmstripRuntimeOptions["onWindowChange"];
   readonly #onAxisChange: FilmstripRuntimeOptions["onAxisChange"];
+  readonly #loops: () => boolean;
   readonly #controller = new AbortController();
   readonly #observer: ResizeObserver;
   #index: number;
@@ -63,6 +66,7 @@ export class FilmstripRuntime {
     this.#onSelect = options.onSelect;
     this.#onWindowChange = options.onWindowChange;
     this.#onAxisChange = options.onAxisChange;
+    this.#loops = options.loops ?? (() => false);
     this.#deferActivation = options.deferActivation ?? false;
     const { signal } = this.#controller;
     this.#scroller.addEventListener("scroll", this.#onScroll, { passive: true, signal });
@@ -379,7 +383,10 @@ export class FilmstripRuntime {
               : null;
     if (target === null || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
-    const index = Math.max(0, Math.min(this.#count - 1, target));
+    const count = this.#count;
+    const index = this.#loops()
+      ? (target + count) % count
+      : Math.max(0, Math.min(count - 1, target));
     if (index !== this.#index) this.choose(index, true, "keyboard");
   };
 

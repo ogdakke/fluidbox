@@ -10,7 +10,7 @@ import { album, countText, coverAlt, customViewerText, type MountLive } from "./
   standalone: true,
   imports: [FluidboxModule],
   template: `
-    <div fluidboxRoot [items]="album" [labels]="labels()">
+    <div fluidboxRoot [items]="album" [labels]="labels()" [loop]="loop()">
       <button [fluidboxTrigger]="album[0]" class="pattern-thumb pattern-album" data-test="trigger">
         <img [src]="album[0].src" [alt]="coverAlt" />
         <span fluidboxThumbnailOverlay travel class="pattern-overlay" data-test="count">
@@ -36,6 +36,7 @@ class Live {
   readonly customViewerText = customViewerText;
   readonly labels = signal<Partial<FluidboxLabels> | undefined>(undefined);
   readonly viewer = signal(false);
+  readonly loop = signal(false);
 }
 
 export const mount: MountLive = async (root) => {
@@ -47,5 +48,6 @@ export const mount: MountLive = async (root) => {
   return {
     setLabels: (next) => live.labels.set(next),
     setViewer: (on) => live.viewer.set(on),
+    setLoop: (on) => live.loop.set(on),
   };
 };

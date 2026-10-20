@@ -1,6 +1,6 @@
 # Pattern examples contract
 
-Every framework implements the same ten patterns in `src/patterns/<framework>/`, where
+Every framework implements the same eleven patterns in `src/patterns/<framework>/`, where
 `<framework>` is `react`, `vue`, `solid`, `angular`, `elements` or `javascript`. The page
 `/<framework>/` mounts them through `mountPatternPage` (`src/patterns/page.ts`), and
 `tests/browser/patterns.spec.ts` checks every page against the hooks below. The docs show the same
@@ -112,3 +112,13 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
     back to 1; Next → 2; a horizontal wheel to the left (or ArrowLeft on touch devices) → 3; the
     selected filmstrip thumbnail is `data-index="2"` and the first thumbnail is right of the
     second; Escape returns focus to trigger 3.
+11. **url** — a gallery of `photos` whose open photo lives in the address as `?photo=N` (N =
+    index + 1). Frameworks pass `open` and `index` from their own state and update it from the
+    change callbacks (`onOpenChange`/`onIndexChange`, `v-model`-style `update:` events,
+    `[(open)]`/`[(index)]`); elements set the gallery's `open` and `index` attributes; JS calls
+    `open()` and `close()`. Opening pushes a history entry, moving replaces it, closing goes back
+    over it (or drops `photo` from an address the page loaded with), and `popstate` brings the
+    viewer to the address. Thumbnails as in basic. Test: click trigger 2 → "Item 2 of 4" and
+    `photo=2`; ArrowRight → `photo=3`; Back → closed, no `photo`; Forward → "Item 3 of 4";
+    Escape → no `photo`; load `?photo=4` → "Item 4 of 4"; Escape → no `photo`, focus on
+    trigger 4.

@@ -43,8 +43,10 @@ import {
   frameLayerOf,
   latestOrigins,
   resolveLabels,
+  createFluidboxSync,
   targetKeys,
   unloadFluidbox,
+  watchFluidbox,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import type {
@@ -254,6 +256,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     items: untrack(() => props.items),
     labels: untrack(() => props.labels),
     zoom: untrack(zoom),
+    loop: untrack(() => props.loop),
     loading: untrack(() => props.loading),
     // Renderers resolve by key when an item renders, so the newest render
     // function is used without rebuilding the viewer.
@@ -294,6 +297,18 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
       { signal: events.signal },
     );
   }
+  watchFluidbox(
+    fluidbox,
+    {
+      open: (open, details) => props.onOpenChange?.(open, details),
+      index: (index, details) => props.onIndexChange?.(index, details),
+    },
+    events.signal,
+  );
+  // Your open and index win whenever they change. Effects run once Root's
+  // children mount, so the triggers are there and an open flies from its own.
+  const sync = createFluidboxSync(fluidbox);
+  createEffect(() => sync(props.open, props.index));
 
   createEffect(
     on(
@@ -303,6 +318,13 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     ),
   );
   createEffect(on(zoom, (next) => fluidbox.update({ zoom: next }), { defer: true }));
+  createEffect(
+    on(
+      () => props.loop,
+      (next) => fluidbox.update({ loop: next }),
+      { defer: true },
+    ),
+  );
   createEffect(
     on(
       () => props.loading,

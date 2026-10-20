@@ -47,6 +47,10 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
     title: "Right to left",
     note: "A gallery in an Arabic, right-to-left section: the viewer reads its direction and language from there.",
   },
+  url: {
+    title: "Photo in the address",
+    note: "The open photo lives in ?photo=, so a link opens it and Back closes it.",
+  },
 };
 
 /** Build the page: one section per pattern, its live example, and the code that made it. */

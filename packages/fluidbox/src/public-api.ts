@@ -389,6 +389,12 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
   /** Draw `custom` items, by the name in their `render`. Read when a slide mounts. */
   readonly renderers?: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  /**
+   * Go round: past the last item comes the first, and before the first the
+   * last, by swipe, key, button and filmstrip alike. A single item never loops.
+   * @default false
+   */
+  readonly loop?: boolean;
   /** Draw your own controls and captions into the viewer. */
   readonly viewer?: FluidboxViewerRenderer<TItem>;
   /**
@@ -420,9 +426,15 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
  * value; a key set to undefined goes back to its default.
  */
 export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
-  readonly [K in "labels" | "zoom" | "controls" | "viewer" | "filmstrip" | "sheet" | "loading"]?:
-    | FluidboxOptions<TItem>[K]
-    | undefined;
+  readonly [K in
+    | "labels"
+    | "zoom"
+    | "loop"
+    | "controls"
+    | "viewer"
+    | "filmstrip"
+    | "sheet"
+    | "loading"]?: FluidboxOptions<TItem>[K] | undefined;
 };
 
 export interface FluidboxCommandOptions {

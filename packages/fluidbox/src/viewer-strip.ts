@@ -56,6 +56,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
   readonly #labels: FluidboxLabels;
   #source: FluidboxSource<TItem>;
+  #loop: boolean;
+  /**
+   * The position on show. Without a loop it is the item's index. With one,
+   * positions run on past both ends and each shows item `position mod count`.
+   */
   #index = 0;
   #base = 0;
   #width = 0;
@@ -90,8 +95,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     allows: (index: number) => boolean,
     renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>,
     labels: FluidboxLabels,
+    loop = false,
   ) {
     this.#labels = labels;
+    this.#loop = loop;
     this.#ownerDocument = ownerDocument;
     this.#source = source;
     this.#onSelect = onSelect;
@@ -125,8 +132,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     });
   }
 
+  /** The item on show. */
   get index() {
-    return this.#index;
+    return this.#item(this.#index);
   }
 
   get active() {
@@ -135,8 +143,36 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return slide;
   }
 
+  /**
+   * Whether the strip is on an item and staying there. A glide still on its
+   * way elsewhere can pass the item, a whole lap behind in a loop.
+   */
+  shows(index: number) {
+    return this.index === index && (!this.#selection || this.#selection.index === this.#index);
+  }
+
   get activeItem() {
-    return this.#source.getItem(this.#index);
+    return this.#source.getItem(this.index);
+  }
+
+  /** Whether the strip goes round: a single item has nowhere to go. */
+  get #loops() {
+    return this.#loop && this.#source.count > 1;
+  }
+
+  /** The item at a position. */
+  #item(position: number) {
+    const count = this.#source.count;
+    return this.#loops ? ((position % count) + count) % count : position;
+  }
+
+  /** The position of an item: the nearest one, or the next one round in the `step` direction. */
+  #near(index: number, step?: 1 | -1) {
+    if (!this.#loops) return index;
+    const count = this.#source.count;
+    let delta = (((index - this.#index) % count) + count) % count;
+    if (step === -1 ? delta > 0 : step !== 1 && delta > count / 2) delta -= count;
+    return this.#index + delta;
   }
 
   /** How far the frozen strip sits from its slide, in screen pixels. */
@@ -158,8 +194,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   setSource(source: FluidboxSource<TItem>) {
     this.#resolveSelection();
     this.#unfence();
+    const index = this.index;
     this.#source = source;
-    this.#index = Math.max(0, Math.min(this.#index, source.count - 1));
+    this.#index = Math.max(0, Math.min(index, source.count - 1));
     for (const slide of this.#slides.values()) {
       this.#unload(slide);
       slide.element.remove();
@@ -168,6 +205,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#base = 0;
     this.#renderWindow(this.#index, this.#index);
     this.#align(this.#index);
+  }
+
+  /** Go round, or stop at the ends. The slides are made again around the item on show. */
+  setLoop(loop: boolean) {
+    if (loop === this.#loop) return;
+    const index = this.index;
+    this.#loop = loop;
+    this.#index = index;
+    this.setSource(this.#source);
   }
 
   mount() {
@@ -195,10 +241,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
   }
 
-  select(index: number, smooth: boolean): Promise<void> {
-    if (!Number.isInteger(index) || index < 0 || index >= this.#source.count) {
-      throw new RangeError(`Viewer strip index ${index} is out of range.`);
+  select(item: number, smooth: boolean, step?: 1 | -1): Promise<void> {
+    if (!Number.isInteger(item) || item < 0 || item >= this.#source.count) {
+      throw new RangeError(`Viewer strip index ${item} is out of range.`);
     }
+    const index = this.#near(item, step);
     // A newer selection owns the strip. Cancel the previous smooth-scroll
     // fallback before rebasing its virtual window, otherwise that stale timer
     // can jump to a slide which has already been recycled.
@@ -264,18 +311,24 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   relabel() {
     this.element.setAttribute("aria-label", this.#labels.slides);
     for (const [index, slide] of this.#slides) {
-      slide.element.setAttribute("aria-label", this.#labels.position(index, this.#source.count));
+      slide.element.setAttribute(
+        "aria-label",
+        this.#labels.position(this.#item(index), this.#source.count),
+      );
       slide.retry.textContent = this.#labels.retry;
       slide.error.firstChild!.textContent = `${this.#labels.error} `;
     }
   }
 
   #makeSlide(index: number) {
-    const item = this.#source.getItem(index);
+    const item = this.#source.getItem(this.#item(index));
     const element = this.#ownerDocument.createElement("div");
     element.dataset.fluidboxSlide = "";
     element.setAttribute("role", "group");
-    element.setAttribute("aria-label", this.#labels.position(index, this.#source.count));
+    element.setAttribute(
+      "aria-label",
+      this.#labels.position(this.#item(index), this.#source.count),
+    );
     element.setAttribute("aria-hidden", String(index !== this.#index));
     const frame = this.#ownerDocument.createElement("div");
     frame.dataset.fluidboxFrame = "";
@@ -400,7 +453,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   prepareOpening(index: number, origin?: HTMLImageElement) {
-    const slide = this.#slides.get(index);
+    const position = this.#near(index);
+    const slide = this.#slides.get(position);
     const item = this.#source.getItem(index);
     if (slide?.cover) {
       // Embedded pages paint long after the opening motion starts. The origin's
@@ -423,15 +477,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       if (decodedPreview) slide.image.decoding = "sync";
       if (decodedPreview) delete slide.image.dataset.fluidboxImagePending;
       else slide.image.dataset.fluidboxImagePending = "";
+      // The preview first: Safari loads `src` the moment the sources and
+      // srcset go, and until then it is the full image's fallback.
+      slide.image.src = preview;
       for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
       slide.image.removeAttribute("srcset");
       slide.image.removeAttribute("sizes");
-      slide.image.src = preview;
     }
     this.#reset(slide);
     slide.fullApplied = false;
     slide.deferFull = decodedPreview !== null;
-    this.#load(index, slide);
+    this.#load(position, slide);
   }
 
   /**
@@ -440,7 +496,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * starts on the frame the card shows and the picture never stops moving.
    */
   continueVideo(index: number, origin: HTMLVideoElement) {
-    const slide = this.#slides.get(index);
+    const slide = this.#slides.get(this.#near(index));
     const item = this.#source.getItem(index);
     const video = slide?.image;
     if (!slide || item.type !== "video" || !(video instanceof HTMLVideoElement)) return;
@@ -512,7 +568,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     })();
   }
 
-  completeOpening(index: number) {
+  completeOpening(item: number) {
+    const index = this.#near(item);
     const slide = this.#slides.get(index);
     if (!slide) return;
     slide.opening = false;
@@ -522,9 +579,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #renderWindow(anchor: number, scrollIndex: number) {
-    const size = Math.min(WINDOW_SIZE, this.#source.count);
+    const size = this.#loops ? WINDOW_SIZE : Math.min(WINDOW_SIZE, this.#source.count);
     if (size === 0) return;
-    const base = Math.max(0, Math.min(anchor - Math.floor(size / 2), this.#source.count - size));
+    const start = anchor - Math.floor(size / 2);
+    const base = this.#loops ? start : Math.max(0, Math.min(start, this.#source.count - size));
     if (base === this.#base && this.#slides.size === size) return;
     for (const [index, slide] of this.#slides) {
       if (index >= base && index < base + size) continue;
@@ -598,7 +656,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const offset = this.#left - (this.#index - this.#base) * this.#width;
     const direction = offset > 2 ? 1 : offset < -2 ? -1 : 0;
     const target = this.#index + direction;
-    if (!direction || target < 0 || target >= this.#source.count) return true;
+    if (!direction || (!this.#loops && (target < 0 || target >= this.#source.count))) return true;
     if (this.#ask(target)) return true;
     this.#fence = direction;
     for (const [index, slide] of this.#slides) {
@@ -613,7 +671,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #ask(index: number) {
     if (index === this.#index || index === this.#approved) return true;
     if (index === this.#refused) return false;
-    if (this.#allows(index)) {
+    if (this.#allows(this.#item(index))) {
       this.#approved = index;
       return true;
     }
@@ -631,12 +689,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #sync(forcedIndex?: number, notify = true) {
     if (!this.#source.count) return;
     const left = this.#frozen ? this.#frozenLeft : this.#left;
+    // Looping, the window's ends bound the position; else the gallery's do.
+    const [first, last] = this.#loops
+      ? [this.#base, this.#base + this.#slides.size - 1]
+      : [0, this.#source.count - 1];
     const index =
       forcedIndex ??
-      Math.max(
-        0,
-        Math.min(this.#source.count - 1, this.#base + Math.round(left / Math.max(1, this.#width))),
-      );
+      Math.max(first, Math.min(last, this.#base + Math.round(left / Math.max(1, this.#width))));
     if (index === this.#index) return;
     // A move the gesture could not ask about in time, such as a long fling.
     // The strip stays on the current slide and returns to it on settle.
@@ -650,7 +709,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.active.element.setAttribute("aria-hidden", "false");
     this.active.retry.tabIndex = 0;
     this.#loadWindow();
-    const media = this.#source.getItem(index);
+    const media = this.#source.getItem(this.#item(index));
     const player = this.active.image;
     if (
       media.type === "video" &&
@@ -660,7 +719,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     ) {
       void player.play().catch(() => {});
     }
-    if (notify) this.#onSelect(index, false);
+    if (notify) this.#onSelect(this.#item(index), false);
   }
 
   #loadWindow() {
@@ -671,7 +730,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #load(index: number, slide: ViewerSlide) {
-    const item = this.#source.getItem(index);
+    const item = this.#source.getItem(this.#item(index));
     this.#loadPreview(item, slide);
     if (slide.deferFull) return;
     if (slide.loaded) {
@@ -748,7 +807,12 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       const controller = new AbortController();
       slide.controller = controller;
       slide.dispose =
-        renderer({ item, index, target: slide.image, signal: controller.signal }) ?? undefined;
+        renderer({
+          item,
+          index: this.#item(index),
+          target: slide.image,
+          signal: controller.signal,
+        }) ?? undefined;
     }
     slide.loaded = true;
   }
@@ -788,7 +852,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #applyImage(index: number, slide: ViewerSlide) {
-    const item = this.#source.getItem(index);
+    const item = this.#source.getItem(this.#item(index));
     if (item.type !== "img" || !(slide.image instanceof HTMLImageElement) || !slide.picture) return;
     slide.imageVersion += 1;
     const version = slide.imageVersion;
@@ -963,7 +1027,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const refused = this.#refused !== null;
     this.#unfence();
     if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
-    if (this.#userOwned && this.#userScrolled) this.#onSelect(this.#index, true);
+    if (this.#userOwned && this.#userScrolled) this.#onSelect(this.index, true);
     this.#userOwned = false;
     this.#userScrolled = false;
     this.#approved = null;

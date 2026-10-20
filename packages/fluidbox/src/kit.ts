@@ -45,6 +45,8 @@ export function unloadFluidbox(fluidbox: Fluidbox<any>) {
 
 export { indexIn };
 
+export { createFluidboxSync, watchFluidbox, type FluidboxChangeDetails } from "./controlled";
+
 /** Where a framework draws one piece of rendered content, as a portal. */
 export interface FluidboxSlot<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;

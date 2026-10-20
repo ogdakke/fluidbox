@@ -1,3 +1,4 @@
+import { createFluidboxSync } from "./controlled";
 import { createFluidbox } from "./create-fluidbox";
 import { forwardEvents } from "./events";
 import { FluidboxFilmstripElement, FluidboxSheetElement } from "./filmstrip";
@@ -60,7 +61,9 @@ const ITEM_ATTRIBUTES = new Set([
   "aria-label",
 ]);
 /** Attributes whose change updates the viewer. */
-const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max", "loading"];
+const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max", "loop", "loading"];
+/** Your state for the viewer: `open`, and the `index` it shows. */
+const CONTROL_ATTRIBUTES = ["open", "index"];
 const LOADINGS: readonly string[] = ["hover", "press", "eager"] satisfies FluidboxLoading[];
 
 /** The `<fluidbox-item>` trigger an element is in, or is. */
@@ -109,7 +112,7 @@ function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined 
  * own controls, where `<fluidbox-controls>` stands for the default ones.
  */
 export class FluidboxGalleryElement extends HTMLElement {
-  static readonly observedAttributes = VIEWER_ATTRIBUTES;
+  static readonly observedAttributes = [...VIEWER_ATTRIBUTES, ...CONTROL_ATTRIBUTES];
 
   addEventListener<K extends keyof FluidboxGalleryEventMap>(
     type: K,
@@ -169,6 +172,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   #readyWaiters: Array<{ resolve(fluidbox: Fluidbox): void; reject(error: unknown): void }> = [];
   #lifetime: AbortController | undefined;
   #updateQueued = false;
+  #sync: ((open?: boolean, index?: number) => void) | undefined;
   /** What the items set through `items` or `setItems` came to, once applied. */
   #itemsResult: Promise<boolean> | undefined;
   /** A new function when `viewer` changes, so the update draws the viewer again. */
@@ -227,8 +231,14 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#teardown();
   }
 
-  attributeChangedCallback(_name: string, previous: string | null, next: string | null) {
-    if (previous !== next) this.#queueUpdate();
+  attributeChangedCallback(name: string, previous: string | null, next: string | null) {
+    if (previous === next) return;
+    if (!CONTROL_ATTRIBUTES.includes(name)) this.#queueUpdate();
+    else if (this.#fluidbox)
+      void this.#ready().then(
+        () => this.#control(),
+        () => {},
+      );
   }
 
   /** The fluidbox behind the gallery, once it is ready. A rebuild replaces it. */
@@ -390,6 +400,12 @@ export class FluidboxGalleryElement extends HTMLElement {
     return this.#fluidbox;
   }
 
+  /** Bring the viewer to the `open` and `index` attributes, where they changed. */
+  #control() {
+    const index = Number.parseInt(this.getAttribute("index") ?? "", 10);
+    this.#sync?.(this.hasAttribute("open"), Number.isNaN(index) ? undefined : index);
+  }
+
   #zoomAttributes(): FluidboxOptions["zoom"] | undefined {
     if (this.hasAttribute("nozoom")) return false;
     const number = (name: string) => {
@@ -424,6 +440,7 @@ export class FluidboxGalleryElement extends HTMLElement {
     return {
       labels: this.#labels,
       zoom: this.zoom,
+      loop: this.hasAttribute("loop"),
       loading: this.loading,
       controls: undefined,
       viewer: this.#viewerRenderer,
@@ -522,6 +539,7 @@ export class FluidboxGalleryElement extends HTMLElement {
     }
     const fluidbox = this.#fluidbox!;
     this.#bindTriggers(fluidbox);
+    this.#control();
     for (const waiter of this.#readyWaiters) waiter.resolve(fluidbox);
     this.#readyWaiters = [];
   }
@@ -535,6 +553,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       renderers: this.#runtimeRenderers,
     });
     this.#fluidbox = fluidbox;
+    this.#sync = createFluidboxSync(fluidbox);
     this.#events = new AbortController();
     forwardEvents(fluidbox, this, this.#events.signal);
     this.#unsubscribe = fluidbox.subscribe((state) => {

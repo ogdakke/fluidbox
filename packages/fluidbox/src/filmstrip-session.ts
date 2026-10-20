@@ -83,6 +83,8 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
       onAxisChange: (vertical) => {
         this.scroller.setAttribute("aria-orientation", vertical ? "vertical" : "horizontal");
       },
+      // Only a looping gallery has a next item at the end and a previous one at the start.
+      loops: () => controller.state.hasNext && controller.state.hasPrevious,
     });
   }
 
@@ -125,7 +127,9 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     } else {
       const image = this.element.ownerDocument.createElement("img");
       const sources = filmstripThumbnailSources(item);
-      image.src = item.thumbnail?.src ?? sources[0] ?? "";
+      // The smallest candidate: a thumbnail's plain src can be its largest, as
+      // with Next's getImageProps, and an src starts downloading as it is set.
+      image.src = sources[0] ?? "";
       image.alt = "";
       image.draggable = false;
       image.dataset.fluidboxFilmstripThumbnail = "";

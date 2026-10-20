@@ -47,8 +47,10 @@ import {
   frameLayerOf,
   latestOrigins,
   resolveLabels,
+  createFluidboxSync,
   targetKeys,
   unloadFluidbox,
+  watchFluidbox,
   type FluidboxSlot,
   type FluidboxSlots,
   type FluidboxTrigger,
@@ -86,7 +88,7 @@ export type {
   FluidboxViewerProps,
   UseFluidbox,
 } from "./types";
-export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 export type {
   FluidboxCustomItem,
   FluidboxIframeItem,
@@ -173,7 +175,7 @@ const eventProps = {
 } as const satisfies Record<(typeof fluidboxEventTypes)[number], keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
-  const { items, labels, zoom, loading, children } = props;
+  const { items, open, index, labels, zoom, loop, loading, children } = props;
   const slotsRef = useRef<{ filmstrip: FluidboxSlots<TItem>; sheet: FluidboxSlots<TItem> } | null>(
     null,
   );
@@ -220,6 +222,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     items,
     labels: labelOptions(),
     zoom: zoomOption(),
+    loop,
     loading,
     // Renderers are looked up by name when an item renders, so the newest
     // render function is used without telling the viewer.
@@ -289,9 +292,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   const first = useRef(true);
   useIsomorphicLayoutEffect(() => {
     if (first.current) first.current = false;
-    else fluidbox.update({ labels: labelOptions(), zoom: zoomOption(), loading });
+    else fluidbox.update({ labels: labelOptions(), zoom: zoomOption(), loop, loading });
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [fluidbox, labelsKey, zoomKey, loading]);
+  }, [fluidbox, labelsKey, zoomKey, loop, loading]);
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
@@ -305,8 +308,26 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         { signal: events.signal },
       );
     }
+    watchFluidbox(
+      fluidbox,
+      {
+        open: (open, details) => latest.current.onOpenChange?.(open, details),
+        index: (index, details) => latest.current.onIndexChange?.(index, details),
+      },
+      events.signal,
+    );
     return () => events.abort();
   }, [fluidbox, latest]);
+
+  // Your open and index win whenever they change. The triggers have
+  // registered by now, so an open flies from the item's own.
+  // A remount, StrictMode's included, starts afresh, as the viewer it dropped did.
+  const sync = useRef<ReturnType<typeof createFluidboxSync>>(null);
+  useIsomorphicLayoutEffect(() => () => void (sync.current = null), [fluidbox]);
+  useIsomorphicLayoutEffect(() => {
+    sync.current ??= createFluidboxSync(fluidbox);
+    sync.current(open, index);
+  }, [fluidbox, open, index]);
 
   const lastItems = useRef(items);
   useIsomorphicLayoutEffect(() => {

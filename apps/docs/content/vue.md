@@ -1,7 +1,7 @@
 ---
 title: Vue
 section: Frameworks
-order: 2
+order: 3
 description: The Vue binding for fluidbox, with every component, composable, prop, slot and event, and the Vue-specific behaviour.
 ---
 
@@ -83,8 +83,11 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 | Prop        | Type                                                           | Default               | Purpose                                                                                                                                                 |
 | ----------- | -------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `items`     | `readonly TItem[] \| FluidboxItemList<TItem>`                  |                       | Required. The items, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                                        |
+| `open`      | `boolean`                                                      |                       | Whether the viewer is open, for `v-model:open`. It opens on `index` and closes as this changes. Leave it out to let the triggers own it.                |
+| `index`     | `number`                                                       |                       | The item the viewer shows, for `v-model:index`. An index out of range is ignored.                                                                       |
 | `renderers` | `Record<string, (ctx: { item, index, signal }) => VNodeChild>` | `{}`                  | Draw `custom` items, by the name in their `render`. The type is `FluidboxVueRenderer`.                                                                  |
 | `zoom`      | `false \| { step?: number; max?: number }`                     | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                                                |
+| `loop`      | `boolean`                                                      | `false`               | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                                           |
 | `labels`    | `Partial<FluidboxLabels>`                                      | English               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                                   |
 | `origins`   | `FluidboxOriginAdapter<TItem>`                                 | triggers              | Finds the triggers of items without a mounted `Trigger`, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
 | `loading`   | `"hover" \| "press" \| "eager"`                                | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                        |
@@ -97,6 +100,8 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 | `@itemchange`       | `FluidboxItemChangeEvent` | The viewer moves to an item, including the one it opens on.                                   |
 | `@settle`           | `FluidboxItemChangeEvent` | The viewer comes to rest on an item.                                                          |
 | `@sheetchange`      | `FluidboxSheetEvent`      | The sheet comes to rest at another stop: `event.stop`, 0 at rest.                             |
+| `@update:open`      | `boolean`, `{ reason }`   | The viewer opens or closes, from any input. Half of `v-model:open`.                           |
+| `@update:index`     | `number`, `{ reason }`    | The viewer moves to another item, opening included. Half of `v-model:index`.                  |
 
 The events are the fluidbox's own; see [Events](./javascript.md#events) for their fields and reasons. `event.item` is your own object, of the type of `items`.
 
@@ -154,7 +159,7 @@ Neither takes props. `Viewer` teleports its slot into the viewer's body-level la
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
-With an empty slot each shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of the gallery, `Close` while the viewer is closed. Pass `:disabled` to override it. Your `@click` runs first; `event.preventDefault()` stops the command. They work anywhere inside `Root`, in the viewer or on the page.
+With an empty slot each shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of a gallery that doesn't loop, `Close` while the viewer is closed. Pass `:disabled` to override it. Your `@click` runs first; `event.preventDefault()` stops the command. They work anywhere inside `Root`, in the viewer or on the page.
 
 ### `Fluidbox.Filmstrip`
 
@@ -218,17 +223,19 @@ The entry exports the parts' types (`FluidboxApi`, `FluidboxCommands`, `Fluidbox
 
 ## Patterns
 
-| Pattern                                            | In Vue                                                                                                             |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| [Gallery](./patterns/basic.md)                     | `:items`, and a `Trigger` per item. The default controls come without a `Viewer`.                                  |
-| [One trigger for an album](./patterns/overlay.md)  | `<Fluidbox.Trigger v-slot="{ item }" :item="album[0]" :returns="album">` and `<Fluidbox.ThumbnailOverlay travel>`. |
-| [Rich origins](./patterns/origins.md)              | `data-fluidbox-origin` on an element inside the `Trigger`; `as-child` for your own element.                        |
-| [Custom content](./patterns/renderers.md)          | `:renderers="{ note: () => h(Note) }"`.                                                                            |
-| [Programmatic control](./patterns/programmatic.md) | The root slot's `{ status, index, open }`, and `@beforeitemchange` with `event.preventDefault()`.                  |
-| [Zoom](./patterns/zoom.md)                         | `:zoom="{ step, max }"` or `:zoom="false"`.                                                                        |
-| [Filmstrip](./patterns/filmstrip.md)               | `<Fluidbox.Filmstrip />`, or with a slot for your own thumbnails.                                                  |
-| [Sheet](./patterns/sheet.md)                       | `<Fluidbox.Sheet v-slot="{ item }">`, `@sheetchange`, and `<Fluidbox.SheetStop :stop="1">` in a `Viewer`.          |
-| [Headless controls](./patterns/headless.md)        | Your own buttons in a `Viewer`, using the root slot's object.                                                      |
+| Pattern                                            | In Vue                                                                                                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Gallery](./patterns/basic.md)                     | `:items`, and a `Trigger` per item. The default controls come without a `Viewer`.                                                                      |
+| [One trigger for an album](./patterns/overlay.md)  | `<Fluidbox.Trigger v-slot="{ item }" :item="album[0]" :returns="album">` and `<Fluidbox.ThumbnailOverlay travel>`.                                     |
+| [Rich origins](./patterns/origins.md)              | `data-fluidbox-origin` on an element inside the `Trigger`; `as-child` for your own element.                                                            |
+| [Custom content](./patterns/renderers.md)          | `:renderers="{ note: () => h(Note) }"`.                                                                                                                |
+| [Programmatic control](./patterns/programmatic.md) | The root slot's `{ status, index, open }`, and `@beforeitemchange` with `event.preventDefault()`.                                                      |
+| [Zoom](./patterns/zoom.md)                         | `:zoom="{ step, max }"` or `:zoom="false"`.                                                                                                            |
+| [Filmstrip](./patterns/filmstrip.md)               | `<Fluidbox.Filmstrip />`, or with a slot for your own thumbnails.                                                                                      |
+| [Sheet](./patterns/sheet.md)                       | `<Fluidbox.Sheet v-slot="{ item }">`, `@sheetchange`, and `<Fluidbox.SheetStop :stop="1">` in a `Viewer`.                                              |
+| [Headless controls](./patterns/headless.md)        | Your own buttons in a `Viewer`, using the root slot's object.                                                                                          |
+| [Right to left](./patterns/rtl.md)                 | Root `labels`, inside a `dir="rtl"` element.                                                                                                           |
+| [Photo in the address](./patterns/url.md)          | `:open`, `:index`, `@update:open` and `@update:index` from a ref that follows `?photo=`. `v-model:open` and `v-model:index` when nothing else listens. |
 
 ## Vue notes
 

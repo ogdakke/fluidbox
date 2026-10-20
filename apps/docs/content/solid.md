@@ -1,7 +1,7 @@
 ---
 title: Solid
 section: Frameworks
-order: 3
+order: 4
 description: The Solid binding for fluidbox, with every Fluidbox part, hook and prop, and the Solid-specific behaviour.
 ---
 
@@ -87,21 +87,26 @@ All parts are properties of the `Fluidbox` object.
 
 ### `Fluidbox.Root`
 
-| Prop                 | Type                                                            | Default               | Purpose                                                                                          |
-| -------------------- | --------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------ |
-| `items`              | `readonly TItem[] \| FluidboxItemList<TItem>`                   |                       | The gallery's items, or a lazy list (see [Items and origins](./items-and-origins.md)).           |
-| `labels`             | `Partial<FluidboxLabels>`                                       | English               | Every string the viewer shows or announces. Changes apply to an open viewer.                     |
-| `zoom`               | `false \| { step?: number; max?: number }`                      | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off. Changes apply to an open viewer.                        |
-| `renderers`          | `Record<string, (ctx: { item, index, signal }) => JSX.Element>` | `{}`                  | Renders `type: "custom"` items by their `render` key. The type is `FluidboxSolidRenderer`.       |
-| `origins`            | `FluidboxOriginAdapter<TItem>`                                  | triggers              | Finds origins for items without a mounted trigger, and `revealOrigin` scrolls one into view.     |
-| `loading`            | `"hover" \| "press" \| "eager"`                                 | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
-| `onBeforeToggle`     | `(event: FluidboxToggleEvent) => void`                          |                       | Before the viewer opens or closes. `event.preventDefault()` cancels it.                          |
-| `onToggle`           | `(event: FluidboxToggleEvent) => void`                          |                       | As the viewer starts to open or close.                                                           |
-| `onBeforeItemChange` | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | Before the viewer moves to another item. `event.preventDefault()` keeps it still.                |
-| `onItemChange`       | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | When the active item changes, opening included.                                                  |
-| `onSettle`           | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | When the active item comes to rest.                                                              |
-| `onSheetChange`      | `(event: FluidboxSheetEvent) => void`                           |                       | When the sheet comes to rest at another stop: `event.stop`, `event.reason`.                      |
-| `children`           | `JSX.Element`                                                   |                       | Your page content and the other parts.                                                           |
+| Prop                 | Type                                                            | Default               | Purpose                                                                                                                                       |
+| -------------------- | --------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`              | `readonly TItem[] \| FluidboxItemList<TItem>`                   |                       | The gallery's items, or a lazy list (see [Items and origins](./items-and-origins.md)).                                                        |
+| `open`               | `boolean`                                                       |                       | Whether the viewer is open, when your state owns it. It opens on `index` and closes as this changes. Leave it out to let the triggers own it. |
+| `index`              | `number`                                                        |                       | The item the viewer shows, when your state owns it. An index out of range is ignored.                                                         |
+| `labels`             | `Partial<FluidboxLabels>`                                       | English               | Every string the viewer shows or announces. Changes apply to an open viewer.                                                                  |
+| `zoom`               | `false \| { step?: number; max?: number }`                      | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off. Changes apply to an open viewer.                                                                     |
+| `loop`               | `boolean`                                                       | `false`               | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                                 |
+| `renderers`          | `Record<string, (ctx: { item, index, signal }) => JSX.Element>` | `{}`                  | Renders `type: "custom"` items by their `render` key. The type is `FluidboxSolidRenderer`.                                                    |
+| `origins`            | `FluidboxOriginAdapter<TItem>`                                  | triggers              | Finds origins for items without a mounted trigger, and `revealOrigin` scrolls one into view.                                                  |
+| `loading`            | `"hover" \| "press" \| "eager"`                                 | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                              |
+| `onBeforeToggle`     | `(event: FluidboxToggleEvent) => void`                          |                       | Before the viewer opens or closes. `event.preventDefault()` cancels it.                                                                       |
+| `onToggle`           | `(event: FluidboxToggleEvent) => void`                          |                       | As the viewer starts to open or close.                                                                                                        |
+| `onBeforeItemChange` | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | Before the viewer moves to another item. `event.preventDefault()` keeps it still.                                                             |
+| `onItemChange`       | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | When the active item changes, opening included.                                                                                               |
+| `onSettle`           | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | When the active item comes to rest.                                                                                                           |
+| `onSheetChange`      | `(event: FluidboxSheetEvent) => void`                           |                       | When the sheet comes to rest at another stop: `event.stop`, `event.reason`.                                                                   |
+| `onOpenChange`       | `(open: boolean, details: { reason }) => void`                  |                       | As the viewer opens or closes, from any input. Set `open` from it.                                                                            |
+| `onIndexChange`      | `(index: number, details: { reason }) => void`                  |                       | As the viewer moves to another item, opening included. Set `index` from it.                                                                   |
+| `children`           | `JSX.Element`                                                   |                       | Your page content and the other parts.                                                                                                        |
 
 `TItem` comes from `items`, so the events hand back your own item objects. The [API reference](./api.md) describes the events and their `reason`.
 
@@ -151,7 +156,7 @@ It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbo
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
-Each takes button attributes. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of the gallery, `Close` while the viewer is closed. Pass `disabled` to override it. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
+Each takes button attributes. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of a gallery that doesn't loop, `Close` while the viewer is closed. Pass `disabled` to override it. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
 
 ### `Fluidbox.Filmstrip`
 
@@ -216,6 +221,8 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 | [Filmstrip](./patterns/filmstrip.md)               | `<Fluidbox.Filmstrip />`, or with a child function for your own thumbnails.                                        |
 | [Sheet](./patterns/sheet.md)                       | `Fluidbox.Sheet snapPoints class` with `{({ item }) => ...}`, `useFluidboxSheet()`, and a `SheetStop` in `Viewer`. |
 | [Headless controls](./patterns/headless.md)        | Your own buttons in `Viewer`, using `useFluidbox()`.                                                               |
+| [Right to left](./patterns/rtl.md)                 | Root `labels`, inside a `dir="rtl"` element.                                                                       |
+| [Photo in the address](./patterns/url.md)          | `open`, `index`, `onOpenChange` and `onIndexChange` from a signal that follows `?photo=`.                          |
 
 ## Solid notes
 

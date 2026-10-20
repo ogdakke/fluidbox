@@ -15,12 +15,16 @@ function element(tag: string, attributes: Record<string, string>, ...children: (
 export const mount: MountLive = (root) => {
   const [labels, setLabels] = createSignal<Partial<FluidboxLabels> | undefined>();
   const [viewer, setViewer] = createSignal(false);
+  const [loop, setLoop] = createSignal(false);
   render(
     () =>
       createComponent(Fluidbox.Root, {
         items: album,
         get labels() {
           return labels();
+        },
+        get loop() {
+          return loop();
         },
         get children() {
           return [
@@ -70,5 +74,5 @@ export const mount: MountLive = (root) => {
       }),
     root,
   );
-  return { setLabels: (next) => setLabels(() => next), setViewer };
+  return { setLabels: (next) => setLabels(() => next), setViewer, setLoop };
 };

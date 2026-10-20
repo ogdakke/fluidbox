@@ -131,6 +131,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #generation = 0;
   #listening = false;
   #zoom: FluidboxOptions<TItem>["zoom"];
+  #loop: boolean;
   readonly #renderers: FluidboxOptions<TItem>["renderers"];
   readonly #controls: SessionController<TItem> = this.#controller();
   /** Changed in place by update, so every part of the viewer reads the new strings. */
@@ -172,6 +173,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     // The adapter only ever sees this fluidbox's items.
     this.#origins = new OriginRegistry(options.origins as FluidboxOriginAdapter | undefined);
     this.#zoom = options.zoom;
+    this.#loop = !!options.loop;
     this.#renderers = options.renderers;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
@@ -190,6 +192,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   /** Give a new viewer what it would have seen, had it been there from the start. */
   #attach(viewer: FluidboxRuntimeDriver<TItem>) {
+    viewer.setLoop(this.#loop);
     viewer.setSource(this.#source);
     viewer.connect(this.#controls, this.#portal(), this.#extensions());
     for (const [id, overlay] of this.#overlays) {
@@ -342,6 +345,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     if (has("zoom")) {
       this.#zoom = options.zoom;
       this.#viewer?.setZoom(options.zoom);
+    }
+    if (has("loop") && !!options.loop !== this.#loop) {
+      this.#loop = !!options.loop;
+      this.#viewer?.setLoop(this.#loop);
+      // The ends gain or lose their neighbours.
+      this.#publish(this.#state.status, this.#state.index);
     }
     let relabeled = false;
     if (has("labels")) {
@@ -693,13 +702,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const count = this.#source.count;
     if (count === 0) return Promise.resolve(completed(false));
     const index = this.#state.index;
+    const step = command === "next" ? 1 : -1;
     const target =
       index === null
         ? 0
-        : command === "next"
-          ? Math.min(count - 1, index + 1)
-          : Math.max(0, index - 1);
-    return this.#select(command, target, { index: target }, options);
+        : this.#loop
+          ? (index + step + count) % count
+          : Math.max(0, Math.min(count - 1, index + step));
+    return this.#select(command, target, { index: target }, { ...options, step });
   }
 
   #setSource(source: FluidboxSource<TItem>): Promise<SessionCommandResult> {
@@ -798,6 +808,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     if (opening) this.#revealedId = id;
     return this.#move(operation, index, opening, reason, {
       scrub: options.scrub,
+      step: options.step,
       phase: opening ? "open" : "selection",
     });
   }
@@ -826,9 +837,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     reason: SessionChangeReason,
     {
       scrub,
+      step,
       phase = "selection",
       changed = true,
-    }: { scrub?: boolean; phase?: "open" | "selection"; changed?: boolean },
+    }: { scrub?: boolean; step?: 1 | -1; phase?: "open" | "selection"; changed?: boolean },
   ) {
     const item = this.#source.getItem(index);
     const context: ViewerSessionMotionContext<TItem> = {
@@ -838,6 +850,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       signal: operation.controller.signal,
       reason,
       scrub,
+      step,
     };
     this.#origins.hideThumbnail(idOf(item));
     void this.#run(operation, () =>
@@ -1071,9 +1084,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       index,
       item,
       count: this.#source.count,
-      hasPrevious: index !== null && index > 0,
-      hasNext: index !== null && index < this.#source.count - 1,
+      hasPrevious: index !== null && (index > 0 || this.#loops),
+      hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
     });
+  }
+
+  /** Whether the gallery goes round: a single item has nowhere to go. */
+  get #loops() {
+    return this.#loop && this.#source.count > 1;
   }
 
   #publish(status: FluidboxStatus, index: number | null) {

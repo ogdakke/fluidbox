@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createFluidbox } from "../src/create-fluidbox";
-import { unloadFluidbox } from "../src/kit";
-import type { FluidboxImageItem, FluidboxState } from "../src/public-api";
+import { createFluidboxSync, unloadFluidbox } from "../src/kit";
+import type { Fluidbox, FluidboxImageItem, FluidboxState } from "../src/public-api";
 
 const items: FluidboxImageItem[] = [
   { id: "one", type: "img", src: "/one.jpg", alt: "One", width: 4, height: 3 },
@@ -48,5 +48,50 @@ describe("a fluidbox before its viewer", () => {
     expect(fluidbox.state.status).toBe("closed");
     expect(fluidbox.items.count).toBe(2);
     fluidbox.destroy();
+  });
+});
+
+describe("createFluidboxSync", () => {
+  const stub = (status: FluidboxState["status"], index: number | null) => {
+    const calls: string[] = [];
+    const fluidbox = {
+      state: { status, index, count: 4 },
+      open: (target: number) => void calls.push(`open ${target}`),
+      close: () => void calls.push("close"),
+    };
+    return { fluidbox: fluidbox as unknown as Fluidbox<any>, calls };
+  };
+
+  it("opens on the index, and closes as open turns false", () => {
+    const { fluidbox, calls } = stub("closed", null);
+    const sync = createFluidboxSync(fluidbox);
+    sync(true, 2);
+    (fluidbox.state as { status: string }).status = "open";
+    sync(false, 2);
+    expect(calls).toEqual(["open 2", "close"]);
+  });
+
+  it("acts only on the value that changed", () => {
+    // The viewer opened on 3 from a trigger. The app heard of the open first
+    // and still holds its old index: that must not pull the viewer back.
+    const { fluidbox, calls } = stub("closed", null);
+    const sync = createFluidboxSync(fluidbox);
+    sync(false, 0);
+    Object.assign(fluidbox.state, { status: "opening", index: 3 });
+    sync(true, 0);
+    sync(true, 3);
+    expect(calls).toEqual([]);
+    // A new index from the app moves the open viewer.
+    sync(true, 1);
+    expect(calls).toEqual(["open 1"]);
+  });
+
+  it("ignores an index out of range, and leaves open undefined to the viewer", () => {
+    const { fluidbox, calls } = stub("open", 1);
+    const sync = createFluidboxSync(fluidbox);
+    sync(undefined, 9);
+    sync(undefined, 1.5);
+    sync(undefined, 2);
+    expect(calls).toEqual(["open 2"]);
   });
 });

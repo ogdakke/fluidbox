@@ -11,6 +11,7 @@ import { Programmatic } from "./programmatic";
 import { Renderers } from "./renderers";
 import { Rtl } from "./rtl";
 import { Sheet } from "./sheet";
+import { Url } from "./url";
 import { Zoom } from "./zoom";
 
 const mount =
@@ -36,4 +37,5 @@ export const patterns: Record<PatternName, MountPattern> = {
   sheet: mount(Sheet),
   headless: mount(Headless),
   rtl: mount(Rtl),
+  url: mount(Url),
 };

@@ -2,7 +2,7 @@
 title: Overview
 section: Patterns
 order: 0
-description: Ten common lightbox setups, each live and in every framework.
+description: Eleven common lightbox setups, each live and in every framework.
 ---
 
 # Patterns
@@ -21,6 +21,7 @@ Each pattern is a small, complete example. Pick your framework in any tab, and e
 | [Sheet](./sheet.md)                       | A panel under the photo with snap points                      |
 | [Headless controls](./headless.md)        | Your own caption bar and buttons                              |
 | [Right to left](./rtl.md)                 | An Arabic gallery: the viewer reads right to left             |
+| [Photo in the address](./url.md)          | `?photo=` opens a photo, and Back closes it                   |
 
 ## The example data
 

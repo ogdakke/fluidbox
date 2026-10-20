@@ -13,7 +13,7 @@ import type {
   FluidboxTarget,
   FluidboxToggleEvent,
 } from "@ogdakke/fluidbox";
-import type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+import type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
 /** What a React renderer gets: the item it draws, and a signal aborted when it leaves. */
 export interface FluidboxReactRenderContext<TItem extends FluidboxItem = FluidboxItem> {
@@ -36,6 +36,19 @@ export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> 
 export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   /** An array, or a list read on demand. A new value replaces the items. */
   readonly items: FluidboxItems<TItem>;
+  /**
+   * Whether the viewer is open, when your state owns it. The viewer opens on
+   * `index` and closes when this changes. Leave it out to let triggers own it.
+   */
+  readonly open?: boolean;
+  /** The item the viewer shows, when your state owns it. */
+  readonly index?: number;
+  /** As the viewer opens or closes, from any input. Set `open` to follow it. */
+  readonly onOpenChange?: (open: boolean, details: FluidboxChangeDetails) => void;
+  /** As the viewer moves to another item, opening included. Set `index` to follow it. */
+  readonly onIndexChange?: (index: number, details: FluidboxChangeDetails) => void;
+  /** Go round: past the last item comes the first. A single item never loops. */
+  readonly loop?: boolean;
   /** Your strings for the viewer. They change the open viewer in place. */
   readonly labels?: Partial<FluidboxLabels>;
   /** Zoom steps, or `false` to turn zoom off. Compared by value. */

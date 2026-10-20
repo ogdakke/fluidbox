@@ -50,6 +50,8 @@ export interface SessionCommandOptions {
   readonly scrub?: boolean;
   /** The strip asked with `allows` first, so the move skips its before-event. */
   readonly approved?: boolean;
+  /** Next or previous: which way a looping strip goes round. */
+  readonly step?: 1 | -1;
 }
 
 export type SessionCommandResult =
@@ -167,6 +169,8 @@ export interface ViewerSessionMotionContext<TItem extends FluidboxItem = Fluidbo
   readonly reason: SessionChangeReason;
   /** The move follows a continuous input, so the slide jumps rather than glides. */
   readonly scrub?: boolean;
+  /** Next or previous: which way a looping strip goes round. */
+  readonly step?: 1 | -1;
 }
 
 export interface ViewerSessionCloseContext {

@@ -6,11 +6,12 @@ import { album, countText, coverAlt, customViewerText, type MountLive } from "./
 export const mount: MountLive = (root) => {
   const labels = shallowRef<Partial<FluidboxLabels> | undefined>();
   const viewer = shallowRef(false);
+  const loop = shallowRef(false);
   const Live = defineComponent({
     setup: () => () =>
       h(
         Fluidbox.Root,
-        { items: album, labels: labels.value },
+        { items: album, labels: labels.value, loop: loop.value },
         {
           default: () => [
             h(
@@ -51,5 +52,6 @@ export const mount: MountLive = (root) => {
   return {
     setLabels: (next) => (labels.value = next),
     setViewer: (on) => (viewer.value = on),
+    setLoop: (on) => (loop.value = on),
   };
 };

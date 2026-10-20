@@ -62,7 +62,10 @@ import {
   frameLayerOf,
   latestOrigins,
   resolveLabels,
+  createFluidboxSync,
   unloadFluidbox,
+  watchFluidbox,
+  type FluidboxChangeDetails,
   type FluidboxSlot,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
@@ -81,7 +84,7 @@ export type {
   FluidboxVueRenderContext,
   FluidboxVueRenderer,
 } from "./types";
-export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 export type {
   FluidboxCustomItem,
   FluidboxIframeItem,
@@ -249,7 +252,7 @@ const sameItems = (a: FluidboxItems<AnyItem>, b: FluidboxItems<AnyItem>) =>
     a.length === b.length &&
     a.every((item, index) => item === b[index]));
 
-const settingKeys = ["labels", "zoom", "viewer", "filmstrip", "sheet", "loading"] as const;
+const settingKeys = ["labels", "zoom", "loop", "viewer", "filmstrip", "sheet", "loading"] as const;
 type Settings = {
   -readonly [K in (typeof settingKeys)[number]]: FluidboxUpdateOptions<AnyItem>[K];
 };
@@ -257,10 +260,19 @@ type Settings = {
 export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   /** The items, or a list read on demand. Reactive, also in place. */
   readonly items: FluidboxItems<TItem>;
+  /**
+   * Whether the viewer is open, for `v-model:open`. The viewer opens on
+   * `index` and closes when this changes. Leave it out to let triggers own it.
+   */
+  readonly open?: boolean;
+  /** The item the viewer shows, for `v-model:index`. */
+  readonly index?: number;
   /** Your strings for the viewer. */
   readonly labels?: Partial<FluidboxLabels>;
   /** Pinch, double-tap, wheel and keyboard zoom of images. `false` turns it off. */
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
+  /** Go round: past the last item comes the first. A single item never loops. */
+  readonly loop?: boolean;
   /** Draw `custom` items, by the name in their `render`. */
   readonly renderers?: Readonly<Record<string, FluidboxVueRenderer<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
@@ -276,6 +288,8 @@ type RootEmits<TItem extends FluidboxItem> = {
   itemchange: (event: FluidboxItemChangeEvent<TItem>) => true;
   settle: (event: FluidboxItemChangeEvent<TItem>) => true;
   sheetchange: (event: FluidboxSheetEvent) => true;
+  "update:open": (open: boolean, details: FluidboxChangeDetails) => true;
+  "update:index": (index: number, details: FluidboxChangeDetails) => true;
 };
 
 type RootSlots<TItem extends FluidboxItem> = SlotsType<{
@@ -328,6 +342,7 @@ const Root = defineComponent(
       return {
         labels: labelsInput && { ...toRaw(labelsInput) },
         zoom: zoom === false ? false : zoom && { step: zoom.step, max: zoom.max },
+        loop: props.loop,
         // Without a Viewer part, the viewer has the default controls.
         viewer:
           features.viewers > 0 ? (viewer as unknown as FluidboxViewerRenderer<AnyItem>) : undefined,
@@ -363,13 +378,21 @@ const Root = defineComponent(
     for (const type of fluidboxEventTypes) {
       fluidbox.addEventListener(
         type,
-        (event) => (emit as (type: string, event: Event) => void)(type, event),
+        (event) => (emit as unknown as (type: string, event: Event) => void)(type, event),
         { signal: events.signal },
       );
     }
     fluidbox.addEventListener("sheetchange", (event) => (sheetStop.value = event.stop), {
       signal: events.signal,
     });
+    watchFluidbox(
+      fluidbox,
+      {
+        open: (open, details) => emit("update:open", open, details),
+        index: (index, details) => emit("update:index", index, details),
+      },
+      events.signal,
+    );
 
     // The parts register as Root mounts; the runtime loads the add-ons they turn on.
     onMounted(() => {
@@ -385,6 +408,16 @@ const Root = defineComponent(
           applied = next;
         },
         { immediate: true },
+      );
+      // Your open and index win whenever they change. The triggers have
+      // registered by now, so an open flies from the item's own.
+      const sync = createFluidboxSync(fluidbox);
+      watch(
+        [() => props.open, () => props.index],
+        ([open, index]) => sync(open === undefined ? undefined : open !== false, index),
+        {
+          immediate: true,
+        },
       );
     });
     onBeforeUnmount(() => {
@@ -444,8 +477,8 @@ const Root = defineComponent(
   },
   {
     name: "FluidboxRoot",
-    props: ["items", "labels", "zoom", "renderers", "origins", "loading"],
-    emits: [...fluidboxEventTypes],
+    props: ["items", "open", "index", "labels", "zoom", "loop", "renderers", "origins", "loading"],
+    emits: [...fluidboxEventTypes, "update:open", "update:index"],
   },
 );
 

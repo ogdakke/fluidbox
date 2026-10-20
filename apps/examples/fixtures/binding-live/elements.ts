@@ -41,5 +41,6 @@ export const mount: MountLive = async (root) => {
     setViewer: (on) => {
       gallery.viewer = on ? viewer : undefined;
     },
+    setLoop: (on) => gallery.toggleAttribute("loop", on),
   };
 };

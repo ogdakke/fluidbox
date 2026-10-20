@@ -26,39 +26,41 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 };
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
+// Controlled open and index added about 250 B to each binding's initial chunk,
+// and looping about 100 B to the core's and 270 B to its viewer chunk.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 7_650,
-  elements: 11_150,
-  react: 11_450,
-  solid: 10_650,
-  vue: 11_350,
-  angular: 11_550,
-  filmstrip: 3_600,
+  root: 7_800,
+  elements: 11_500,
+  react: 11_850,
+  solid: 11_000,
+  vue: 11_750,
+  angular: 12_000,
+  filmstrip: 3_700,
   sheet: 7_350,
   kit: 1_450,
 };
 const cssGzipLimit = 3_200;
 // Right-to-left support added about 200 B to every core entry's viewer chunk.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 31_850,
+  root: 32_250,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
-  elements: 34_850,
-  react: 35_400,
-  solid: 34_550,
-  vue: 35_300,
-  angular: 35_500,
-  filmstrip: 3_600,
+  elements: 35_500,
+  react: 36_100,
+  solid: 35_200,
+  vue: 35_950,
+  angular: 36_200,
+  filmstrip: 3_700,
   sheet: 7_350,
   kit: 1_450,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 34_950,
-  elements: 37_950,
-  react: 38_500,
-  solid: 37_650,
-  vue: 38_400,
-  angular: 38_600,
-  filmstrip: 4_850,
+  root: 35_350,
+  elements: 38_600,
+  react: 39_200,
+  solid: 38_300,
+  vue: 39_050,
+  angular: 39_300,
+  filmstrip: 4_950,
   sheet: 8_700,
   kit: 4_550,
 };

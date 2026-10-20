@@ -1,6 +1,6 @@
 /**
  * Data and styles shared by every framework's pattern examples. Each framework
- * implements the same ten patterns in `src/patterns/<framework>/`, against the
+ * implements the same eleven patterns in `src/patterns/<framework>/`, against the
  * hooks listed in CONTRACT.md, so one browser spec checks them all.
  */
 import type { FluidboxImageItem, FluidboxItem, FluidboxLabels } from "@ogdakke/fluidbox";
@@ -128,7 +128,8 @@ export type PatternName =
   | "filmstrip"
   | "sheet"
   | "headless"
-  | "rtl";
+  | "rtl"
+  | "url";
 
 export const patternNames: readonly PatternName[] = [
   "basic",
@@ -141,4 +142,5 @@ export const patternNames: readonly PatternName[] = [
   "sheet",
   "headless",
   "rtl",
+  "url",
 ];

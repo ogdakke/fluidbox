@@ -144,6 +144,7 @@ export class DomViewerDriver<
   readonly #lifetime = new AbortController();
   #controller: SessionController<TItem> | undefined;
   #strip: ViewerStrip<TItem> | undefined;
+  #loop = false;
   #portalDispose: FluidboxDispose | undefined;
   #source: FluidboxSource<TItem> | undefined;
   #extensions: FluidboxExtensionInstance<TItem>[] = [];
@@ -277,6 +278,13 @@ export class DomViewerDriver<
   }
 
   /** Change the zoom options. Turning zoom off zooms the photo back out. */
+  /** Go round the gallery, or stop at its ends. */
+  setLoop(loop: boolean) {
+    if (loop === this.#loop) return;
+    this.#loop = loop;
+    this.#strip?.setLoop(loop);
+  }
+
   setZoom(options: false | FluidboxZoomOptions | undefined) {
     const next = zoomConfig(options);
     if (next?.max === this.#zoomOptions?.max && next?.step === this.#zoomOptions?.step) return;
@@ -409,6 +417,7 @@ export class DomViewerDriver<
       },
       this.#renderers,
       this.#labels,
+      this.#loop,
     );
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
@@ -616,14 +625,14 @@ export class DomViewerDriver<
       !originMatchesItem(context.origin, context.item),
     );
     this.#setActiveTrigger(context.origin?.trigger ?? null);
-    const selected = this.#strip?.index === context.index;
+    const selected = this.#strip?.shows(context.index);
     // A native swipe updates the strip before it reports the selected index.
     // Sending that selection back into the strip would snap an in-progress
     // touch gesture to its midpoint and discard the browser's momentum.
     if (!selected) {
       const smooth =
         !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
-      await this.#strip?.select(context.index, smooth);
+      await this.#strip?.select(context.index, smooth, context.step);
     }
     this.#render(context.item, context.index);
     // The overlay is invisible while open. Moving it between slide frames

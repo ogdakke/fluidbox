@@ -5,6 +5,7 @@ import {
   NgZone,
   Output,
   ViewContainerRef,
+  booleanAttribute,
   computed,
   inject,
   signal,
@@ -38,6 +39,8 @@ import {
   fluidboxEventTypes,
   latestOrigins,
   resolveLabels,
+  createFluidboxSync,
+  watchFluidbox,
   unloadFluidbox,
 } from "@ogdakke/fluidbox/kit";
 import { injectIsBrowser, mountContent, type FluidboxContent } from "./mount.js";
@@ -111,10 +114,19 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
 {
   /** The gallery's items: an array, or a list read on demand. */
   @Input() items: FluidboxItems<TItem> = [];
+  /**
+   * Whether the viewer is open, for `[(open)]`. The viewer opens on `index`
+   * and closes when this changes. Leave it out to let triggers own it.
+   */
+  @Input("open") opened?: boolean;
+  /** The item the viewer shows, for `[(index)]`. */
+  @Input() index?: number;
   /** Your strings for the viewer. */
   @Input() labels?: Partial<FluidboxLabels>;
   /** Zoom steps, or false to turn zoom off. */
   @Input() zoom?: FluidboxOptions["zoom"];
+  /** Go round: past the last item comes the first. A single item never loops. */
+  @Input({ transform: booleanAttribute }) loop = false;
   /** Draw `custom` items, by the name in their `render`: a template or a component. */
   @Input() renderers?: Readonly<Record<string, FluidboxContent<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
@@ -134,6 +146,10 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   @Output() readonly settle = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
   /** When the sheet comes to rest at another stop. */
   @Output() readonly sheetChange = new EventEmitter<FluidboxSheetEvent>();
+  /** As the viewer opens or closes, from any input. Half of `[(open)]`. */
+  @Output() readonly openChange = new EventEmitter<boolean>();
+  /** As the viewer moves to another item, opening included. Half of `[(index)]`. */
+  @Output() readonly indexChange = new EventEmitter<number>();
 
   readonly #zone = inject(NgZone);
   readonly #container = inject(ViewContainerRef);
@@ -174,6 +190,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly #parts: Parts<TItem> = { viewer: null, filmstrip: null, sheet: null };
   #scheduled = false;
   #destroyed = false;
+  readonly #sync = createFluidboxSync(this.fluidbox);
 
   constructor() {
     const fluidbox = this.fluidbox;
@@ -211,6 +228,11 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
         if (output.observed) this.#zone.run(() => output.emit(event));
       });
     }
+    watchFluidbox(fluidbox, {
+      open: (open) => this.openChange.observed && this.#zone.run(() => this.openChange.emit(open)),
+      index: (index) =>
+        this.indexChange.observed && this.#zone.run(() => this.indexChange.emit(index)),
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -220,7 +242,16 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       this.#update({ labels: this.labels });
     }
     if (changes["zoom"]) this.#update({ zoom: zoomOption(this.zoom) });
+    if (changes["loop"]) this.#update({ loop: this.loop });
     if (changes["loading"]) this.#update({ loading: this.loading });
+    // Your open and index win whenever they change, once the triggers inside
+    // have registered, so an open flies from the item's own.
+    if ((changes["open"] || changes["index"]) && this.#browser) {
+      queueMicrotask(() => {
+        if (this.#destroyed) return;
+        this.#zone.runOutsideAngular(() => this.#sync(this.opened, this.index));
+      });
+    }
   }
 
   ngOnDestroy(): void {

@@ -44,6 +44,7 @@ class TestDriver {
   registerThumbnailOverlay: (...args: unknown[]) => void | (() => void) = () => {};
   connect() {}
   setZoom() {}
+  setLoop() {}
   relabel() {}
   setPortal() {}
   setExtensions() {}
