@@ -7,7 +7,7 @@ description: Fluidbox in Next.js through the React binding, with the gallery in 
 
 # Next.js
 
-Next.js uses the [React binding](./react.md), `@ogdakke/fluidbox/react`. The package has nothing specific to Next. This page shows where each piece goes, and how to feed the viewer from Next's image optimizer so it loads the size the screen needs. It was checked with Next.js 16.4 and React 19.3: a `next build` in Chromium, Firefox and WebKit, and `next dev` in Chromium.
+Next.js uses the [React binding](./react.md), `@ogdakke/fluidbox/react`. The package has nothing specific to Next. This page shows where each piece goes, and how to feed the viewer from Next's image optimizer so it loads the size the screen needs. It was checked with Next.js 16.4 and React 19.3, with `next build` in Chromium, Firefox and WebKit and `next dev` in Chromium.
 
 ## Install
 
@@ -30,44 +30,42 @@ import "@ogdakke/fluidbox/sheet.css";
 
 ## The items, from the optimizer
 
-`getImageProps` from `next/image` returns the `src` and `srcSet` that `<Image>` would render. Call it twice per photo: once at full-screen `sizes` for the viewer, and once with the triggers' `sizes` for the `thumbnail`.
+`getImageProps` from `next/image` returns the props `<Image>` would render. Call it twice per photo, once at full-screen `sizes` for the viewer and once at the grid's `sizes` for the triggers, and hand both to `imageItem`:
 
 ```ts
 // app/photos.ts
-import type { FluidboxImageItem } from "@ogdakke/fluidbox";
+import { imageItem } from "@ogdakke/fluidbox";
 import { getImageProps } from "next/image";
+import valley from "./images/valley.webp";
+import canyon from "./images/canyon.webp";
 
 const files = [
-  { src: "/photos/valley.webp", width: 1800, height: 1200, alt: "River valley" },
-  { src: "/photos/canyon.webp", width: 1920, height: 1080, alt: "Canyon" },
+  { slug: "valley", src: valley, alt: "River valley" },
+  { slug: "canyon", src: canyon, alt: "Canyon" },
 ];
 
-/** The width of a grid column, for the triggers' sizes. */
-export const thumbnailSizes = "(min-width: 640px) 25vw, 50vw";
-
-/** An item that keeps its file for <Image>. */
-export type Photo = FluidboxImageItem & { readonly file: string };
-
-export const photos: Photo[] = files.map(({ src, width, height, alt }) => {
-  const full = getImageProps({ src, width, height, alt, sizes: "100vw" }).props;
-  const thumb = getImageProps({ src, width, height, alt, sizes: thumbnailSizes }).props;
+export const photos = files.map(({ slug, src, alt }) => {
+  const image = { src, alt, placeholder: "blur" } as const;
+  const full = getImageProps({ ...image, sizes: "100vw" });
+  const thumb = getImageProps({
+    ...image,
+    sizes: "(min-width: 640px) 25vw, 50vw",
+  });
   return {
-    type: "img",
-    file: src,
-    src: full.src,
-    srcset: full.srcSet,
-    sizes: "100vw",
-    width,
-    height,
-    alt,
-    thumbnail: { src: thumb.src, srcset: thumb.srcSet, sizes: thumbnailSizes },
+    ...imageItem(full.props, thumb.props),
+    slug,
+    thumb: thumb.props,
   };
 });
+
+export type Photo = (typeof photos)[number];
 ```
 
-- The `thumbnail` is the same srcset the trigger's `<Image>` renders. The viewer sees that the trigger already shows this photo, so the opening flies the image the page has already decoded. Without a match it crossfades from the trigger to the thumbnail.
-- `getImageProps` sets `src` to the largest width, as a fallback for browsers without `srcset`. The viewer picks from the srcset like the browser does. On a 1200 px screen it loads the 1200w file, and the filmstrip takes the thumbnail's smallest candidate.
-- `file` is a [field of your own](./media.md#fields-of-your-own). Items don't have to carry an `id`, so the trigger needs the file under another name.
+- The viewer gets the full srcset, the thumbnail and Next's blur as the `placeholder`. The blur paints the moment a slide appears, under the thumbnail and the full image.
+- `thumb` keeps the grid's props for the triggers to render, so the grid's `sizes` lives in one place. The viewer sees that the trigger already shows the thumbnail and flies the image the page has decoded.
+- On a 1200 px screen the viewer loads the 1200w file, and the filmstrip takes the thumbnail's smallest candidate. `src` is the largest width, which only browsers without `srcset` load.
+- A static import gives Next the width, the height and the blur. For a remote file, pass `width`, `height` and a `blurDataURL` of your own.
+- `slug` and `thumb` are [fields of your own](./media.md#fields-of-your-own). The viewer hands them back in every state and callback.
 
 ## The gallery
 
@@ -78,22 +76,15 @@ The React parts use hooks, and `Fluidbox` is one object that a server component 
 "use client";
 
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import Image from "next/image";
-import { thumbnailSizes, type Photo } from "./photos";
+import type { Photo } from "./photos";
 
 export function Gallery({ photos }: { photos: Photo[] }) {
   return (
     <Fluidbox.Root items={photos}>
       <div className="grid">
         {photos.map((photo) => (
-          <Fluidbox.Trigger key={photo.file} item={photo}>
-            <Image
-              src={photo.file}
-              width={photo.width}
-              height={photo.height}
-              alt={photo.alt}
-              sizes={thumbnailSizes}
-            />
+          <Fluidbox.Trigger key={photo.slug} item={photo}>
+            <img {...photo.thumb} />
           </Fluidbox.Trigger>
         ))}
       </div>
@@ -113,7 +104,7 @@ export default function Page() {
 }
 ```
 
-The items are plain objects, so they cross from the server component to the client one as props. Keep `thumbnailSizes` in `photos.ts` and not in `gallery.tsx`. A server component that imports a value from a `"use client"` file gets a reference to it, not the string.
+The items are plain objects, so they cross from the server component to the client one as props. The `<img>` renders what `<Image>` would, lazy loading and blur included. Next's `no-img-element` lint rule flags it, so turn the rule off for that line.
 
 ## Server rendering
 
@@ -151,16 +142,70 @@ export default function Photos({ photos }: { photos: Photo[] }) {
 
 ## The open photo in the URL
 
-The [photo in the address](./patterns/url.md) pattern reads `location` as it renders, and the server has no `location`. Start with no photo and read the address in an effect:
+The [photo in the address](./patterns/url.md) pattern works in Next as it is. It reads `?photo=` after hydration, since the server has no `location`, so a link with `?photo=2` opens the second photo as soon as the page runs, flying from its trigger. Put it in the client component with the gallery.
+
+## A page per photo
+
+Instagram-style galleries give each photo its own path. Opening one from the grid shows it in the viewer at `/photos/canyon`, and loading that path shows a page of its own, which a server can render with its own title and preview image. Next's intercepting routes build this with a modal route. The viewer already is the modal, so the gallery only has to write the path:
 
 ```tsx
-const [photo, setPhoto] = useState<number | null>(null);
-useEffect(() => {
-  const onPopState = () => setPhoto(photoInUrl());
-  onPopState();
-  addEventListener("popstate", onPopState);
-  return () => removeEventListener("popstate", onPopState);
-}, []);
+// app/gallery.tsx
+"use client";
+
+import { Fluidbox } from "@ogdakke/fluidbox/react";
+import { usePathname } from "next/navigation";
+import type { Photo } from "./photos";
+
+export function Gallery({ photos }: { photos: Photo[] }) {
+  const photoAt = (path: string | null) =>
+    photos.findIndex(({ slug }) => path === `/photos/${slug}`);
+  const shown = photoAt(usePathname());
+
+  return (
+    <Fluidbox.Root
+      items={photos}
+      open={shown >= 0}
+      index={shown >= 0 ? shown : undefined}
+      onOpenChange={(open) => {
+        // Back to the grid, unless Back closed it already.
+        if (!open && photoAt(location.pathname) >= 0) {
+          history.back();
+        }
+      }}
+      onIndexChange={(index) => {
+        const url = `/photos/${photos[index]!.slug}`;
+        if (photoAt(location.pathname) >= 0) {
+          history.replaceState(null, "", url);
+        } else {
+          history.pushState(null, "", url);
+        }
+      }}
+    >
+      {/* The grid, as above */}
+    </Fluidbox.Root>
+  );
+}
 ```
 
-The viewer can't open before hydration anyway, so a link with `?photo=2` opens the second photo as soon as the page can run it, flying from its trigger.
+```tsx
+// app/photos/[slug]/page.tsx
+import { notFound } from "next/navigation";
+import { photos } from "../../photos";
+
+export function generateStaticParams() {
+  return photos.map(({ slug }) => ({ slug }));
+}
+
+type Props = { params: Promise<{ slug: string }> };
+
+export default async function PhotoPage({ params }: Props) {
+  const { slug } = await params;
+  const photo = photos.find((each) => each.slug === slug);
+  if (!photo) notFound();
+  return <img {...photo.thumb} sizes="100vw" />;
+}
+```
+
+- `history.pushState` and `replaceState` update `usePathname` without a navigation, so the grid stays on screen under the viewer. Opening adds one entry, moving replaces it, and Back closes the viewer.
+- A reload at `/photos/canyon` loads the photo's own page, not the grid.
+- Checked with `next build` in Chromium, Firefox and WebKit: opening, moving, closing, Back, Forward and a reload.

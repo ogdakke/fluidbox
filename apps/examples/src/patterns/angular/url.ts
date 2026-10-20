@@ -1,5 +1,5 @@
 // #region example
-import { Component, HostListener, signal } from "@angular/core";
+import { afterNextRender, Component, HostListener, signal } from "@angular/core";
 import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
 import { photos } from "../shared";
@@ -51,7 +51,12 @@ function followInUrl(photo: number | null) {
 export class Url {
   readonly photos = photos;
   readonly label = itemLabel;
-  readonly photo = signal(photoInUrl());
+  // Read the address once rendered, so the server and the browser render the same.
+  readonly photo = signal<number | null>(null);
+
+  constructor() {
+    afterNextRender(() => this.onPopState());
+  }
 
   @HostListener("window:popstate")
   onPopState() {

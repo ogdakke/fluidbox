@@ -1,6 +1,7 @@
-/** The plain JavaScript API: `createFluidbox`, `createItemList`, the event classes and every type. Safe to import on the server, with no side effects. */
+/** The plain JavaScript API: `createFluidbox`, `createItemList`, `imageItem`, the event classes and every type. Safe to import on the server, with no side effects. */
 export { createFluidbox } from "./create-fluidbox";
 export { createItemList, idOf, itemLabel } from "./items";
+export { imageItem, type FluidboxImageProps } from "./image-item";
 export { FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxToggleEvent } from "./public-api";
 
 export type {

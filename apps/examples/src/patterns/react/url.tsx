@@ -27,9 +27,11 @@ function followInUrl(photo: number | null) {
 }
 
 export function Url() {
-  const [photo, setPhoto] = useState(photoInUrl);
+  // Read the address after the first render, so the server and the browser render the same.
+  const [photo, setPhoto] = useState<number | null>(null);
   useEffect(() => {
     const onPopState = () => setPhoto(photoInUrl());
+    onPopState();
     addEventListener("popstate", onPopState);
     return () => removeEventListener("popstate", onPopState);
   }, []);

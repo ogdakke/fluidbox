@@ -16,4 +16,4 @@ The viewer can follow your state instead of its triggers. Pass `open` and `index
 - The viewer ignores an `index` out of range, so a stale link opens nothing.
 - The callbacks fire for every input, the viewer's own buttons and keys included. In React, Solid and Vue each one also gets a `reason`: `"trigger"`, `"keyboard"`, `"pointer"`, `"wheel"`, `"api"` or `"items"`.
 - Leave `open` out and the triggers own it again. Pass only `index` to steer an open viewer from outside, as a carousel beside it would.
-- `photoInUrl` reads `location`, so on a server-rendered page read the address in an effect, or from the request.
+- Each version reads the address after the first render, in an effect, `onMount`, `onMounted` or `afterNextRender`. The server has no `location`, and its HTML then matches the browser's first render, with the viewer closed. Server-rendered pages, [Next.js](../nextjs.md) among them, take the pattern as it is.

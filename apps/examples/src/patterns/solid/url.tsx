@@ -1,6 +1,6 @@
 /** @jsxImportSource solid-js */
 // #region example
-import { createSignal, For, onCleanup } from "solid-js";
+import { createSignal, For, onCleanup, onMount } from "solid-js";
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/solid";
 import { photos } from "../shared";
@@ -28,10 +28,14 @@ function followInUrl(photo: number | null) {
 }
 
 export function Url() {
-  const [photo, setPhoto] = createSignal(photoInUrl());
-  const onPopState = () => setPhoto(photoInUrl());
-  addEventListener("popstate", onPopState);
-  onCleanup(() => removeEventListener("popstate", onPopState));
+  // Read the address once mounted, so the server and the browser render the same.
+  const [photo, setPhoto] = createSignal<number | null>(null);
+  onMount(() => {
+    const onPopState = () => setPhoto(photoInUrl());
+    onPopState();
+    addEventListener("popstate", onPopState);
+    onCleanup(() => removeEventListener("popstate", onPopState));
+  });
 
   return (
     <Fluidbox.Root

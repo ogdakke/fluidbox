@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
-import { onBeforeUnmount, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref } from "vue";
 import { photos } from "../shared";
 
 /** The photo in the address: `?photo=2` is the second. */
@@ -27,9 +27,13 @@ function followInUrl(photo: number | null) {
   else history.replaceState(history.state, "", url);
 }
 
-const photo = ref(photoInUrl());
+// Read the address once mounted, so the server and the browser render the same.
+const photo = ref<number | null>(null);
 const onPopState = () => (photo.value = photoInUrl());
-addEventListener("popstate", onPopState);
+onMounted(() => {
+  onPopState();
+  addEventListener("popstate", onPopState);
+});
 onBeforeUnmount(() => removeEventListener("popstate", onPopState));
 
 function onOpenChange(open: boolean) {

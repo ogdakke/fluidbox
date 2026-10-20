@@ -180,6 +180,28 @@ While an image opens, the slide paints, from the bottom up: the `placeholder`, t
 
 The filmstrip tries the `thumbnail`, then the full image or the video's poster, the smallest `srcset` candidate of each first. The slide and the iframe still show the thumbnail with its `srcset` and `sizes`, so the browser picks the candidate that fits.
 
+## Items from `<img>` props
+
+`imageItem(image, thumbnail?)` from `@ogdakke/fluidbox` builds an image item from the props an `<img>` takes, in React's spelling (`srcSet`) or the HTML one (`srcset`). `image` is the full-size picture for the viewer. `thumbnail`, at the triggers' `sizes`, becomes the item's `thumbnail`. A `url()` in either one's `style.backgroundImage` becomes the `placeholder`. That is where `next/image` puts its blur.
+
+```ts
+import { imageItem } from "@ogdakke/fluidbox";
+
+const item = imageItem(
+  {
+    src: "/harbour-1600.jpg",
+    srcSet: "/harbour-800.jpg 800w, /harbour-1600.jpg 1600w",
+    sizes: "100vw",
+    width: 1600,
+    height: 1200,
+    alt: "Harbour",
+  },
+  { src: "/harbour-400.jpg", sizes: "25vw" },
+);
+```
+
+It throws a `TypeError` without a width and height. It returns a plain item, so spread it into an object of your own to add fields. [Next.js](./nextjs.md#the-items-from-the-optimizer) shows it with `getImageProps`.
+
 ## Fields of your own
 
 Items are your own objects. Add any field, and the viewer hands your object back in every state, event and callback. Type them by extending an item type, and the type flows through:

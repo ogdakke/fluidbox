@@ -319,6 +319,7 @@ assert<
     | "createItemList"
     | "idOf"
     | "itemLabel"
+    | "imageItem"
     | "FluidboxItemChangeEvent"
     | "FluidboxSheetEvent"
     | "FluidboxToggleEvent"
