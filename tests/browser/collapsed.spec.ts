@@ -137,6 +137,28 @@ async function finishFrameProbe(page: Page, testInfo: TestInfo) {
   return frames;
 }
 
+test("a press on the teaser keeps its overlay while the viewer prepares", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "a mouse press");
+  const { teaser } = await loadGallery(page);
+  const trigger = teaser.locator('[slot="trigger"]');
+  await trigger.hover();
+  await page.waitForLoadState("networkidle");
+  const before = await teaser.screenshot();
+  const box = (await trigger.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(
+    page.locator(
+      "[data-fluidbox-prepared] [data-fluidbox-slide-preview][data-fluidbox-image-ready]",
+    ),
+  ).not.toHaveCount(0);
+  expect(await teaser.screenshot()).toEqual(before);
+  await page.mouse.up();
+});
+
 test("visible items preserve the collapsed card while hidden items replace it", async ({
   page,
 }, testInfo) => {

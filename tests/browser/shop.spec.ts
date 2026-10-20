@@ -22,6 +22,27 @@ test.describe("shop fixture, wide screen", () => {
   test.skip(({ isMobile }) => isMobile, "the wide-screen layout");
   test.use({ viewport: { width: 1440, height: 900 } });
 
+  test("a press leaves the card as it was while the viewer prepares", async ({ page }) => {
+    await load(page);
+    const card = page.locator(".shop-slide").first();
+    await expect(card.locator("img")).toHaveAttribute("data-loaded", "true");
+    await card.hover();
+    await page.waitForLoadState("networkidle");
+    const before = await card.screenshot();
+    const box = (await card.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    // The prepared viewer's preview is the 160px thumbnail, set over the card.
+    await expect(
+      page.locator(
+        "[data-fluidbox-prepared] [data-fluidbox-slide-preview][data-fluidbox-image-ready]",
+      ),
+    ).not.toHaveCount(0);
+    expect(await card.screenshot()).toEqual(before);
+    await page.mouse.up();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  });
+
   test("thumbnails and frame options step the carousel", async ({ page }) => {
     await load(page);
     await page.locator(".shop-thumbs .shop-thumb").nth(2).click();
