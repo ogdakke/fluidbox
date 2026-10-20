@@ -19,9 +19,11 @@ const menu = document.querySelector<HTMLDetailsElement>(".docs-nav__menu")!;
 
 const normalize = (path: string) => (path.endsWith("/") ? path : `${path}/`);
 let renderId = 0;
+let shownPath = normalize(location.pathname);
 
 async function render(path: string, hash: string) {
   const id = ++renderId;
+  shownPath = normalize(path);
   const index = pages.findIndex((page) => page.path === normalize(path));
   const page = pages[index];
   nav.innerHTML = renderNav(pages, page?.path ?? "");
@@ -62,7 +64,11 @@ document.addEventListener("click", (event) => {
   void render(link.pathname, link.hash);
 });
 
-addEventListener("popstate", () => void render(location.pathname, location.hash));
+// A live example may move through history on its own page, as the photo in the address does.
+addEventListener("popstate", () => {
+  if (normalize(location.pathname) === shownPath) return;
+  void render(location.pathname, location.hash);
+});
 if (matchMedia("(max-width: 900px)").matches) menu.open = false;
 // The page arrives prerendered; only wire it up.
 if (content.childElementCount) {
