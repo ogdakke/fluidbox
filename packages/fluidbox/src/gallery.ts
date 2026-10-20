@@ -164,6 +164,8 @@ export class FluidboxGalleryElement extends HTMLElement {
   #overlays: (() => void)[] = [];
   #observer: MutationObserver | undefined;
   #refreshQueued = false;
+  /** Refreshes chained on #refreshPromise that have not settled yet. */
+  #refreshing = 0;
   #refreshPromise: Promise<void> = Promise.resolve();
   #unsubscribe: (() => void) | undefined;
   #events: AbortController | undefined;
@@ -353,8 +355,8 @@ export class FluidboxGalleryElement extends HTMLElement {
     };
   }
 
-  async open(target?: FluidboxTarget, options?: FluidboxCommandOptions): Promise<boolean> {
-    return (await this.#ready()).open(target, options);
+  open(target?: FluidboxTarget, options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.open(target, options));
   }
 
   /** Start loading an item a press is likely to open. Call the result to let go. */
@@ -375,20 +377,31 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
-  async load(): Promise<boolean> {
-    return (await this.#ready()).load();
+  load(): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.load());
   }
 
-  async close(options?: FluidboxCommandOptions): Promise<boolean> {
-    return (await this.#ready()).close(options);
+  close(options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.close(options));
   }
 
-  async next(options?: FluidboxCommandOptions): Promise<boolean> {
-    return (await this.#ready()).next(options);
+  next(options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.next(options));
   }
 
-  async previous(options?: FluidboxCommandOptions): Promise<boolean> {
-    return (await this.#ready()).previous(options);
+  previous(options?: FluidboxCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.previous(options));
+  }
+
+  /**
+   * Run a command at once when nothing is queued to rebuild or update the
+   * fluidbox, as a press or a key does, so it lands in order with them.
+   * Otherwise wait for that work, so the command reaches the new options.
+   */
+  #run(command: (fluidbox: Fluidbox) => Promise<boolean>): Promise<boolean> {
+    const settled = !this.#refreshQueued && !this.#updateQueued && !this.#refreshing;
+    if (settled && this.#fluidbox) return command(this.#fluidbox);
+    return this.#ready().then(command);
   }
 
   async #ready() {
@@ -478,8 +491,12 @@ export class FluidboxGalleryElement extends HTMLElement {
     queueMicrotask(() => {
       this.#refreshQueued = false;
       if (!this.isConnected) return;
+      this.#refreshing += 1;
       this.#refreshPromise = this.#refreshPromise
         .then(() => this.#refresh())
+        .finally(() => {
+          this.#refreshing -= 1;
+        })
         .catch((error: unknown) => {
           for (const waiter of this.#readyWaiters) waiter.reject(error);
           this.#readyWaiters = [];
