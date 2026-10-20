@@ -137,7 +137,7 @@ function createMounts() {
     add: (entry: Mount) => set([...list, entry]),
     remove: (entry: Mount) => set(list.filter((candidate) => candidate !== entry)),
     read: () => list,
-    subscribe(listener: () => void) {
+    subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
