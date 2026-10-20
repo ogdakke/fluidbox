@@ -121,6 +121,33 @@ interface Mount {
   readonly node: ReactNode;
 }
 
+/**
+ * The content drawn into the viewer's slides. A store, not state: React renders
+ * a store's change before the next paint, so a slide that opens shows its
+ * content from the opening's first frame.
+ */
+function createMounts() {
+  let list: readonly Mount[] = [];
+  const listeners = new Set<() => void>();
+  const set = (next: readonly Mount[]) => {
+    list = next;
+    for (const listener of listeners) listener();
+  };
+  return {
+    add: (entry: Mount) => set([...list, entry]),
+    remove: (entry: Mount) => set(list.filter((candidate) => candidate !== entry)),
+    read: () => list,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+const noMounts: readonly Mount[] = [];
+
 /** What the Filmstrip and Sheet parts ask of the viewer. Their presence turns each on. */
 interface Addons {
   filmstrip: { readonly custom: boolean } | null;
@@ -198,27 +225,42 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   }).current;
   const latest = useLatest(props);
   const [viewerTarget, setViewerTarget] = useState<HTMLElement | null>(null);
-  const [mounts, setMounts] = useState<readonly Mount[]>([]);
+  const shownViewerTarget = useRef<HTMLElement | null>(null);
+  useIsomorphicLayoutEffect(() => {
+    shownViewerTarget.current = viewerTarget;
+  }, [viewerTarget]);
+  const mountsRef = useRef<ReturnType<typeof createMounts> | null>(null);
+  mountsRef.current ??= createMounts();
+  const mountStore = mountsRef.current;
+  const mounts = useSyncExternalStore(mountStore.subscribe, mountStore.read, () => noMounts);
   const nextKey = useRef(0);
 
   const renderViewer = useCallback<FluidboxViewerRenderer<TItem>>(({ target }) => {
-    setViewerTarget(target);
+    // A viewer made by the open it serves measures its layer right after this,
+    // and the content can change the layer's insets and theme, so render it now.
+    // A redraw into the target already shown, as a label change makes from a
+    // layout effect, where React can't flush, has nothing new to render.
+    if (target === shownViewerTarget.current) setViewerTarget(target);
+    else flushSync(() => setViewerTarget(target));
     return () => setViewerTarget((current) => (current === target ? null : current));
   }, []);
 
-  const mount = useCallback((target: HTMLElement, node: ReactNode) => {
-    // React removes portal content after a commit, when the runtime may already
-    // have emptied the target, so each mount renders into a host of its own.
-    const host = target.ownerDocument.createElement("span");
-    host.dataset.fluidboxMount = "";
-    target.append(host);
-    const entry: Mount = { key: nextKey.current++, target: host, node };
-    setMounts((current) => [...current, entry]);
-    return () => {
-      setMounts((current) => current.filter((candidate) => candidate !== entry));
-      host.remove();
-    };
-  }, []);
+  const mount = useCallback(
+    (target: HTMLElement, node: ReactNode) => {
+      // React removes portal content after a commit, when the runtime may already
+      // have emptied the target, so each mount renders into a host of its own.
+      const host = target.ownerDocument.createElement("span");
+      host.dataset.fluidboxMount = "";
+      target.append(host);
+      const entry: Mount = { key: nextKey.current++, target: host, node };
+      mountStore.add(entry);
+      return () => {
+        mountStore.remove(entry);
+        host.remove();
+      };
+    },
+    [mountStore],
+  );
 
   const labelOptions = (): Partial<FluidboxLabels> => ({
     ...latest.current.labels,
