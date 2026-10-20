@@ -547,7 +547,6 @@ export class DomViewerDriver<
     if (context.instant) {
       // Hidden until the image can paint, so it replaces the server's copy in one frame.
       this.#keepThumbnailVisible(undefined);
-      this.#strip?.completeOpening(context.index);
       await this.#mediaReady();
       if (context.signal.aborted) return;
       this.#clearMotionStyles();
@@ -567,7 +566,6 @@ export class DomViewerDriver<
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
       this.#thumbnailOverlays?.prepare(context.item, context.index, this.#frame, "open", 0);
-      this.#strip?.completeOpening(context.index);
       delete this.#portal.overlay.dataset.fluidboxPrepared;
       this.#setState("open");
       this.#focusUnlessInside();
@@ -630,7 +628,6 @@ export class DomViewerDriver<
     );
     if (context.signal.aborted) return;
     this.#setState("open");
-    this.#strip?.completeOpening(context.index);
     // A gesture that interrupted the opening owns the overlays until it settles.
     if (!this.#dragGesture.active) this.#thumbnailOverlays?.set("open", 0, new DOMMatrix());
     this.#endReveal();

@@ -23,8 +23,6 @@ interface ViewerSlide {
   readonly error: HTMLDivElement;
   readonly retry: HTMLButtonElement;
   loaded: boolean;
-  opening: boolean;
-  deferFull: boolean;
   decoded: boolean;
   fullApplied: boolean;
   imageVersion: number;
@@ -234,11 +232,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#mounted = false;
     this.#observer.disconnect();
     this.#resolveSelection();
-    for (const slide of this.#slides.values()) {
-      slide.opening = false;
-      slide.deferFull = false;
-      this.#unload(slide);
-    }
+    for (const slide of this.#slides.values()) this.#unload(slide);
   }
 
   select(item: number, smooth: boolean, step?: 1 | -1): Promise<void> {
@@ -443,8 +437,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       error,
       retry,
       loaded: false,
-      opening: false,
-      deferFull: false,
       decoded: false,
       fullApplied: false,
       imageVersion: 0,
@@ -467,7 +459,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       return;
     }
     if (!slide || item.type !== "img" || !(slide.image instanceof HTMLImageElement)) return;
-    slide.opening = true;
     const decodedPreview = origin ? observeDecodedPreview(origin) : null;
     const preview = decodedPreview || item.thumbnail?.src || origin?.currentSrc || origin?.src;
     if (preview) {
@@ -486,7 +477,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     this.#reset(slide);
     slide.fullApplied = false;
-    slide.deferFull = decodedPreview !== null;
     this.#load(position, slide);
   }
 
@@ -566,16 +556,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       await presented();
       handoff.abort();
     })();
-  }
-
-  completeOpening(item: number) {
-    const index = this.#near(item);
-    const slide = this.#slides.get(index);
-    if (!slide) return;
-    slide.opening = false;
-    slide.deferFull = false;
-    if (slide.decoded) this.#applyImage(index, slide);
-    else this.#load(index, slide);
   }
 
   #renderWindow(anchor: number, scrollIndex: number) {
@@ -732,7 +712,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #load(index: number, slide: ViewerSlide) {
     const item = this.#source.getItem(this.#item(index));
     this.#loadPreview(item, slide);
-    if (slide.deferFull) return;
     if (slide.loaded) {
       if (slide.image instanceof HTMLImageElement)
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
@@ -755,6 +734,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         // Decode the exact candidate the slide will pick before it swaps, so the
         // preview stays on screen until the sharper picture can paint at once.
         const loader = this.#stage(item, slide);
+        loader.fetchPriority = index === this.#index ? "high" : "low";
         slide.controller = controller;
         const abort = () => {
           loader.removeAttribute("srcset");
@@ -766,7 +746,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           .then(() => {
             if (controller.signal.aborted) return;
             slide.decoded = true;
-            if (!slide.opening) this.#applyImage(index, slide);
+            this.#applyImage(index, slide);
           })
           .catch(() => {
             if (!controller.signal.aborted) this.#fail(index, slide);
@@ -826,8 +806,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.controller = undefined;
     slide.dispose?.();
     slide.dispose = undefined;
-    slide.opening = false;
-    slide.deferFull = false;
     slide.decoded = false;
     slide.fullApplied = false;
     slide.error.hidden = true;

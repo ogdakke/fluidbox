@@ -337,13 +337,22 @@ test("plain runtime keeps the preview painted until the full image can replace i
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
+  let serveFull!: () => void;
+  const fullHeld = new Promise<void>((resolve) => (serveFull = resolve));
+  await page.route(
+    (url) => url.search === "?full",
+    async (route) => {
+      await fullHeld;
+      await route.continue();
+    },
+  );
   await page.goto("/headless.html");
   await page.evaluate(async () => {
     await window.headlessViewer.setItems([
       {
         id: "preview-test",
         type: "img",
-        src: "/photo-square.svg",
+        src: "/photo-square.svg?full",
         alt: "Preview handoff",
         width: 800,
         height: 800,
@@ -358,7 +367,9 @@ test("plain runtime keeps the preview painted until the full image can replace i
   await expect(media).toHaveAttribute("src", "/photo-portrait.svg");
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
   await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
-  await expect(media).toHaveAttribute("src", "/photo-square.svg");
+  await expect(media).toHaveAttribute("src", "/photo-portrait.svg");
+  serveFull();
+  await expect(media).toHaveAttribute("src", "/photo-square.svg?full");
 });
 
 test("adjacent slides paint their placeholder while responsive images are pending", async ({
@@ -415,12 +426,15 @@ test("plain runtime retains the last decoded origin when its next source is pend
   page,
 }) => {
   let fullRequests = 0;
+  let serveFull!: () => void;
+  const fullHeld = new Promise<void>((resolve) => (serveFull = resolve));
   await page.route("**/pending-origin.svg", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 1_000));
     await route.abort();
   });
   await page.route("**/deferred-full.svg", async (route) => {
     fullRequests += 1;
+    await fullHeld;
     await route.fulfill({
       contentType: "image/svg+xml",
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><rect width="800" height="800" fill="green"/></svg>',
@@ -449,18 +463,14 @@ test("plain runtime retains the last decoded origin when its next source is pend
   const activeMedia = page.locator(
     '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
   );
+  // The full image loads from the start of the flight, behind the last decoded origin.
   await expect(activeMedia).toHaveAttribute("src", /photo-square\.svg/);
+  await expect.poll(() => fullRequests).toBe(1);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-status",
     "opening",
   );
-  expect(fullRequests).toBe(0);
-  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
-  await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
-    "data-fluidbox-status",
-    "open",
-  );
-  await expect.poll(() => fullRequests).toBe(1);
+  serveFull();
   await expect(activeMedia).toHaveAttribute("src", "/deferred-full.svg");
 });
 
