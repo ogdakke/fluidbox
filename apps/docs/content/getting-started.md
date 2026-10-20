@@ -70,6 +70,26 @@ Every binding has the same parts with the same names: `Root` holds the items and
 - **Custom elements.** `<fluidbox-gallery>` with `<fluidbox-item>` children. See [Custom elements](./custom-elements.md).
 - **Plain JavaScript.** `createFluidbox()`, and `fluidbox.bind()` for each trigger. See [JavaScript](./javascript.md).
 
+## Loading the viewer
+
+The page loads the triggers, the items and the viewer's state. The viewer itself, with its gestures, transitions and slides, is a chunk of its own. By default it loads when a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus, so it has usually arrived by the time the click does. An open loads it if it hasn't.
+
+The `loading` option picks the moment:
+
+| `loading`           | The viewer's code loads                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `"hover"` (default) | When a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus. |
+| `"press"`           | When a trigger is pressed. Nothing loads for a pointer that only passes over.                |
+| `"eager"`           | Once the page is idle, whether or not anyone opens a viewer.                                 |
+
+For a signal of your own, call `load()`. A route that's about to show the gallery, or a menu that leads to it, can start the download early:
+
+```ts
+menu.addEventListener("toggle", () => void fluidbox.load(), { once: true });
+```
+
+`load()` resolves `true` once the code has loaded and `false` if it failed, as when offline. A failed load tries again on the next call or open. The bindings take `loading` on Root and put `load` next to the commands, and `<fluidbox-gallery>` has a `loading` attribute and a `load()` method.
+
 ## Add-ons
 
 The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. Turn one on, with an option, a framework part or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child, and the fluidbox loads its entry. An open waits for it. To bundle an entry up front, import it once in the browser bundle:

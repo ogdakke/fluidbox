@@ -77,6 +77,8 @@ export interface FluidboxTrigger<TItem extends FluidboxItem = FluidboxItem> {
 
 /** How long a preload waits for a click after the pointer lifts. */
 const PRELOAD_GRACE = 250;
+/** How long a mouse rests on a trigger before the viewer's code loads. */
+const HOVER_INTENT = 100;
 
 /** Make a trigger for a fluidbox. Call setElement once the element exists. */
 export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
@@ -91,6 +93,8 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   let dispose: (() => void) | undefined;
   let preload: (() => void) | undefined;
   let preloadTimer: ReturnType<typeof setTimeout> | undefined;
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+  let intents: AbortController | undefined;
   let lastPreviewId: string | null = null;
 
   const ids = () => idsIn(fluidbox.items, targets);
@@ -110,6 +114,25 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       },
     };
     dispose = host.registerOrigin(known, origin);
+  };
+  // Signs of a coming press load the viewer's code, if the fluidbox loads it on hover.
+  const listenForIntent = (target: HTMLElement) => {
+    intents = new AbortController();
+    const { signal } = intents;
+    const options = { signal, passive: true };
+    const leave = () => clearTimeout(hoverTimer);
+    target.addEventListener(
+      "pointerenter",
+      (event) => {
+        leave();
+        if (event.pointerType !== "mouse") host.intend();
+        else hoverTimer = setTimeout(() => host.intend(), HOVER_INTENT);
+      },
+      options,
+    );
+    target.addEventListener("pointerleave", leave, options);
+    target.addEventListener("focusin", () => host.intend(), options);
+    signal.addEventListener("abort", leave);
   };
   const discardPreload = () => {
     clearTimeout(preloadTimer);
@@ -144,7 +167,9 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       if (next === element) return;
       element = next;
       registered = "";
+      intents?.abort();
       if (next) {
+        listenForIntent(next);
         next.dataset.fluidboxTrigger = "";
         if (!next.hasAttribute("aria-haspopup")) next.setAttribute("aria-haspopup", "dialog");
         if (!next.hasAttribute("aria-expanded")) next.setAttribute("aria-expanded", "false");
@@ -179,6 +204,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     },
     destroy() {
       discardPreload();
+      intents?.abort();
       dispose?.();
       dispose = undefined;
       element = null;

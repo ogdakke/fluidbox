@@ -204,11 +204,17 @@ void fluidbox.filmstrip;
 assert<Equal<ReturnType<typeof fluidbox.open>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.close>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.setItems>, Promise<boolean>>>();
+assert<Equal<ReturnType<typeof fluidbox.load>, Promise<boolean>>>();
+assert<Equal<Root.FluidboxLoading, "hover" | "press" | "eager">>();
 assert<Equal<FluidboxReason, "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items">>();
 // A scrub is a kind of move, not a source of one.
 void fluidbox.open(1, { scrub: true });
 
 createFluidbox({ items: lazy, controls: true, filmstrip: true, sheet: true, zoom: false });
+createFluidbox({ items: photos, loading: "eager" });
+fluidbox.update({ loading: "press" });
+// @ts-expect-error hover, press or eager
+createFluidbox({ items: photos, loading: "lazy" });
 // @ts-expect-error items, not a source
 createFluidbox({ source: photos });
 // @ts-expect-error the viewer, not a portal
@@ -379,6 +385,8 @@ const gallerySheet: FluidboxSheet | null = gallery.sheet;
 const galleryFluidbox: Fluidbox | null = gallery.fluidbox;
 void [galleryState, gallerySheet, galleryFluidbox];
 gallery.preload(photo)();
+void gallery.load().then((loaded: boolean) => loaded);
+gallery.loading = "press";
 void gallery.setItems(photos).then((applied: boolean) => applied);
 gallery.addEventListener("sheetchange", (event) => void event.stop);
 gallery.addEventListener("itemchange", (event) => {

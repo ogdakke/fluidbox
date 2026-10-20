@@ -98,6 +98,7 @@ Exported as `fluidbox`: `<div fluidboxRoot #fb="fluidbox">`.
 | `zoom`      | `false \| { step?: number; max?: number }`     | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                         |
 | `renderers` | `Record<string, TemplateRef \| Type<unknown>>` | `{}`                  | Draw `custom` items, by the name in their `render`: a template or a component. See below.        |
 | `origins`   | `FluidboxOriginAdapter<TItem>`                 | triggers              | Finds origins for items without a mounted trigger, and `revealOrigin` scrolls one into view.     |
+| `loading`   | `"hover" \| "press" \| "eager"`                | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
 
 | Output               | Payload                          | When                                                                                    |
 | -------------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
@@ -117,6 +118,7 @@ The events are the plain API's. See [Events](./javascript.md#events) for their f
 | `close()`, `next()`, `previous()` | `Promise<boolean>`             | The other commands. Each takes `{ signal }` too.                                                                                                              |
 | `setItems(items)`                 | `Promise<boolean>`             | Replaces the items, as a new `[items]` does.                                                                                                                  |
 | `preload(target)`                 | `() => void`                   | Starts loading an item a press is likely to open. Call the result to let go.                                                                                  |
+| `load()`                          | `Promise<boolean>`             | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                               |
 | `fluidbox`                        | `Fluidbox<TItem>`              | The [plain fluidbox](./javascript.md#the-fluidbox), with `sheet`, `update` and `addEventListener`. Its `destroy()` does nothing: the root owns the viewer.    |
 
 ```html
@@ -211,7 +213,7 @@ Call them in an injection context (a field initializer or constructor) of a comp
 
 | Function                 | Returns                      | Purpose                                                                                                           |
 | ------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `injectFluidbox()`       | `Signal<FluidboxApi<TItem>>` | The state of the root above, with `open`, `close`, `next`, `previous`, `setItems` and `preload` on it.            |
+| `injectFluidbox()`       | `Signal<FluidboxApi<TItem>>` | The state of the root above, with `open`, `close`, `next`, `previous`, `setItems`, `preload` and `load` on it.    |
 | `injectFluidbox(select)` | `Signal<T>`                  | What `select` picks from it, such as `({ index }) => index`.                                                      |
 | `injectFluidboxSheet()`  | `FluidboxSheetApi`           | `{ stop, set }`: the stop the sheet rests at, as a signal that follows `sheetchange`, and `set(stop)` to move it. |
 

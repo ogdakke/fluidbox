@@ -74,27 +74,29 @@ Returns a `Fluidbox`. Only `items` is required.
 | `filmstrip` | `boolean \| { render? }`                                  | `false`                               | A thumbnail strip. Loads its entry; needs `filmstrip.css`.                                                                                  |
 | `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Loads its entry; needs `sheet.css`.                                                                                 |
 | `origins`   | `FluidboxOriginAdapter<TItem>`                            |                                       | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
+| `loading`   | `"hover" \| "press" \| "eager"`                           | `"hover"`                             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                            |
 
-To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip` or `sheet`, call `update`. The open viewer stays open. To change the items, call `setItems`. The fluidbox looks up `renderers` by name each time a custom slide mounts, and reads `origins` on each use.
+To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading`, call `update`. The open viewer stays open. To change the items, call `setItems`. The fluidbox looks up `renderers` by name each time a custom slide mounts, and reads `origins` on each use.
 
 ## The fluidbox
 
-| Member                                   | Returns                   | What it does                                                                                                |
-| ---------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `state`                                  | `FluidboxState<TItem>`    | The current state, a frozen snapshot. See [State](#state).                                                  |
-| `items`                                  | `FluidboxItemList<TItem>` | The items the viewer reads, as a list: the ones it was made with, or the last `setItems`.                   |
-| `open(target?, options?)`                | `Promise<boolean>`        | Opens the viewer on an item, or moves to it while open. Without a target: the current item, else the first. |
-| `close(options?)`                        | `Promise<boolean>`        | Closes the viewer.                                                                                          |
-| `next(options?)`                         | `Promise<boolean>`        | Moves to the next item while open.                                                                          |
-| `previous(options?)`                     | `Promise<boolean>`        | Moves to the previous item while open.                                                                      |
-| `update(options)`                        | `void`                    | Changes `labels`, `zoom`, `controls`, `viewer`, `filmstrip` or `sheet` live. See [update](#update).         |
-| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there.                             |
-| `preload(target)`                        | `() => void`              | Starts loading an item a press is likely to open, while the viewer is closed. Call the result to let go.    |
-| `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                      |
-| `bindOverlay(element, target, options?)` | `() => void`              | Makes an element on a trigger a thumbnail overlay. See [Thumbnail overlays](#thumbnail-overlays).           |
-| `subscribe(listener)`                    | `() => void`              | Calls `listener(state)` after every state change.                                                           |
-| `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                   |
-| `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.        |
+| Member                                   | Returns                   | What it does                                                                                                   |
+| ---------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `state`                                  | `FluidboxState<TItem>`    | The current state, a frozen snapshot. See [State](#state).                                                     |
+| `items`                                  | `FluidboxItemList<TItem>` | The items the viewer reads, as a list: the ones it was made with, or the last `setItems`.                      |
+| `open(target?, options?)`                | `Promise<boolean>`        | Opens the viewer on an item, or moves to it while open. Without a target: the current item, else the first.    |
+| `close(options?)`                        | `Promise<boolean>`        | Closes the viewer.                                                                                             |
+| `next(options?)`                         | `Promise<boolean>`        | Moves to the next item while open.                                                                             |
+| `previous(options?)`                     | `Promise<boolean>`        | Moves to the previous item while open.                                                                         |
+| `update(options)`                        | `void`                    | Changes `labels`, `zoom`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading` live. See [update](#update). |
+| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there.                                |
+| `preload(target)`                        | `() => void`              | Starts loading an item a press is likely to open, while the viewer is closed. Call the result to let go.       |
+| `load()`                                 | `Promise<boolean>`        | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                |
+| `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                         |
+| `bindOverlay(element, target, options?)` | `() => void`              | Makes an element on a trigger a thumbnail overlay. See [Thumbnail overlays](#thumbnail-overlays).              |
+| `subscribe(listener)`                    | `() => void`              | Calls `listener(state)` after every state change.                                                              |
+| `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                      |
+| `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.           |
 
 A target is an item, its index or its id. The fluidbox matches an item object by its id, so a copy of it works too. The fluidbox is an `EventTarget`, with the events listed below.
 
@@ -118,7 +120,7 @@ A target, `FluidboxTarget`, is an item, its index or its id: `open(photo)`, `ope
 
 Each command returns a promise that settles when the motion has: `open` once the viewer is open, `close` once it is closed, `next` once the slide has moved. It resolves `true` when the command happened. It resolves `false` when a listener prevented it, a later command took over, its signal aborted, or there was nothing to do, as with `next()` on the last item or `close()` while closed.
 
-An unknown id or an index out of range rejects with a `RangeError`, and `preload` throws one. After `destroy()`, the commands resolve `false`, so a part of your app still holding the old fluidbox does nothing. `setItems`, `preload`, `bind`, `bindOverlay` and `subscribe` throw an `InvalidStateError` `DOMException`.
+An unknown id or an index out of range rejects with a `RangeError`, and `preload` throws one. After `destroy()`, the commands and `load()` resolve `false`, so a part of your app still holding the old fluidbox does nothing. `setItems`, `preload`, `bind`, `bindOverlay` and `subscribe` throw an `InvalidStateError` `DOMException`.
 
 ### State
 
@@ -173,7 +175,7 @@ fluidbox.addEventListener("settle", ({ id }) => {
 
 ## Triggers
 
-`fluidbox.bind(element, target, options?)` makes an element a trigger. It registers the element as its item's origin, so the flight starts and lands there. It starts loading the item on pointer down, and opens the viewer on click unless a listener prevented the click. It adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to the element. Use an element that can take focus, such as a `<button>`. It returns a function that unbinds.
+`fluidbox.bind(element, target, options?)` makes an element a trigger. It registers the element as its item's origin, so the flight starts and lands there. It loads the viewer's code as `loading` says, starts loading the item on pointer down, and opens the viewer on click unless a listener prevented the click. It adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to the element. Use an element that can take focus, such as a `<button>`. It returns a function that unbinds.
 
 | Option            | Type                                   | What it does                                                                                                                    |
 | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |

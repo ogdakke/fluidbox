@@ -5,6 +5,7 @@ import type {
   FluidboxItemChangeEvent,
   FluidboxItems,
   FluidboxLabels,
+  FluidboxLoading,
   FluidboxOriginAdapter,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -39,6 +40,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly renderers?: Readonly<Record<string, FluidboxSolidRenderer<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
   readonly origins?: FluidboxOriginAdapter<TItem>;
+  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
+  readonly loading?: FluidboxLoading;
   /** Before the viewer opens or closes. `event.preventDefault()` cancels a command. */
   readonly onBeforeToggle?: (event: FluidboxToggleEvent) => void;
   /** As the viewer starts to open or close. */
@@ -132,6 +135,8 @@ export interface FluidboxApi<
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
+  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
+  load(): Promise<boolean>;
 }
 
 export interface FluidboxSheetApi {

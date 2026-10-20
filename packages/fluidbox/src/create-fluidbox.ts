@@ -14,6 +14,7 @@ import {
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
+  type FluidboxLoading,
   type FluidboxOptions,
   type FluidboxOrigin,
   type FluidboxOriginAdapter,
@@ -135,6 +136,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** Changed in place by update, so every part of the viewer reads the new strings. */
   readonly #labels: FluidboxLabels;
   #settings: Settings<TItem>;
+  #loading: FluidboxLoading = "hover";
   readonly #lifetime = new AbortController();
   readonly #bindings = new Set<() => void>();
   /** Re-resolve each binding's targets after the items change. */
@@ -175,6 +177,15 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this[hostKey] = this.#host();
     this.#makeAddons();
     if (driver) this.#attach(driver);
+    this.#setLoading(options.loading);
+  }
+
+  #setLoading(loading: FluidboxLoading | undefined) {
+    this.#loading = loading ?? "hover";
+    // Browsers without idle callbacks load on the next task.
+    if (this.#loading !== "eager" || this.#viewer || typeof window === "undefined") return;
+    const idle = window.requestIdleCallback ?? setTimeout;
+    idle(() => void this.load());
   }
 
   /** Give a new viewer what it would have seen, had it been there from the start. */
@@ -324,6 +335,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       sheet: has("sheet") ? options.sheet : previous.sheet,
     };
     this.#settings = next;
+    if (has("loading")) this.#setLoading(options.loading);
     if (has("zoom")) {
       this.#zoom = options.zoom;
       this.#viewer?.setZoom(options.zoom);
@@ -402,19 +414,18 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const item = this.#source.getItem(index);
     const context = { item, index, origin: this.#origins.get(idOf(item)) };
     if (this.#viewer) return this.#viewer.prepare(context);
-    let released = false;
-    let dispose: FluidboxDispose | undefined;
-    this.#loadViewer().then(
-      (viewer) => {
-        if (!released && viewer) dispose = viewer.prepare(context);
-      },
-      // The open that follows reports the failure.
-      () => {},
+    // Code that arrives during the press only loads: the page changing as a tap
+    // ends can cost the tap its click. The open that follows does the rest.
+    void this.load();
+    return () => {};
+  }
+
+  load() {
+    if (this.#lifetime.signal.aborted) return Promise.resolve(false);
+    return this.#loadViewer().then(
+      (viewer) => !!viewer,
+      () => false,
     );
-    return () => {
-      released = true;
-      dispose?.();
-    };
   }
 
   bind(
@@ -564,6 +575,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #host(): FluidboxHost {
     return {
       registerOrigin: (ids, origin) => this.#registerOrigin(ids, origin),
+      intend: () => {
+        if (this.#loading === "hover") void this.load();
+      },
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
       // Drop the viewer, keeping what it needs, so the next press or open makes a new one.

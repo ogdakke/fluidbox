@@ -6,7 +6,7 @@ import "./site.css";
 
 mountSite("fixtures", {
   fixture:
-    "Harness · query flags: count, virtual, shadow, no-filmstrip, iframe, iframes, pictures, viewer-template",
+    "Harness · query flags: count, virtual, shadow, no-filmstrip, iframe, iframes, pictures, viewer-template, loading",
 });
 
 const root = document.querySelector<HTMLElement>("#fixture")!;
@@ -81,6 +81,8 @@ if (params.has("virtual")) {
     gallery.append(viewer);
   }
   gallery.setAttribute("aria-label", "Test gallery");
+  const loading = params.get("loading");
+  if (loading) gallery.setAttribute("loading", loading);
   for (let index = 0; index < count; index++) {
     const lightbox = document.createElement("fluidbox-item");
     lightbox.setAttribute("item-id", String(index));

@@ -97,6 +97,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
+  FluidboxLoading,
   FluidboxOrigin,
   FluidboxOriginAdapter,
   FluidboxReason,
@@ -172,7 +173,7 @@ const eventProps = {
 } as const satisfies Record<(typeof fluidboxEventTypes)[number], keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
-  const { items, labels, zoom, children } = props;
+  const { items, labels, zoom, loading, children } = props;
   const slotsRef = useRef<{ filmstrip: FluidboxSlots<TItem>; sheet: FluidboxSlots<TItem> } | null>(
     null,
   );
@@ -219,6 +220,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     items,
     labels: labelOptions(),
     zoom: zoomOption(),
+    loading,
     // Renderers are looked up by name when an item renders, so the newest
     // render function is used without telling the viewer.
     renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
@@ -287,9 +289,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   const first = useRef(true);
   useIsomorphicLayoutEffect(() => {
     if (first.current) first.current = false;
-    else fluidbox.update({ labels: labelOptions(), zoom: zoomOption() });
+    else fluidbox.update({ labels: labelOptions(), zoom: zoomOption(), loading });
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [fluidbox, labelsKey, zoomKey]);
+  }, [fluidbox, labelsKey, zoomKey, loading]);
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
@@ -321,6 +323,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       previous: (options) => fluidbox.previous(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
+      load: () => fluidbox.load(),
     }),
     [fluidbox],
   );

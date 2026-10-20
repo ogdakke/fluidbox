@@ -54,6 +54,8 @@ export interface FluidboxApi<
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
+  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
+  load(): Promise<boolean>;
 }
 
 /** The sheet as `injectFluidboxSheet()` gives it. */
@@ -117,6 +119,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   @Input() renderers?: Readonly<Record<string, FluidboxContent<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
   @Input() origins?: FluidboxOriginAdapter<TItem>;
+  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
+  @Input() loading?: FluidboxOptions["loading"];
 
   /** Before the viewer opens or closes. `$event.preventDefault()` cancels a command. */
   @Output() readonly beforeToggle = new EventEmitter<FluidboxToggleEvent>();
@@ -181,6 +185,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       previous: (options?: FluidboxCommandOptions) => fluidbox.previous(options),
       setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
       preload: (target: FluidboxTarget<TItem>) => this.preload(target),
+      load: () => this.load(),
     };
     this.api = computed(() => ({ ...this.#state(), ...commands }));
     fluidbox.subscribe(() =>
@@ -215,6 +220,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       this.#update({ labels: this.labels });
     }
     if (changes["zoom"]) this.#update({ zoom: zoomOption(this.zoom) });
+    if (changes["loading"]) this.#update({ loading: this.loading });
   }
 
   ngOnDestroy(): void {
@@ -249,6 +255,11 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void {
     return this.#zone.runOutsideAngular(() => this.fluidbox.preload(target));
+  }
+
+  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
+  load(): Promise<boolean> {
+    return this.#zone.runOutsideAngular(() => this.fluidbox.load());
   }
 
   /** @internal For parts: called when the state or the items change. */

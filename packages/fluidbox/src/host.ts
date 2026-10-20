@@ -7,6 +7,8 @@ import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
  */
 export interface FluidboxHost {
   registerOrigin(ids: readonly string[], origin: RuntimeOrigin): () => void;
+  /** A trigger is likely to be pressed: the pointer rests on it, it's touched or focused. */
+  intend(): void;
   command(
     name: "open" | "close" | "next" | "previous",
     target: FluidboxTarget | undefined,

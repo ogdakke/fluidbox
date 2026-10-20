@@ -87,6 +87,7 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 | `zoom`      | `false \| { step?: number; max?: number }`                     | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                                                |
 | `labels`    | `Partial<FluidboxLabels>`                                      | English               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                                   |
 | `origins`   | `FluidboxOriginAdapter<TItem>`                                 | triggers              | Finds the triggers of items without a mounted `Trigger`, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
+| `loading`   | `"hover" \| "press" \| "eager"`                                | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                        |
 
 | Event               | Payload                   | When                                                                                          |
 | ------------------- | ------------------------- | --------------------------------------------------------------------------------------------- |
@@ -190,11 +191,11 @@ Rendering it turns the sheet on. The runtime makes the sheet, a `<section data-f
 
 Call them in `setup` of a component inside `Fluidbox.Root`.
 
-| Composable              | Returns              | Purpose                                                                                                                                                                            |
-| ----------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useFluidbox()`         | `FluidboxApi<TItem>` | One reactive object: the state (`status`, `id`, `index`, `item`, `count`, `hasPrevious`, `hasNext`) and the commands (`open`, `close`, `next`, `previous`, `setItems`, `preload`). |
-| `useFluidbox(selector)` | `ComputedRef`        | The part of that object the selector picks.                                                                                                                                        |
-| `useFluidboxSheet()`    | `FluidboxSheetApi`   | One reactive object: the sheet's `stop`, which follows `sheetchange`, and `set(stop, { animate? })`.                                                                               |
+| Composable              | Returns              | Purpose                                                                                                                                                                                    |
+| ----------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `useFluidbox()`         | `FluidboxApi<TItem>` | One reactive object: the state (`status`, `id`, `index`, `item`, `count`, `hasPrevious`, `hasNext`) and the commands (`open`, `close`, `next`, `previous`, `setItems`, `preload`, `load`). |
+| `useFluidbox(selector)` | `ComputedRef`        | The part of that object the selector picks.                                                                                                                                                |
+| `useFluidboxSheet()`    | `FluidboxSheetApi`   | One reactive object: the sheet's `stop`, which follows `sheetchange`, and `set(stop, { animate? })`.                                                                                       |
 
 ```vue
 <script setup lang="ts">
@@ -209,7 +210,7 @@ const atEnd = useFluidbox((state) => !state.hasNext);
 </template>
 ```
 
-Read the object's fields where you use them, as `fluidbox.index`. Destructuring it in `<script setup>` reads the values once. The commands are the fluidbox's own. Each resolves `true` once it happened and `false` when it didn't, as when an event listener prevented it. Commands made before the viewer exists wait for it, and run once Root has mounted. A target is the item, its index or its id: `open(photo)`, `open(2)` or `open("photo-fjord")`. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go.
+Read the object's fields where you use them, as `fluidbox.index`. Destructuring it in `<script setup>` reads the values once. The commands are the fluidbox's own. Each resolves `true` once it happened and `false` when it didn't, as when an event listener prevented it. Commands made before the viewer exists wait for it, and run once Root has mounted. A target is the item, its index or its id: `open(photo)`, `open(2)` or `open("photo-fjord")`. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go. `load()` loads the viewer's code now.
 
 ### Types
 

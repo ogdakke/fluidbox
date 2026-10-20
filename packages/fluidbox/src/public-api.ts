@@ -366,6 +366,15 @@ export interface FluidboxFilmstripOptions<TItem extends FluidboxItem = FluidboxI
 
 export type FluidboxControlName = "previous" | "next" | "close";
 
+/**
+ * When the viewer's code loads. `"hover"` loads it when a mouse rests on a
+ * trigger for 100 ms, a finger or pen touches one, or one takes focus.
+ * `"press"` loads it when a trigger is pressed, and `"eager"` once the page is
+ * idle. In every mode, an open loads it if it hasn't loaded yet, and
+ * `load()` loads it whenever you call it.
+ */
+export type FluidboxLoading = "hover" | "press" | "eager";
+
 /** Every option but `items`, `renderers` and `origins` can change later through `update`. */
 export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly items: FluidboxItems<TItem>;
@@ -399,6 +408,11 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly sheet?: boolean | FluidboxSheetOptions<TItem>;
   /** Find origins the viewer can't see, as in a virtualized grid. Read on each use. */
   readonly origins?: FluidboxOriginAdapter<TItem>;
+  /**
+   * When the viewer's code loads.
+   * @default "hover"
+   */
+  readonly loading?: FluidboxLoading;
 }
 
 /**
@@ -406,7 +420,7 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
  * value; a key set to undefined goes back to its default.
  */
 export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
-  readonly [K in "labels" | "zoom" | "controls" | "viewer" | "filmstrip" | "sheet"]?:
+  readonly [K in "labels" | "zoom" | "controls" | "viewer" | "filmstrip" | "sheet" | "loading"]?:
     | FluidboxOptions<TItem>[K]
     | undefined;
 };
@@ -485,17 +499,25 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
    */
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /**
-   * Start loading an item a press is likely to open, while closed. Call the result
-   * to drop the work. Throws a RangeError for an unknown target.
+   * Start loading an item a press is likely to open, while closed. Until the
+   * viewer's code has loaded, this only loads the code. Call the result to drop
+   * the work. Throws a RangeError for an unknown target.
    */
   preload(target: FluidboxTarget<TItem>): () => void;
   /**
+   * Load the viewer's code now, as on any signal of your own that a viewer is
+   * about to open. Resolves to true once it has loaded, or false if it failed or
+   * the fluidbox was destroyed. A failed load tries again on the next call.
+   */
+  load(): Promise<boolean>;
+  /**
    * Make an element a trigger that opens the viewer on an item. The item, and any
    * in `returns`, close back onto it. It sets `data-fluidbox-trigger`,
-   * `aria-haspopup="dialog"` and `aria-expanded` on the element, preloads on a
-   * primary-button `pointerdown`, and drops that work 250 ms after the pointer
-   * lifts without a click. A click opens the item the trigger shows, its target or
-   * the item of `returns` it last closed onto, unless the click was prevented.
+   * `aria-haspopup="dialog"` and `aria-expanded` on the element, loads the viewer's
+   * code as the `loading` option says, preloads on a primary-button `pointerdown`,
+   * and drops that work 250 ms after the pointer lifts without a click. A click
+   * opens the item the trigger shows, its target or the item of `returns` it last
+   * closed onto, unless the click was prevented.
    * Returns a function that unbinds.
    */
   bind(

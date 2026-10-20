@@ -54,6 +54,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
+  FluidboxLoading,
   FluidboxOrigin,
   FluidboxOriginAdapter,
   FluidboxReason,

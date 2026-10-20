@@ -36,6 +36,8 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
+  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
+  load(): Promise<boolean>;
 }
 
 /**

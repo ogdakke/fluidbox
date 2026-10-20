@@ -89,6 +89,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
+  FluidboxLoading,
   FluidboxOrigin,
   FluidboxOriginAdapter,
   FluidboxReason,
@@ -253,6 +254,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     items: untrack(() => props.items),
     labels: untrack(() => props.labels),
     zoom: untrack(zoom),
+    loading: untrack(() => props.loading),
     // Renderers resolve by key when an item renders, so the newest render
     // function is used without rebuilding the viewer.
     renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
@@ -301,6 +303,13 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     ),
   );
   createEffect(on(zoom, (next) => fluidbox.update({ zoom: next }), { defer: true }));
+  createEffect(
+    on(
+      () => props.loading,
+      (next) => fluidbox.update({ loading: next }),
+      { defer: true },
+    ),
+  );
   // Each part's render functions stay the same while it is mounted, so the
   // viewer only remounts an add-on when its options really change. Not
   // deferred: the parts register as Root's children render, before this runs.
@@ -710,6 +719,7 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
     previous: (options) => fluidbox.previous(options),
     setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
     preload: (target) => fluidbox.preload(target),
+    load: () => fluidbox.load(),
   };
 }
 

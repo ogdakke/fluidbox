@@ -12,6 +12,7 @@ import type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItems,
+  FluidboxLoading,
   FluidboxOptions,
   FluidboxOriginAdapter,
   FluidboxRenderer,
@@ -59,7 +60,8 @@ const ITEM_ATTRIBUTES = new Set([
   "aria-label",
 ]);
 /** Attributes whose change updates the viewer. */
-const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max"];
+const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max", "loading"];
+const LOADINGS: readonly string[] = ["hover", "press", "eager"] satisfies FluidboxLoading[];
 
 /** The `<fluidbox-item>` trigger an element is in, or is. */
 const triggerOf = (node: Node) =>
@@ -323,6 +325,16 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#queueUpdate();
   }
 
+  /** When the viewer's code loads, as the `loading` attribute says: `hover` (the default), `press` or `eager`. */
+  get loading(): FluidboxLoading {
+    const value = this.getAttribute("loading") ?? "";
+    return LOADINGS.includes(value) ? (value as FluidboxLoading) : "hover";
+  }
+
+  set loading(loading: FluidboxLoading) {
+    this.setAttribute("loading", loading);
+  }
+
   /** Follow the viewer state, across the rebuilds a change of options makes. */
   subscribe(listener: (state: FluidboxState) => void): () => void {
     this.#listeners.add(listener);
@@ -350,6 +362,11 @@ export class FluidboxGalleryElement extends HTMLElement {
       released = true;
       dispose?.();
     };
+  }
+
+  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
+  async load(): Promise<boolean> {
+    return (await this.#ready()).load();
   }
 
   async close(options?: FluidboxCommandOptions): Promise<boolean> {
@@ -407,6 +424,7 @@ export class FluidboxGalleryElement extends HTMLElement {
     return {
       labels: this.#labels,
       zoom: this.zoom,
+      loading: this.loading,
       controls: undefined,
       viewer: this.#viewerRenderer,
       filmstrip,

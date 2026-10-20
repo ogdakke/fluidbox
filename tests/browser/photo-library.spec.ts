@@ -19,6 +19,9 @@ async function firstVisiblePhotoIndex(page: Page, includeWindow = true): Promise
 test("React trigger prepares on pointerdown and discards a cancelled open", async ({ page }) => {
   await page.goto("/photo-library.html?count=100");
   const trigger = page.locator("[data-photo-index]").first();
+  // A pointer resting on the trigger loads the viewer's code; a press prepares once it's there.
+  await trigger.hover();
+  await page.waitForLoadState("networkidle");
   await trigger.dispatchEvent("pointerdown", { button: 0, isPrimary: true, pointerId: 1 });
   const prepared = page.locator("[data-fluidbox-overlay][data-fluidbox-prepared]");
   await expect(prepared).toHaveCount(1);

@@ -40,6 +40,7 @@ import {
   type FluidboxItemList,
   type FluidboxItems,
   type FluidboxLabels,
+  type FluidboxLoading,
   type FluidboxOriginAdapter,
   type FluidboxRenderContext,
   type FluidboxRenderer,
@@ -91,6 +92,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
+  FluidboxLoading,
   FluidboxOrigin,
   FluidboxOriginAdapter,
   FluidboxReason,
@@ -247,7 +249,7 @@ const sameItems = (a: FluidboxItems<AnyItem>, b: FluidboxItems<AnyItem>) =>
     a.length === b.length &&
     a.every((item, index) => item === b[index]));
 
-const settingKeys = ["labels", "zoom", "viewer", "filmstrip", "sheet"] as const;
+const settingKeys = ["labels", "zoom", "viewer", "filmstrip", "sheet", "loading"] as const;
 type Settings = {
   -readonly [K in (typeof settingKeys)[number]]: FluidboxUpdateOptions<AnyItem>[K];
 };
@@ -263,6 +265,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly renderers?: Readonly<Record<string, FluidboxVueRenderer<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
   readonly origins?: FluidboxOriginAdapter<TItem>;
+  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
+  readonly loading?: FluidboxLoading;
 }
 
 type RootEmits<TItem extends FluidboxItem> = {
@@ -329,6 +333,7 @@ const Root = defineComponent(
           features.viewers > 0 ? (viewer as unknown as FluidboxViewerRenderer<AnyItem>) : undefined,
         filmstrip: features.filmstrip?.options(),
         sheet: features.sheet?.options(),
+        loading: props.loading,
       };
     };
 
@@ -416,6 +421,7 @@ const Root = defineComponent(
       previous: (options) => fluidbox.previous(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
+      load: () => fluidbox.load(),
     };
     const sheet: FluidboxSheetApi = {
       get stop() {
@@ -438,7 +444,7 @@ const Root = defineComponent(
   },
   {
     name: "FluidboxRoot",
-    props: ["items", "labels", "zoom", "renderers", "origins"],
+    props: ["items", "labels", "zoom", "renderers", "origins", "loading"],
     emits: [...fluidboxEventTypes],
   },
 );

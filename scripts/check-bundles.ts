@@ -27,39 +27,39 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 7_450,
-  elements: 10_900,
-  react: 11_300,
-  solid: 10_450,
-  vue: 11_200,
-  angular: 11_400,
+  root: 7_650,
+  elements: 11_150,
+  react: 11_450,
+  solid: 10_650,
+  vue: 11_350,
+  angular: 11_550,
   filmstrip: 3_600,
   sheet: 7_350,
-  kit: 1_300,
+  kit: 1_450,
 };
 const cssGzipLimit = 3_200;
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 31_450,
+  root: 31_650,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
-  elements: 34_400,
-  react: 35_050,
-  solid: 34_150,
-  vue: 34_900,
-  angular: 35_100,
+  elements: 34_650,
+  react: 35_200,
+  solid: 34_350,
+  vue: 35_100,
+  angular: 35_300,
   filmstrip: 3_600,
   sheet: 7_350,
-  kit: 1_300,
+  kit: 1_450,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 34_550,
-  elements: 37_500,
-  react: 38_150,
-  solid: 37_250,
-  vue: 38_000,
-  angular: 38_200,
+  root: 34_750,
+  elements: 37_750,
+  react: 38_300,
+  solid: 37_450,
+  vue: 38_200,
+  angular: 38_400,
   filmstrip: 4_850,
   sheet: 8_700,
-  kit: 4_400,
+  kit: 4_550,
 };
 
 const jsonIndex = process.argv.indexOf("--json");

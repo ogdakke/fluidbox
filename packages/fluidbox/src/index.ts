@@ -19,6 +19,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
+  FluidboxLoading,
   FluidboxOptions,
   FluidboxOrigin,
   FluidboxOriginAdapter,

@@ -105,11 +105,12 @@ The gallery reads the boolean attributes of a `<video>` as HTML does, so an attr
 
 ## `<fluidbox-gallery>`
 
-| Attribute   | What it does                                                 |
-| ----------- | ------------------------------------------------------------ |
-| `nozoom`    | Turns zoom off.                                              |
-| `zoom-step` | The scale of a double-tap or double-click zoom. Default `2`. |
-| `zoom-max`  | The largest zoom scale. Default `4`.                         |
+| Attribute   | What it does                                                                                                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nozoom`    | Turns zoom off.                                                                                                                                                                 |
+| `zoom-step` | The scale of a double-tap or double-click zoom. Default `2`.                                                                                                                    |
+| `zoom-max`  | The largest zoom scale. Default `4`.                                                                                                                                            |
+| `loading`   | When the viewer's code loads: `hover` (the default), `press` or `eager`. The `loading` property reflects it. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
 
 The properties are the [`createFluidbox` options](./javascript.md#createfluidboxoptions) the markup can't say, and the [fluidbox's](./javascript.md#the-fluidbox) state and handles:
 
@@ -133,6 +134,7 @@ The properties are the [`createFluidbox` options](./javascript.md#createfluidbox
 | `previous(options?)`      | `Promise<boolean>`  | Previous item.                                                                         |
 | `setItems(items)`         | `Promise<boolean>`  | Replaces the items, as the `items` property does, and resolves once they apply.        |
 | `preload(target)`         | `() => void`        | Starts loading an item a press is likely to open. Call the result to let go.           |
+| `load()`                  | `Promise<boolean>`  | Loads the viewer's code now, once the gallery has read its items.                      |
 | `subscribe(listener)`     | `() => void`        | Calls `listener(state)` on every state change.                                         |
 | `whenReady()`             | `Promise<Fluidbox>` | Resolves once the gallery has read its items. Rejects if the gallery is not connected. |
 
@@ -218,7 +220,7 @@ strip.render = ({ index, target }) => {
 
 **Markup changes are picked up.** The gallery watches its children. Adding or removing items, or changing an item's `item-id`, `returns`, `placeholder`, `aria-label` or `slot`, re-reads the items on the next microtask. An open viewer stays on the same item id if it is still there. The content inside a trigger is yours. Swapping its picture, as an album cover does, changes nothing in the gallery. The gallery reads the trigger's thumbnail when it reads the item, and reads a `<template slot="content">` when it re-reads the items.
 
-**Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step` or `zoom-max`, adding or removing a `<fluidbox-filmstrip>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
+**Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step`, `zoom-max` or `loading`, adding or removing a `<fluidbox-filmstrip>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
 
 **Focus.** After a close whose trigger is gone, the gallery focuses itself, so focus doesn't fall to the page. For that it sets `tabindex="-1"` on itself, unless it already has one.
 

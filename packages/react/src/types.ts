@@ -44,6 +44,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly renderers?: Readonly<Record<string, FluidboxReactRenderer<TItem>>>;
   /** Find origins the viewer can't see, as in a virtualized grid. */
   readonly origins?: FluidboxOriginAdapter<TItem>;
+  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
+  readonly loading?: FluidboxOptions<TItem>["loading"];
   /** Before the viewer opens or closes. `event.preventDefault()` stops it. */
   readonly onBeforeToggle?: (event: FluidboxToggleEvent) => void;
   /** As the viewer starts to open or close. */
@@ -119,6 +121,8 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   readonly setItems: (items: FluidboxItems<TItem>) => Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   readonly preload: (target: FluidboxTarget<TItem>) => () => void;
+  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
+  readonly load: () => Promise<boolean>;
 }
 
 /** The viewer state and its commands. */
