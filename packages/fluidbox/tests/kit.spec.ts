@@ -1,100 +1,52 @@
-import { describe, expect, it, vi } from "vitest";
-import { hostKey, type FluidboxHost } from "../src/host";
-import { createDeferredFluidbox } from "../src/kit";
-import { toList } from "../src/items";
-import type { Fluidbox, FluidboxImageItem } from "../src/public-api";
+import { describe, expect, it } from "vitest";
+import { createFluidbox } from "../src/create-fluidbox";
+import { unloadFluidbox } from "../src/kit";
+import type { FluidboxImageItem, FluidboxState } from "../src/public-api";
 
 const items: FluidboxImageItem[] = [
   { id: "one", type: "img", src: "/one.jpg", alt: "One", width: 4, height: 3 },
   { id: "two", type: "img", src: "/two.jpg", alt: "Two", width: 4, height: 3 },
 ];
 
-/** A fluidbox with only what the stand-in reaches for, recording its commands. */
-function fakeFluidbox() {
-  const calls: string[] = [];
-  const list = toList(items);
-  const host: FluidboxHost = {
-    items: list,
-    registerOrigin: () => () => {},
-    registerOverlay: () => () => {},
-    preload: () => () => {},
-    command: (name, target) => {
-      calls.push(`host:${name}:${typeof target === "object" ? "item" : String(target)}`);
-      return Promise.resolve(true);
-    },
-  };
-  const fluidbox = Object.assign(new EventTarget(), {
-    [hostKey]: host,
-    items: list,
-    state: {
-      status: "closed",
-      id: null,
-      index: null,
-      item: null,
-      count: list.count,
-      hasPrevious: false,
-      hasNext: false,
-    },
-    sheet: null,
-    open: vi.fn((target?: number | string | object) => {
-      calls.push(`open:${typeof target === "object" ? "item" : String(target)}`);
-      return Promise.resolve(true);
-    }),
-    close: vi.fn(() => {
-      calls.push("close");
-      return Promise.resolve(true);
-    }),
-    next: vi.fn(() => Promise.resolve(true)),
-    previous: vi.fn(() => Promise.resolve(true)),
-    update: vi.fn(),
-    subscribe: () => () => {},
-  });
-  return {
-    fluidbox: fluidbox as unknown as Fluidbox<FluidboxImageItem>,
-    update: fluidbox.update,
-    calls,
-  };
-}
-
-describe("createDeferredFluidbox", () => {
-  it("runs commands made before attach on the fluidbox, in order", async () => {
-    const deferred = createDeferredFluidbox(items);
-    const opened = deferred.fluidbox.open(items[1]);
-    const closed = deferred.fluidbox.close();
-    const fromPart = (deferred.fluidbox as unknown as { [hostKey]: FluidboxHost })[hostKey].command(
-      "next",
-      undefined,
-      "pointer",
-    );
-    const { fluidbox, calls } = fakeFluidbox();
-    expect(calls).toEqual([]);
-    deferred.attach(fluidbox);
-    await expect(opened).resolves.toBe(true);
-    await expect(closed).resolves.toBe(true);
-    await expect(fromPart).resolves.toBe(true);
-    expect(calls).toEqual(["open:item", "close", "host:next:undefined"]);
+// There is no document here, as in a render on the server: a fluidbox that
+// touched one would throw.
+describe("a fluidbox before its viewer", () => {
+  // First, before any test loads the entry.
+  it("makes an add-on that loads while another update comes in", async () => {
+    const fluidbox = createFluidbox({ items });
+    fluidbox.update({ sheet: true });
+    fluidbox.update({ controls: ["close"] });
+    await import("../src/sheet-entry");
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(fluidbox.sheet).not.toBeNull();
+    fluidbox.destroy();
   });
 
-  it("runs commands at once while attached, and forwards update", async () => {
-    const deferred = createDeferredFluidbox(items);
-    const { fluidbox, update, calls } = fakeFluidbox();
-    deferred.attach(fluidbox);
-    await expect(deferred.fluidbox.open("two")).resolves.toBe(true);
-    expect(calls).toEqual(["open:two"]);
-    deferred.fluidbox.update({ zoom: false });
-    expect(update).toHaveBeenCalledWith({ zoom: false });
+  it("is made, updated and given items without a document", async () => {
+    const fluidbox = createFluidbox({ items, labels: { close: "Shut" }, zoom: { max: 3 } });
+    const states: FluidboxState<FluidboxImageItem>[] = [];
+    fluidbox.subscribe((state) => states.push(state));
+    fluidbox.update({ labels: { close: "Done" }, zoom: false, controls: ["close"] });
+    await fluidbox.setItems(items.slice(0, 1));
+    expect(fluidbox.items.count).toBe(1);
+    expect(states.at(-1)).toMatchObject({ status: "closed", count: 1 });
+    fluidbox.destroy();
   });
 
-  it("keeps commands made after detach for the next fluidbox", async () => {
-    const deferred = createDeferredFluidbox(items);
-    const first = fakeFluidbox();
-    deferred.attach(first.fluidbox);
-    deferred.detach();
-    const opened = deferred.fluidbox.open(0);
-    const second = fakeFluidbox();
-    deferred.attach(second.fluidbox);
-    await expect(opened).resolves.toBe(true);
-    expect(first.calls).toEqual([]);
-    expect(second.calls).toEqual(["open:0"]);
+  it("turns add-ons on without their entries' imports", async () => {
+    const fluidbox = createFluidbox({ items, filmstrip: true });
+    expect(() => fluidbox.update({ sheet: true })).not.toThrow();
+    // The fluidbox loads them itself; wait for the same modules.
+    await Promise.all([import("../src/filmstrip-entry"), import("../src/sheet-entry")]);
+    fluidbox.destroy();
+  });
+
+  it("unloads to closed and stays usable", () => {
+    const fluidbox = createFluidbox({ items });
+    unloadFluidbox(fluidbox);
+    unloadFluidbox(fluidbox);
+    expect(fluidbox.state.status).toBe("closed");
+    expect(fluidbox.items.count).toBe(2);
+    fluidbox.destroy();
   });
 });

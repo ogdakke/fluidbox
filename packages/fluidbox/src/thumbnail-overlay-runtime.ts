@@ -1,12 +1,16 @@
 import { idOf } from "./items";
+import {
+  overlayProgressHolder,
+  publishOverlayPhase,
+  resetOverlayPhase,
+  type ThumbnailOverlayPhase,
+} from "./overlay-phase";
 import type {
   FluidboxDispose,
   FluidboxItem,
   FluidboxItemId,
   FluidboxThumbnailOverlayRegistration,
 } from "./runtime-types";
-
-export type ThumbnailOverlayPhase = "idle" | "opening" | "open" | "dragging" | "closing";
 
 interface ActiveOverlay<TItem extends FluidboxItem> {
   readonly id: FluidboxItemId;
@@ -471,8 +475,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   }
 
   #publish(target: HTMLElement, phase: ThumbnailOverlayPhase, progress: number) {
-    target.dataset.fluidboxPhase = phase;
-    this.#progressHolder(target).style.setProperty("--fluidbox-closed", String(progress));
+    publishOverlayPhase(target, phase, progress);
   }
 
   /**
@@ -481,11 +484,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
    * transform while the registered progress animates on the target.
    */
   #progressHolder(target: HTMLElement) {
-    const host = target.parentElement;
-    return target.dataset.fluidboxTransitionContent !== undefined &&
-      host?.dataset.fluidboxTransitionHost !== undefined
-      ? host
-      : target;
+    return overlayProgressHolder(target);
   }
 
   #position(target: HTMLElement, frame: HTMLElement) {
@@ -545,7 +544,6 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   }
 
   #reset(target: HTMLElement) {
-    delete target.dataset.fluidboxPhase;
-    target.style.removeProperty("--fluidbox-closed");
+    resetOverlayPhase(target);
   }
 }

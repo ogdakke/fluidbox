@@ -21,12 +21,11 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
           session?.destroy();
           session = undefined;
           if (current.count < 2) return;
-          const { requestedIndex, activeIndex } = controller.state;
           session = new FilmstripSession(
             dialog.ownerDocument,
             current,
             controller,
-            requestedIndex ?? activeIndex ?? 0,
+            controller.state.index ?? 0,
             { renderItem, labels },
           );
           layer.append(session.dock);
@@ -34,7 +33,7 @@ export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): 
         };
         build();
         const unsubscribe = controller.subscribe((state) => {
-          const index = state.requestedIndex ?? state.activeIndex;
+          const index = state.index;
           if (index !== null) session?.sync(index);
         });
         return {

@@ -15,29 +15,18 @@ export const fluidboxEventTypes = [
   "sheetchange",
 ] as const satisfies readonly (keyof FluidboxEventMap)[];
 
+const eventClasses: (new (type: any, init: any) => Event)[] = [
+  FluidboxToggleEvent,
+  FluidboxItemChangeEvent,
+  FluidboxSheetEvent,
+];
+
 /** A copy of a fluidbox event, to fire on another target. */
 function copyOf(event: Event): Event | null {
-  if (event instanceof FluidboxToggleEvent) {
-    return new FluidboxToggleEvent(event.type as "toggle", {
-      cancelable: event.cancelable,
-      oldState: event.oldState,
-      newState: event.newState,
-      reason: event.reason,
-    });
-  }
-  if (event instanceof FluidboxItemChangeEvent) {
-    return new FluidboxItemChangeEvent(event.type as "itemchange", {
-      cancelable: event.cancelable,
-      id: event.id,
-      index: event.index,
-      item: event.item,
-      reason: event.reason,
-    });
-  }
-  if (event instanceof FluidboxSheetEvent) {
-    return new FluidboxSheetEvent("sheetchange", { stop: event.stop, reason: event.reason });
-  }
-  return null;
+  const EventClass = eventClasses.find((each) => event instanceof each);
+  // The event's own fields are its init; `cancelable` is a getter on Event.
+  const init = Object.assign({}, event, { cancelable: event.cancelable });
+  return EventClass ? new EventClass(event.type, init) : null;
 }
 
 /**

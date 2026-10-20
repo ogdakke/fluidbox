@@ -10,7 +10,6 @@ import {
   signal,
   type OnChanges,
   type OnDestroy,
-  type OnInit,
   type Signal,
   type SimpleChanges,
 } from "@angular/core";
@@ -36,12 +35,10 @@ import {
   type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
 import {
-  createDeferredFluidbox,
   fluidboxEventTypes,
   latestOrigins,
-  loadAddons,
   resolveLabels,
-  type DeferredFluidbox,
+  unloadFluidbox,
 } from "@ogdakke/fluidbox/kit";
 import { injectIsBrowser, mountContent, type FluidboxContent } from "./mount.js";
 
@@ -101,13 +98,14 @@ const zoomOption = (zoom: FluidboxOptions["zoom"]) =>
  * `fluidbox`: `<div fluidboxRoot #fb="fluidbox">`, then `fb.state()` and
  * `fb.open(2)`.
  *
- * The viewer is made once and lives as long as the root. New labels or zoom,
- * and a `fluidboxViewer`, `fluidboxFilmstrip` or `fluidboxSheet` coming, going
- * or changing its inputs, apply to it in place, open or not.
+ * The fluidbox is made with the root and touches nothing until a viewer is
+ * pressed or opened. New labels or zoom, and a `fluidboxViewer`,
+ * `fluidboxFilmstrip` or `fluidboxSheet` coming, going or changing its inputs,
+ * apply to it in place, open or not.
  */
 @Directive({ selector: "[fluidboxRoot]", exportAs: "fluidbox", standalone: true })
 export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
-  implements OnChanges, OnInit, OnDestroy
+  implements OnChanges, OnDestroy
 {
   /** The gallery's items: an array, or a list read on demand. */
   @Input() items: FluidboxItems<TItem> = [];
@@ -133,10 +131,26 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   /** When the sheet comes to rest at another stop. */
   @Output() readonly sheetChange = new EventEmitter<FluidboxSheetEvent>();
 
-  /** @internal Stands in for the viewer, so parts can bind before it exists. */
-  readonly deferred: DeferredFluidbox<TItem> = createDeferredFluidbox<TItem>([]);
-  readonly #state = signal(this.deferred.fluidbox.state);
-  readonly #list = signal(this.deferred.fluidbox.items);
+  readonly #zone = inject(NgZone);
+  readonly #container = inject(ViewContainerRef);
+  readonly #browser = injectIsBrowser();
+  /** The fluidbox. Parts bind to it as they are made. */
+  readonly fluidbox: Fluidbox<TItem> = createFluidbox<TItem>({
+    items: [],
+    // Renderers resolve by name when a slide mounts, so the newest one is used.
+    renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+      get: (_, name) => {
+        const content = typeof name === "string" ? this.renderers?.[name] : undefined;
+        if (!content) return undefined;
+        return ({ item, index, target }: FluidboxRenderContext<TItem>) =>
+          mountContent(this.#zone, this.#container, content, item, index, target);
+      },
+      has: (_, name) => typeof name === "string" && !!this.renderers?.[name],
+    }),
+    origins: latestOrigins(() => this.origins),
+  });
+  readonly #state = signal(this.fluidbox.state);
+  readonly #list = signal(this.fluidbox.items);
   readonly #labels = signal(resolveLabels(undefined));
   readonly #stop = signal(0);
   /** The viewer's state. */
@@ -153,31 +167,23 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     set: (stop, options) => this.fluidbox.sheet?.set(stop, options),
   };
 
-  readonly #zone = inject(NgZone);
-  readonly #container = inject(ViewContainerRef);
-  readonly #browser = injectIsBrowser();
   readonly #parts: Parts<TItem> = { viewer: null, filmstrip: null, sheet: null };
-  /** Options changed since the viewer last saw them. */
-  #pending: FluidboxUpdateOptions<TItem> = {};
-  #viewer: Fluidbox<TItem> | undefined;
-  #loading = false;
   #scheduled = false;
-  #initialized = false;
   #destroyed = false;
 
   constructor() {
     const fluidbox = this.fluidbox;
     const commands = {
       open: (target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions) =>
-        fluidbox.open(target, options),
+        this.open(target, options),
       close: (options?: FluidboxCommandOptions) => fluidbox.close(options),
       next: (options?: FluidboxCommandOptions) => fluidbox.next(options),
       previous: (options?: FluidboxCommandOptions) => fluidbox.previous(options),
       setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
-      preload: (target: FluidboxTarget<TItem>) => fluidbox.preload(target),
+      preload: (target: FluidboxTarget<TItem>) => this.preload(target),
     };
     this.api = computed(() => ({ ...this.#state(), ...commands }));
-    this.deferred.subscribe(() =>
+    fluidbox.subscribe(() =>
       this.#zone.run(() => {
         this.#state.set(fluidbox.state);
         this.#list.set(fluidbox.items);
@@ -202,40 +208,26 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     }
   }
 
-  /** The fluidbox: the viewer once it exists, a stand-in before. */
-  get fluidbox(): Fluidbox<TItem> {
-    return this.deferred.fluidbox;
-  }
-
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["items"]) void this.fluidbox.setItems(this.items ?? []);
     if (changes["labels"]) {
       this.#labels.set(resolveLabels(this.labels));
-      this.#pending = { ...this.#pending, labels: this.labels };
-      this.schedule();
+      this.#update({ labels: this.labels });
     }
-    if (changes["zoom"]) {
-      this.#pending = { ...this.#pending, zoom: zoomOption(this.zoom) };
-      this.schedule();
-    }
-  }
-
-  ngOnInit(): void {
-    this.#initialized = true;
-    this.schedule();
+    if (changes["zoom"]) this.#update({ zoom: zoomOption(this.zoom) });
   }
 
   ngOnDestroy(): void {
     this.#destroyed = true;
-    this.deferred.detach();
-    this.#viewer?.destroy();
-    this.#viewer = undefined;
+    // Drops the viewer and closes it at once.
+    unloadFluidbox(this.fluidbox);
     this.#stop.set(0);
   }
 
   /** Open an item, by the item, its index or its id, or move to it while open. */
   open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean> {
-    return this.fluidbox.open(target, options);
+    // Opening can load the viewer, whose listeners stay outside the zone.
+    return this.#zone.runOutsideAngular(() => this.fluidbox.open(target, options));
   }
 
   close(options?: FluidboxCommandOptions): Promise<boolean> {
@@ -256,12 +248,12 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
 
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void {
-    return this.fluidbox.preload(target);
+    return this.#zone.runOutsideAngular(() => this.fluidbox.preload(target));
   }
 
   /** @internal For parts: called when the state or the items change. */
   watch(listener: () => void): () => void {
-    return this.deferred.subscribe(listener);
+    return this.fluidbox.subscribe(() => listener());
   }
 
   /** @internal For parts: plug a viewer, filmstrip or sheet into the viewer. */
@@ -275,81 +267,31 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     };
   }
 
-  /**
-   * @internal Make the viewer after the current change detection pass, once every part
-   * inside has connected; after that, hand it what changed.
-   */
+  /** @internal Hand the viewer the parts after the current change detection pass, once every part inside has connected. */
   schedule(): void {
-    if (!this.#browser || !this.#initialized || this.#scheduled) return;
+    if (!this.#browser || this.#scheduled) return;
     this.#scheduled = true;
     queueMicrotask(() => {
       this.#scheduled = false;
-      if (!this.#destroyed) this.#sync();
-    });
-  }
-
-  /** The options the parts give, with their stable renderers. */
-  #partOptions(): FluidboxUpdateOptions<TItem> {
-    const { viewer, filmstrip, sheet } = this.#parts;
-    return {
-      viewer: viewer?.render,
-      filmstrip: filmstrip ? (filmstrip.render ? { render: filmstrip.render } : true) : undefined,
-      sheet: sheet
-        ? { snapPoints: sheet.snapPoints, dismiss: sheet.dismiss, render: sheet.render }
-        : undefined,
-    };
-  }
-
-  #sync(): void {
-    if (this.#loading) return;
-    const { filmstrip, sheet } = this.#parts;
-    // The filmstrip and sheet runtimes load the first time a root uses them.
-    const loading = loadAddons([
-      ...(filmstrip ? (["filmstrip"] as const) : []),
-      ...(sheet ? (["sheet"] as const) : []),
-    ]);
-    if (loading) {
-      // Again once they are in: by then the parts may have changed, or the root gone.
-      this.#loading = true;
-      void loading.then(() => {
-        this.#loading = false;
-        if (!this.#destroyed) this.#sync();
-      });
-      return;
-    }
-    const parts = this.#partOptions();
-    if (this.#viewer) {
-      const pending = this.#pending;
-      this.#pending = {};
+      if (this.#destroyed) return;
+      const { viewer, filmstrip, sheet } = this.#parts;
       // Unchanged parts compare equal, so the viewer redraws only what changed.
-      this.#viewer.update({ ...pending, ...parts });
-      return;
-    }
-    this.#pending = {};
-    // Renderers resolve by name when a slide mounts, so the newest one is used.
-    const renderers = new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
-      get: (_, name) => {
-        const content = typeof name === "string" ? this.renderers?.[name] : undefined;
-        if (!content) return undefined;
-        return ({ item, index, target }: FluidboxRenderContext<TItem>) =>
-          mountContent(this.#zone, this.#container, content, item, index, target);
-      },
-      has: (_, name) => typeof name === "string" && !!this.renderers?.[name],
+      this.#update({
+        viewer: viewer?.render,
+        filmstrip: filmstrip ? (filmstrip.render ? { render: filmstrip.render } : true) : undefined,
+        sheet: sheet
+          ? { snapPoints: sheet.snapPoints, dismiss: sheet.dismiss, render: sheet.render }
+          : undefined,
+      });
     });
-    // The runtime listens to pointer and key events; outside the zone they do
-    // not run change detection. Callbacks come back in through zone.run.
-    const viewer = this.#zone.runOutsideAngular(() =>
-      createFluidbox<TItem>({
-        items: this.fluidbox.items,
-        labels: this.labels,
-        zoom: zoomOption(this.zoom),
-        renderers,
-        origins: latestOrigins(() => this.origins),
-        ...parts,
-      }),
-    );
-    this.#viewer = viewer;
-    this.deferred.attach(viewer);
+  }
+
+  /**
+   * An update can load the filmstrip or sheet, and the viewer's listeners
+   * stay outside the zone. Callbacks come back in through zone.run.
+   */
+  #update(options: FluidboxUpdateOptions<TItem>): void {
+    this.#zone.runOutsideAngular(() => this.fluidbox.update(options));
   }
 }
 

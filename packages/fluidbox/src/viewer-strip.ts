@@ -21,6 +21,7 @@ interface ViewerSlide {
   readonly cover?: HTMLImageElement;
   readonly image: HTMLElement;
   readonly error: HTMLDivElement;
+  readonly retry: HTMLButtonElement;
   loaded: boolean;
   opening: boolean;
   deferFull: boolean;
@@ -34,7 +35,6 @@ interface ViewerSlide {
   dispose?: FluidboxDispose;
 }
 
-/** Bounded native-scrolling gallery for the plain DOM runtime. */
 /** Point an image at a thumbnail, its srcset and sizes included. */
 function paintThumbnail(image: HTMLImageElement, thumbnail: FluidboxThumbnail) {
   if (thumbnail.sizes) image.sizes = thumbnail.sizes;
@@ -44,6 +44,7 @@ function paintThumbnail(image: HTMLImageElement, thumbnail: FluidboxThumbnail) {
   image.src = thumbnail.src;
 }
 
+/** Bounded native-scrolling gallery for the plain DOM runtime. */
 export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   readonly element: HTMLDivElement;
   readonly #ownerDocument: Document;
@@ -149,7 +150,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#unload(slide);
       slide.element.remove();
     }
-    for (const slide of this.#slides.values()) this.#unload(slide);
     this.#slides.clear();
     this.#base = 0;
     this.#renderWindow(this.#index, this.#index);
@@ -250,8 +250,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.element.setAttribute("aria-label", this.#labels.slides);
     for (const [index, slide] of this.#slides) {
       slide.element.setAttribute("aria-label", this.#labels.position(index, this.#source.count));
-      const retry = slide.error.querySelector("button");
-      if (retry) retry.textContent = this.#labels.retry;
+      slide.retry.textContent = this.#labels.retry;
       slide.error.firstChild!.textContent = `${this.#labels.error} `;
     }
   }
@@ -290,25 +289,25 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     let preview: HTMLImageElement | undefined;
     let cover: HTMLImageElement | undefined;
     let media: HTMLElement;
+    const decorative = (key: string) => {
+      const image = this.#ownerDocument.createElement("img");
+      image.dataset[key] = "";
+      image.alt = "";
+      image.setAttribute("aria-hidden", "true");
+      image.decoding = "sync";
+      return image;
+    };
     if (item.type === "img") {
       frame.dataset.fluidboxImageFrame = "";
       if (item.placeholder) {
-        placeholder = this.#ownerDocument.createElement("img");
-        placeholder.dataset.fluidboxSlidePlaceholder = "";
-        placeholder.alt = "";
-        placeholder.setAttribute("aria-hidden", "true");
-        placeholder.decoding = "sync";
+        placeholder = decorative("fluidboxSlidePlaceholder");
         placeholder.src = item.placeholder;
         frame.append(placeholder);
       }
       if (item.thumbnail?.src) {
-        preview = this.#ownerDocument.createElement("img");
-        preview.dataset.fluidboxSlidePreview = "";
-        preview.alt = "";
-        preview.setAttribute("aria-hidden", "true");
         // A preview is small and usually already decoded for the page; paint it
         // on the first frame it appears in.
-        preview.decoding = "sync";
+        preview = decorative("fluidboxSlidePreview");
         frame.append(preview);
       }
       picture = this.#ownerDocument.createElement("picture");
@@ -328,14 +327,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         },
         { signal: this.#controller.signal },
       );
-      image.addEventListener(
-        "error",
-        () => {
-          error.hidden = false;
-          retry.tabIndex = index === this.#index ? 0 : -1;
-        },
-        { signal: this.#controller.signal },
-      );
+      image.addEventListener("error", () => this.#fail(index, slide), {
+        signal: this.#controller.signal,
+      });
       picture.append(image);
       frame.append(picture);
       media = image;
@@ -356,11 +350,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       iframe.setAttribute("allowfullscreen", "");
       frame.append(iframe);
       media = iframe;
-      cover = this.#ownerDocument.createElement("img");
-      cover.dataset.fluidboxMediaCover = "";
-      cover.alt = "";
-      cover.setAttribute("aria-hidden", "true");
-      cover.decoding = "sync";
+      cover = decorative("fluidboxMediaCover");
       if (item.thumbnail) paintThumbnail(cover, item.thumbnail);
       frame.append(cover);
     } else {
@@ -383,6 +373,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       cover,
       image: media,
       error,
+      retry,
       loaded: false,
       opening: false,
       deferFull: false,
@@ -422,10 +413,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.removeAttribute("sizes");
       slide.image.src = preview;
     }
-    slide.controller?.abort();
-    slide.controller = undefined;
-    slide.loaded = false;
-    slide.decoded = false;
+    this.#reset(slide);
     slide.fullApplied = false;
     slide.deferFull = decodedPreview !== null;
     this.#load(index, slide);
@@ -462,24 +450,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.frame.append(canvas);
     const playing = !origin.paused && !origin.ended;
     let frameRequest = 0;
-    let videoFrameRequest = 0;
     const follow = () => {
       if (handoff.signal.aborted) return;
       paint();
-      if ("requestVideoFrameCallback" in origin) {
-        videoFrameRequest = origin.requestVideoFrameCallback(follow);
-      } else {
-        frameRequest = requestAnimationFrame(follow);
-      }
+      frameRequest = origin.requestVideoFrameCallback(follow);
     };
     if (playing) follow();
     handoff.signal.addEventListener(
       "abort",
       () => {
-        cancelAnimationFrame(frameRequest);
-        if (videoFrameRequest && "cancelVideoFrameCallback" in origin) {
-          origin.cancelVideoFrameCallback(videoFrameRequest);
-        }
+        origin.cancelVideoFrameCallback(frameRequest);
         // An animation on a detached element may never finish, and the opening waits on it.
         for (const animation of canvas.getAnimations()) animation.cancel();
         canvas.remove();
@@ -496,10 +476,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         video.addEventListener(type, () => resolve(), { once: true, signal });
       });
     const presented = () =>
-      new Promise<void>((resolve) => {
-        if ("requestVideoFrameCallback" in video) video.requestVideoFrameCallback(() => resolve());
-        else requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
+      new Promise<void>((resolve) => video.requestVideoFrameCallback(() => resolve()));
     const seek = async (time: number) => {
       if (Math.abs(video.currentTime - time) < 0.01 && video.readyState >= 2) return;
       const seeked = once("seeked");
@@ -580,10 +557,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#instantFrame = requestAnimationFrame(this.#alignInstant);
       return;
     }
+    this.#endInstant();
+  };
+
+  #endInstant() {
     this.#instantTarget = null;
+    cancelAnimationFrame(this.#instantFrame);
     this.#instantFrame = 0;
     this.element.style.removeProperty("scroll-snap-type");
-  };
+  }
 
   #align(index: number) {
     if (!this.#width) return;
@@ -648,12 +630,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     previous?.element.setAttribute("aria-hidden", "true");
     // A video left behind stops; one marked autoplay starts when it comes into view.
     if (previous?.image instanceof HTMLVideoElement) previous.image.pause();
-    const previousRetry = previous?.error.querySelector("button");
-    if (previousRetry) previousRetry.tabIndex = -1;
+    if (previous) previous.retry.tabIndex = -1;
     this.#index = index;
     this.active.element.setAttribute("aria-hidden", "false");
-    const activeRetry = this.active.error.querySelector("button");
-    if (activeRetry) activeRetry.tabIndex = 0;
+    this.active.retry.tabIndex = 0;
     this.#loadWindow();
     const media = this.#source.getItem(index);
     const player = this.active.image;
@@ -715,10 +695,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
             if (!slide.opening) this.#applyImage(index, slide);
           })
           .catch(() => {
-            if (!controller.signal.aborted) {
-              slide.error.hidden = false;
-              slide.error.querySelector("button")!.tabIndex = index === this.#index ? 0 : -1;
-            }
+            if (!controller.signal.aborted) this.#fail(index, slide);
           })
           .finally(() => {
             controller.signal.removeEventListener("abort", abort);
@@ -807,14 +784,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.image.decoding = slide.decoded ? "sync" : "async";
     if (!this.#painted(slide.image)) slide.image.dataset.fluidboxImagePending = "";
     for (const source of slide.picture.querySelectorAll("source")) source.remove();
-    for (const resource of item.sources ?? []) {
-      const source = this.#ownerDocument.createElement("source");
-      source.srcset = resource.srcset ?? "";
-      if (resource.sizes) source.sizes = resource.sizes;
-      if (resource.media) source.media = resource.media;
-      if (resource.type) source.type = resource.type;
-      slide.picture.insertBefore(source, slide.image);
-    }
+    slide.image.before(...this.#sources(item));
     this.#writeSet(slide.image, item, slide);
     // Neighboring images must begin loading before native scrolling exposes them.
     slide.image.loading = "eager";
@@ -857,18 +827,27 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     else image.sizes = `${Math.max(1, slide.frame.offsetWidth)}px`;
   }
 
+  /** The item's `<source>` elements; a staged copy goes through #writeSet. */
+  #sources(item: TItem, staged?: ViewerSlide) {
+    return (item.type === "img" ? (item.sources ?? []) : []).map((resource) => {
+      const source = this.#ownerDocument.createElement("source");
+      if (staged) this.#writeSet(source, resource, staged);
+      else {
+        source.srcset = resource.srcset ?? "";
+        if (resource.sizes) source.sizes = resource.sizes;
+      }
+      if (resource.media) source.media = resource.media;
+      if (resource.type) source.type = resource.type;
+      return source;
+    });
+  }
+
   /** A detached copy of the slide's picture that loads the same candidate. */
   #stage(item: TItem, slide: ViewerSlide) {
     const picture = this.#ownerDocument.createElement("picture");
     const image = this.#ownerDocument.createElement("img");
     if (item.type === "img") {
-      for (const resource of item.sources ?? []) {
-        const source = this.#ownerDocument.createElement("source");
-        this.#writeSet(source, resource, slide);
-        if (resource.media) source.media = resource.media;
-        if (resource.type) source.type = resource.type;
-        picture.append(source);
-      }
+      picture.append(...this.#sources(item, slide));
       this.#writeSet(image, item, slide);
       image.src = item.src;
     }
@@ -911,11 +890,21 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #retry(index: number) {
     const slide = this.#slides.get(index);
     if (!slide) return;
+    this.#reset(slide);
+    this.#load(index, slide);
+  }
+
+  /** Drop a slide's load so the next #load starts it over. */
+  #reset(slide: ViewerSlide) {
     slide.controller?.abort();
     slide.controller = undefined;
     slide.loaded = false;
     slide.decoded = false;
-    this.#load(index, slide);
+  }
+
+  #fail(index: number, slide: ViewerSlide) {
+    slide.error.hidden = false;
+    slide.retry.tabIndex = index === this.#index ? 0 : -1;
   }
 
   #onScroll = () => {
@@ -927,36 +916,35 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (this.#instantTarget !== null) {
       const left = (this.#instantTarget - this.#base) * this.#width;
       if (Math.abs(this.element.scrollLeft - left) > 1) return;
-      this.#instantTarget = null;
-      cancelAnimationFrame(this.#instantFrame);
-      this.#instantFrame = 0;
-      this.element.style.removeProperty("scroll-snap-type");
+      this.#endInstant();
     }
     if (this.#rebasing || !this.#width) return;
     if (!this.#userOwned && !this.#selection) return;
     if (this.#userOwned) this.#userScrolled = true;
-    if (this.#fence || (this.#userOwned && !this.#askAhead())) {
-      clearTimeout(this.#settleTimer);
-      if (!this.#touching) this.#settleTimer = setTimeout(this.#settled, 180);
-      return;
-    }
     // Delayed events from an instant align are not navigation. Let only a
     // native gesture or a pending smooth selection derive an index from the
     // physical scroll position. The forced sync in #jump already made an
     // instant selection authoritative.
-    this.#sync(undefined, this.#userOwned);
-    clearTimeout(this.#settleTimer);
-    if (!this.#touching) this.#settleTimer = setTimeout(this.#settled, 180);
+    if (!this.#fence && (!this.#userOwned || this.#askAhead())) {
+      this.#sync(undefined, this.#userOwned);
+    }
+    if (this.#touching) clearTimeout(this.#settleTimer);
+    else this.#scheduleSettle();
   };
+
+  #scheduleSettle() {
+    clearTimeout(this.#settleTimer);
+    this.#settleTimer = setTimeout(this.#settled, 180);
+  }
 
   #settled = () => {
     if (this.#touching || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
-    clearTimeout(this.#settleTimer);
     // A finger or trackpad still pressing into a fence keeps it up.
     if (this.#fence && (this.#fingers || performance.now() - this.#lastWheel < 180)) {
-      this.#settleTimer = setTimeout(this.#settled, 180);
+      this.#scheduleSettle();
       return;
     }
+    clearTimeout(this.#settleTimer);
     const refused = this.#refused !== null;
     this.#unfence();
     if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
@@ -996,19 +984,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#fingers = (event as TouchEvent).touches.length > 0;
     }
     this.#touching = false;
-    if (!this.#userScrolled) {
-      // A browser taking over a native pan emits pointercancel before its
-      // first scroll event. Keep ownership briefly so that the first scroll
-      // event updates the selected slide.
-      if (event.type === "pointercancel") {
-        clearTimeout(this.#settleTimer);
-        this.#settleTimer = setTimeout(this.#settled, 180);
-      } else {
-        this.#userOwned = false;
-      }
-      return;
-    }
-    clearTimeout(this.#settleTimer);
-    this.#settleTimer = setTimeout(this.#settled, 180);
+    // A browser taking over a native pan emits pointercancel before its
+    // first scroll event. Keep ownership briefly so that the first scroll
+    // event updates the selected slide.
+    if (this.#userScrolled || event.type === "pointercancel") this.#scheduleSettle();
+    else this.#userOwned = false;
   };
 }

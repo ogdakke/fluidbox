@@ -132,10 +132,6 @@ export class FilmstripRuntime {
     this.#onSelect(index, settled, input);
   }
 
-  get controlling() {
-    return this.#mode === "user";
-  }
-
   settle(index: number) {
     if (this.#initializing) return false;
     this.#index = index;
@@ -307,9 +303,11 @@ export class FilmstripRuntime {
     // those events take control here, the passing thumbnail becomes a new
     // selection and starts a center -> select -> center feedback loop.
     // Touch, pointer, wheel, and keyboard input claim ownership explicitly.
-    if (this.#initializing || this.#mode !== "user") return;
-    this.#userScrolled = true;
+    if (this.#mode !== "user") return;
     this.#publishWindow(this.#nearestIndex());
+    // Input during the opening scrolls the strip, but selects only once it is ready.
+    if (this.#initializing) return;
+    this.#userScrolled = true;
     if (!this.#scrollFrame) {
       this.#scrollFrame = requestAnimationFrame(() => {
         this.#scrollFrame = 0;

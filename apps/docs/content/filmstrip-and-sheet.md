@@ -7,7 +7,7 @@ description: The two optional add-ons, the filmstrip and the sheet, with their i
 
 # Filmstrip and sheet
 
-Both are optional add-ons with their own entries, so their code loads only when you use them. Import the entry once, anywhere in the browser bundle. Then turn the add-on on with the `filmstrip` and `sheet` options of `createFluidbox`, the `Filmstrip` and `Sheet` parts in each framework, or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
+Both are optional add-ons with their own entries, so their code loads only when you use them. Turn one on with the `filmstrip` and `sheet` options of `createFluidbox`, the `Filmstrip` and `Sheet` parts in each framework, or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
@@ -28,7 +28,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-The entries register the add-ons on import and are safe to import on the server. Turning one on without its import throws an `Error` that names the import, such as `The sheet needs its entry: import "@ogdakke/fluidbox/sheet" once.` `<fluidbox-gallery>` loads them itself when it holds their element.
+The fluidbox loads an add-on's entry the first time you turn it on, and an open waits for it. Import the entry yourself, as above, to have it in the page's bundle from the start instead. The entries are safe to import on the server.
 
 ## Filmstrip
 

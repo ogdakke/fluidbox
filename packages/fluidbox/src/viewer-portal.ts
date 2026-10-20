@@ -11,22 +11,8 @@ export interface ViewerPortalElements {
   readonly addons: HTMLDivElement;
 }
 
-function required<TElement extends Element>(root: ParentNode, selector: string): TElement {
-  const element = root.querySelector<TElement>(selector);
-  if (!element) throw new Error(`Viewer portal is missing ${selector}.`);
-  return element;
-}
-
 /** Create the runtime-owned body portal without registering custom elements. */
-export interface ViewerPortalOptions {
-  /** The dialog's name until an item names it. */
-  readonly label: string;
-}
-
-export function createViewerPortal(
-  ownerDocument: Document = document,
-  options: ViewerPortalOptions,
-): ViewerPortalElements {
+export function createViewerPortal(ownerDocument: Document, label: string): ViewerPortalElements {
   const overlay = ownerDocument.createElement("div");
   overlay.dataset.fluidboxOverlay = "";
   overlay.innerHTML = `
@@ -41,30 +27,33 @@ export function createViewerPortal(
       </div>
     </div>
   `;
-  required(overlay, "[data-fluidbox-dialog]").setAttribute("aria-label", options.label);
+  // The markup above is static, so every part is there.
+  const part = <TElement extends Element>(name: string) =>
+    overlay.querySelector<TElement>(`[data-fluidbox-${name}]`)!;
+  const dialog = part<HTMLDivElement>("dialog");
+  // The dialog's name until an item names it.
+  dialog.setAttribute("aria-label", label);
   return {
     overlay,
-    container: required(overlay, "[data-fluidbox-container]"),
-    backdrop: required(overlay, "[data-fluidbox-backdrop]"),
-    dialog: required(overlay, "[data-fluidbox-dialog]"),
-    frame: required(overlay, "[data-fluidbox-frame]"),
-    media: required(overlay, "[data-fluidbox-media]"),
-    status: required(overlay, "[data-fluidbox-announcer]"),
-    portalTarget: required(overlay, "[data-fluidbox-portal]"),
-    addons: required(overlay, "[data-fluidbox-addons]"),
+    container: part("container"),
+    backdrop: part("backdrop"),
+    dialog,
+    frame: part("frame"),
+    media: part("media"),
+    status: part("announcer"),
+    portalTarget: part("portal"),
+    addons: part("addons"),
   };
 }
 
 /** Owns inert background state for one active body-level portal. */
 export class ViewerModalIsolation {
   readonly #overlay: HTMLElement;
-  readonly #additionalExempt: () => Element | null;
   readonly #inertElements = new Map<Element, boolean>();
   #observer: MutationObserver | undefined;
 
-  constructor(overlay: HTMLElement, additionalExempt: () => Element | null = () => null) {
+  constructor(overlay: HTMLElement) {
     this.#overlay = overlay;
-    this.#additionalExempt = additionalExempt;
   }
 
   activate() {
@@ -86,14 +75,8 @@ export class ViewerModalIsolation {
   }
 
   #isolate() {
-    const additionalExempt = this.#additionalExempt();
     for (const element of this.#overlay.ownerDocument.body.children) {
-      if (
-        element === this.#overlay ||
-        element === additionalExempt ||
-        this.#inertElements.has(element)
-      )
-        continue;
+      if (element === this.#overlay || this.#inertElements.has(element)) continue;
       this.#inertElements.set(element, element.hasAttribute("inert"));
       element.setAttribute("inert", "");
     }

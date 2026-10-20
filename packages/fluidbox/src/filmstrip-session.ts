@@ -76,7 +76,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
       count: source.count,
       index,
       onSelect: (nextIndex, settled, input) => {
-        if (!settled && controller.state.requestedIndex === nextIndex) return;
+        if (!settled && controller.state.index === nextIndex) return;
         void controller.goTo({ index: nextIndex }, { reason: input, scrub: !settled });
       },
       onWindowChange: (center, layout, force) => this.#applyWindow(center, layout, force),

@@ -1324,3 +1324,47 @@ test("update adds a sheet to the open viewer, and takes it away again", async ({
   );
   expect(await page.evaluate(() => window.headlessSecondaryViewer.state.status)).toBe("open");
 });
+
+test("a pinch that lands on a drag starts from where the finger took the photo", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "pixel-7", "Multi-touch goes through Chromium's CDP.");
+  await page.goto("/javascript/");
+  await expect(page.locator("html")).toHaveAttribute("data-patterns-ready", "");
+  await page.locator('[data-pattern="zoom"] [data-test="trigger"]').nth(2).click();
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  const slide = page.locator('[data-fluidbox-slide][aria-hidden="false"]');
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(slide).toHaveAttribute("aria-label", "Item 3 of 4");
+  const session = await page.context().newCDPSession(page);
+  type Point = { x: number; y: number; id: number };
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", touchPoints: Point[]) =>
+    session.send("Input.dispatchTouchEvent", { type, touchPoints });
+  const media = slide.locator("[data-fluidbox-media]");
+  const { width, height } = page.viewportSize()!;
+  const x = width / 2;
+  const y = height / 2;
+  await touch("touchStart", [{ x, y, id: 1 }]);
+  for (let step = 4; step <= 60; step += 4) await touch("touchMove", [{ x, y: y + step, id: 1 }]);
+  await page.waitForTimeout(200);
+  const dragged = (await media.boundingBox())!;
+  await touch("touchStart", [
+    { x, y: y + 60, id: 1 },
+    { x: x + 60, y, id: 2 },
+  ]);
+  const caught = (await media.boundingBox())!;
+  expect(Math.abs(caught.y - dragged.y), "the photo stays where the finger took it").toBeLessThan(
+    1,
+  );
+  expect(Math.abs(caught.width - dragged.width)).toBeLessThan(1);
+  for (let step = 1; step <= 10; step++) {
+    await touch("touchMove", [
+      { x: x - step * 6, y: y + 60 + step * 6, id: 1 },
+      { x: x + 60 + step * 6, y: y - step * 6, id: 2 },
+    ]);
+  }
+  await expect(dialog).toHaveAttribute("data-zoomed", "");
+  await expect(slide).toHaveAttribute("aria-label", "Item 3 of 4");
+  await touch("touchEnd", []);
+  await expect(slide).toHaveAttribute("aria-label", "Item 3 of 4");
+});

@@ -238,7 +238,7 @@ test("gallery controls reveal with the backdrop and arrow selection does not fad
   await page.locator("fluidbox-item").first().click({ noWaitAfter: true });
 
   const dialog = page.locator("[data-fluidbox-dialog]");
-  await expect(dialog).toHaveAttribute("data-gallery-controls-revealing", "");
+  await expect(dialog).toHaveAttribute("data-revealing", "");
   const next = dialog.locator("[data-fluidbox-next]");
   const close = dialog.locator("[data-fluidbox-close]");
   await expect(next).toHaveCSS("pointer-events", "none");

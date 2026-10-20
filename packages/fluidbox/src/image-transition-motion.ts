@@ -1,5 +1,5 @@
-import { dismissCloseValue, type CornerRadii } from "./fluidbox-gesture";
-import { originPose } from "./origin-pose";
+import { dismissCloseValue } from "./fluidbox-gesture";
+import { originPose, radiiOf } from "./origin-pose";
 import { cropPose, emptyClip, mixClip, type ImageClip } from "./transition-geometry";
 
 export interface ImageTransitionPose {
@@ -30,13 +30,6 @@ export function readImageTransitionPose(
   );
   const transform = frameTransform.multiply(imageTransform);
   const crop = transform.inverse().multiply(frameTransform);
-  const scale = Math.abs(frameTransform.a);
-  const radii: CornerRadii = [
-    (Number.parseFloat(frameStyle.borderTopLeftRadius) || 0) * scale,
-    (Number.parseFloat(frameStyle.borderTopRightRadius) || 0) * scale,
-    (Number.parseFloat(frameStyle.borderBottomRightRadius) || 0) * scale,
-    (Number.parseFloat(frameStyle.borderBottomLeftRadius) || 0) * scale,
-  ];
   const width = image.offsetWidth;
   const height = image.offsetHeight;
   return {
@@ -46,7 +39,7 @@ export function readImageTransitionPose(
       right: Math.max(0, width - crop.e - width * crop.a),
       bottom: Math.max(0, height - crop.f - height * crop.d),
       left: Math.max(0, crop.e),
-      radii,
+      radii: radiiOf(frameStyle, Math.abs(frameTransform.a)),
     },
   };
 }
@@ -76,9 +69,8 @@ export function applyImageTransitionPose(
 export function originTransitionPose(
   origin: HTMLElement,
   picture: HTMLElement | null,
-  frame: HTMLElement,
   image: HTMLElement,
-  current: ImageTransitionPose = readImageTransitionPose(frame, image),
+  current: ImageTransitionPose,
 ): ImageTransitionPose | null {
   const imageRect = image.getBoundingClientRect();
   return originPose({
@@ -97,8 +89,8 @@ interface ImageTransitionMotionOptions {
   readonly to: ImageTransitionPose;
   readonly width: number;
   readonly height: number;
+  /** The backdrop's opacity at the start; it ends shown when opening and hidden when closing. */
   readonly backdropFrom: number;
-  readonly backdropTo: number;
   readonly duration: number;
   readonly response: number;
   readonly samples: number;
@@ -117,7 +109,6 @@ export function createImageTransitionMotion({
   width,
   height,
   backdropFrom,
-  backdropTo,
   duration,
   response,
   samples,
@@ -157,7 +148,7 @@ export function createImageTransitionMotion({
     radius.push({ offset, borderRadius: rendered.borderRadius });
     backdrop.push({
       offset,
-      opacity: value(backdropFrom, backdropTo),
+      opacity: value(backdropFrom, opening ? 1 : 0),
     });
     progress.push({ offset, opacity: value(0, 1) });
   }

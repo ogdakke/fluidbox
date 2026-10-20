@@ -53,7 +53,6 @@ import {
   type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
 import {
-  createDeferredFluidbox,
   createSlots,
   createTrigger,
   fluidboxControlIcon,
@@ -61,9 +60,8 @@ import {
   fluidboxEventTypes,
   frameLayerOf,
   latestOrigins,
-  loadAddons,
   resolveLabels,
-  type FluidboxAddonName,
+  unloadFluidbox,
   type FluidboxSlot,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
@@ -189,7 +187,7 @@ interface Features {
 }
 
 interface RootContext {
-  /** Stands in for the viewer from the first render; commands before mount wait for it. */
+  /** Made in Root's setup; it touches nothing until a viewer is pressed or opened. */
   readonly fluidbox: FluidboxInstance<AnyItem>;
   readonly state: Readonly<ShallowRef<FluidboxState<AnyItem>>>;
   /** Changes whenever the item list does, so triggers and overlays register again. */
@@ -281,9 +279,9 @@ type RootSlots<TItem extends FluidboxItem> = SlotsType<{
 }>;
 
 /**
- * Owns one viewer per gallery. The viewer is made on mount, so Root is safe to
- * render on the server, and lives until Root unmounts: prop and part changes
- * apply to it in place. The default slot gets the `useFluidbox()` object.
+ * Owns one fluidbox per gallery. It touches nothing until a viewer is pressed
+ * or opened, so Root is safe to render on the server, and prop and part
+ * changes apply to it in place. Unmounting drops the viewer. The default slot gets the `useFluidbox()` object.
  */
 const Root = defineComponent(
   <TItem extends FluidboxItem>(
@@ -295,36 +293,10 @@ const Root = defineComponent(
       const value = props.items;
       return Array.isArray(value) ? value.map((item: TItem) => toRaw(item)) : toRaw(value);
     });
-    const deferred = createDeferredFluidbox<TItem>(items.value);
-    const fluidbox = deferred.fluidbox;
-    const state = shallowRef(fluidbox.state);
-    const list = shallowRef(fluidbox.items);
     const viewerTarget = shallowRef<HTMLElement | null>(null);
-    const sheetStop = shallowRef(0);
     const features = shallowReactive<Features>({ viewers: 0, filmstrip: null, sheet: null });
     const mounts = useMounts();
     const labels = computed(() => resolveLabels(props.labels));
-
-    const unsubscribe = deferred.subscribe(() => {
-      state.value = fluidbox.state;
-      if (fluidbox.items !== list.value) list.value = fluidbox.items;
-    });
-    // An inline array of the same items, as `:items="[product]"`, changes nothing.
-    watch(items, (next, previous) => {
-      if (!sameItems(next, previous)) void fluidbox.setItems(next);
-    });
-
-    const events = new AbortController();
-    for (const type of fluidboxEventTypes) {
-      fluidbox.addEventListener(
-        type,
-        (event) => (emit as (type: string, event: Event) => void)(type, event),
-        { signal: events.signal },
-      );
-    }
-    fluidbox.addEventListener("sheetchange", (event) => (sheetStop.value = event.stop), {
-      signal: events.signal,
-    });
 
     // Renderers resolve by name when a slide mounts, so the newest one is used.
     const renderers = new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
@@ -360,55 +332,60 @@ const Root = defineComponent(
       };
     };
 
-    let real: FluidboxInstance<TItem> | null = null;
-    let applied: Settings | null = null;
-    let pending = 0;
-    let unmounted = false;
+    let applied = settings();
+    const fluidbox = createFluidbox<TItem>({
+      items: items.value,
+      ...(applied as FluidboxUpdateOptions<TItem>),
+      renderers,
+      origins: latestOrigins(() => props.origins as FluidboxOriginAdapter<TItem> | undefined),
+    });
+    const state = shallowRef(fluidbox.state);
+    const list = shallowRef(fluidbox.items);
+    const sheetStop = shallowRef(0);
 
-    function apply(next: Settings) {
-      if (unmounted) return;
-      if (!real || !applied) {
-        real = createFluidbox<TItem>({
-          items: items.value,
-          ...(next as FluidboxUpdateOptions<TItem>),
-          renderers,
-          origins: latestOrigins(() => props.origins as FluidboxOriginAdapter<TItem> | undefined),
-        });
-        deferred.attach(real);
-        sheetStop.value = real.sheet?.stop ?? 0;
-      } else {
-        const changes: Partial<Settings> = {};
-        for (const key of settingKeys) {
-          if (!same(applied[key], next[key])) (changes as Record<string, unknown>)[key] = next[key];
-        }
-        if (Object.keys(changes).length) real.update(changes as FluidboxUpdateOptions<TItem>);
-      }
-      applied = next;
+    const unsubscribe = fluidbox.subscribe(() => {
+      state.value = fluidbox.state;
+      if (fluidbox.items !== list.value) list.value = fluidbox.items;
+      // A sheet that loads or goes changes the stop too.
+      sheetStop.value = fluidbox.sheet?.stop ?? 0;
+    });
+    // An inline array of the same items, as `:items="[product]"`, changes nothing.
+    watch(items, (next, previous) => {
+      if (!sameItems(next, previous)) void fluidbox.setItems(next);
+    });
+
+    const events = new AbortController();
+    for (const type of fluidboxEventTypes) {
+      fluidbox.addEventListener(
+        type,
+        (event) => (emit as (type: string, event: Event) => void)(type, event),
+        { signal: events.signal },
+      );
     }
+    fluidbox.addEventListener("sheetchange", (event) => (sheetStop.value = event.stop), {
+      signal: events.signal,
+    });
 
+    // The parts register as Root mounts; the runtime loads the add-ons they turn on.
     onMounted(() => {
       watch(
         settings,
         (next) => {
-          const ticket = ++pending;
-          // The Filmstrip and Sheet parts load their add-ons, so only the ones rendered cost anything.
-          const addons: FluidboxAddonName[] = [];
-          if (next.filmstrip) addons.push("filmstrip");
-          if (next.sheet) addons.push("sheet");
-          const loading = loadAddons(addons);
-          if (!loading) apply(next);
-          else void loading.then(() => ticket === pending && apply(next));
+          const changes: Partial<Settings> = {};
+          for (const key of settingKeys) {
+            if (!same(applied[key], next[key]))
+              (changes as Record<string, unknown>)[key] = next[key];
+          }
+          if (Object.keys(changes).length) fluidbox.update(changes as FluidboxUpdateOptions<TItem>);
+          applied = next;
         },
         { immediate: true },
       );
     });
     onBeforeUnmount(() => {
-      unmounted = true;
       unsubscribe();
       events.abort();
-      deferred.detach();
-      real?.destroy();
-      real = null;
+      unloadFluidbox(fluidbox);
     });
 
     const api: FluidboxApi<TItem> = {

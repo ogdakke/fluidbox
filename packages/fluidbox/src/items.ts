@@ -125,6 +125,22 @@ export function indexIn(list: FluidboxItemList, id: string): number | null {
   return null;
 }
 
+/**
+ * The ids targets name in a list now, without repeats. An index names whichever
+ * item is there; an id counts once the list holds it.
+ */
+export function idsIn(list: FluidboxItemList, targets: readonly (number | string)[]): string[] {
+  const ids = new Set<string>();
+  for (const target of targets) {
+    if (typeof target === "string") {
+      if (indexIn(list, target) !== null) ids.add(target);
+    } else if (Number.isInteger(target) && target >= 0 && target < list.count) {
+      ids.add(idOf(list.get(target)));
+    }
+  }
+  return [...ids];
+}
+
 /** The runtime's source over a list. */
 export function toSource<TItem extends FluidboxItem>(
   list: FluidboxItemList<TItem>,

@@ -14,8 +14,6 @@ const BACKDROP_FADE_END = 0.6;
 const DISMISS_EDGE = { x: 48, y: 80 } as const;
 const DISMISS_EDGE_TRAVEL = 64;
 const DISMISS_FLICK_HORIZON = 160;
-const DISMISS_SETTLE_RESPONSE = 0.28;
-const DISMISS_SETTLE_DAMPING = 0.86;
 
 type DismissAxis = keyof typeof DISMISS_EDGE;
 type WheelGesturePhase = "tracking" | "settling" | "past-open";
@@ -37,7 +35,6 @@ export interface FluidboxDragStart {
   wheelOffset: number;
   wheelSnapOffset: number;
   opacity: number;
-  closeOpacity: number;
   borderRadii: CornerRadii;
   targetRadii: CornerRadii;
   /** Media insets at the start of the drag and at the origin. */
@@ -62,8 +59,6 @@ export interface FluidboxDragState extends FluidboxDragStart {
   wheelSettleDistance: number;
   wheelSnapProgress: number;
   wheelSettleSnapProgress: number;
-  lastX: number;
-  lastY: number;
   velocityX: number;
   velocityY: number;
   springVelocityX: number;
@@ -90,10 +85,6 @@ export class FluidboxGestureController {
     this.#onWheelCommit = onWheelCommit;
   }
 
-  get state(): FluidboxDragState | undefined {
-    return this.#state;
-  }
-
   get active(): boolean {
     return this.#state !== undefined;
   }
@@ -114,8 +105,6 @@ export class FluidboxGestureController {
       wheelSettleDistance: 0,
       wheelSnapProgress: 0,
       wheelSettleSnapProgress: 0,
-      lastX: 0,
-      lastY: 0,
       velocityX: 0,
       velocityY: 0,
       springVelocityX: 0,
@@ -132,12 +121,10 @@ export class FluidboxGestureController {
     const now = performance.now();
     const elapsed = now - state.time;
     if (elapsed > 0) {
-      state.velocityX = Math.max(-3, Math.min(3, (x - state.lastX) / Math.max(8, elapsed)));
-      state.velocityY = Math.max(-3, Math.min(3, (y - state.lastY) / Math.max(8, elapsed)));
+      state.velocityX = Math.max(-3, Math.min(3, (x - state.inputX) / Math.max(8, elapsed)));
+      state.velocityY = Math.max(-3, Math.min(3, (y - state.inputY) / Math.max(8, elapsed)));
     }
     state.time = now;
-    state.lastX = x;
-    state.lastY = y;
     state.inputX = x;
     state.inputY = y;
     state.targetX = dismissTarget(x, "x");
@@ -375,32 +362,13 @@ export function dismissRadiusProgress(x: number, y: number): number {
   return Math.min(1, Math.max(Math.abs(x) / DISMISS_EDGE.x, Math.abs(y) / DISMISS_EDGE.y) * 2);
 }
 
-export function dismissReturnValue(
-  from: number,
-  to: number,
-  velocity: number,
-  elapsedMs: number,
-): number {
-  const time = elapsedMs / 1000;
-  const omega = (2 * Math.PI) / DISMISS_SETTLE_RESPONSE;
-  const displacement = from - to;
-  const zetaOmega = DISMISS_SETTLE_DAMPING * omega;
-  const omegaD = omega * Math.sqrt(1 - DISMISS_SETTLE_DAMPING * DISMISS_SETTLE_DAMPING);
-  const coefficient = (velocity * 1000 + zetaOmega * displacement) / omegaD;
-  return (
-    to +
-    Math.exp(-zetaOmega * time) *
-      (displacement * Math.cos(omegaD * time) + coefficient * Math.sin(omegaD * time))
-  );
-}
-
 export function dismissCloseValue(
   from: number,
   to: number,
   velocity: number,
   elapsedMs: number,
-  durationMs = 220,
-  responseMs = 280,
+  durationMs: number,
+  responseMs: number,
 ): number {
   const evaluate = (timeMs: number) => {
     const time = timeMs / 1000;

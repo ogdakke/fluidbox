@@ -1,36 +1,39 @@
-import { describe, expect, it } from "vitest";
-import { ViewerOwnership } from "../src/viewer-ownership";
+import { afterEach, describe, expect, it } from "vitest";
+import { activeViewer } from "../src/viewer-ownership";
 
-describe("ViewerOwnership", () => {
+const owner = () => ({ closeImmediately: () => true });
+
+describe("activeViewer", () => {
+  afterEach(() => {
+    activeViewer.active = null;
+  });
+
   it("returns the previous owner when a new viewer claims the portal", () => {
-    const ownership = new ViewerOwnership<object>();
-    const first = {};
-    const second = {};
+    const first = owner();
+    const second = owner();
 
-    expect(ownership.claim(first)).toBeNull();
-    expect(ownership.claim(second)).toBe(first);
-    expect(ownership.active).toBe(second);
+    expect(activeViewer.claim(first)).toBeNull();
+    expect(activeViewer.claim(second)).toBe(first);
+    expect(activeViewer.active).toBe(second);
   });
 
   it("does not let stale release clear the replacement owner", () => {
-    const ownership = new ViewerOwnership<object>();
-    const first = {};
-    const second = {};
-    ownership.claim(first);
-    ownership.claim(second);
+    const first = owner();
+    const second = owner();
+    activeViewer.claim(first);
+    activeViewer.claim(second);
 
-    expect(ownership.release(first)).toBe(false);
-    expect(ownership.active).toBe(second);
-    expect(ownership.release(second)).toBe(true);
-    expect(ownership.active).toBeNull();
+    activeViewer.release(first);
+    expect(activeViewer.active).toBe(second);
+    activeViewer.release(second);
+    expect(activeViewer.active).toBeNull();
   });
 
   it("treats a repeated claim as an idempotent no-op", () => {
-    const ownership = new ViewerOwnership<object>();
-    const viewer = {};
+    const viewer = owner();
 
-    ownership.claim(viewer);
-    expect(ownership.claim(viewer)).toBeNull();
-    expect(ownership.active).toBe(viewer);
+    activeViewer.claim(viewer);
+    expect(activeViewer.claim(viewer)).toBeNull();
+    expect(activeViewer.active).toBe(viewer);
   });
 });

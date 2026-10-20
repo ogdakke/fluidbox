@@ -41,27 +41,33 @@ const resist = (value: number, min: number, max: number, range: number) =>
       ? max + range * (1 - Math.exp((max - value) / range))
       : value;
 
-// Same log-space resistance as voidmesh/lib/canvas-math.ts. Equal zoom
-// ratios beyond either boundary receive equal resistance (coefficient 0.55).
-function rubberZoom(scale: number, max: number): number {
+const sides = ["top", "right", "bottom", "left"] as const;
+
+/** Maps a scale's log-space distance beyond [1, max] through `curve`. */
+function beyondBounds(
+  scale: number,
+  max: number,
+  curve: (offset: number, range: number) => number,
+): number {
   if (scale >= 1 && scale <= max) return scale;
   const boundary = scale < 1 ? 0 : Math.log(max);
   const offset = Math.log(Math.max(Number.MIN_VALUE, scale)) - boundary;
-  const range = Math.log(max);
-  const damped = range * (1 - 1 / ((Math.abs(offset) * 0.55) / range + 1));
-  return Math.exp(boundary + Math.sign(offset) * damped);
+  return Math.exp(boundary + Math.sign(offset) * curve(Math.abs(offset), Math.log(max)));
 }
+
+// Same log-space resistance as voidmesh/lib/canvas-math.ts. Equal zoom
+// ratios beyond either boundary receive equal resistance (coefficient 0.55).
+const rubberZoom = (scale: number, max: number) =>
+  beyondBounds(scale, max, (offset, range) => range * (1 - 1 / ((offset * 0.55) / range + 1)));
 
 // Recover gesture coordinates when grabbing an unfinished rubber-band return,
 // so its already-damped visible scale isn't damped a second time.
-function rawZoom(scale: number, max: number): number {
-  if (scale >= 1 && scale <= max) return scale;
-  const boundary = scale < 1 ? 0 : Math.log(max);
-  const offset = Math.log(scale) - boundary;
-  const range = Math.log(max);
-  const raw = Math.abs(offset) / (0.55 * (1 - Math.min(Math.abs(offset) / range, 0.999)));
-  return Math.exp(boundary + Math.sign(offset) * raw);
-}
+const rawZoom = (scale: number, max: number) =>
+  beyondBounds(
+    scale,
+    max,
+    (offset, range) => offset / (0.55 * (1 - Math.min(offset / range, 0.999))),
+  );
 
 /** Owns image zoom/pan while active; gallery navigation and dismissal stay outside. */
 export class FluidboxZoom {
@@ -101,28 +107,30 @@ export class FluidboxZoom {
   #clickTimer: ReturnType<typeof setTimeout> | undefined;
   #tap: { x: number; y: number; time: number } | undefined;
   #source: "touch" | "wheel" | "safari" | null = null;
-  #touch: { start: Pose; center: Point; span: number; rawScale: number } | null = null;
+  #touch: { start: Pose; center: Point; span: number } | null = null;
   #rawScale = 1;
   #touchTap: Point | null = null;
   #touchMoved = false;
-  #safariStart = fit();
-  #cursor: Point = { x: 0, y: 0 };
+  #cursor: Point = { x: innerWidth / 2, y: innerHeight / 2 };
   #suppressClick = false;
 
   constructor(root: HTMLElement, options: Options) {
     this.#options = options;
     this.#root = root;
-    this.#cursor = { x: innerWidth / 2, y: innerHeight / 2 };
     const { signal } = this.#controller;
-    root.addEventListener("touchstart", this.#touchStart, {
-      capture: true,
-      passive: false,
-      signal,
-    });
-    root.addEventListener("touchmove", this.#touchMove, { capture: true, passive: false, signal });
-    root.addEventListener("touchend", this.#touchEnd, { capture: true, passive: false, signal });
-    root.addEventListener("touchcancel", this.#touchEnd, { capture: true, passive: false, signal });
-    root.addEventListener("wheel", this.#wheel, { capture: true, passive: false, signal });
+    const capture = { capture: true, passive: false, signal };
+    for (const [type, listener] of [
+      ["touchstart", this.#touchStart],
+      ["touchmove", this.#touchMove],
+      ["touchend", this.#touchEnd],
+      ["touchcancel", this.#touchEnd],
+      ["wheel", this.#wheel],
+      ["gesturestart", this.#gestureStart],
+      ["gesturechange", this.#gestureChange],
+      ["gestureend", this.#gestureEnd],
+    ] as const) {
+      root.addEventListener(type, listener as EventListener, capture);
+    }
     root.addEventListener(
       "pointermove",
       (event) => {
@@ -130,21 +138,6 @@ export class FluidboxZoom {
       },
       { signal },
     );
-    root.addEventListener("gesturestart", this.#gestureStart, {
-      capture: true,
-      passive: false,
-      signal,
-    });
-    root.addEventListener("gesturechange", this.#gestureChange, {
-      capture: true,
-      passive: false,
-      signal,
-    });
-    root.addEventListener("gestureend", this.#gestureEnd, {
-      capture: true,
-      passive: false,
-      signal,
-    });
     root.addEventListener("dblclick", (event) => event.preventDefault(), { signal });
   }
 
@@ -190,12 +183,10 @@ export class FluidboxZoom {
     const canvas = document.createElement("div");
     canvas.dataset.fluidboxZoomCanvas = "";
     viewport.style.setProperty("--fluidbox-zoom-chrome", `${chromeReach(window)}px`);
-    for (const side of ["top", "right", "bottom", "left"] as const) {
-      viewport.style.setProperty(`--fluidbox-zoom-stage-${side}`, `${g.stage[side]}px`);
-    }
     // The zoomed image pans under the stage insets, and on past them under the
     // browser's bars, unless --fluidbox-zoom-clip keeps it inside that side.
-    for (const side of ["top", "right", "bottom", "left"] as const) {
+    for (const side of sides) {
+      viewport.style.setProperty(`--fluidbox-zoom-stage-${side}`, `${g.stage[side]}px`);
       if (!g.stage[side]) continue;
       const bleed = side === "top" || side === "bottom" ? " + var(--fluidbox-zoom-reach)" : "";
       viewport.style.setProperty(
@@ -327,20 +318,13 @@ export class FluidboxZoom {
     // "stage" clips every side; otherwise a list of sides, such as "right bottom".
     const words = (style?.getPropertyValue("--fluidbox-zoom-clip") ?? "").trim().split(/\s+/);
     const clipped = (side: string) => words.includes("stage") || words.includes(side);
-    return {
-      stage: {
-        top: inset("top"),
-        right: inset("right"),
-        bottom: inset("bottom"),
-        left: inset("left"),
-      },
-      clip: {
-        top: clipped("top"),
-        right: clipped("right"),
-        bottom: clipped("bottom"),
-        left: clipped("left"),
-      },
-    };
+    const stage = { top: 0, right: 0, bottom: 0, left: 0 };
+    const clip = { top: false, right: false, bottom: false, left: false };
+    for (const side of sides) {
+      stage[side] = inset(side);
+      clip[side] = clipped(side);
+    }
+    return { stage, clip };
   }
 
   #stageCenter(): Point {
@@ -392,6 +376,17 @@ export class FluidboxZoom {
     };
   }
 
+  #rest(target: Pose) {
+    cancelAnimationFrame(this.#frame);
+    this.#paint();
+    this.#options.state(target.scale > 1.001);
+    this.#enterNative();
+  }
+
+  #target(scale: number, anchor: Point): Pose {
+    return scale === 1 ? fit() : this.#bounded(this.#around(scale, anchor), false);
+  }
+
   #animate(target: Pose, springBack = false) {
     this.#freeze();
     const image = this.#image;
@@ -399,58 +394,39 @@ export class FluidboxZoom {
     const from = this.#pose;
     this.#pose = target;
     if (this.#options.reducedMotion()) {
-      this.#paint();
-      this.#options.state(target.scale > 1.001);
-      this.#enterNative();
+      this.#rest(target);
       return;
     }
-    let frames: Keyframe[];
+    let ease: (offset: number) => number;
     if (springBack) {
       // Critically damped return with the reference's 0.25s response. Sample
       // once into compositor keyframes; no layout reads or JS animation loop.
       const omega = (2 * Math.PI) / 0.25;
       const remaining = (time: number) => (1 + omega * time) * Math.exp(-omega * time);
       const end = remaining(0.4);
-      frames = Array.from({ length: 49 }, (_, i) => {
-        const offset = i / 48;
-        const progress = (1 - remaining(offset * 0.4)) / (1 - end);
-        const scale = Math.exp(
-          Math.log(from.scale) + Math.log(target.scale / from.scale) * progress,
-        );
-        const translation =
-          Math.abs(target.scale - from.scale) > 0.000001
-            ? (scale - from.scale) / (target.scale - from.scale)
-            : progress;
-        return {
-          offset,
-          transform: transform({
-            scale,
-            x: from.x + (target.x - from.x) * translation,
-            y: from.y + (target.y - from.y) * translation,
-          }),
-        };
-      });
+      ease = (offset) => (1 - remaining(offset * 0.4)) / (1 - end);
     } else {
-      // Keep logarithmic zoom easing, but translate by the same normalized
-      // scale change so every image point follows a straight screen-space path.
-      frames = Array.from({ length: 49 }, (_, i) => {
-        const offset = i / 48;
-        const zoomProgress = 1 - (1 - offset) ** 3;
-        const scale = from.scale * (target.scale / from.scale) ** zoomProgress;
-        const progress =
-          Math.abs(target.scale - from.scale) > 0.000001
-            ? (scale - from.scale) / (target.scale - from.scale)
-            : zoomProgress;
-        return {
-          offset,
-          transform: transform({
-            scale,
-            x: from.x + (target.x - from.x) * progress,
-            y: from.y + (target.y - from.y) * progress,
-          }),
-        };
-      });
+      ease = (offset) => 1 - (1 - offset) ** 3;
     }
+    // Keep logarithmic zoom easing, but translate by the same normalized
+    // scale change so every image point follows a straight screen-space path.
+    const frames = Array.from({ length: 49 }, (_, i): Keyframe => {
+      const offset = i / 48;
+      const zoomProgress = ease(offset);
+      const scale = from.scale * (target.scale / from.scale) ** zoomProgress;
+      const progress =
+        Math.abs(target.scale - from.scale) > 0.000001
+          ? (scale - from.scale) / (target.scale - from.scale)
+          : zoomProgress;
+      return {
+        offset,
+        transform: transform({
+          scale,
+          x: from.x + (target.x - from.x) * progress,
+          y: from.y + (target.y - from.y) * progress,
+        }),
+      };
+    });
     const animation = image.animate(frames, {
       duration: springBack ? 400 : 320,
       easing: "linear",
@@ -473,10 +449,8 @@ export class FluidboxZoom {
       () => {
         if (this.#animation !== animation) return;
         this.#animation = null;
-        this.#paint();
         animation.cancel();
-        this.#options.state(target.scale > 1.001);
-        this.#enterNative();
+        this.#rest(target);
       },
       () => {},
     );
@@ -487,20 +461,14 @@ export class FluidboxZoom {
     this.#source = null;
     this.#touch = null;
     const scale = Math.max(1, Math.min(this.#options.config().max, this.#pose.scale));
-    const center = this.#stageCenter();
-    const target = scale === 1 ? fit() : this.#bounded(this.#around(scale, center), false);
+    const target = this.#target(scale, this.#stageCenter());
     if (
       Math.abs(target.scale - this.#pose.scale) > 0.0001 ||
       Math.abs(target.x - this.#pose.x) > 0.1 ||
       Math.abs(target.y - this.#pose.y) > 0.1
     )
       this.#animate(target, true);
-    else {
-      cancelAnimationFrame(this.#frame);
-      this.#paint();
-      this.#options.state(scale > 1.001);
-      this.#enterNative();
-    }
+    else this.#rest(target);
   }
 
   #consume(event: Event) {
@@ -538,8 +506,8 @@ export class FluidboxZoom {
       start: { ...this.#pose },
       center: midpoint(a, b),
       span: touches.length > 1 ? distance(a, b) : 0,
-      rawScale: rawZoom(this.#pose.scale, this.#options.config().max),
     };
+    this.#rawScale = rawZoom(this.#pose.scale, this.#options.config().max);
   }
 
   #touchMove = (event: TouchEvent) => {
@@ -574,7 +542,7 @@ export class FluidboxZoom {
     const start = this.#touch;
     if (start.span && event.touches.length > 1) {
       const scale = rubberZoom(
-        (start.rawScale * distance(a, b)) / start.span,
+        (this.#rawScale * distance(a, b)) / start.span,
         this.#options.config().max,
       );
       this.#pose = this.#bounded(this.#around(scale, center, start.start, start.center), true);
@@ -648,7 +616,6 @@ export class FluidboxZoom {
     if (!this.#acquire()) return;
     this.#consume(event);
     this.#source = "safari";
-    this.#safariStart = { ...this.#pose };
     this.#options.state(true);
   };
   #gestureChange = (event: Event) => {
@@ -656,8 +623,7 @@ export class FluidboxZoom {
     this.#consume(event);
     const gesture = event as SafariGesture;
     const anchor = { x: gesture.clientX ?? this.#cursor.x, y: gesture.clientY ?? this.#cursor.y };
-    const max = this.#options.config().max;
-    const scale = rubberZoom(rawZoom(this.#safariStart.scale, max) * gesture.scale, max);
+    const scale = rubberZoom(this.#rawScale * gesture.scale, this.#options.config().max);
     this.#pose = this.#bounded(this.#around(scale, anchor), true);
     this.#queue();
   };
@@ -698,7 +664,7 @@ export class FluidboxZoom {
       this.#tap = undefined;
       if (this.#acquire()) {
         const scale = this.#pose.scale > 1.01 ? 1 : this.#options.config().step;
-        this.#animate(scale === 1 ? fit() : this.#bounded(this.#around(scale, anchor), false));
+        this.#animate(this.#target(scale, anchor));
       }
     } else {
       this.#tap = { ...anchor, time: now };
@@ -711,9 +677,7 @@ export class FluidboxZoom {
   zoomBy(factor: number) {
     if (!this.#acquire()) return;
     const scale = Math.max(1, Math.min(this.#options.config().max, this.#pose.scale * factor));
-    this.#animate(
-      scale === 1 ? fit() : this.#bounded(this.#around(scale, this.#stageCenter()), false),
-    );
+    this.#animate(this.#target(scale, this.#stageCenter()));
   }
   reset() {
     if (this.#acquire()) this.#animate(fit());

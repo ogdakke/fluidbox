@@ -271,6 +271,49 @@ test("a wheel during the opening takes over and dismisses", async ({ page }, tes
   await expect(dialog).toHaveCount(0, { timeout: 15_000 });
 });
 
+test("a drag that catches the opening keeps the controls hidden", async ({ page }) => {
+  // ?slow plays the opening at a tenth of its speed, so the drag lands mid-flight.
+  await page.goto("/flight.html?slow");
+  const trigger = page.locator('[data-flight-case="cover"] [data-flight-trigger]');
+  await trigger.scrollIntoViewIfNeeded();
+  await trigger.click();
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  await expect(dialog).toHaveAttribute("data-fluidbox-status", "opening");
+  await page.waitForTimeout(400);
+  const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
+  const box = (await frame.boundingBox())!;
+  const pointer = {
+    pointerId: 12,
+    pointerType: "touch",
+    isPrimary: true,
+    clientX: box.x + box.width / 2,
+  };
+  const y = box.y + box.height / 2;
+  await frame.dispatchEvent("pointerdown", { ...pointer, clientY: y });
+  await frame.dispatchEvent("pointermove", { ...pointer, clientY: y + 40 });
+  await frame.dispatchEvent("pointermove", { ...pointer, clientY: y + 80 });
+  await expect(dialog).toHaveAttribute("data-dragging");
+  // The reveal's animation would outrank the rule that hides the controls in a drag.
+  const revealing = () =>
+    page.evaluate(() =>
+      document
+        .getAnimations()
+        .some(
+          (animation) =>
+            (animation as CSSAnimation).animationName === "fluidbox-gallery-controls-appear",
+        ),
+    );
+  expect(await revealing(), "the reveal stops when the drag takes over").toBe(false);
+  await page.waitForTimeout(600);
+  expect(await revealing()).toBe(false);
+  const close = dialog.locator("[data-fluidbox-close]");
+  // ?slow stretches the fade too.
+  await expect
+    .poll(() => close.evaluate((element) => getComputedStyle(element).opacity), { timeout: 8000 })
+    .toBe("0");
+  await frame.dispatchEvent("pointerup", { ...pointer, clientY: y + 80 });
+});
+
 test("a close after an idle moment still animates", async ({ page }) => {
   const trigger = await prepareCase(page, "cover");
   await trigger.click();

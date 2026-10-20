@@ -72,7 +72,7 @@ Every binding has the same parts with the same names: `Root` holds the items and
 
 ## Add-ons
 
-The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. The framework `Filmstrip` and `Sheet` parts load their entry themselves, and so does `<fluidbox-gallery>` for a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child. With `createFluidbox()`, import the entry once, anywhere in the browser bundle, before you turn the add-on on:
+The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. Turn one on, with an option, a framework part or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child, and the fluidbox loads its entry. An open waits for it. To bundle an entry up front, import it once in the browser bundle:
 
 ```ts
 import "@ogdakke/fluidbox/filmstrip";
@@ -81,7 +81,7 @@ import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
 ```
 
-Turning one on in `createFluidbox()` without its import throws an `Error` that names the import. Each needs its stylesheet, `filmstrip.css` or `sheet.css`, whichever way you turn it on. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
+Each needs its stylesheet, `filmstrip.css` or `sheet.css`, whichever way you turn it on. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
 
 ## Server rendering
 

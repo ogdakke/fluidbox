@@ -71,8 +71,8 @@ Returns a `Fluidbox`. Only `items` is required.
 | `renderers` | `Record<string, FluidboxRenderer<TItem>>`                 | `{}`                                  | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                   |
 | `zoom`      | `false \| { step?: number; max?: number }`                | `{ step: 2, max: 4 }`                 | `step` is the scale of a double-tap or double-click; `max` the largest scale. `false` turns zoom off.                                       |
 | `labels`    | `Partial<FluidboxLabels>`                                 | English                               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                       |
-| `filmstrip` | `boolean \| { render? }`                                  | `false`                               | A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"` and `filmstrip.css`.                                                        |
-| `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and `sheet.css`.                                                           |
+| `filmstrip` | `boolean \| { render? }`                                  | `false`                               | A thumbnail strip. Loads its entry; needs `filmstrip.css`.                                                                                  |
+| `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Loads its entry; needs `sheet.css`.                                                                                 |
 | `origins`   | `FluidboxOriginAdapter<TItem>`                            |                                       | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
 
 To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip` or `sheet`, call `update`. The open viewer stays open. To change the items, call `setItems`. The fluidbox looks up `renderers` by name each time a custom slide mounts, and reads `origins` on each use.
@@ -263,7 +263,7 @@ The default buttons carry `data-fluidbox-previous`, `data-fluidbox-next` and `da
 
 ## Add-ons
 
-The filmstrip and the sheet have their own entries. Import the entry once in the browser bundle, then turn the add-on on with its option:
+The filmstrip and the sheet have their own entries. Turn one on with its option and the fluidbox loads its entry; import the entry to bundle it up front:
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
@@ -284,7 +284,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-Turning one on without its import throws an `Error` that names the import. [Filmstrip and sheet](./filmstrip-and-sheet.md) has every option.
+An open waits for an entry that is still loading. [Filmstrip and sheet](./filmstrip-and-sheet.md) has every option.
 
 ## Patterns
 

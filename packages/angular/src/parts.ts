@@ -68,6 +68,7 @@ export class FluidboxTriggerDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly #element = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly #renderer = inject(Renderer2);
   readonly #changes = inject(ChangeDetectorRef);
+  readonly #zone = inject(NgZone);
   readonly #browser = injectIsBrowser();
   readonly #target = signal<FluidboxTarget<TItem>>(0);
   readonly #returns = signal<readonly FluidboxTarget<TItem>[]>([], { equal: sameKeys });
@@ -117,10 +118,12 @@ export class FluidboxTriggerDirective<TItem extends FluidboxItem = FluidboxItem>
     const element = this.#element.nativeElement;
     const listen = (name: string, handler: (event: PointerEvent & MouseEvent) => void) =>
       this.#cleanup.push(this.#renderer.listen(element, name, handler));
-    listen("pointerdown", (event) => this.#trigger.pointerDown(event));
+    // A press or click can load the viewer, whose listeners stay outside the zone.
+    const outside = (run: () => void) => this.#zone.runOutsideAngular(run);
+    listen("pointerdown", (event) => outside(() => this.#trigger.pointerDown(event)));
     listen("pointerup", () => this.#trigger.pointerUp());
     listen("pointercancel", () => this.#trigger.pointerCancel());
-    listen("click", (event) => this.#trigger.click(event));
+    listen("click", (event) => outside(() => this.#trigger.click(event)));
     if (element.localName === "button" && !element.hasAttribute("type"))
       this.#renderer.setAttribute(element, "type", "button");
     this.#trigger.setElement(element);

@@ -27,7 +27,13 @@ export type {
   FluidboxRevealContext,
   FluidboxStatus,
 } from "./public-api";
-import type { FluidboxOrigin, FluidboxOriginAdapter, FluidboxStatus } from "./public-api";
+import type {
+  Fluidbox,
+  FluidboxControlName,
+  FluidboxOrigin,
+  FluidboxState,
+  FluidboxViewerRenderer,
+} from "./public-api";
 
 export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel";
 
@@ -42,6 +48,8 @@ export interface SessionCommandOptions {
   readonly reason?: SessionReason;
   /** A move that follows a continuous input; see FluidboxCommandOptions. */
   readonly scrub?: boolean;
+  /** The strip asked with `allows` first, so the move skips its before-event. */
+  readonly approved?: boolean;
 }
 
 export type SessionCommandResult =
@@ -50,50 +58,18 @@ export type SessionCommandResult =
   | { readonly status: "prevented" }
   | { readonly status: "aborted" };
 
-export interface SessionState {
-  readonly status: FluidboxStatus;
-  readonly count: number;
-  readonly activeId: FluidboxItemId | null;
-  readonly activeIndex: number | null;
-  readonly requestedId: FluidboxItemId | null;
-  readonly requestedIndex: number | null;
-  readonly canPrevious: boolean;
-  readonly canNext: boolean;
-}
-
-export type SessionEvent =
-  | {
-      readonly type: "open-request" | "change-request";
-      readonly target: SessionTarget;
-      readonly reason: SessionReason;
-    }
-  | { readonly type: "close-request"; readonly reason: SessionReason }
-  | {
-      readonly type: "selection-change" | "selection-settle";
-      readonly id: FluidboxItemId;
-      readonly index: number;
-      readonly reason: SessionChangeReason;
-    }
-  | { readonly type: "status-change"; readonly status: FluidboxStatus };
-
-export interface SessionBeforeCommandEvent {
-  readonly command: "open" | "close" | "goTo" | "next" | "previous";
-  readonly target?: SessionTarget;
-  readonly reason: SessionReason;
-  readonly defaultPrevented: boolean;
-  preventDefault(): void;
-}
-
 export type FluidboxDispose = () => void;
 
 export type { FluidboxRenderContext, FluidboxRenderer } from "./public-api";
 import type { FluidboxRenderer } from "./public-api";
 
-/** Draws the viewer's layer for controls and captions, once. */
-export type FluidboxPortalRenderer = (context: {
-  readonly target: HTMLElement;
-  readonly signal: AbortSignal;
-}) => void | FluidboxDispose;
+/** The viewer's layer for controls and captions: the default buttons, then your viewer content. */
+export interface FluidboxViewerLayer {
+  readonly fluidbox: Fluidbox<any>;
+  readonly controls: readonly FluidboxControlName[];
+  readonly viewer?: FluidboxViewerRenderer<any>;
+  readonly labels: FluidboxLabels;
+}
 
 export type FluidboxThumbnailOverlayBehavior = "host" | "travel";
 
@@ -171,37 +147,47 @@ export interface FluidboxExtension<TItem extends FluidboxItem = FluidboxItem> {
   mount(context: FluidboxExtensionContext<TItem>): FluidboxExtensionInstance<TItem>;
 }
 
-/** What the session needs; the fluidbox gives the driver the rest. */
-export interface SessionOptions<TItem extends FluidboxItem = FluidboxItem> {
-  readonly source: FluidboxSource<TItem>;
-  readonly origins?: FluidboxOriginAdapter;
-  readonly onBeforeCommand?: (event: SessionBeforeCommandEvent) => void;
-  readonly onEvent?: (event: SessionEvent) => void;
-}
-
+/** What the viewer and its add-ons drive the fluidbox with. */
 export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
-  readonly state: SessionState;
-  /** The source the viewer reads, as last given to createFluidbox or setSource. */
-  readonly source: FluidboxSource<TItem>;
-  /** Prepare a closed viewer for a likely open. Dispose to cancel unused work. */
-  prepare(target: SessionTarget): FluidboxDispose;
-  open(target: SessionTarget, options?: SessionCommandOptions): Promise<SessionCommandResult>;
+  readonly state: FluidboxState<TItem>;
   close(options?: SessionCommandOptions): Promise<SessionCommandResult>;
   goTo(target: SessionTarget, options?: SessionCommandOptions): Promise<SessionCommandResult>;
-  /** Fire the before-event for a move to `target` without making it. False when it was prevented. */
-  allows(target: SessionTarget, reason: SessionReason): boolean;
   next(options?: SessionCommandOptions): Promise<SessionCommandResult>;
   previous(options?: SessionCommandOptions): Promise<SessionCommandResult>;
-  setSource(source: FluidboxSource<TItem>): Promise<SessionCommandResult>;
-  registerOrigin(
-    id: FluidboxItemId | readonly FluidboxItemId[],
-    origin: FluidboxOrigin,
-  ): FluidboxDispose;
-  registerThumbnailOverlay(
+  /** Fire the before-event for a move to `target` without making it. False when it was prevented. */
+  allows(target: SessionTarget, reason: SessionReason): boolean;
+  subscribe(listener: (state: FluidboxState<TItem>) => void): FluidboxDispose;
+}
+
+export interface ViewerSessionMotionContext<TItem extends FluidboxItem = FluidboxItem> {
+  readonly item: TItem;
+  readonly index: number;
+  readonly origin: FluidboxOrigin | null;
+  readonly signal: AbortSignal;
+  readonly reason: SessionChangeReason;
+  /** The move follows a continuous input, so the slide jumps rather than glides. */
+  readonly scrub?: boolean;
+}
+
+export interface ViewerSessionCloseContext {
+  readonly origin: FluidboxOrigin | null;
+  readonly signal: AbortSignal;
+  readonly reason: SessionChangeReason;
+}
+
+/** DOM motion and portal ownership: the viewer the fluidbox drives. */
+export interface ViewerSessionDriver<TItem extends FluidboxItem = FluidboxItem> {
+  setSource?(source: FluidboxSource<TItem>): void;
+  prepare?(context: Omit<ViewerSessionMotionContext<TItem>, "signal" | "reason">): FluidboxDispose;
+  open(context: ViewerSessionMotionContext<TItem>): void | boolean | Promise<void | boolean>;
+  select(context: ViewerSessionMotionContext<TItem>): void | Promise<void>;
+  close(context: ViewerSessionCloseContext): void | Promise<void>;
+  registerThumbnailOverlay?(
     id: FluidboxItemId,
     registration: FluidboxThumbnailOverlayRegistration<TItem>,
-  ): FluidboxDispose;
-  subscribe(listener: (state: SessionState) => void): FluidboxDispose;
+  ): void | FluidboxDispose;
+  /** The page may have scrolled to reveal an origin; follow it before the next frame. */
+  revealed?(): void;
   destroy(): void;
 }
 

@@ -1,5 +1,4 @@
 const decodedPreviews = new WeakMap<HTMLImageElement, string>();
-const observedImages = new WeakSet<HTMLImageElement>();
 
 function rememberDecodedPreview(image: HTMLImageElement) {
   const src = image.currentSrc || image.src;
@@ -7,12 +6,13 @@ function rememberDecodedPreview(image: HTMLImageElement) {
   decodedPreviews.set(image, src);
 }
 
+function onLoad(event: Event) {
+  rememberDecodedPreview(event.currentTarget as HTMLImageElement);
+}
+
 /** Retain the last source which the browser confirmed was decoded for an origin image. */
 export function observeDecodedPreview(image: HTMLImageElement) {
   rememberDecodedPreview(image);
-  if (!observedImages.has(image)) {
-    observedImages.add(image);
-    image.addEventListener("load", () => rememberDecodedPreview(image));
-  }
+  image.addEventListener("load", onLoad);
   return decodedPreviews.get(image) ?? null;
 }

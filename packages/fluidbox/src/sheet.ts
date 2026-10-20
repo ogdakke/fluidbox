@@ -324,14 +324,13 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
         this.#reset();
         return;
       }
-      const index = state.requestedIndex ?? state.activeIndex;
+      const index = state.index;
       if (index !== null) this.#renderItem(index);
       // Triggers rendered with the viewer's content arrive after the sheet attached.
       if (state.status === "open") this.#syncTriggers();
     });
     // A sheet added by update() on an open viewer has no state change to wait for.
-    const { requestedIndex, activeIndex } = context.controller.state;
-    const index = requestedIndex ?? activeIndex;
+    const index = context.controller.state.index;
     if (index !== null) this.#renderItem(index);
   }
 

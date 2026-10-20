@@ -4,7 +4,6 @@ import {
   boundDismissVelocity,
   dismissCloseValue,
   dismissRadiusProgress,
-  dismissReturnValue,
   dragDistance,
   FluidboxGestureController,
   type FluidboxDragStart,
@@ -56,12 +55,6 @@ describe("dismiss bounds", () => {
     expect(dismissRadiusProgress(0, 40)).toBe(1);
   });
 
-  test("starts gently and settles within the dismissal window", () => {
-    expect(dismissReturnValue(100, 0, 0, 16)).toBeGreaterThan(90);
-    expect(dismissReturnValue(100, 0, 0, 100)).toBeLessThan(30);
-    expect(Math.abs(dismissReturnValue(100, 0, 0, 220))).toBeLessThan(1);
-  });
-
   test("never crosses the thumbnail target while closing", () => {
     const cases: Array<[number, number, number]> = [
       [100, 0, 0],
@@ -71,7 +64,7 @@ describe("dismiss bounds", () => {
     ];
     for (const [from, to, velocity] of cases) {
       const values = Array.from({ length: 61 }, (_, index) =>
-        dismissCloseValue(from, to, velocity, (220 * index) / 60),
+        dismissCloseValue(from, to, velocity, (220 * index) / 60, 220, 280),
       );
       expect(values.every((value) => value >= Math.min(from, to))).toBe(true);
       expect(values.every((value) => value <= Math.max(from, to))).toBe(true);

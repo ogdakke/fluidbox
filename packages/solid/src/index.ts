@@ -36,18 +36,15 @@ import {
 } from "@ogdakke/fluidbox";
 import {
   controlNames,
-  createDeferredFluidbox,
   createTrigger,
   fluidboxControlIcon,
   fluidboxControls,
   fluidboxEventTypes,
   frameLayerOf,
   latestOrigins,
-  loadAddons,
   resolveLabels,
   targetKeys,
-  type DeferredFluidbox,
-  type FluidboxAddonName,
+  unloadFluidbox,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import type {
@@ -113,11 +110,9 @@ interface SheetRegistration {
 }
 
 interface FluidboxContextValue {
-  readonly deferred: DeferredFluidbox<any>;
+  readonly fluidbox: FluidboxHandle<any>;
   readonly state: Accessor<FluidboxState<any>>;
   readonly items: Accessor<FluidboxItemList<any>>;
-  /** The fluidbox from createFluidbox, once the browser made one. */
-  readonly current: Accessor<FluidboxHandle<any> | null>;
   readonly labels: Accessor<FluidboxLabels>;
   /** The viewer's layer for controls and captions, while the viewer exists. */
   readonly viewerTarget: Accessor<HTMLElement | null>;
@@ -218,29 +213,11 @@ const eventProps = {
 } as const satisfies Record<keyof FluidboxEventMap, keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.Element {
-  const deferred = createDeferredFluidbox<TItem>(untrack(() => props.items));
-  const fluidbox = deferred.fluidbox;
-  const [state, setState] = createSignal(fluidbox.state);
-  const [items, setItems] = createSignal(fluidbox.items, { equals: false });
-  const [current, setCurrent] = createSignal<FluidboxHandle<TItem> | null>(null);
   const [viewerTarget, setViewerTarget] = createSignal<HTMLElement | null>(null);
   const [viewers, setViewers] = createSignal(0);
   const [filmstrip, setFilmstrip] = registry<FilmstripRegistration>();
   const [sheet, setSheet] = registry<SheetRegistration>();
   const labels = createMemo(() => resolveLabels(props.labels));
-  onCleanup(
-    deferred.subscribe(() => {
-      setState(fluidbox.state);
-      setItems(fluidbox.items);
-    }),
-  );
-
-  for (const type of fluidboxEventTypes) {
-    const listener = (event: Event) =>
-      (props[eventProps[type]] as ((event: Event) => void) | undefined)?.(event);
-    fluidbox.addEventListener(type, listener);
-    onCleanup(() => fluidbox.removeEventListener(type, listener));
-  }
 
   // Custom content renders under an owner inside the Provider, so it reaches
   // both the app's context and the fluidbox's.
@@ -258,20 +235,6 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     mounts.add(release);
     return release;
   };
-  // Renderers resolve by key when an item renders, so the newest render
-  // function is used without rebuilding the viewer.
-  const renderers = new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
-    get(_, key) {
-      const renderer = typeof key === "string" ? props.renderers?.[key] : undefined;
-      return renderer
-        ? (((context) =>
-            mount(context.target, () =>
-              renderer({ item: context.item, index: context.index, signal: context.signal }),
-            )) satisfies FluidboxRenderer<TItem>)
-        : undefined;
-    },
-    has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
-  });
 
   const zoom = createMemo(
     () => {
@@ -283,68 +246,67 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
       equals: (a, b) => a === b || (!!a && !!b && a.step === b.step && a.max === b.max),
     },
   );
-  // Each part's render functions stay the same while it is mounted, so the
-  // viewer only remounts an add-on when its options really change.
-  const filmstripOption = createMemo(() => filmstrip()?.option ?? false);
-  const sheetOption = createMemo(() => sheet()?.option ?? false);
-  const addons = () => ({ filmstrip: filmstripOption(), sheet: sheetOption() });
-  // Called again with the newest options until every add-on they turn on has loaded.
-  let live = true;
-  const whenLoaded = (run: (options: ReturnType<typeof addons>) => void) => {
-    const options = untrack(addons);
-    const names: FluidboxAddonName[] = [];
-    if (options.filmstrip) names.push("filmstrip");
-    if (options.sheet) names.push("sheet");
-    const loading = loadAddons(names);
-    if (!loading) run(options);
-    else void loading.then(() => live && whenLoaded(run));
-  };
-  // Stable, so update never redraws the viewer's layer on its account.
-  const viewer = ({ target }: { target: HTMLElement }) => {
-    setViewerTarget(target);
-    return () => setViewerTarget((shown) => (shown === target ? null : shown));
-  };
-  const origins = latestOrigins(() => props.origins);
 
-  // The viewer is made once, in the browser only. Option changes go to update().
-  createEffect(() =>
-    untrack(() =>
-      whenLoaded((options) => {
-        const real = createFluidbox<TItem>({
-          items: fluidbox.items,
-          labels: props.labels,
-          zoom: zoom(),
-          renderers,
-          origins,
-          viewer,
-          ...options,
-        });
-        deferred.attach(real);
-        setCurrent(() => real);
-      }),
-    ),
-  );
-  onCleanup(() => {
-    live = false;
-    const real = untrack(current);
-    if (!real) return;
-    setCurrent(null);
-    deferred.detach();
-    real.destroy();
+  // The fluidbox exists from the start, so parts bind to it as they render. It
+  // touches nothing until a viewer is pressed or opened.
+  const fluidbox = createFluidbox<TItem>({
+    items: untrack(() => props.items),
+    labels: untrack(() => props.labels),
+    zoom: untrack(zoom),
+    // Renderers resolve by key when an item renders, so the newest render
+    // function is used without rebuilding the viewer.
+    renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+      get(_, key) {
+        const renderer = typeof key === "string" ? props.renderers?.[key] : undefined;
+        return renderer
+          ? (((context) =>
+              mount(context.target, () =>
+                renderer({ item: context.item, index: context.index, signal: context.signal }),
+              )) satisfies FluidboxRenderer<TItem>)
+          : undefined;
+      },
+      has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
+    }),
+    origins: latestOrigins(() => props.origins),
+    viewer: ({ target }) => {
+      setViewerTarget(target);
+      return () => setViewerTarget((shown) => (shown === target ? null : shown));
+    },
   });
+  onCleanup(() => unloadFluidbox(fluidbox));
+
+  const [state, setState] = createSignal(fluidbox.state);
+  const [items, setItems] = createSignal(fluidbox.items, { equals: false });
+  onCleanup(
+    fluidbox.subscribe(() => {
+      setState(fluidbox.state);
+      setItems(fluidbox.items);
+    }),
+  );
+  const events = new AbortController();
+  onCleanup(() => events.abort());
+  for (const type of fluidboxEventTypes) {
+    fluidbox.addEventListener(
+      type,
+      (event) => (props[eventProps[type]] as ((event: Event) => void) | undefined)?.(event),
+      { signal: events.signal },
+    );
+  }
+
   createEffect(
     on(
       () => props.labels,
-      (next) => untrack(current)?.update({ labels: next }),
+      (next) => fluidbox.update({ labels: next }),
       { defer: true },
     ),
   );
-  createEffect(on(zoom, (next) => untrack(current)?.update({ zoom: next }), { defer: true }));
-  createEffect(
-    on(addons, () => whenLoaded((options) => untrack(current)?.update(options)), {
-      defer: true,
-    }),
-  );
+  createEffect(on(zoom, (next) => fluidbox.update({ zoom: next }), { defer: true }));
+  // Each part's render functions stay the same while it is mounted, so the
+  // viewer only remounts an add-on when its options really change. Not
+  // deferred: the parts register as Root's children render, before this runs.
+  const filmstripOption = createMemo(() => filmstrip()?.option ?? false);
+  const sheetOption = createMemo(() => sheet()?.option ?? false);
+  createEffect(() => fluidbox.update({ filmstrip: filmstripOption(), sheet: sheetOption() }));
 
   createRenderEffect(
     on(
@@ -355,10 +317,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   );
 
   const value: FluidboxContextValue = {
-    deferred,
+    fluidbox,
     state,
     items,
-    current,
     labels,
     viewerTarget,
     viewers,
@@ -426,7 +387,7 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
     returns: local.returns,
     onPreviewChange: () => setLanding((count) => count + 1),
   });
-  const trigger = createTrigger<TItem>(context.deferred.fluidbox, untrack(options));
+  const trigger = createTrigger<TItem>(context.fluidbox, untrack(options));
   createRenderEffect(() => trigger.update(options()));
   createEffect(on(context.items, () => trigger.refresh(), { defer: true }));
   onCleanup(() => trigger.destroy());
@@ -533,7 +494,7 @@ function action(name: FluidboxControlName) {
             if (event.defaultPrevented) return;
             // Prevented, so the viewer's own handling of the attribute skips it.
             event.preventDefault();
-            void control.run(context.deferred.fluidbox, event);
+            void control.run(context.fluidbox, event);
           },
           get children() {
             return isEmpty() ? defaultIcon(name) : content();
@@ -661,7 +622,7 @@ function ThumbnailOverlay(props: FluidboxThumbnailOverlayProps): JSX.Element {
     if (!host) return;
     onCleanup(
       untrack(() =>
-        context.deferred.fluidbox.bindOverlay(
+        context.fluidbox.bindOverlay(
           host,
           trigger.target(),
           travels
@@ -720,7 +681,7 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
   const context = useFluidboxContext();
   const state = context.state as Accessor<FluidboxState<TItem>>;
   if (selector) return createMemo(() => selector(state()));
-  const fluidbox = context.deferred.fluidbox as FluidboxHandle<TItem>;
+  const fluidbox = context.fluidbox as FluidboxHandle<TItem>;
   return {
     get status() {
       return state().status;
@@ -755,15 +716,19 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
 /** The sheet's stop as a signal, and a command to move it. Needs a Fluidbox.Sheet. */
 export function useFluidboxSheet(): FluidboxSheetApi {
   const context = useFluidboxContext();
+  const { fluidbox } = context;
   const [stop, setStop] = createSignal(0);
-  createEffect(() => setStop(context.current()?.sheet?.stop ?? 0));
-  const fluidbox = context.deferred.fluidbox;
+  // A sheet that loads or goes changes the stop too.
+  createEffect(() => {
+    context.state();
+    setStop(fluidbox.sheet?.stop ?? 0);
+  });
   const listener = (event: FluidboxSheetEvent) => setStop(event.stop);
   fluidbox.addEventListener("sheetchange", listener);
   onCleanup(() => fluidbox.removeEventListener("sheetchange", listener));
   return {
     stop,
-    set: (next, options) => context.current()?.sheet?.set(next, options),
+    set: (next, options) => fluidbox.sheet?.set(next, options),
   };
 }
 

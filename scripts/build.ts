@@ -6,6 +6,7 @@
  */
 import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { transform } from "lightningcss";
 
 const root = resolve(import.meta.dirname, "..");
 const core = resolve(root, "packages/fluidbox");
@@ -20,18 +21,20 @@ async function run(command: string[], cwd: string) {
 
 await run(["bun", "run", "build:core"], core);
 // The stylesheets' comments document them for the CSS reference; consumers get
-// the rules alone.
+// the rules alone, minified for the browsers in apps/docs/content/browser-support.md.
+const major = (version: number) => version << 16;
+const targets = {
+  safari: major(18),
+  ios_saf: major(18),
+  chrome: major(140),
+  android: major(140),
+  edge: major(140),
+  firefox: major(142),
+};
 for (const name of ["styles.css", "filmstrip.css", "sheet.css"]) {
   const path = resolve(core, "dist", name);
-  const css = await readFile(path, "utf8");
-  await writeFile(
-    path,
-    `${css
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/[ \t]+$/gm, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim()}\n`,
-  );
+  const { code } = transform({ filename: name, code: await readFile(path), minify: true, targets });
+  await writeFile(path, code);
 }
 await Promise.all(
   bindings.map((name) => run(["bun", "run", "build"], resolve(root, "packages", name))),

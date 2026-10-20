@@ -23,6 +23,10 @@ export class OriginRegistry {
     this.#adapter = adapter;
   }
 
+  get adapter(): FluidboxOriginAdapter | undefined {
+    return this.#adapter;
+  }
+
   get(id: FluidboxItemId): FluidboxOrigin | null {
     const registered = this.#registrations.get(id);
     if (registered && registered.origin.trigger.isConnected !== false) return registered.origin;

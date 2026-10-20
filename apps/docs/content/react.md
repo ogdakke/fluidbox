@@ -232,4 +232,4 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 
 **Previews update before the close flight.** When the viewer closes on a different item of a multi-item trigger, the trigger re-renders synchronously (`flushSync`) so the flight lands on the right picture. The trigger finds its image when it registers, so keep the `<img>` mounted and change its `src` instead of swapping in a new element.
 
-**Bundle.** The filmstrip and sheet runtimes load when a `Fluidbox.Filmstrip` or `Fluidbox.Sheet` first renders, so they work without an import of their own and cost nothing until then.
+**Bundle.** The page loads the triggers, the items and the viewer's state. The viewer itself, with its gestures, transitions and slides, loads when a trigger is pressed or a viewer first opens. The filmstrip and sheet runtimes load when a `Fluidbox.Filmstrip` or `Fluidbox.Sheet` first renders, so they work without an import of their own and cost nothing until then.

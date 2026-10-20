@@ -34,7 +34,6 @@ import type * as FilmstripEntry from "@ogdakke/fluidbox/filmstrip";
 import type { FluidboxFilmstripOptions } from "@ogdakke/fluidbox/filmstrip";
 import type { FluidboxSheetOptions, FluidboxSheetSnapPoint } from "@ogdakke/fluidbox/sheet";
 import {
-  createDeferredFluidbox,
   createTrigger,
   bindTrigger,
   defaultLabels,
@@ -46,7 +45,7 @@ import {
   itemLabel,
   latestOrigins,
   resolveOrigin,
-  type DeferredFluidbox,
+  unloadFluidbox,
   type FluidboxSlot,
   type FluidboxSlots,
   type FluidboxTrigger,
@@ -334,8 +333,7 @@ void [sheetOptions, filmstripOptions];
 
 // The binding kit.
 
-const deferred: DeferredFluidbox<Photo> = createDeferredFluidbox<Photo>(photos);
-const stand: Fluidbox<Photo> = deferred.fluidbox;
+const stand: Fluidbox<Photo> = createFluidbox<Photo>({ items: photos });
 const trigger: FluidboxTrigger<Photo> = createTrigger(stand, {
   target: "one",
   returns: photos,
@@ -355,9 +353,7 @@ slotRenderer.subscribe(
 )();
 const layer: HTMLElement | undefined = frameLayerOf(button);
 void layer;
-deferred.attach(createFluidbox({ items: photos }));
-deferred.subscribe(() => {})();
-deferred.detach();
+unloadFluidbox(stand);
 const label: string = itemLabel(note);
 const close: Promise<boolean> = fluidboxControls.close.run(stand);
 const disabled: boolean = fluidboxControls.next.disabled(stand.state);

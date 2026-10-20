@@ -1,5 +1,5 @@
 import { hostOf } from "./host";
-import { idOf, indexIn, targetKeys } from "./items";
+import { idOf, idsIn, indexIn, targetKeys } from "./items";
 import type {
   Fluidbox,
   FluidboxItem,
@@ -93,19 +93,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   let preloadTimer: ReturnType<typeof setTimeout> | undefined;
   let lastPreviewId: string | null = null;
 
-  // Indexes name whichever item is there now; ids are looked up as they are.
-  const ids = () => {
-    const list = fluidbox.items;
-    const known: string[] = [];
-    for (const target of targets) {
-      if (typeof target === "string") {
-        if (indexIn(list, target) !== null) known.push(target);
-      } else if (Number.isInteger(target) && target >= 0 && target < list.count) {
-        known.push(idOf(list.get(target)));
-      }
-    }
-    return [...new Set(known)];
-  };
+  const ids = () => idsIn(fluidbox.items, targets);
   const register = () => {
     const known = element ? ids() : [];
     const key = element && known.length ? known.join("\u0000") : "";
@@ -176,7 +164,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       if (event.defaultPrevented || !event.isPrimary || event.button !== 0) return;
       discardPreload();
       const target = openTarget();
-      if (target !== undefined) preload = host.preload(target);
+      if (target !== undefined) preload = fluidbox.preload(target as FluidboxTarget<TItem>);
     },
     pointerUp() {
       clearTimeout(preloadTimer);

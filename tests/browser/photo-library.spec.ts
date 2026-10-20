@@ -907,10 +907,10 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
     // The fade is a CSS animation that starts with the reveal attribute, and
     // a stalled frame can play it out unseen, so pause it in that same task.
     new MutationObserver(() => {
-      if (document.querySelector("[data-chrome-revealing]")) window.__motion.freeze();
+      if (document.querySelector("[data-revealing]")) window.__motion.freeze();
     }).observe(document.body, {
       attributes: true,
-      attributeFilter: ["data-chrome-revealing"],
+      attributeFilter: ["data-revealing"],
       subtree: true,
     });
   });

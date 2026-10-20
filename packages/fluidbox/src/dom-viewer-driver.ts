@@ -1,6 +1,7 @@
+import { drawViewerLayer } from "./viewer-layer";
 import { idOf } from "./items";
 import { chromeReach } from "./chrome-reach";
-import { originIsVisible } from "./origin-geometry";
+import { visibleOrigin } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
 import {
   backdropVisibility,
@@ -18,6 +19,7 @@ import {
   openImageTransitionPose,
   originTransitionPose,
   readImageTransitionPose,
+  type ImageTransitionMotion,
   type ImageTransitionPose,
 } from "./image-transition-motion";
 import type {
@@ -28,7 +30,7 @@ import type {
   FluidboxItem,
   FluidboxItemId,
   FluidboxOrigin,
-  FluidboxPortalRenderer,
+  FluidboxViewerLayer,
   FluidboxRenderer,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
@@ -39,8 +41,7 @@ import type {
   ViewerSessionCloseContext,
   ViewerSessionDriver,
   ViewerSessionMotionContext,
-} from "./viewer-session";
-import { viewerSelectionCommandOptions } from "./viewer-session";
+} from "./runtime-types";
 import {
   createViewerPortal,
   ViewerModalIsolation,
@@ -49,10 +50,10 @@ import {
 import type { FluidboxLabels } from "./labels";
 import { ViewerStrip } from "./viewer-strip";
 import { activeViewer } from "./viewer-ownership";
-import { handoffDecodedFlightImage } from "./flight-image";
-import { mapRadii, mixInsets } from "./transition-geometry";
+import { mapRadii, mixInsets, type ImageClip } from "./transition-geometry";
 import { originPose, originPicture } from "./origin-pose";
-import { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
+import type { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
+import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 
 const OPEN_DURATION = 300;
 const TOUCH_DISMISS_DISTANCE = 60;
@@ -87,7 +88,7 @@ interface PreparedOpen<TItem extends FluidboxItem> {
   readonly picture: HTMLElement | null;
   readonly animations: Animation[];
   readonly start: PaintedPose & { readonly fromOrigin: boolean };
-  readonly motion: ReturnType<typeof createImageTransitionMotion>;
+  readonly motion: ImageTransitionMotion;
 }
 
 function finitePose(pose: PaintedPose) {
@@ -126,7 +127,9 @@ export class DomViewerDriver<
 > implements ViewerSessionDriver<TItem> {
   readonly #portal: ViewerPortalElements;
   readonly #isolation: ViewerModalIsolation;
-  readonly #thumbnailOverlays: ThumbnailOverlayRuntime<TItem>;
+  /** Loaded with the first overlay, so a viewer without overlays never loads it. */
+  #thumbnailOverlays: ThumbnailOverlayRuntime<TItem> | undefined;
+  #overlaysLoad: Promise<unknown> | undefined;
   readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
   readonly #viewerOwner = {
     closeImmediately: () => {
@@ -159,7 +162,6 @@ export class DomViewerDriver<
   #flightMedia: HTMLElement | undefined;
   #flightSource: HTMLElement | undefined;
   #flightSourceFrame: HTMLElement | undefined;
-  #closeCrossfade = false;
   #crossfadeThumbnail: HTMLElement | undefined;
   #flightMarker: Comment | undefined;
   #preparedFlight:
@@ -167,10 +169,8 @@ export class DomViewerDriver<
     | undefined;
   #flightOrigin = { x: 0, y: 0, width: 0, height: 0 };
   #flightViewerOrigin = { x: 0, y: 0 };
-  #closeStart: ImageTransitionPose | undefined;
-  #closeTargetOrigin: HTMLElement | null = null;
-  #closeTargetPicture: HTMLElement | null = null;
-  #closeDuration = 0;
+  /** Aims the closing flight at where its origin is now. */
+  #retargetClose: (() => void) | undefined;
   #closeOriginObserver: ResizeObserver | undefined;
   #mediaObserver: ResizeObserver | undefined;
   #observedMedia: HTMLElement | undefined;
@@ -214,9 +214,8 @@ export class DomViewerDriver<
     labels: FluidboxLabels,
   ) {
     this.#labels = labels;
-    this.#portal = createViewerPortal(ownerDocument, { label: labels.viewer });
+    this.#portal = createViewerPortal(ownerDocument, labels.viewer);
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
-    this.#thumbnailOverlays = new ThumbnailOverlayRuntime(ownerDocument);
     this.#renderers = renderers ?? {};
     this.#portal.dialog.dataset.fluidboxHeadless = "";
     this.#portal.container.addEventListener(
@@ -245,26 +244,18 @@ export class DomViewerDriver<
       },
       { signal: this.#lifetime.signal },
     );
-    this.#portal.container.addEventListener("pointerdown", this.#onPointerDown, {
-      passive: true,
-      signal: this.#lifetime.signal,
-    });
-    this.#portal.container.addEventListener("pointermove", this.#onPointerMove, {
-      passive: false,
-      signal: this.#lifetime.signal,
-    });
-    this.#portal.container.addEventListener("pointerup", this.#onPointerEnd, {
-      passive: true,
-      signal: this.#lifetime.signal,
-    });
-    this.#portal.container.addEventListener("pointercancel", this.#onPointerCancel, {
-      passive: true,
-      signal: this.#lifetime.signal,
-    });
-    this.#portal.container.addEventListener("wheel", this.#onWheel, {
-      passive: false,
-      signal: this.#lifetime.signal,
-    });
+    for (const [type, listener, passive] of [
+      ["pointerdown", this.#onPointerDown, true],
+      ["pointermove", this.#onPointerMove, false],
+      ["pointerup", this.#onPointerEnd, true],
+      ["pointercancel", this.#onPointerEnd, true],
+      ["wheel", this.#onWheel, false],
+    ] as const) {
+      this.#portal.container.addEventListener(type, listener as EventListener, {
+        passive,
+        signal: this.#lifetime.signal,
+      });
+    }
     ownerDocument.addEventListener("keydown", this.#onKeydown, {
       capture: true,
       signal: this.#lifetime.signal,
@@ -302,7 +293,7 @@ export class DomViewerDriver<
     this.#strip?.relabel();
     for (const extension of this.#extensions) extension.relabel?.();
     const controller = this.#controller;
-    const index = controller?.state.requestedIndex ?? controller?.state.activeIndex ?? null;
+    const index = controller?.state.index ?? null;
     if (index !== null && this.#source && index < this.#source.count) {
       this.#render(this.#source.getItem(index), index);
     } else {
@@ -311,10 +302,11 @@ export class DomViewerDriver<
   }
 
   /** Draw the portal layer again, as after its controls or content changed. */
-  setPortal(renderer: FluidboxPortalRenderer | undefined) {
+  setPortal(layer: FluidboxViewerLayer | undefined) {
     this.#portalDispose?.();
-    this.#portalDispose =
-      renderer?.({ target: this.#portal.portalTarget, signal: this.#lifetime.signal }) ?? undefined;
+    this.#portalDispose = layer
+      ? drawViewerLayer(layer, this.#portal.portalTarget, this.#lifetime.signal)
+      : undefined;
   }
 
   /** Replace the extensions, as when the filmstrip or the sheet is turned on, off or changed. */
@@ -351,8 +343,7 @@ export class DomViewerDriver<
     if (!this.#zoomOptions || this.#destroyed) return undefined;
     if (this.#zoom) return this.#zoom;
     this.#zoomLoad ??= import("./fluidbox-zoom").then(({ FluidboxZoom }) => {
-      if (this.#destroyed) return undefined;
-      if (!this.#zoomOptions) return undefined;
+      if (this.#destroyed || !this.#zoomOptions) return undefined;
       const labels = this.#labels;
       return (this.#zoom = new FluidboxZoom(this.#portal.container, {
         prepare: () => this.#prepareZoom(),
@@ -377,7 +368,7 @@ export class DomViewerDriver<
           }
         },
         close: () => void this.#controller?.close({ reason: "pointer" }),
-        reducedMotion: () => matchMedia("(prefers-reduced-motion: reduce)").matches,
+        reducedMotion: () => this.#prefersReducedMotion(),
       }));
     });
     return this.#zoomLoad;
@@ -385,7 +376,7 @@ export class DomViewerDriver<
 
   connect(
     controller: SessionController<TItem>,
-    renderer?: FluidboxPortalRenderer,
+    renderer?: FluidboxViewerLayer,
     extensions: readonly (FluidboxExtension<TItem> | undefined)[] = [],
   ) {
     this.#controller = controller;
@@ -408,11 +399,8 @@ export class DomViewerDriver<
       source,
       (index, settled) => {
         const controller = this.#controller;
-        if (
-          controller?.state.status === "open" &&
-          (controller.state.requestedIndex !== index || settled)
-        ) {
-          void controller.goTo({ index }, viewerSelectionCommandOptions("pointer", settled));
+        if (controller?.state.status === "open" && (controller.state.index !== index || settled)) {
+          void controller.goTo({ index }, { reason: "pointer", scrub: !settled, approved: true });
         }
       },
       (index) => {
@@ -434,7 +422,28 @@ export class DomViewerDriver<
     id: FluidboxItemId,
     registration: FluidboxThumbnailOverlayRegistration<TItem>,
   ) {
-    return this.#thumbnailOverlays.register(id, registration);
+    if (this.#thumbnailOverlays) return this.#thumbnailOverlays.register(id, registration);
+    // Until the runtime is here, the overlay shows its resting state.
+    publishOverlayPhase(registration.element, "idle", 1);
+    const ownerDocument = this.#portal.overlay.ownerDocument;
+    this.#overlaysLoad ??= import("./thumbnail-overlay-runtime").then(
+      ({ ThumbnailOverlayRuntime }) => {
+        if (!this.#destroyed) this.#thumbnailOverlays = new ThumbnailOverlayRuntime(ownerDocument);
+      },
+      () => {
+        this.#overlaysLoad = undefined;
+      },
+    );
+    let released = false;
+    let dispose: FluidboxDispose | undefined;
+    void this.#overlaysLoad.then(() => {
+      if (!released) dispose = this.#thumbnailOverlays?.register(id, registration);
+    });
+    return () => {
+      released = true;
+      if (dispose) dispose();
+      else resetOverlayPhase(registration.element);
+    };
   }
 
   prepare(context: Omit<ViewerSessionMotionContext<TItem>, "signal" | "reason">) {
@@ -442,11 +451,7 @@ export class DomViewerDriver<
     if (this.#destroyed || this.#controller?.state.status !== "closed" || activeViewer.active) {
       return () => {};
     }
-    const view = this.#portal.overlay.ownerDocument.defaultView!;
-    this.#viewportWidth = view.innerWidth;
-    this.#sizeContainer(view);
-    this.#applyTheme(context.origin?.trigger ?? null);
-    this.#syncPageHeight();
+    this.#stage(context.origin?.trigger ?? null);
     void this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
     this.#render(context.item, context.index);
@@ -455,32 +460,17 @@ export class DomViewerDriver<
     this.#strip?.mount();
     for (const extension of this.#extensions) extension.attach?.();
 
-    const origin = context.origin?.visual;
-    const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const crossfade = !!from && !originMatchesItem(context.origin, context.item);
-    const picture = this.#originPicture(from, context.origin, crossfade);
-    if (picture instanceof HTMLVideoElement) this.#strip?.continueVideo(context.index, picture);
-    const start = this.#openingStart(from, picture, undefined, crossfade);
-    const motion = this.#openingMotion(start, start.fromOrigin, undefined, crossfade);
-    this.#applyMediaPose(this.#frame, this.#media, start);
-    this.#frame.style.opacity = start.frameOpacity;
-    this.#portal.backdrop.style.opacity = start.backdropOpacity;
-    const animations = this.#openingAnimations(motion);
+    const plan = this.#plan(context);
+    this.#applyMediaPose(this.#frame, this.#media, plan.start);
+    this.#frame.style.opacity = plan.start.frameOpacity;
+    this.#portal.backdrop.style.opacity = plan.start.backdropOpacity;
+    const animations = this.#animatePose(plan.motion);
     for (const animation of animations) {
       animation.pause();
       animation.currentTime = 0;
     }
     const token = {};
-    this.#preparedOpen = {
-      token,
-      item: context.item,
-      index: context.index,
-      origin: from,
-      picture,
-      animations,
-      start,
-      motion,
-    };
+    this.#preparedOpen = { ...plan, token, item: context.item, index: context.index, animations };
     return () => {
       if (this.#preparedOpen?.token === token) this.#discardPreparation();
     };
@@ -491,6 +481,11 @@ export class DomViewerDriver<
     // opening's first frame is ready to cover it, or the card blinks empty.
     this.#keepThumbnailVisible(context.origin?.thumbnail);
     this.#preparedFlight = undefined;
+    // An overlay registered just before the open still travels with it.
+    if (this.#overlaysLoad && !this.#thumbnailOverlays) {
+      await this.#overlaysLoad;
+      if (context.signal.aborted) return;
+    }
     const previous = activeViewer.claim(this.#viewerOwner);
     if (previous && !previous.closeImmediately()) {
       activeViewer.claim(previous);
@@ -508,12 +503,8 @@ export class DomViewerDriver<
         : undefined;
     if (!prepared) this.#discardPreparation();
     else this.#preparedOpen = undefined;
-    const view = this.#portal.overlay.ownerDocument.defaultView!;
-    this.#viewportWidth = view.innerWidth;
-    this.#sizeContainer(view);
     const focused = this.#portal.overlay.ownerDocument.activeElement;
-    this.#applyTheme(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
-    this.#syncPageHeight();
+    this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
       await this.#strip?.select(context.index, false);
       this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
@@ -541,7 +532,7 @@ export class DomViewerDriver<
       for (const animation of prepared?.animations ?? []) animation.cancel();
       this.#takeInterruptedPose();
       this.#clearMotionStyles();
-      this.#thumbnailOverlays.prepare(context.item, context.index, this.#frame, "open", 0);
+      this.#thumbnailOverlays?.prepare(context.item, context.index, this.#frame, "open", 0);
       this.#strip?.completeOpening(context.index);
       delete this.#portal.overlay.dataset.fluidboxPrepared;
       this.#setState("open");
@@ -550,30 +541,17 @@ export class DomViewerDriver<
     }
 
     const interruptedPose = this.#takeInterruptedPose(false);
-    const origin = context.origin?.visual;
-    const from =
-      prepared?.origin ?? (origin && origin.isConnected && originIsVisible(origin) ? origin : null);
-    const crossfade = !!from && !originMatchesItem(context.origin, context.item);
-    const picture = prepared
-      ? prepared.picture
-      : this.#originPicture(from, context.origin, crossfade);
-    this.#activeOrigin = from;
+    const { origin, picture, crossfade, start, motion } = this.#plan(
+      context,
+      interruptedPose,
+      prepared,
+    );
+    this.#activeOrigin = origin;
     this.#activePicture = picture;
-    if (!prepared && picture instanceof HTMLVideoElement) {
-      this.#strip?.continueVideo(context.index, picture);
-    }
     const keptThumbnail = context.origin?.thumbnail;
     if (crossfade) this.#keepThumbnailVisible(keptThumbnail);
-    const start =
-      prepared && !interruptedPose
-        ? prepared.start
-        : this.#openingStart(from, picture, interruptedPose, crossfade);
-    const motion =
-      prepared && !interruptedPose
-        ? prepared.motion
-        : this.#openingMotion(start, start.fromOrigin, interruptedPose, crossfade);
-    const overlayFrom = interruptedPose ? this.#thumbnailOverlays.currentProgress(1) : 1;
-    this.#thumbnailOverlays.prepare(
+    const overlayFrom = interruptedPose ? (this.#thumbnailOverlays?.currentProgress(1) ?? 1) : 1;
+    this.#thumbnailOverlays?.prepare(
       context.item,
       context.index,
       this.#frame,
@@ -582,58 +560,46 @@ export class DomViewerDriver<
     );
     const controlsReady = motion.backdrop.find((keyframe) => Number(keyframe.opacity) >= 0.85);
     const controlsRevealDelay = Number(controlsReady?.offset ?? 0.7) * motion.duration;
-    const controlsReveal = this.#thumbnailOverlays.prepareControlsReveal(controlsRevealDelay);
+    const controlsReveal = this.#thumbnailOverlays?.prepareControlsReveal(controlsRevealDelay);
     this.#applyMediaPose(this.#frame, this.#media, start);
     this.#frame.style.opacity = interruptedPose?.frameOpacity ?? start.frameOpacity;
     this.#portal.backdrop.style.opacity = interruptedPose?.backdropOpacity ?? "0";
-    const animations = [
-      ...(prepared && !interruptedPose ? prepared.animations : this.#openingAnimations(motion)),
-      ...this.#thumbnailOverlays.animations(
-        motion.frame,
-        motion.progress,
-        motion.duration,
-        overlayFrom,
-        0,
-      ),
-    ];
-    if (this.#portal.dialog.hasAttribute("data-gallery")) {
-      this.#portal.dialog.style.setProperty(
-        "--fluidbox-gallery-controls-reveal-delay",
-        `${controlsRevealDelay}ms`,
-      );
-      this.#portal.dialog.dataset.galleryControlsRevealing = "";
-    }
-    this.#portal.dialog.style.setProperty(
-      "--fluidbox-chrome-reveal-delay",
-      `${controlsRevealDelay}ms`,
+    this.#portal.dialog.style.setProperty("--fluidbox-reveal-delay", `${controlsRevealDelay}ms`);
+    this.#portal.dialog.dataset.revealing = "";
+    const animations = this.#fly(
+      motion,
+      overlayFrom,
+      0,
+      prepared && !interruptedPose ? prepared.animations : this.#animatePose(motion),
     );
-    this.#portal.dialog.dataset.chromeRevealing = "";
-    this.#synchronizeStart(animations);
     delete this.#portal.overlay.dataset.fluidboxPrepared;
     // Safari can paint a freshly shown image a frame late. The opening starts
     // exactly over the card, so the card stays painted underneath until the
     // overlay has been presented once.
-    if (!crossfade) this.#releaseThumbnailAfterFirstFrame(keptThumbnail, context.signal);
-    if (!keptThumbnail) this.#releaseThumbnailAfterFirstFrame(undefined, context.signal);
+    if (!crossfade || !keptThumbnail) {
+      this.#releaseThumbnailAfterFirstFrame(crossfade ? undefined : keptThumbnail, context.signal);
+    }
     await this.#play(animations, context.signal, () =>
-      this.#thumbnailOverlays.set("opening", 0, new DOMMatrix()),
+      this.#thumbnailOverlays?.set("opening", 0, new DOMMatrix()),
     );
     if (context.signal.aborted) return;
-    await Promise.all([
-      this.#waitForGalleryControlsReveal(context.signal),
-      this.#waitForChromeReveal(context.signal),
-      this.#waitForAnimation(controlsReveal, context.signal),
-    ]);
+    const reveals = this.#portal.dialog
+      .getAnimations({ subtree: true })
+      .filter(
+        (animation) =>
+          (animation as CSSAnimation).animationName === "fluidbox-gallery-controls-appear",
+      );
+    await Promise.all(
+      [...reveals, controlsReveal].map((animation) =>
+        this.#waitForAnimation(animation, context.signal),
+      ),
+    );
     if (context.signal.aborted) return;
     this.#setState("open");
     this.#strip?.completeOpening(context.index);
     // A gesture that interrupted the opening owns the overlays until it settles.
-    if (!this.#dragGesture.active) this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
-    this.#thumbnailOverlays.finishControlsReveal();
-    delete this.#portal.dialog.dataset.galleryControlsRevealing;
-    this.#portal.dialog.style.removeProperty("--fluidbox-gallery-controls-reveal-delay");
-    delete this.#portal.dialog.dataset.chromeRevealing;
-    this.#portal.dialog.style.removeProperty("--fluidbox-chrome-reveal-delay");
+    if (!this.#dragGesture.active) this.#thumbnailOverlays?.set("open", 0, new DOMMatrix());
+    this.#endReveal();
     this.#focusUnlessInside();
   }
 
@@ -643,8 +609,7 @@ export class DomViewerDriver<
     this.#zoom?.suspend();
     void this.#loadZoom();
     this.#takeInterruptedPose();
-    const origin = context.origin?.visual;
-    this.#activeOrigin = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    this.#activeOrigin = visibleOrigin(context.origin?.visual);
     this.#activePicture = this.#originPicture(
       this.#activeOrigin,
       context.origin,
@@ -665,7 +630,6 @@ export class DomViewerDriver<
     // during native scrolling can invalidate the browser's painted snap.
     // A scrub is a direct preview. The full-size image swaps immediately
     // while native scrolling continues under the user's finger.
-    if (selected || context.scrub) return;
   }
 
   async close(context: ViewerSessionCloseContext) {
@@ -696,27 +660,20 @@ export class DomViewerDriver<
       this.#finishClose();
       return;
     }
-    const origin = context.origin?.visual;
-    const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
+    const from = visibleOrigin(context.origin?.visual);
     const closing = this.#strip?.activeItem;
-    this.#closeCrossfade = !!from && !!closing && !originMatchesItem(context.origin, closing);
-    const picture = this.#originPicture(from, context.origin, this.#closeCrossfade);
+    const crossfade = !!from && !!closing && !originMatchesItem(context.origin, closing);
+    const picture = this.#originPicture(from, context.origin, crossfade);
     if (picture instanceof HTMLVideoElement) this.#handBackVideo(picture);
-    this.#keepThumbnailVisible(this.#closeCrossfade ? context.origin?.thumbnail : undefined);
+    this.#keepThumbnailVisible(crossfade ? context.origin?.thumbnail : undefined);
     const start = interruptedPose ?? {
       ...readImageTransitionPose(this.#frame, this.#media),
       frameOpacity: "1",
       backdropOpacity: getComputedStyle(this.#portal.backdrop).opacity,
     };
-    const originTarget = from
-      ? originTransitionPose(from, picture, this.#frame, this.#media, start)
-      : null;
-    let target = originTarget ?? {
-      transform: new DOMMatrix(start.transform.toString())
-        .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
-        .scale(0.96),
-      clip: start.clip,
-    };
+    const originTarget = from ? originTransitionPose(from, picture, this.#media, start) : null;
+    let target =
+      originTarget ?? this.#shrunk(start.clip, new DOMMatrix(start.transform.toString()));
     const travel = Math.max(
       Math.abs(target.transform.e - start.transform.e),
       Math.abs(target.transform.f - start.transform.f),
@@ -743,15 +700,17 @@ export class DomViewerDriver<
       media = flight.media;
       target = flight.target;
       if (media !== source) {
-        const handedOff = await handoffDecodedFlightImage(
-          source,
-          media as HTMLImageElement,
-          () => !context.signal.aborted,
-          prepared?.ready.then(async (decoded) => {
-            if (!decoded) await (media as HTMLImageElement).decode();
-          }),
-        );
-        if (!handedOff) return this.#removeFlight();
+        // Keep the painted source visible until its flight clone can replace it.
+        const image = media as HTMLImageElement;
+        await (
+          prepared
+            ? prepared.ready.then(async (decoded) => {
+                if (!decoded) await image.decode();
+              })
+            : image.decode()
+        ).catch(() => {});
+        if (context.signal.aborted) return this.#removeFlight();
+        source.dataset.fluidboxFlightSourceHidden = "";
         this.#flightSourceFrame?.setAttribute("data-fluidbox-flight-source-hidden", "");
         this.#flight?.style.removeProperty("visibility");
       }
@@ -760,27 +719,40 @@ export class DomViewerDriver<
     } else {
       this.#preparedFlight = undefined;
     }
-    this.#closeStart = start;
-    this.#closeTargetOrigin = originTarget ? from : null;
-    this.#closeTargetPicture = picture;
-    this.#closeDuration = duration;
-    const motion = createImageTransitionMotion({
-      opening: false,
-      from: start,
-      to: target,
-      width: this.#media.offsetWidth,
-      height: this.#media.offsetHeight,
-      backdropFrom: Number(start.backdropOpacity),
-      backdropTo: 0,
-      duration,
-      response: duration * 0.9,
-      samples: 60,
-      fadeFrame: !originTarget,
-      crossfade: this.#closeCrossfade,
-    });
-    const overlayFrom = this.#thumbnailOverlays.currentProgress(0);
+    const closeMotion = (to: ImageTransitionPose, width: number, height: number) =>
+      createImageTransitionMotion({
+        opening: false,
+        from: start,
+        to,
+        width,
+        height,
+        backdropFrom: Number(start.backdropOpacity),
+        duration,
+        response: duration * 0.9,
+        samples: 60,
+        fadeFrame: !originTarget,
+        crossfade,
+      });
+    const motion = closeMotion(target, this.#media.offsetWidth, this.#media.offsetHeight);
+    this.#retargetClose =
+      from && originTarget
+        ? () => {
+            const media = this.#flightMedia;
+            if (!media || this.#animations.length < 3) return;
+            const target = this.#flightTargetPose(from, picture, media);
+            if (!target) return;
+            const motion = closeMotion(target, media.offsetWidth, media.offsetHeight);
+            const keyframes = [motion.frame, motion.image, motion.radius];
+            for (const [index, frames] of keyframes.entries()) {
+              const effect = this.#animations[index]!.effect;
+              if (effect instanceof KeyframeEffect) effect.setKeyframes(frames);
+            }
+            this.#thumbnailOverlays?.retarget(this.#animations, motion.frame);
+          }
+        : undefined;
+    const overlayFrom = this.#thumbnailOverlays?.currentProgress(0) ?? 0;
     if (this.#strip) {
-      this.#thumbnailOverlays.prepare(
+      this.#thumbnailOverlays?.prepare(
         this.#strip.activeItem,
         this.#strip.index,
         frame,
@@ -793,12 +765,8 @@ export class DomViewerDriver<
     const cover = originTarget
       ? frame.querySelector<HTMLImageElement>(":scope > [data-fluidbox-media-cover][src]")
       : null;
-    const animations = [
-      frame.animate(motion.frame, this.#motionOptions(motion.duration)),
-      media.animate(motion.image, this.#motionOptions(motion.duration)),
-      frame.animate(motion.radius, this.#motionOptions(motion.duration)),
-      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
-      ...this.#animateFallbacks(frame, motion.image, motion.duration),
+    const animations = this.#fly(motion, overlayFrom, 1, [
+      ...this.#animatePose(motion, frame, media),
       ...(cover
         ? [
             cover.animate([{ opacity: getComputedStyle(cover).opacity }, { opacity: 1 }], {
@@ -808,17 +776,9 @@ export class DomViewerDriver<
             }),
           ]
         : []),
-      ...this.#thumbnailOverlays.animations(
-        motion.frame,
-        motion.progress,
-        motion.duration,
-        overlayFrom,
-        1,
-      ),
-    ];
-    this.#synchronizeStart(animations);
+    ]);
     await this.#play(animations, context.signal, () =>
-      this.#thumbnailOverlays.set("closing", 1, target.transform),
+      this.#thumbnailOverlays?.set("closing", 1, target.transform),
     );
     if (context.signal.aborted) return;
     this.#finishClose();
@@ -839,7 +799,7 @@ export class DomViewerDriver<
     this.#mediaObserver = undefined;
     this.#observedMedia = undefined;
     this.#discardPreparation();
-    this.#thumbnailOverlays.destroy();
+    this.#thumbnailOverlays?.destroy();
     this.#cancelAnimations(false);
     this.#portalDispose?.();
     this.#portalDispose = undefined;
@@ -859,8 +819,7 @@ export class DomViewerDriver<
   }
 
   #render(item: TItem, index: number) {
-    const media = item;
-    const label = media.type === "img" ? media.alt : media.title;
+    const label = item.type === "img" ? item.alt : item.title;
     this.#portal.dialog.setAttribute("aria-label", label || this.#labels.viewer);
     this.#portal.status.textContent = this.#labels.position(
       index,
@@ -902,7 +861,7 @@ export class DomViewerDriver<
       delete this.#crossfadeThumbnail.dataset.fluidboxThumbnailCrossfade;
     this.#crossfadeThumbnail = thumbnail;
     if (thumbnail) thumbnail.dataset.fluidboxThumbnailCrossfade = "";
-    else this.#thumbnailOverlays.releaseGhost();
+    else this.#thumbnailOverlays?.releaseGhost();
   }
 
   #releaseThumbnailAfterFirstFrame(thumbnail: HTMLElement | undefined, signal: AbortSignal) {
@@ -911,7 +870,7 @@ export class DomViewerDriver<
       view.requestAnimationFrame(() => {
         if (!signal.aborted && this.#crossfadeThumbnail === thumbnail) {
           this.#keepThumbnailVisible(undefined);
-          this.#thumbnailOverlays.releaseGhost();
+          this.#thumbnailOverlays?.releaseGhost();
         }
       }),
     );
@@ -946,17 +905,40 @@ export class DomViewerDriver<
     return originPicture(from);
   }
 
+  /**
+   * Where an opening starts and how it moves. A prepared opening keeps its own
+   * plan, unless the opening takes over a motion that was interrupted.
+   */
+  #plan(
+    context: Omit<ViewerSessionMotionContext<TItem>, "signal" | "reason">,
+    interrupted?: PaintedPose,
+    prepared?: PreparedOpen<TItem>,
+  ) {
+    const origin = prepared?.origin ?? visibleOrigin(context.origin?.visual);
+    const crossfade = !!origin && !originMatchesItem(context.origin, context.item);
+    const picture = prepared
+      ? prepared.picture
+      : this.#originPicture(origin, context.origin, crossfade);
+    if (!prepared && picture instanceof HTMLVideoElement) {
+      this.#strip?.continueVideo(context.index, picture);
+    }
+    if (prepared && !interrupted) {
+      return { origin, picture, crossfade, start: prepared.start, motion: prepared.motion };
+    }
+    const start = interrupted
+      ? { ...interrupted, fromOrigin: true }
+      : this.#openingStart(origin, picture, crossfade);
+    const motion = this.#openingMotion(start, crossfade && !interrupted);
+    return { origin, picture, crossfade, start, motion };
+  }
+
   #openingStart(
     from: HTMLElement | null,
     picture: HTMLElement | null,
-    interrupted?: PaintedPose,
-    crossfade = false,
+    crossfade: boolean,
   ): PaintedPose & { readonly fromOrigin: boolean } {
-    if (interrupted) return { ...interrupted, fromOrigin: true };
     const openPose = openImageTransitionPose();
-    const pose = from
-      ? originTransitionPose(from, picture, this.#frame, this.#media, openPose)
-      : null;
+    const pose = from ? originTransitionPose(from, picture, this.#media, openPose) : null;
     if (pose) {
       return {
         ...pose,
@@ -966,22 +948,24 @@ export class DomViewerDriver<
       };
     }
     return {
-      transform: new DOMMatrix()
-        .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
-        .scale(0.96),
-      clip: openPose.clip,
+      ...this.#shrunk(openPose.clip),
       frameOpacity: "0",
       backdropOpacity: "0",
       fromOrigin: false,
     };
   }
 
-  #openingMotion(
-    start: PaintedPose,
-    hasOrigin: boolean,
-    interrupted?: PaintedPose,
-    crossfade = false,
-  ) {
+  /** Where a motion without an origin starts or ends: the media a little smaller, in place. */
+  #shrunk(clip: ImageClip, from = new DOMMatrix()) {
+    return {
+      transform: from
+        .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
+        .scale(0.96),
+      clip,
+    };
+  }
+
+  #openingMotion(start: PaintedPose & { readonly fromOrigin: boolean }, crossfade: boolean) {
     const response = matchMedia("(hover: none) and (pointer: coarse)").matches
       ? TOUCH_OPENING_SPRING_RESPONSE
       : OPENING_SPRING_RESPONSE;
@@ -992,23 +976,44 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: Number(start.backdropOpacity),
-      backdropTo: 1,
       duration: OPEN_DURATION,
       response,
       samples: 24,
-      fadeFrame: !hasOrigin && !interrupted,
-      crossfade: crossfade && !interrupted,
+      fadeFrame: !start.fromOrigin,
+      crossfade,
     });
   }
 
-  #openingAnimations(motion: ReturnType<typeof createImageTransitionMotion>) {
+  /** Play a motion on the media, its frame and the backdrop. */
+  #animatePose(motion: ImageTransitionMotion, frame = this.#frame, media = this.#media) {
+    const options: KeyframeAnimationOptions = {
+      duration: motion.duration,
+      easing: "linear",
+      fill: "both",
+    };
     return [
-      this.#frame.animate(motion.frame, this.#motionOptions(motion.duration)),
-      this.#media.animate(motion.image, this.#motionOptions(motion.duration)),
-      this.#frame.animate(motion.radius, this.#motionOptions(motion.duration)),
-      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(motion.duration)),
-      ...this.#animateFallbacks(this.#frame, motion.image, motion.duration),
+      frame.animate(motion.frame, options),
+      media.animate(motion.image, options),
+      frame.animate(motion.radius, options),
+      this.#portal.backdrop.animate(motion.backdrop, options),
+      ...Array.from(this.#fallbackLayers(frame), (layer) => layer.animate(motion.image, options)),
     ];
+  }
+
+  /** Start a motion's animations with the travelling overlays', from one progress to another. */
+  #fly(motion: ImageTransitionMotion, from: number, to: number, animations: Animation[]) {
+    const all = [
+      ...animations,
+      ...(this.#thumbnailOverlays?.animations(
+        motion.frame,
+        motion.progress,
+        motion.duration,
+        from,
+        to,
+      ) ?? []),
+    ];
+    this.#synchronizeStart(all);
+    return all;
   }
 
   #fallbackLayers(frame: HTMLElement) {
@@ -1032,12 +1037,6 @@ export class DomViewerDriver<
     }
   }
 
-  #animateFallbacks(frame: HTMLElement, keyframes: Keyframe[], duration: number) {
-    return Array.from(this.#fallbackLayers(frame), (layer) =>
-      layer.animate(keyframes, this.#motionOptions(duration)),
-    );
-  }
-
   #discardPreparation() {
     const prepared = this.#preparedOpen;
     if (!prepared) return;
@@ -1046,6 +1045,15 @@ export class DomViewerDriver<
     this.#strip?.unmount();
     this.#clearMotionStyles();
     this.#portal.overlay.remove();
+  }
+
+  /** Size the viewer to the window and take the theme of its source. */
+  #stage(theme: HTMLElement | null) {
+    const view = this.#portal.overlay.ownerDocument.defaultView!;
+    this.#viewportWidth = view.innerWidth;
+    this.#sizeContainer(view);
+    this.#applyTheme(theme);
+    this.#syncPageHeight();
   }
 
   #applyTheme(source: HTMLElement | null) {
@@ -1062,32 +1070,6 @@ export class DomViewerDriver<
       this.#portal.overlay.style.setProperty(property, value);
       this.#themeProperties.add(property);
     }
-  }
-
-  async #waitForGalleryControlsReveal(signal: AbortSignal) {
-    const control = this.#portal.dialog.querySelector<HTMLElement>(
-      "[data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]",
-    );
-    const animation = control
-      ?.getAnimations()
-      .find(
-        (candidate) =>
-          (candidate as CSSAnimation).animationName === "fluidbox-gallery-controls-appear",
-      );
-    await this.#waitForAnimation(animation, signal);
-  }
-
-  async #waitForChromeReveal(signal: AbortSignal) {
-    const chrome = this.#portal.dialog.querySelector<HTMLElement>(
-      "[data-fluidbox-chrome], [data-fluidbox-portal] > :not([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close], [data-fluidbox-mount]), [data-fluidbox-portal] > [data-fluidbox-mount] > *",
-    );
-    const animation = chrome
-      ?.getAnimations()
-      .find(
-        (candidate) =>
-          (candidate as CSSAnimation).animationName === "fluidbox-gallery-controls-appear",
-      );
-    await this.#waitForAnimation(animation, signal);
   }
 
   async #waitForAnimation(animation: Animation | undefined, signal: AbortSignal) {
@@ -1133,10 +1115,6 @@ export class DomViewerDriver<
     this.#clearMotionStyles();
   }
 
-  #motionOptions(duration: number): KeyframeAnimationOptions {
-    return { duration, easing: "linear", fill: "both" };
-  }
-
   #prefersReducedMotion() {
     return (
       this.#portal.overlay.ownerDocument.defaultView?.matchMedia("(prefers-reduced-motion: reduce)")
@@ -1163,7 +1141,7 @@ export class DomViewerDriver<
 
   #cancelAnimations(preserve: boolean) {
     if (preserve && this.#animations.length > 0) {
-      this.#thumbnailOverlays.preservePaint();
+      this.#thumbnailOverlays?.preservePaint();
       let pose: PaintedPose | undefined;
       try {
         pose = this.#flightFrame ? this.#paintedFlightPose() : this.#paintedPose();
@@ -1261,13 +1239,20 @@ export class DomViewerDriver<
       !(this.#media instanceof HTMLImageElement)
     )
       return null;
-    // A pinch can land mid-dismiss; drop the drag whole, or the strip stays
-    // frozen and the dialog keeps its dragging state.
+    // A pinch can land mid-dismiss. Drop the drag whole, or the strip stays
+    // frozen and the dialog keeps its dragging state, but leave the photo
+    // where the finger took it: the zoom starts from its transform.
     if (this.#dragGesture.active) {
-      this.#dragGesture.cancel();
-      this.#preparedFlight = undefined;
-      this.#clearMotionStyles();
-      this.#strip?.resume();
+      const dragged = this.#media.getBoundingClientRect();
+      this.#dropDrag();
+      const rest = this.#media.getBoundingClientRect();
+      if (rest.width > 0) {
+        const scale = dragged.width / rest.width;
+        this.#media.style.setProperty(
+          "--fluidbox-media-transform",
+          `matrix(${scale}, 0, 0, ${scale}, ${dragged.left - rest.left}, ${dragged.top - rest.top})`,
+        );
+      }
     }
     this.#cancelAnimations(true);
     const interrupted = this.#takeInterruptedPose();
@@ -1366,10 +1351,7 @@ export class DomViewerDriver<
     this.#flightMedia = undefined;
     this.#flightSource = undefined;
     this.#flightSourceFrame = undefined;
-    this.#closeStart = undefined;
-    this.#closeTargetOrigin = null;
-    this.#closeTargetPicture = null;
-    this.#closeDuration = 0;
+    this.#retargetClose = undefined;
     this.#closeOriginObserver?.disconnect();
     this.#closeOriginObserver = undefined;
     cancelAnimationFrame(this.#closeRetargetFrame);
@@ -1383,10 +1365,10 @@ export class DomViewerDriver<
     cancelAnimationFrame(this.#closeRetargetSettleFrame);
     this.#closeRetargetFrame = requestAnimationFrame(() => {
       this.#closeRetargetFrame = 0;
-      this.#updateCloseTarget();
+      this.#retargetClose?.();
       this.#closeRetargetSettleFrame = requestAnimationFrame(() => {
         this.#closeRetargetSettleFrame = 0;
-        this.#updateCloseTarget();
+        this.#retargetClose?.();
       });
     });
   };
@@ -1402,7 +1384,7 @@ export class DomViewerDriver<
         this.#viewportWidth = view.innerWidth;
         this.#sizeContainer(view);
       }
-      this.#updateCloseTarget();
+      this.#retargetClose?.();
       this.#scheduleCloseTargetUpdate();
       return;
     }
@@ -1452,40 +1434,6 @@ export class DomViewerDriver<
     this.#portal.overlay.style.setProperty("--fluidbox-page-height", `${height}px`);
   }
 
-  #updateCloseTarget() {
-    const origin = this.#closeTargetOrigin;
-    const start = this.#closeStart;
-    const frame = this.#flightFrame;
-    const media = this.#flightMedia;
-    if (!origin || !start || !frame || !media || this.#animations.length < 3) return;
-    const target = this.#flightTargetPose(origin, this.#closeTargetPicture, media);
-    if (!target) return;
-    const motion = createImageTransitionMotion({
-      opening: false,
-      from: start,
-      to: target,
-      width: media.offsetWidth,
-      height: media.offsetHeight,
-      backdropFrom: 1,
-      backdropTo: 0,
-      duration: this.#closeDuration,
-      response: this.#closeDuration * 0.9,
-      samples: 60,
-      crossfade: this.#closeCrossfade,
-    });
-    const [frameAnimation, mediaAnimation, radiusAnimation] = this.#animations;
-    if (frameAnimation?.effect instanceof KeyframeEffect) {
-      frameAnimation.effect.setKeyframes(motion.frame);
-    }
-    if (mediaAnimation?.effect instanceof KeyframeEffect) {
-      mediaAnimation.effect.setKeyframes(motion.image);
-    }
-    if (radiusAnimation?.effect instanceof KeyframeEffect) {
-      radiusAnimation.effect.setKeyframes(motion.radius);
-    }
-    this.#thumbnailOverlays.retarget(this.#animations, motion.frame);
-  }
-
   /** Gestures take over an opening in flight as well as a settled viewer. */
   #acceptsGestures() {
     const status = this.#controller?.state.status;
@@ -1496,9 +1444,10 @@ export class DomViewerDriver<
     if (this.#dragGesture.active || !this.#acceptsGestures()) return;
     this.#zoom?.suspend();
     this.#cancelAnimations(true);
+    this.#endReveal();
     const frame = this.#frame;
     if (this.#strip) {
-      this.#thumbnailOverlays.prepare(
+      this.#thumbnailOverlays?.prepare(
         this.#strip.activeItem,
         this.#strip.index,
         frame,
@@ -1510,16 +1459,10 @@ export class DomViewerDriver<
     const matrix = current.transform;
     this.#strip?.freeze();
     this.#preparedFlight = undefined;
-    const origin = this.#activeOrigin;
-    const from = origin && origin.isConnected && originIsVisible(origin) ? origin : null;
-    const target = (from
-      ? originTransitionPose(from, this.#activePicture, frame, this.#media, current)
-      : null) ?? {
-      transform: new DOMMatrix()
-        .translate(this.#media.offsetWidth * 0.02, this.#media.offsetHeight * 0.02)
-        .scale(0.96),
-      clip: current.clip,
-    };
+    const from = visibleOrigin(this.#activeOrigin);
+    const target =
+      (from ? originTransitionPose(from, this.#activePicture, this.#media, current) : null) ??
+      this.#shrunk(current.clip);
     const wheelTarget = wheelDirection ? new DOMMatrix(target.transform.toString()) : undefined;
     const wheelOffset = !wheelTarget
       ? 0
@@ -1537,7 +1480,6 @@ export class DomViewerDriver<
       wheelOffset,
       wheelSnapOffset: wheelDirection ? (this.#strip?.snapOffset ?? 0) : 0,
       opacity: Number(getComputedStyle(this.#portal.backdrop).opacity),
-      closeOpacity: 1,
       borderRadii: current.clip.radii,
       targetRadii: target.clip.radii,
       clip: current.clip,
@@ -1627,18 +1569,23 @@ export class DomViewerDriver<
       },
       state,
     );
-    this.#thumbnailOverlays.set("dragging", progress, matrix);
+    this.#thumbnailOverlays?.set("dragging", progress, matrix);
     this.#portal.backdrop.style.opacity = String(state.opacity * backdropVisibility(progress));
     if (
       state.wheelTarget &&
       state.wheelPhase !== "tracking" &&
       Math.abs(dragDistance(state)) < 0.1
     ) {
-      this.#dragGesture.finish();
-      this.#preparedFlight = undefined;
-      this.#clearMotionStyles();
-      this.#strip?.resume();
+      this.#dropDrag();
     }
+  }
+
+  /** Let go of a drag that leaves the viewer as it was. */
+  #dropDrag() {
+    this.#dragGesture.cancel();
+    this.#preparedFlight = undefined;
+    this.#clearMotionStyles();
+    this.#strip?.resume();
   }
 
   #commitWheelDismiss() {
@@ -1728,28 +1675,18 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: opacity,
-      backdropTo: 1,
       duration,
       response: duration * 0.8,
       samples: 24,
     });
-    const animations = [
-      this.#frame.animate(motion.frame, this.#motionOptions(duration)),
-      this.#media.animate(motion.image, this.#motionOptions(duration)),
-      this.#frame.animate(motion.radius, this.#motionOptions(duration)),
-      this.#portal.backdrop.animate(motion.backdrop, this.#motionOptions(duration)),
-      ...this.#animateFallbacks(this.#frame, motion.image, duration),
-      ...this.#thumbnailOverlays.animations(
-        motion.frame,
-        motion.progress,
-        duration,
-        this.#thumbnailOverlays.currentProgress(dragProgress(state)),
-        0,
-      ),
-    ];
-    this.#synchronizeStart(animations);
+    const animations = this.#fly(
+      motion,
+      this.#thumbnailOverlays?.currentProgress(dragProgress(state)) ?? 0,
+      0,
+      this.#animatePose(motion),
+    );
     void this.#play(animations, this.#lifetime.signal).then(() => {
-      this.#thumbnailOverlays.set("open", 0, new DOMMatrix());
+      this.#thumbnailOverlays?.set("open", 0, new DOMMatrix());
       this.#strip?.resume();
     });
   }
@@ -1758,7 +1695,7 @@ export class DomViewerDriver<
     this.#keepThumbnailVisible(undefined);
     this.#strip?.resume();
     this.#removeFlight();
-    this.#thumbnailOverlays.finishClose();
+    this.#thumbnailOverlays?.finishClose();
     this.#setActiveTrigger(null);
     activeViewer.release(this.#viewerOwner);
     this.#isolation.deactivate();
@@ -1782,14 +1719,21 @@ export class DomViewerDriver<
       target.toggleAttribute("data-starting-style", state === "opening");
       target.toggleAttribute("data-ending-style", state === "closing");
       target.toggleAttribute("data-opening", state === "opening");
-      target.toggleAttribute("data-dismissing", state === "closing");
+      // A drag that caught the opening still owns the viewer once it opens.
+      target.toggleAttribute("data-dismissing", state === "closing" || this.#dragGesture.active);
     }
-    if (state === "closed") {
-      delete this.#portal.dialog.dataset.galleryControlsRevealing;
-      this.#portal.dialog.style.removeProperty("--fluidbox-gallery-controls-reveal-delay");
-      delete this.#portal.dialog.dataset.chromeRevealing;
-      this.#portal.dialog.style.removeProperty("--fluidbox-chrome-reveal-delay");
-    }
+    if (state === "closed") this.#endReveal();
+  }
+
+  /**
+   * Stop the controls' and chrome's reveal. Its animation would outrank the
+   * rules that hide them, so a drag that catches the opening ends it first.
+   */
+  #endReveal() {
+    this.#thumbnailOverlays?.finishControlsReveal();
+    const { dialog } = this.#portal;
+    delete dialog.dataset.revealing;
+    dialog.style.removeProperty("--fluidbox-reveal-delay");
   }
 
   #onKeydown = (event: KeyboardEvent) => {
@@ -1851,19 +1795,14 @@ export class DomViewerDriver<
     } else if ((this.#controller?.state.count ?? 0) > 1 && verticalKeys.has(event.key)) {
       void this.#controller?.close({ reason: "keyboard" });
     } else if (
-      event.key === "ArrowRight" &&
-      ["opening", "open"].includes(this.#controller?.state.status ?? "closed")
+      (event.key === "ArrowRight" || event.key === "ArrowLeft") &&
+      this.#acceptsGestures()
     ) {
       event.preventDefault();
       this.#zoom?.suspend();
-      void this.#controller?.next({ reason: "keyboard" });
-    } else if (
-      event.key === "ArrowLeft" &&
-      ["opening", "open"].includes(this.#controller?.state.status ?? "closed")
-    ) {
-      event.preventDefault();
-      this.#zoom?.suspend();
-      void this.#controller?.previous({ reason: "keyboard" });
+      void this.#controller?.[event.key === "ArrowRight" ? "next" : "previous"]({
+        reason: "keyboard",
+      });
     }
   };
 
@@ -1951,14 +1890,9 @@ export class DomViewerDriver<
 
   #onPointerEnd = (event: PointerEvent) => {
     if (event.pointerId !== this.#pointer?.id) return;
-    if (this.#releaseExtensionDrag("end", event.clientY)) return;
-    this.#endDrag();
-  };
-
-  #onPointerCancel = (event: PointerEvent) => {
-    if (event.pointerId !== this.#pointer?.id) return;
-    if (this.#releaseExtensionDrag("cancel", event.clientY)) return;
-    this.#endDrag(true);
+    const cancel = event.type === "pointercancel";
+    if (this.#releaseExtensionDrag(cancel ? "cancel" : "end", event.clientY)) return;
+    this.#endDrag(cancel);
   };
 
   #releaseExtensionDrag(phase: "end" | "cancel", clientY: number) {

@@ -34,7 +34,7 @@ function intersect(a: Box, b: Box): Box {
   };
 }
 
-function radiiOf(style: CSSStyleDeclaration, scale: number): CornerRadii {
+export function radiiOf(style: CSSStyleDeclaration, scale: number): CornerRadii {
   return [
     (Number.parseFloat(style.borderTopLeftRadius) || 0) * scale,
     (Number.parseFloat(style.borderTopRightRadius) || 0) * scale,

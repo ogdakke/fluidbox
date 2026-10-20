@@ -1,11 +1,9 @@
-import { controlButton, controlNames } from "./controls";
-import { loadAddons } from "./addons";
 import { createFluidbox } from "./create-fluidbox";
 import { forwardEvents } from "./events";
 import { FluidboxFilmstripElement, FluidboxSheetElement } from "./filmstrip";
 import { FluidboxItemElement, type DeclarativeFluidboxDefinition } from "./item";
 import { idOf, toList } from "./items";
-import { resolveLabels, type FluidboxLabels } from "./labels";
+import type { FluidboxLabels } from "./labels";
 import type {
   Fluidbox,
   FluidboxCommandOptions,
@@ -386,24 +384,14 @@ export class FluidboxGalleryElement extends HTMLElement {
     return step || max ? { ...(step ? { step } : {}), ...(max ? { max } : {}) } : undefined;
   }
 
-  /** Hand the viewer the current options, once the add-ons they turn on have loaded. */
+  /** Hand the viewer the current options. It loads the add-ons they turn on. */
   #queueUpdate() {
     if (!this.#fluidbox || this.#updateQueued) return;
     this.#updateQueued = true;
-    queueMicrotask(async () => {
+    queueMicrotask(() => {
       this.#updateQueued = false;
-      for (let loading = this.#loadAddons(); loading; loading = this.#loadAddons()) await loading;
-      if (!this.isConnected) return;
-      this.#fluidbox?.update(this.#options());
+      if (this.isConnected) this.#fluidbox?.update(this.#options());
     });
-  }
-
-  /** Load the entries of the add-ons the gallery holds elements for. */
-  #loadAddons() {
-    return loadAddons([
-      ...(this.querySelector(":scope > fluidbox-sheet") ? (["sheet"] as const) : []),
-      ...(this.querySelector(":scope > fluidbox-filmstrip") ? (["filmstrip"] as const) : []),
-    ]);
   }
 
   #options() {
@@ -500,10 +488,6 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#definitions = definitions;
     this.#syncRenderers();
     if (!this.#fluidbox) {
-      // An add-on loads only for a gallery that holds its element, and again
-      // for one added while the first was loading.
-      for (let loading = this.#loadAddons(); loading; loading = this.#loadAddons()) await loading;
-      if (this.#fluidbox || !this.isConnected) return;
       this.#create(list);
       this.#itemsResult = undefined;
     } else {
@@ -619,21 +603,12 @@ export class FluidboxGalleryElement extends HTMLElement {
   #mountViewer(context: FluidboxViewerContext<any>) {
     const { target } = context;
     const ownerDocument = target.ownerDocument;
-    const labels = resolveLabels(this.#labels);
-    const defaults = () => controlNames.map((name) => controlButton(ownerDocument, name, labels));
     const template = this.querySelector<HTMLTemplateElement>(":scope > template[slot=viewer]");
     let dispose: void | (() => void);
-    if (this.#viewer) {
-      dispose = this.#viewer(context);
-    } else if (template) {
-      const content = ownerDocument.importNode(template.content, true);
-      for (const placeholder of content.querySelectorAll("fluidbox-controls")) {
-        placeholder.replaceWith(...defaults());
-      }
-      target.append(content);
-    } else {
-      target.append(...defaults());
-    }
+    // The viewer's layer expands each <fluidbox-controls> into the default buttons.
+    if (this.#viewer) dispose = this.#viewer(context);
+    else if (template) target.append(ownerDocument.importNode(template.content, true));
+    else target.append(ownerDocument.createElement("fluidbox-controls"));
     return () => {
       dispose?.();
       target.replaceChildren();

@@ -2,7 +2,7 @@
  * Check whether an origin intersects the window and every clipping ancestor.
  * Shadow hosts participate in the same walk.
  */
-export function originIsVisible(element: HTMLElement): boolean {
+function originIsVisible(element: HTMLElement): boolean {
   const bounds = element.getBoundingClientRect();
   let left = Math.max(0, bounds.left);
   let top = Math.max(0, bounds.top);
@@ -27,4 +27,9 @@ export function originIsVisible(element: HTMLElement): boolean {
     ancestor = ancestor.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
   }
   return right > left && bottom > top;
+}
+
+/** The origin, when it is in the document and shows on screen. */
+export function visibleOrigin(element: HTMLElement | null | undefined) {
+  return element && element.isConnected && originIsVisible(element) ? element : null;
 }

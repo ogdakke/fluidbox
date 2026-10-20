@@ -19,9 +19,13 @@ const isFrameworkImport = (specifier: string, peer: string): boolean =>
 export const peerFor = (specifier: string): (typeof frameworkPeers)[number] | undefined =>
   frameworkPeers.find((peer) => isFrameworkImport(specifier, peer));
 
-/** A chunk that is the sheet's or the filmstrip's entry. */
+/**
+ * A chunk that loads only for a viewer that uses it: the sheet's or the
+ * filmstrip's entry, or the thumbnail overlays' runtime.
+ */
 const isAddon = (chunk: { facadeModuleId?: string | null } | undefined) =>
-  !!chunk?.facadeModuleId && /[/\\](sheet|filmstrip)(-entry)?\.[jt]s$/.test(chunk.facadeModuleId);
+  !!chunk?.facadeModuleId &&
+  /[/\\](sheet|filmstrip|thumbnail-overlay-runtime)(-entry)?\.[jt]s$/.test(chunk.facadeModuleId);
 
 /**
  * Build `tests/bundle/<name>.ts` as a consumer would and walk its chunk graph. Initial is what
@@ -42,7 +46,8 @@ export async function measureEntry(name: string, cwd = process.cwd()) {
     clean: false,
     write: false,
     logLevel: "silent",
-    deps: { neverBundle: [...frameworkPeers, /^react-dom(?:\/.*)?$/] },
+    // A framework and its subpaths, such as solid-js/web, come from the app.
+    deps: { neverBundle: (id: string) => !!peerFor(id) },
   });
   const chunks = result.bundles
     .flatMap((bundle) => bundle.chunks)

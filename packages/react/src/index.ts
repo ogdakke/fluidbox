@@ -34,12 +34,10 @@ import {
   type FluidboxOriginAdapter,
   type FluidboxRenderer,
   type FluidboxState,
-  type FluidboxUpdateOptions,
   type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
 import {
   controlNames,
-  createDeferredFluidbox,
   createSlots,
   createTrigger,
   defaultLabels,
@@ -48,11 +46,9 @@ import {
   fluidboxEventTypes,
   frameLayerOf,
   latestOrigins,
-  loadAddons,
   resolveLabels,
   targetKeys,
-  type DeferredFluidbox,
-  type FluidboxAddonName,
+  unloadFluidbox,
   type FluidboxSlot,
   type FluidboxSlots,
   type FluidboxTrigger,
@@ -127,7 +123,6 @@ interface Addons {
 }
 
 interface FluidboxContextValue {
-  readonly deferred: DeferredFluidbox<any>;
   readonly fluidbox: FluidboxInstance<any>;
   readonly commands: FluidboxCommands<any>;
   readonly items: FluidboxRootProps<any>["items"];
@@ -178,9 +173,6 @@ const eventProps = {
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
   const { items, labels, zoom, children } = props;
-  const deferredRef = useRef<DeferredFluidbox<TItem> | null>(null);
-  deferredRef.current ??= createDeferredFluidbox(items);
-  const deferred = deferredRef.current;
   const slotsRef = useRef<{ filmstrip: FluidboxSlots<TItem>; sheet: FluidboxSlots<TItem> } | null>(
     null,
   );
@@ -190,43 +182,68 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   const [viewerTarget, setViewerTarget] = useState<HTMLElement | null>(null);
   const [mounts, setMounts] = useState<readonly Mount[]>([]);
   const nextKey = useRef(0);
-  const fluidboxRef = useRef<FluidboxInstance<TItem> | null>(null);
 
   const renderViewer = useCallback<FluidboxViewerRenderer<TItem>>(({ target }) => {
     setViewerTarget(target);
     return () => setViewerTarget((current) => (current === target ? null : current));
   }, []);
-  const position = useCallback<FluidboxLabels["position"]>(
-    (index, count) => (latest.current.labels?.position ?? defaultLabels.position)(index, count),
-    [latest],
-  );
 
-  // The Viewer, Filmstrip and Sheet parts register in their layout effects,
-  // which run before Root's, so the viewer is made with them. Later changes go
-  // through update, once the commit is done.
+  const mount = useCallback((target: HTMLElement, node: ReactNode) => {
+    // React removes portal content after a commit, when the runtime may already
+    // have emptied the target, so each mount renders into a host of its own.
+    const host = target.ownerDocument.createElement("span");
+    host.dataset.fluidboxMount = "";
+    target.append(host);
+    const entry: Mount = { key: nextKey.current++, target: host, node };
+    setMounts((current) => [...current, entry]);
+    return () => {
+      setMounts((current) => current.filter((candidate) => candidate !== entry));
+      host.remove();
+    };
+  }, []);
+
+  const labelOptions = (): Partial<FluidboxLabels> => ({
+    ...latest.current.labels,
+    position: (index, count) =>
+      (latest.current.labels?.position ?? defaultLabels.position)(index, count),
+  });
+  const zoomOption = (): FluidboxRootProps<TItem>["zoom"] => {
+    const { zoom } = latest.current;
+    return zoom === false ? false : zoom ? { ...zoom } : undefined;
+  };
+
+  // The fluidbox exists from the first render, so parts bind to it as they
+  // render. It touches nothing until a viewer is pressed or opened.
+  const fluidboxRef = useRef<FluidboxInstance<TItem> | null>(null);
+  fluidboxRef.current ??= createFluidbox<TItem>({
+    items,
+    labels: labelOptions(),
+    zoom: zoomOption(),
+    // Renderers are looked up by name when an item renders, so the newest
+    // render function is used without telling the viewer.
+    renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+      get(_, key) {
+        const render = typeof key === "string" ? latest.current.renderers?.[key] : undefined;
+        if (!render) return undefined;
+        const renderer: FluidboxRenderer<TItem> = ({ item, index, target, signal }) =>
+          mount(target, render({ item, index, signal }));
+        return renderer;
+      },
+      has: (_, key) => typeof key === "string" && !!latest.current.renderers?.[key],
+    }),
+    // latestOrigins is not generic; the adapter only ever sees this Root's items.
+    origins: latestOrigins(
+      () => latest.current.origins as FluidboxOriginAdapter | undefined,
+    ) as FluidboxOriginAdapter<TItem>,
+  });
+  const fluidbox = fluidboxRef.current;
+  // An unmount, or StrictMode's rehearsal of one, drops the viewer; the next open makes another.
+  useIsomorphicLayoutEffect(() => () => unloadFluidbox(fluidbox), [fluidbox]);
+
+  // The Viewer, Filmstrip and Sheet parts register in their layout effects.
+  // Changes go to the viewer once the commit is done.
   const addons = useRef<Addons>({ filmstrip: null, sheet: null });
   const viewers = useRef(0);
-  const addonOptions = useCallback((): FluidboxUpdateOptions<TItem> => {
-    const { filmstrip, sheet } = addons.current;
-    return {
-      viewer: viewers.current > 0 ? renderViewer : undefined,
-      filmstrip: filmstrip
-        ? filmstrip.custom
-          ? { render: slots.filmstrip.render }
-          : true
-        : undefined,
-      sheet: sheet
-        ? { render: slots.sheet.render, snapPoints: sheet.snapPoints, dismiss: sheet.dismiss }
-        : undefined,
-    };
-  }, [renderViewer, slots]);
-  const addonNames = useCallback(
-    (): FluidboxAddonName[] => [
-      ...(addons.current.filmstrip ? (["filmstrip"] as const) : []),
-      ...(addons.current.sheet ? (["sheet"] as const) : []),
-    ],
-    [],
-  );
   const scheduled = useRef(false);
   const schedule = useCallback(() => {
     if (scheduled.current) return;
@@ -234,13 +251,20 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     // A part that unmounts and mounts again within one commit changes nothing.
     queueMicrotask(() => {
       scheduled.current = false;
-      if (!fluidboxRef.current) return;
-      const apply = () => fluidboxRef.current?.update(addonOptions());
-      const loading = loadAddons(addonNames());
-      if (loading) void loading.then(apply);
-      else apply();
+      const { filmstrip, sheet } = addons.current;
+      fluidbox.update({
+        viewer: viewers.current > 0 ? renderViewer : undefined,
+        filmstrip: filmstrip
+          ? filmstrip.custom
+            ? { render: slots.filmstrip.render }
+            : true
+          : undefined,
+        sheet: sheet
+          ? { render: slots.sheet.render, snapPoints: sheet.snapPoints, dismiss: sheet.dismiss }
+          : undefined,
+      });
     });
-  }, [addonOptions, addonNames]);
+  }, [fluidbox, renderViewer, slots]);
   const setAddon = useCallback(
     <K extends keyof Addons>(name: K, value: Addons[K]) => {
       addons.current = { ...addons.current, [name]: value };
@@ -257,93 +281,20 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     };
   }, [schedule]);
 
-  const mount = useCallback((target: HTMLElement, node: ReactNode) => {
-    // React removes portal content after a commit, when the runtime may already
-    // have emptied the target, so each mount renders into a host of its own.
-    const host = target.ownerDocument.createElement("span");
-    host.dataset.fluidboxMount = "";
-    target.append(host);
-    const entry: Mount = { key: nextKey.current++, target: host, node };
-    setMounts((current) => [...current, entry]);
-    return () => {
-      setMounts((current) => current.filter((candidate) => candidate !== entry));
-      host.remove();
-    };
-  }, []);
-
-  const labelOptions = useCallback(
-    (): Partial<FluidboxLabels> => ({ ...latest.current.labels, position }),
-    [latest, position],
-  );
-  const zoomOption = useCallback((): FluidboxRootProps<TItem>["zoom"] => {
-    const { zoom } = latest.current;
-    return zoom === false ? false : zoom ? { ...zoom } : undefined;
-  }, [latest]);
-
-  // One viewer per mount of Root; every option change goes through update.
-  useIsomorphicLayoutEffect(() => {
-    // Renderers are looked up by name when an item renders, so the newest
-    // render function is used without telling the viewer.
-    const renderers = new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
-      get(_, key) {
-        const render = typeof key === "string" ? latest.current.renderers?.[key] : undefined;
-        if (!render) return undefined;
-        const renderer: FluidboxRenderer<TItem> = ({ item, index, target, signal }) =>
-          mount(target, render({ item, index, signal }));
-        return renderer;
-      },
-      has: (_, key) => typeof key === "string" && !!latest.current.renderers?.[key],
-    });
-    let cancelled = false;
-    const start = () => {
-      if (cancelled) return;
-      // The filmstrip and sheet runtimes load on first use. Until they have,
-      // commands wait on the stand-in, as they do before the first effect.
-      const loading = loadAddons(addonNames());
-      if (loading) {
-        void loading.then(start);
-        return;
-      }
-      const fluidbox = createFluidbox<TItem>({
-        items: deferred.fluidbox.items,
-        labels: labelOptions(),
-        zoom: zoomOption(),
-        renderers,
-        // latestOrigins is not generic; the adapter only ever sees this Root's items.
-        origins: latestOrigins(
-          () => latest.current.origins as FluidboxOriginAdapter | undefined,
-        ) as FluidboxOriginAdapter<TItem>,
-        ...addonOptions(),
-      });
-      fluidboxRef.current = fluidbox;
-      deferred.attach(fluidbox);
-    };
-    start();
-    return () => {
-      cancelled = true;
-      const fluidbox = fluidboxRef.current;
-      fluidboxRef.current = null;
-      if (!fluidbox) return;
-      deferred.detach();
-      fluidbox.destroy();
-    };
-  }, [deferred, mount, labelOptions, zoomOption, addonOptions, addonNames, latest]);
-
   // Strings are compared by value, so an inline labels object changes nothing.
   const labelsKey = JSON.stringify(labels ?? {});
-  useIsomorphicLayoutEffect(() => {
-    fluidboxRef.current?.update({ labels: labelOptions() });
-  }, [labelsKey, labelOptions]);
   const zoomKey = zoom === false ? "off" : `${zoom?.step ?? ""}:${zoom?.max ?? ""}`;
+  const first = useRef(true);
   useIsomorphicLayoutEffect(() => {
-    fluidboxRef.current?.update({ zoom: zoomOption() });
-  }, [zoomKey, zoomOption]);
+    if (first.current) first.current = false;
+    else fluidbox.update({ labels: labelOptions(), zoom: zoomOption() });
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [fluidbox, labelsKey, zoomKey]);
 
-  // The stand-in forwards the viewer's events.
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
     for (const type of fluidboxEventTypes) {
-      deferred.fluidbox.addEventListener(
+      fluidbox.addEventListener(
         type,
         (event) => {
           const handler = latest.current[eventProps[type]] as ((event: Event) => void) | undefined;
@@ -353,26 +304,26 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       );
     }
     return () => events.abort();
-  }, [deferred, latest]);
+  }, [fluidbox, latest]);
 
   const lastItems = useRef(items);
   useIsomorphicLayoutEffect(() => {
     if (lastItems.current === items) return;
     lastItems.current = items;
-    void deferred.fluidbox.setItems(items);
-  }, [items, deferred]);
+    void fluidbox.setItems(items);
+  }, [items, fluidbox]);
 
-  const commands = useMemo<FluidboxCommands<TItem>>(() => {
-    const { fluidbox } = deferred;
-    return {
+  const commands = useMemo<FluidboxCommands<TItem>>(
+    () => ({
       open: (target, options) => fluidbox.open(target, options),
       close: (options) => fluidbox.close(options),
       next: (options) => fluidbox.next(options),
       previous: (options) => fluidbox.previous(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
-    };
-  }, [deferred]);
+    }),
+    [fluidbox],
+  );
 
   const resolvedLabels = useMemo(
     () => resolveLabels(labels),
@@ -381,8 +332,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   );
   const value = useMemo<FluidboxContextValue>(
     () => ({
-      deferred,
-      fluidbox: deferred.fluidbox,
+      fluidbox,
       commands,
       items,
       labels: resolvedLabels,
@@ -393,7 +343,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       setAddon,
       addViewer,
     }),
-    [deferred, commands, items, resolvedLabels, viewerTarget, slots, mount, setAddon, addViewer],
+    [fluidbox, commands, items, resolvedLabels, viewerTarget, slots, mount, setAddon, addViewer],
   );
   return createElement(
     FluidboxContext.Provider,
@@ -856,8 +806,8 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
 export function useFluidbox<TSelected>(
   selector?: (value: FluidboxApi) => TSelected,
 ): TSelected | FluidboxApi {
-  const { deferred, commands } = useFluidboxContext();
-  const subscribe = useCallback((listener: () => void) => deferred.subscribe(listener), [deferred]);
+  const { fluidbox, commands } = useFluidboxContext();
+  const subscribe = useCallback((listener: () => void) => fluidbox.subscribe(listener), [fluidbox]);
   // Select inside the snapshot, so a state change that leaves the selected value
   // alone doesn't re-render. Caching per state keeps a fresh object stable.
   const cache = useRef<{
@@ -867,7 +817,7 @@ export function useFluidbox<TSelected>(
     selected: unknown;
   } | null>(null);
   const read = () => {
-    const state = deferred.fluidbox.state;
+    const state = fluidbox.state;
     const cached = cache.current;
     if (cached && cached.state === state && cached.selector === selector) return cached.selected;
     const value = cached && cached.state === state ? cached.value : { ...state, ...commands };
@@ -880,19 +830,19 @@ export function useFluidbox<TSelected>(
 
 /** The sheet's stop, re-rendering as `sheetchange` moves it, and a function that moves it. */
 export function useFluidboxSheet(): FluidboxSheetApi {
-  const { deferred, fluidbox } = useFluidboxContext();
+  const { fluidbox } = useFluidboxContext();
   const subscribe = useCallback(
     (listener: () => void) => {
       const events = new AbortController();
       fluidbox.addEventListener("sheetchange", listener, { signal: events.signal });
-      // A viewer that attaches or goes changes the sheet too.
-      const release = deferred.subscribe(listener);
+      // A sheet that loads or goes changes the stop too.
+      const release = fluidbox.subscribe(listener);
       return () => {
         events.abort();
         release();
       };
     },
-    [deferred, fluidbox],
+    [fluidbox],
   );
   const stop = useSyncExternalStore(
     subscribe,
