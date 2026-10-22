@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; require-trusted-types-for 'script'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fluidbox under a strict Content Security Policy</title>
+    <link rel="icon" href="/favicon.svg" />
+    <!-- Linked, not imported: a stylesheet a script injects is an inline style. -->
+    <link rel="stylesheet" href="/fixtures/csp.css" />
+    <script src="/csp-violations.js"></script>
+    <script type="module" src="/fixtures/csp.ts"></script>
+  </head>
+  <body>
+    <main class="fb-shell fb-pad csp-page">
+      <h1>Strict Content Security Policy</h1>
+      <p class="fb-muted">
+        No inline scripts or styles, and Trusted Types on. <code>?ssr</code> renders the open viewer
+        on the server for the plain runtime to take over; <code>?react</code> opens a React Root on
+        its first render.
+      </p>
+      <h2>Plain JavaScript</h2>
+      <div class="csp-grid" data-csp-plain>
+        <button type="button" data-photo="0">
+          <img src="/art/canyon.svg" alt="Canyon" width="320" height="240" />
+        </button>
+        <button type="button" data-photo="1">
+          <img src="/photo-portrait.svg" alt="Portrait study" width="320" height="480" />
+        </button>
+        <a href="/art/dune.svg" data-photo="2">
+          <img src="/art/dune.svg" alt="Dune" width="320" height="240" />
+        </a>
+      </div>
+      <h2>Custom elements</h2>
+      <fluidbox-gallery class="csp-grid" data-csp-elements>
+        <fluidbox-item item-id="fjord">
+          <a slot="trigger" href="/art/fjord.svg">
+            <img src="/art/fjord.svg" alt="Fjord" width="320" height="240" />
+          </a>
+          <template slot="content">
+            <img src="/art/fjord.svg" alt="Fjord" width="1400" height="1400" />
+          </template>
+        </fluidbox-item>
+        <fluidbox-item item-id="lagoon">
+          <button slot="trigger" type="button">
+            <img src="/art/lagoon.svg" alt="Lagoon" width="320" height="240" />
+          </button>
+          <template slot="content">
+            <img src="/art/lagoon.svg" alt="Lagoon" width="1400" height="1400" />
+          </template>
+        </fluidbox-item>
+      </fluidbox-gallery>
+      <div data-csp-react></div>
+    </main>
+    <!--fluidbox-static-viewer-->
+  </body>
+</html>

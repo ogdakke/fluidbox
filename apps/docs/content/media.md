@@ -67,11 +67,11 @@ Only images zoom. The viewer loads the full image for the current slide and the 
 | Field         | Type                             | Default      | What it does                                                       |
 | ------------- | -------------------------------- | ------------ | ------------------------------------------------------------------ |
 | `type`        | `"video"`                        |              | Required.                                                          |
-| `src`         | `string`                         |              | Required. The video file.                                          |
+| `src`         | `string`                         |              | Required. The video file: an http(s), relative or `blob:` URL.     |
 | `title`       | `string`                         |              | Required. The video's accessible name, and the filmstrip button's. |
 | `width`       | `number`                         |              | Required. Intrinsic width.                                         |
 | `height`      | `number`                         |              | Required. Intrinsic height.                                        |
-| `poster`      | `string`                         |              | The poster frame's URL.                                            |
+| `poster`      | `string`                         |              | The poster frame's URL, with the same schemes as `src`.            |
 | `autoplay`    | `boolean`                        | `false`      | Plays when its slide comes into view, and pauses when it leaves.   |
 | `loop`        | `boolean`                        | `false`      | Starts again at the end.                                           |
 | `muted`       | `boolean`                        | `false`      | Starts muted. Browsers let a video autoplay only when it is muted. |
@@ -99,16 +99,16 @@ A video pauses when its slide leaves, and unloads when it leaves the loaded wind
 
 `FluidboxIframeItem`, drawn as an `<iframe>`:
 
-| Field            | Type             | What it does                      |
-| ---------------- | ---------------- | --------------------------------- |
-| `type`           | `"iframe"`       | Required.                         |
-| `src`            | `string`         | Required. The embedded page.      |
-| `title`          | `string`         | Required. The iframe's `title`.   |
-| `width`          | `number`         | Required. The frame's width.      |
-| `height`         | `number`         | Required. The frame's height.     |
-| `allow`          | `string`         | The iframe's `allow` attribute.   |
-| `referrerPolicy` | `ReferrerPolicy` | The iframe's `referrerpolicy`.    |
-| `sandbox`        | `string`         | The iframe's `sandbox` attribute. |
+| Field            | Type             | What it does                                                   |
+| ---------------- | ---------------- | -------------------------------------------------------------- |
+| `type`           | `"iframe"`       | Required.                                                      |
+| `src`            | `string`         | Required. The embedded page: an http(s) or relative URL.       |
+| `title`          | `string`         | Required. The iframe's `title`.                                |
+| `width`          | `number`         | Required. The frame's width.                                   |
+| `height`         | `number`         | Required. The frame's height.                                  |
+| `allow`          | `string`         | The iframe's `allow` attribute.                                |
+| `referrerPolicy` | `ReferrerPolicy` | The iframe's `referrerpolicy`.                                 |
+| `sandbox`        | `string`         | The iframe's `sandbox` attribute. See [Safe URLs](#safe-urls). |
 
 ```ts
 import type { FluidboxIframeItem } from "@ogdakke/fluidbox";
@@ -125,6 +125,18 @@ const map: FluidboxIframeItem = {
 ```
 
 The iframe gets `loading="lazy"` and `allowfullscreen`. An embedded page paints well after the opening flight starts, so the viewer covers the frame with a still image until the page has loaded, then fades it out. On close it fades the still back in, so the frame lands as the picture it left from. The still is the item's `thumbnail`, else the trigger's image. Use a screenshot of what the embed first shows.
+
+## Safe URLs
+
+Embed and video URLs often come from merchants or users, so the viewer only loads what can't run script in your page. An iframe's `src` must be an `http:`, `https:` or relative URL; a video's `src` and `poster` may also be `blob:` object URLs. Anything else (`javascript:`, `data:`, `vbscript:`, `file:`, an iframe's `blob:`) throws a `TypeError` naming the item when the items are read, in `createFluidbox`, `setItems`, `createItemList` and `<fluidbox-item>`. A list of your own that skips those checks shows the slide's load error instead.
+
+An iframe item without `sandbox` gets
+
+```text
+allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation
+```
+
+which YouTube, Vimeo and map embeds need, and which stops the embedded page navigating your page, opening dialogs or starting downloads. Fullscreen comes from `allow="fullscreen"` and `allowfullscreen`, not the sandbox. A `sandbox` of your own replaces the default as written; `sandbox: ""` turns everything off. The sandbox is a boundary only for a page on another origin: a same-origin page with `allow-scripts allow-same-origin` can lift it, so frame untrusted pages from their own origin.
 
 ## Custom
 

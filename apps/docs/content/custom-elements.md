@@ -167,7 +167,7 @@ The listeners are typed through the gallery's event map. `@ogdakke/fluidbox` exp
 | `data-fluidbox-close`, `data-fluidbox-previous`, `data-fluidbox-next` | a button in the viewer content            | Runs that command, with the default control styling. Previous and Next are disabled at the ends, Close while closed.              |
 | `data-fluidbox-sheet-stop="N"`                                        | a button in the viewer                    | Moves the sheet to stop `N`.                                                                                                      |
 
-Each trigger also gets `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded`. The trigger's default styles use `:where()`, so your own classes win.
+Each trigger also gets `data-fluidbox-trigger` and `aria-haspopup="dialog"`. Make the `slot="trigger"` element a `<button>` or an `<a href>` ([A link as the trigger](./getting-started.md#a-link-as-the-trigger)); any other element needs its own `role` and `tabindex`, and warns in development without them. The trigger's default styles use `:where()`, so your own classes win.
 
 ## Viewer content
 

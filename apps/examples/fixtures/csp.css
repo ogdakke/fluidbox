@@ -1,0 +1,28 @@
+/* Strict CSP fixture. Tokens come from @ogdakke/fluidbox-design. */
+@import "@ogdakke/fluidbox/styles.css";
+@import "@ogdakke/fluidbox-design/index.css";
+
+.csp-page {
+  padding-block: 40px 56px;
+}
+
+.csp-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-block: 12px 32px;
+}
+
+.csp-grid :is(button, a) {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.csp-grid img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

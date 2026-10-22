@@ -1231,7 +1231,6 @@ export class DomViewerDriver<
     trigger.toggleAttribute("data-open", open);
     trigger.toggleAttribute("data-closed", !open);
     trigger.setAttribute("aria-haspopup", "dialog");
-    trigger.setAttribute("aria-expanded", String(open));
   }
 
   async #play(animations: Animation[], signal: AbortSignal, settle?: () => void) {

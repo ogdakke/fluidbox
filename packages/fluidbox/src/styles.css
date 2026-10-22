@@ -893,6 +893,15 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 [data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-static][hidden] {
   display: none;
 }
+/* The copy has no inline styles, for a strict style-src. Its image's width and
+   height are its ratio scaled past any screen; these limits fit it to the slide. */
+[data-fluidbox-server-viewer],
+:where([data-fluidbox-overlay][data-fluidbox-static]) [data-fluidbox-picture] {
+  display: contents;
+}
+:where([data-fluidbox-overlay][data-fluidbox-static]) [data-fluidbox-slide] [data-fluidbox-media] {
+  max-height: var(--fluidbox-content-height);
+}
 :where([data-fluidbox-overlay][data-fluidbox-static])
   a:is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
   color: var(--fluidbox-color, white);

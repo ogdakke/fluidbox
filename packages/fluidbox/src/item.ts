@@ -1,3 +1,4 @@
+import { checkItemUrls } from "./media-url";
 import type {
   FluidboxItem,
   FluidboxPictureSource,
@@ -131,11 +132,10 @@ export class FluidboxItemElement extends HTMLElement {
       ...(thumbnail ? { thumbnail } : {}),
       ...(placeholder ? { placeholder } : {}),
     };
-    const done = (item: FluidboxItem): DeclarativeFluidboxDefinition => ({
-      item,
-      trigger,
-      ...(sheet ? { sheet } : {}),
-    });
+    const done = (item: FluidboxItem): DeclarativeFluidboxDefinition => {
+      checkItemUrls(item);
+      return { item, trigger, ...(sheet ? { sheet } : {}) };
+    };
     const sized = (element: Element, kind: string) => {
       const width = dimension(element, "width");
       const height = dimension(element, "height");

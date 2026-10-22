@@ -5,6 +5,7 @@ import type {
   FluidboxItems,
   FluidboxTarget,
 } from "./public-api";
+import { checkItemUrls } from "./media-url";
 import type { FluidboxSource } from "./runtime-types";
 
 /**
@@ -105,6 +106,7 @@ export function createItemList<TItem extends FluidboxItem>(
     let found = made.get(at);
     if (!found) {
       found = item(at);
+      checkItemUrls(found);
       made.set(at, found);
       indices.set(idOf(found), at);
     }
@@ -149,6 +151,7 @@ export function toList<TItem extends FluidboxItem>(
   for (const [index, item] of snapshot.entries()) {
     if (item.id === undefined) continue;
     const id = idOf(item);
+    checkItemUrls(item);
     if (indices.has(id)) throw new TypeError(`Duplicate fluidbox item id: ${id}`);
     indices.set(id, index);
   }

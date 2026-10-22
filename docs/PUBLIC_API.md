@@ -39,7 +39,10 @@ checked: an empty id, or a duplicate of an id an item names itself by, throws a 
 array, an item without an `id` whose `src` an earlier item already has gets the next free
 `src#2`, `src#3` (in order, around the ids items name themselves by), so media that repeats a
 photo needs no ids; the same object twice is handed back as a copy the second time. Lazy lists are read synchronously and keep
-their ids unique themselves; without `indexOf`, ids are found by scanning. A list is a snapshot:
+their ids unique themselves; without `indexOf`, ids are found by scanning. An iframe's `src`
+must be http(s) or relative, and a video's `src` and `poster` http(s), relative or `blob:`; any other
+scheme throws a `TypeError` when the item is read. An iframe without `sandbox` gets a default one
+([Safe URLs](../apps/docs/content/media.md#safe-urls)). A list is a snapshot:
 `setItems` replaces it, keeping an open viewer on the same id when it survives. An array of items
 equal field by field (plain objects and arrays by content) to the current ones is a no-op that
 resolves `false` and interrupts nothing; otherwise the viewer keeps the slides of unchanged items

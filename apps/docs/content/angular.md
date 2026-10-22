@@ -147,7 +147,7 @@ Exported as `fluidboxTrigger`.
 | `target`  | `Signal<FluidboxTarget<TItem>>`            | The item it opens.                                                                                                                                                                                    |
 | `returns` | `Signal<readonly FluidboxTarget<TItem>[]>` | The other items that return here.                                                                                                                                                                     |
 
-The directive adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to its element, gives a `<button>` without a `type` `type="button"`, and starts loading the item on pointer down. Put it on an element that can take focus, such as a `<button>` or `<a href>`. A trigger that shows the last viewed item opens on it again, so the flight starts from the picture on it.
+The directive adds `data-fluidbox-trigger` and `aria-haspopup="dialog"` to its element, gives a `<button>` without a `type` `type="button"`, and starts loading the item on pointer down. Put it on a `<button>` or an `<a href>` ([A link as the trigger](./getting-started.md#a-link-as-the-trigger)). It works on any element, but a `<div>` or an `<img>` can't take focus or say what it is, so give one a `role` and `tabindex` and handle its keys yourself; in development it warns. A trigger that shows the last viewed item opens on it again, so the flight starts from the picture on it.
 
 ```html
 <button [fluidboxTrigger]="album[0]" [fluidboxReturns]="album" #cover="fluidboxTrigger">

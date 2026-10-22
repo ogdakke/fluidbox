@@ -176,7 +176,7 @@ fluidbox.addEventListener("settle", ({ id }) => {
 
 ## Triggers
 
-`fluidbox.bind(element, target, options?)` makes an element a trigger. It registers the element as its item's origin, so the flight starts and lands there. It loads the viewer's code as `loading` says, starts loading the item on pointer down, and opens the viewer on click unless a listener prevented the click. It adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to the element. Use an element that can take focus, such as a `<button>`. It returns a function that unbinds.
+`fluidbox.bind(element, target, options?)` makes an element a trigger. It registers the element as its item's origin, so the flight starts and lands there. It loads the viewer's code as `loading` says, starts loading the item on pointer down, and opens the viewer on click unless a listener prevented the click. It adds `data-fluidbox-trigger` and `aria-haspopup="dialog"` to the element. Use a `<button>`, or an `<a href>` to the full image ([A link as the trigger](./getting-started.md#a-link-as-the-trigger)). Any other element needs a `role` and `tabindex` of its own, and warns in development without them. It returns a function that unbinds.
 
 | Option            | Type                                   | What it does                                                                                                                    |
 | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |

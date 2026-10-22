@@ -129,7 +129,7 @@ An item's id is its `id`, else its `src`. Other attributes and listeners go to t
 
 The default slot gets `{ item, index, status }` (`FluidboxTriggerPreview`), which describes the item the trigger shows. While the viewer is open, that is the item it is on. After it closes, it is the last one it showed, so an album cover reopens on it. `item` is `null` when the trigger's items have left the list.
 
-The trigger adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to its element, and starts loading the item on pointer down.
+The trigger adds `data-fluidbox-trigger` and `aria-haspopup="dialog"` to its element, and starts loading the item on pointer down. [A link as the trigger](./getting-started.md#a-link-as-the-trigger) covers a trigger that is a link.
 
 ### `Fluidbox.ThumbnailOverlay`
 

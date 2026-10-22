@@ -8,6 +8,8 @@ import { observeDecodedPreview } from "./decoded-preview";
 import { fitSize } from "./fit-size";
 import { idOf, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
+import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
+import { checkItemUrls } from "./media-url";
 import type { FluidboxThumbnail } from "./public-api";
 
 const WINDOW_SIZE = 31;
@@ -38,6 +40,15 @@ interface ViewerSlide {
 }
 
 /** Point an image at a thumbnail, its srcset and sizes included. */
+function safeUrls(item: FluidboxItem) {
+  try {
+    checkItemUrls(item);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function paintThumbnail(image: HTMLImageElement, thumbnail: FluidboxThumbnail) {
   if (thumbnail.sizes) image.sizes = thumbnail.sizes;
   else image.removeAttribute("sizes");
@@ -810,6 +821,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
             if (slide.controller === controller) slide.controller = undefined;
           });
       }
+    } else if (!safeUrls(item)) {
+      // Item lists reject these already; a list of your own still stops here.
+      this.#fail(index, slide);
     } else if (item.type === "video" && slide.image instanceof HTMLVideoElement) {
       slide.image.src = item.src;
       if (item.poster) slide.image.poster = item.poster;
@@ -833,7 +847,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       // Policy attributes apply to the navigation that src starts, so they go first.
       if (item.allow) slide.image.allow = item.allow;
       if (item.referrerPolicy) slide.image.referrerPolicy = item.referrerPolicy;
-      if (item.sandbox !== undefined) slide.image.setAttribute("sandbox", item.sandbox);
+      slide.image.setAttribute("sandbox", item.sandbox ?? IFRAME_SANDBOX_DEFAULT);
       slide.image.src = item.src;
     } else if (item.type === "custom") {
       const renderer = this.#renderers[item.render];
