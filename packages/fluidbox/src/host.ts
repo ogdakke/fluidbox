@@ -14,6 +14,11 @@ export interface FluidboxHost {
     target: FluidboxTarget | undefined,
     reason: FluidboxReason,
   ): Promise<boolean>;
+  /** Run a zoom control with a reason. */
+  zoom(
+    name: "zoomIn" | "zoomOut" | "zoomReset",
+    reason: "api" | "keyboard" | "pointer",
+  ): Promise<boolean>;
   /**
    * Open at `index` with no motion, showing the viewer once its image has
    * decoded, to take over from a copy of it that the server rendered.

@@ -55,13 +55,13 @@ The gallery adds Previous, Next and Close buttons to the viewer unless you give 
 
 ## Elements
 
-| Element                | Class                      | Role                                                                                        |
-| ---------------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
-| `<fluidbox-gallery>`   | `FluidboxGalleryElement`   | Owns one fluidbox for its `<fluidbox-item>` children, or for the `items` you set.           |
-| `<fluidbox-item>`      | `FluidboxItemElement`      | One item: its trigger and its content. A direct child of the gallery.                       |
-| `<fluidbox-filmstrip>` | `FluidboxFilmstripElement` | Hidden. As a direct child of the gallery, it turns the filmstrip on.                        |
-| `<fluidbox-sheet>`     | `FluidboxSheetElement`     | Hidden. As a direct child of the gallery, it turns the sheet on and holds its content.      |
-| `<fluidbox-controls>`  | none                       | Inside `<template slot="viewer">`, stands for the default Previous, Next and Close buttons. |
+| Element                | Class                      | Role                                                                                                                               |
+| ---------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `<fluidbox-gallery>`   | `FluidboxGalleryElement`   | Owns one fluidbox for its `<fluidbox-item>` children, or for the `items` you set.                                                  |
+| `<fluidbox-item>`      | `FluidboxItemElement`      | One item: its trigger and its content. A direct child of the gallery.                                                              |
+| `<fluidbox-filmstrip>` | `FluidboxFilmstripElement` | Hidden. As a direct child of the gallery, it turns the filmstrip on.                                                               |
+| `<fluidbox-sheet>`     | `FluidboxSheetElement`     | Hidden. As a direct child of the gallery, it turns the sheet on and holds its content.                                             |
+| `<fluidbox-controls>`  | `zoom`                     | Inside `<template slot="viewer">`, stands for the default Previous, Next and Close buttons, and with `zoom` the zoom controls too. |
 
 `@ogdakke/fluidbox/elements` exports the four classes. Importing it adds the tags to `HTMLElementTagNameMap`, so `querySelector("fluidbox-gallery")` is typed, and `fluidbox-preview-change` to `HTMLElementEventMap`.
 
@@ -108,7 +108,7 @@ The gallery reads the boolean attributes of a `<video>` as HTML does, so an attr
 | Attribute   | What it does                                                                                                                                                                    |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `nozoom`    | Turns zoom off.                                                                                                                                                                 |
-| `zoom-step` | The scale of a double-tap or double-click zoom. Default `2`.                                                                                                                    |
+| `zoom-step` | The scale of a click or double-tap zoom. Default `2`.                                                                                                                           |
 | `zoom-max`  | The largest zoom scale. Default `4`.                                                                                                                                            |
 | `loop`      | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                                                                   |
 | `loading`   | When the viewer's code loads: `hover` (the default), `press` or `eager`. The `loading` property reflects it. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
@@ -129,23 +129,24 @@ The properties are the [`createFluidbox` options](./javascript.md#createfluidbox
 | `sheet`     | `FluidboxSheet \| null`                 | The sheet, while a `<fluidbox-sheet>` turns it on.                                                                                 |
 | `fluidbox`  | `Fluidbox \| null`                      | The fluidbox behind the gallery, or `null` before it is ready.                                                                     |
 
-| Method                    | Returns             | What it does                                                                           |
-| ------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
-| `open(target?, options?)` | `Promise<boolean>`  | Opens the viewer on an index or id, or moves to it while open.                         |
-| `close(options?)`         | `Promise<boolean>`  | Closes the viewer.                                                                     |
-| `next(options?)`          | `Promise<boolean>`  | Next item.                                                                             |
-| `previous(options?)`      | `Promise<boolean>`  | Previous item.                                                                         |
-| `setItems(items)`         | `Promise<boolean>`  | Replaces the items, as the `items` property does, and resolves once they apply.        |
-| `preload(target)`         | `() => void`        | Starts loading an item a press is likely to open. Call the result to let go.           |
-| `load()`                  | `Promise<boolean>`  | Loads the viewer's code now, once the gallery has read its items.                      |
-| `subscribe(listener)`     | `() => void`        | Calls `listener(state)` on every state change.                                         |
-| `whenReady()`             | `Promise<Fluidbox>` | Resolves once the gallery has read its items. Rejects if the gallery is not connected. |
+| Method                                                            | Returns             | What it does                                                                           |
+| ----------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `open(target?, options?)`                                         | `Promise<boolean>`  | Opens the viewer on an index or id, or moves to it while open.                         |
+| `close(options?)`                                                 | `Promise<boolean>`  | Closes the viewer.                                                                     |
+| `next(options?)`                                                  | `Promise<boolean>`  | Next item.                                                                             |
+| `previous(options?)`                                              | `Promise<boolean>`  | Previous item.                                                                         |
+| `zoomTo(scale, options?)`, `zoomIn()`, `zoomOut()`, `resetZoom()` | `Promise<boolean>`  | Zoom the image on show. See [Zoom](./patterns/zoom.md).                                |
+| `setItems(items)`                                                 | `Promise<boolean>`  | Replaces the items, as the `items` property does, and resolves once they apply.        |
+| `preload(target)`                                                 | `() => void`        | Starts loading an item a press is likely to open. Call the result to let go.           |
+| `load()`                                                          | `Promise<boolean>`  | Loads the viewer's code now, once the gallery has read its items.                      |
+| `subscribe(listener)`                                             | `() => void`        | Calls `listener(state)` on every state change.                                         |
+| `whenReady()`                                                     | `Promise<Fluidbox>` | Resolves once the gallery has read its items. Rejects if the gallery is not connected. |
 
 The commands work as [the fluidbox's](./javascript.md#commands) do, with an item, an index or an id as the target. Each waits until the gallery has read its items, and rejects if the gallery isn't connected.
 
 ### Events
 
-The gallery fires the fluidbox's events: `beforetoggle`, `toggle`, `beforeitemchange`, `itemchange`, `settle` and `sheetchange`, with the same fields (see [Events](./javascript.md#events)). They don't bubble, like a popover's. Canceling `beforetoggle` or `beforeitemchange` on the gallery cancels the command.
+The gallery fires the fluidbox's events: `beforetoggle`, `toggle`, `beforeitemchange`, `itemchange`, `settle`, `sheetchange` and `zoomchange`, with the same fields (see [Events](./javascript.md#events)). They don't bubble, like a popover's. Canceling `beforetoggle` or `beforeitemchange` on the gallery cancels the command.
 
 ```ts
 const gallery = document.querySelector("fluidbox-gallery")!;

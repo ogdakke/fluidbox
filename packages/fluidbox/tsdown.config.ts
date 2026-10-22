@@ -7,6 +7,7 @@ export default defineConfig({
     filmstrip: "src/filmstrip-entry.ts",
     sheet: "src/sheet-entry.ts",
     kit: "src/kit.ts",
+    "hover-zoom": "src/hover-zoom.ts",
   },
   format: "esm",
   platform: "browser",

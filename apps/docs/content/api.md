@@ -21,7 +21,7 @@ Complete API reference
 
 ## Fluidbox
 
-<!-- api: Fluidbox, FluidboxTarget, FluidboxCommandOptions, FluidboxUpdateOptions, FluidboxBindOptions, FluidboxOverlayOptions -->
+<!-- api: Fluidbox, FluidboxTarget, FluidboxCommandOptions, FluidboxZoomCommandOptions, FluidboxUpdateOptions, FluidboxBindOptions, FluidboxOverlayOptions -->
 
 ```ts
 fluidbox.update({
@@ -32,11 +32,11 @@ fluidbox.update({
 
 ## FluidboxState
 
-<!-- api: FluidboxState, FluidboxStatus -->
+<!-- api: FluidboxState, FluidboxStatus, FluidboxZoomState -->
 
 ## Events
 
-<!-- api: FluidboxEventMap, FluidboxToggleEvent, FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxReason, FluidboxToggleState -->
+<!-- api: FluidboxEventMap, FluidboxToggleEvent, FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxReason, FluidboxToggleState -->
 
 ## Items
 
@@ -75,6 +75,12 @@ createFluidbox({
 ## Add-ons
 
 <!-- api: FluidboxFilmstripOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->
+
+### Hover zoom
+
+`@ogdakke/fluidbox/hover-zoom` magnifies a photo on the page under a resting mouse. See [Zoom](./patterns/zoom.md#hover-zoom).
+
+<!-- api: hoverZoom, FluidboxHoverZoomOptions -->
 
 ## Custom elements
 

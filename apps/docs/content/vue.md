@@ -65,18 +65,19 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 
 ## Components
 
-| Component                              | Renders                     | Role                                                                                       |
-| -------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------ |
-| `Fluidbox.Root`                        | its default slot            | Owns one viewer for a list of items. Every other part must be inside it.                   |
-| `Fluidbox.Trigger`                     | a `<button>`, or its child  | Opens an item. Registers itself as the item's origin.                                      |
-| `Fluidbox.ThumbnailOverlay`            | a `<span>`                  | A badge or caption on the thumbnail that fades or flies with the photo.                    |
-| `Fluidbox.FrameLayer`                  | a `<span>`                  | A layer of a travelling overlay that moves into the flying frame, as one element.          |
-| `Fluidbox.Viewer`                      | its slot, in the viewer     | Your own controls and captions, teleported into the viewer's layer.                        |
-| `Fluidbox.Controls`                    | three `<button>`s           | The default Previous, Next and Close, for a `Viewer` with content of its own.              |
-| `Fluidbox.Previous`, `.Next`, `.Close` | a `<button>`                | Run the command, with the default icon and label, and disable themselves when they can't.  |
-| `Fluidbox.Filmstrip`                   | its slot, in each thumbnail | Turns the filmstrip on, with your thumbnails when it has a slot.                           |
-| `Fluidbox.Sheet`                       | its slot, in the sheet      | Turns the sheet on, with your content for the active item; its attributes go on the sheet. |
-| `Fluidbox.SheetStop`                   | a `<button>`                | Moves the sheet to a stop, or back down when it is there.                                  |
+| Component                                   | Renders                     | Role                                                                                                      |
+| ------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `Fluidbox.Root`                             | its default slot            | Owns one viewer for a list of items. Every other part must be inside it.                                  |
+| `Fluidbox.Trigger`                          | a `<button>`, or its child  | Opens an item. Registers itself as the item's origin.                                                     |
+| `Fluidbox.ThumbnailOverlay`                 | a `<span>`                  | A badge or caption on the thumbnail that fades or flies with the photo.                                   |
+| `Fluidbox.FrameLayer`                       | a `<span>`                  | A layer of a travelling overlay that moves into the flying frame, as one element.                         |
+| `Fluidbox.Viewer`                           | its slot, in the viewer     | Your own controls and captions, teleported into the viewer's layer.                                       |
+| `Fluidbox.Controls`                         | three `<button>`s           | The default Previous, Next and Close, for a `Viewer` with content of its own. `zoom` adds the zoom group. |
+| `Fluidbox.ZoomIn`, `.ZoomOut`, `.ZoomReset` | a `<button>`                | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                                     |
+| `Fluidbox.Previous`, `.Next`, `.Close`      | a `<button>`                | Run the command, with the default icon and label, and disable themselves when they can't.                 |
+| `Fluidbox.Filmstrip`                        | its slot, in each thumbnail | Turns the filmstrip on, with your thumbnails when it has a slot.                                          |
+| `Fluidbox.Sheet`                            | its slot, in the sheet      | Turns the sheet on, with your content for the active item; its attributes go on the sheet.                |
+| `Fluidbox.SheetStop`                        | a `<button>`                | Moves the sheet to a stop, or back down when it is there.                                                 |
 
 ### `Fluidbox.Root`
 
@@ -100,6 +101,7 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 | `@itemchange`       | `FluidboxItemChangeEvent` | The viewer moves to an item, including the one it opens on.                                   |
 | `@settle`           | `FluidboxItemChangeEvent` | The viewer comes to rest on an item.                                                          |
 | `@sheetchange`      | `FluidboxSheetEvent`      | The sheet comes to rest at another stop: `event.stop`, 0 at rest.                             |
+| `@zoomchange`       | `FluidboxZoomEvent`       | The image on show comes to rest at another zoom: `event.scale`, 1 at fit.                     |
 | `@update:open`      | `boolean`, `{ reason }`   | The viewer opens or closes, from any input. Half of `v-model:open`.                           |
 | `@update:index`     | `number`, `{ reason }`    | The viewer moves to another item, opening included. Half of `v-model:index`.                  |
 
@@ -155,7 +157,7 @@ No props. Inside a travelling `ThumbnailOverlay`, it renders a `<span data-fluid
 
 ### `Fluidbox.Viewer` and `Fluidbox.Controls`
 
-Neither takes props. `Viewer` teleports its slot into the viewer's body-level layer once the viewer exists, and stays there while the viewer opens and closes; the layer fades out as a dismiss starts. With a `Viewer`, the viewer has only what you put in it, so add `<Fluidbox.Controls />` for the default buttons, or `Previous`, `Next` and `Close` one by one.
+`Viewer` takes no props, and `Controls` only `zoom`, which adds the zoom controls in their group. `Viewer` teleports its slot into the viewer's body-level layer once the viewer exists, and stays there while the viewer opens and closes; the layer fades out as a dismiss starts. With a `Viewer`, the viewer has only what you put in it, so add `<Fluidbox.Controls />` for the default buttons, or `Previous`, `Next` and `Close` one by one.
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
@@ -196,11 +198,11 @@ Rendering it turns the sheet on. The runtime makes the sheet, a `<section data-f
 
 Call them in `setup` of a component inside `Fluidbox.Root`.
 
-| Composable              | Returns              | Purpose                                                                                                                                                                                    |
-| ----------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `useFluidbox()`         | `FluidboxApi<TItem>` | One reactive object: the state (`status`, `id`, `index`, `item`, `count`, `hasPrevious`, `hasNext`) and the commands (`open`, `close`, `next`, `previous`, `setItems`, `preload`, `load`). |
-| `useFluidbox(selector)` | `ComputedRef`        | The part of that object the selector picks.                                                                                                                                                |
-| `useFluidboxSheet()`    | `FluidboxSheetApi`   | One reactive object: the sheet's `stop`, which follows `sheetchange`, and `set(stop, { animate? })`.                                                                                       |
+| Composable              | Returns              | Purpose                                                                                                                                                                                                                                        |
+| ----------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useFluidbox()`         | `FluidboxApi<TItem>` | One reactive object: the state (`status`, `id`, `index`, `item`, `count`, `hasPrevious`, `hasNext`, `zoom`) and the commands (`open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `resetZoom`, `setItems`, `preload`, `load`). |
+| `useFluidbox(selector)` | `ComputedRef`        | The part of that object the selector picks.                                                                                                                                                                                                    |
+| `useFluidboxSheet()`    | `FluidboxSheetApi`   | One reactive object: the sheet's `stop`, which follows `sheetchange`, and `set(stop, { animate? })`.                                                                                                                                           |
 
 ```vue
 <script setup lang="ts">

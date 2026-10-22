@@ -53,6 +53,7 @@ import {
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
+  zoomControlNames,
   type FluidboxSlot,
   type FluidboxSlots,
   type FluidboxStaticNode,
@@ -62,6 +63,7 @@ import type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxCommands,
+  FluidboxControlsProps,
   FluidboxFilmstripProps,
   FluidboxFrameLayerProps,
   FluidboxRootProps,
@@ -77,6 +79,7 @@ export type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxCommands,
+  FluidboxControlsProps,
   FluidboxFilmstripProps,
   FluidboxFrameLayerProps,
   FluidboxItemContext,
@@ -113,6 +116,9 @@ export type {
   FluidboxTarget,
   FluidboxToggleEvent,
   FluidboxVideoItem,
+  FluidboxZoomCommandOptions,
+  FluidboxZoomEvent,
+  FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 
 /** Content the runtime asked for, rendered through a portal so it keeps the app's context. */
@@ -210,6 +216,7 @@ const eventProps = {
   itemchange: "onItemChange",
   settle: "onSettle",
   sheetchange: "onSheetChange",
+  zoomchange: "onZoomChange",
 } as const satisfies Record<(typeof fluidboxEventTypes)[number], keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
@@ -427,6 +434,10 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       close: (options) => fluidbox.close(options),
       next: (options) => fluidbox.next(options),
       previous: (options) => fluidbox.previous(options),
+      zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
+      zoomIn: (options) => fluidbox.zoomIn(options),
+      zoomOut: (options) => fluidbox.zoomOut(options),
+      resetZoom: (options) => fluidbox.resetZoom(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
       load: () => fluidbox.load(),
@@ -709,14 +720,34 @@ function defaultIcon(name: FluidboxControlName) {
 const Close = action("close");
 const Previous = action("previous");
 const Next = action("next");
-const parts = { previous: Previous, next: Next, close: Close };
+const ZoomIn = action("zoomIn");
+const ZoomOut = action("zoomOut");
+const ZoomReset = action("zoomReset");
+const parts = {
+  previous: Previous,
+  next: Next,
+  close: Close,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  zoomReset: ZoomReset,
+};
 
-/** The default Previous, Next and Close buttons, for a Viewer of your own. */
-function Controls(): ReactElement {
+/**
+ * The default Previous, Next and Close buttons, for a Viewer of your own, and
+ * with `zoom` the zoom controls in their group.
+ */
+function Controls({ zoom = false }: FluidboxControlsProps): ReactElement {
+  const { labels } = useFluidboxContext();
   return createElement(
     Fragment,
     null,
     controlNames.map((name) => createElement(parts[name], { key: name })),
+    zoom &&
+      createElement(
+        "div",
+        { "data-fluidbox-zoom-controls": "", role: "group", "aria-label": labels.zoomed },
+        zoomControlNames.map((name) => createElement(parts[name], { key: name })),
+      ),
   );
 }
 
@@ -1060,6 +1091,9 @@ export const Fluidbox = {
   Close,
   Previous,
   Next,
+  ZoomIn,
+  ZoomOut,
+  ZoomReset,
   Filmstrip,
   Sheet,
   SheetStop,

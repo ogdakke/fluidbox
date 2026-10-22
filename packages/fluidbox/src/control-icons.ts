@@ -3,6 +3,9 @@ export const CONTROL_ICON_PATHS = {
   close: "M6 6l12 12M18 6L6 18",
   previous: "M14.5 5.5L8 12l6.5 6.5",
   next: "M9.5 5.5L16 12l-6.5 6.5",
+  zoomIn: "M5 12h14M12 5v14",
+  zoomOut: "M5 12h14",
+  zoomReset: "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5",
 } as const;
 
 export type ControlIconPart = keyof typeof CONTROL_ICON_PATHS;

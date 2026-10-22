@@ -36,7 +36,7 @@ import type {
   FluidboxThumbnailOverlayRegistration,
   FluidboxZoomOptions,
 } from "./runtime-types";
-import type { FluidboxZoom } from "./fluidbox-zoom";
+import type { FluidboxZoom, ZoomReason } from "./fluidbox-zoom";
 import type {
   ViewerSessionCloseContext,
   ViewerSessionDriver,
@@ -277,6 +277,7 @@ export class DomViewerDriver<
       signal: this.#lifetime.signal,
     });
     this.#zoomOptions = zoomConfig(zoomOptions);
+    this.#portal.dialog.toggleAttribute("data-zoomable", !!this.#zoomOptions);
   }
 
   /** Change the zoom options. Turning zoom off zooms the photo back out. */
@@ -291,8 +292,9 @@ export class DomViewerDriver<
     const next = zoomConfig(options);
     if (next?.max === this.#zoomOptions?.max && next?.step === this.#zoomOptions?.step) return;
     this.#zoomOptions = next;
+    this.#portal.dialog.toggleAttribute("data-zoomable", !!next);
     if (next) return;
-    this.#zoom?.reset();
+    this.#zoom?.reset("api");
     this.#zoom?.destroy();
     this.#zoom = undefined;
     this.#zoomLoad = undefined;
@@ -377,11 +379,34 @@ export class DomViewerDriver<
             if (wasZoomed && this.#strip) void this.#strip.select(this.#strip.index, false);
           }
         },
-        close: () => void this.#controller?.close({ reason: "pointer" }),
+        settled: (scale, reason) => {
+          // The slide's image gets sharper as the zoom shows more of its pixels.
+          if (this.#strip?.shows(this.#strip.index)) this.#strip.sharpen(scale);
+          this.#controller?.zoomed?.(scale, reason);
+          // The open viewer says how far it is zoomed, through its live status.
+          if (this.#controller?.state.status === "open") {
+            this.#portal.status.textContent = labels.zoomLevel(scale);
+          }
+        },
         reducedMotion: () => this.#prefersReducedMotion(),
       }));
     });
     return this.#zoomLoad;
+  }
+
+  /**
+   * Zoom the image on show to `scale` about `origin`. Resolves true once it
+   * rests there, false when nothing can zoom or the motion was interrupted.
+   */
+  zoomTo(
+    scale: number,
+    options: {
+      readonly origin?: { readonly x: number; readonly y: number };
+      readonly signal?: AbortSignal;
+      readonly reason?: ZoomReason;
+    },
+  ): Promise<boolean> {
+    return this.#loadZoom().then((zoom) => zoom?.zoomTo(scale, options) ?? false);
   }
 
   connect(
@@ -1528,7 +1553,7 @@ export class DomViewerDriver<
     this.#viewportWidth = view.innerWidth;
     this.#sizeContainer(view);
     if (this.#zoom?.zoomed) {
-      this.#zoom.reset();
+      this.#zoom.reset("api");
       return;
     }
     if (this.#controller?.state.status === "opening") {

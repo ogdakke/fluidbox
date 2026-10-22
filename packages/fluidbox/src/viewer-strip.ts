@@ -11,6 +11,7 @@ import type { FluidboxLabels } from "./labels";
 import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
 import { checkItemUrls } from "./media-url";
 import type { FluidboxThumbnail } from "./public-api";
+import { sharperCandidate, srcsetCandidates } from "./srcset";
 
 const WINDOW_SIZE = 31;
 const LOAD_RADIUS = 1;
@@ -36,6 +37,10 @@ interface ViewerSlide {
   controller?: AbortController;
   /** A playing origin's picture, shown until the slide's player catches up with it. */
   videoHandoff?: AbortController;
+  /** The load of a sharper candidate for the zoom, until it swaps in. */
+  sharpening?: AbortController;
+  /** The URL of the sharper candidate the image shows for the zoom, if any. */
+  sharpened?: string;
   dispose?: FluidboxDispose;
 }
 
@@ -766,11 +771,92 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (notify) this.#onSelect(this.#item(index), false);
   }
 
+  /** The scale the zoom of the image on show rests at, while it is above fit. */
+  #zoomed: { readonly index: number; readonly scale: number } | undefined;
+
   #loadWindow() {
     for (const [index, slide] of this.#slides) {
+      // A slide that leaves gives back its zoom's sharper image.
+      if (index !== this.#index) this.#blunt(index, slide);
       if (Math.abs(index - this.#index) <= LOAD_RADIUS) this.#load(index, slide);
       else this.#unload(slide);
     }
+  }
+
+  /**
+   * Show the image on show sharper for a zoom resting at `scale`: once its
+   * pixels on screen outnumber its candidate's, decode the smallest larger
+   * candidate of the same source, or of `zoomSrcset` and `zoomSrc`, off screen,
+   * then swap it in at the same size. The largest one caps it.
+   */
+  sharpen(scale: number) {
+    const index = this.#index;
+    // An image still loading sharpens once it shows; see #revealImage.
+    this.#zoomed = { index, scale };
+    const slide = this.#slides.get(index);
+    const item = this.#source.getItem(this.#item(index));
+    const image = slide?.image;
+    if (
+      !slide ||
+      item.type !== "img" ||
+      !(image instanceof HTMLImageElement) ||
+      !slide.fullApplied ||
+      !this.#painted(image)
+    )
+      return;
+    const base = this.#ownerDocument.baseURI;
+    const shown = image.currentSrc;
+    // The candidates of the source the browser chose, so a format it took stays.
+    const sets = [
+      ...[...(slide.picture?.querySelectorAll("source") ?? [])].map((source) => source.srcset),
+      image.srcset,
+    ].map(srcsetCandidates);
+    const href = (src: string) => new URL(src, base).href;
+    const chosen = sets.find((set) => set.some((each) => href(each.src) === shown)) ?? [];
+    const current = chosen.find((each) => href(each.src) === shown)?.width || image.naturalWidth;
+    const view = this.#ownerDocument.defaultView;
+    const needed = image.offsetWidth * scale * (view?.devicePixelRatio ?? 1);
+    const next = sharperCandidate(
+      [
+        ...chosen,
+        ...srcsetCandidates(item.zoomSrcset),
+        ...(item.zoomSrc ? [{ src: item.zoomSrc, width: Infinity }] : []),
+      ],
+      current,
+      needed,
+    );
+    if (!next || href(next.src) === shown || next.src === slide.sharpened) return;
+    slide.sharpening?.abort();
+    const controller = new AbortController();
+    slide.sharpening = controller;
+    const version = slide.imageVersion;
+    const loader = this.#ownerDocument.createElement("img");
+    loader.src = next.src;
+    void loader
+      .decode()
+      .then(() => {
+        if (controller.signal.aborted || slide.imageVersion !== version) return;
+        // The same size on screen: the candidate's density keeps the image's
+        // natural size, which the slide's layout reads unzoomed.
+        const width = image.naturalWidth;
+        image.decoding = "sync";
+        for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
+        image.sizes = `${width}px`;
+        image.srcset = `${next.src} ${loader.naturalWidth}w`;
+        slide.sharpened = next.src;
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (slide.sharpening === controller) slide.sharpening = undefined;
+      });
+  }
+
+  /** Drop a slide's sharper zoom image, going back to its own sources. */
+  #blunt(index: number, slide: ViewerSlide) {
+    slide.sharpening?.abort();
+    slide.sharpening = undefined;
+    if (slide.sharpened && slide.loaded) this.#applyImage(index, slide);
+    slide.sharpened = undefined;
   }
 
   #load(index: number, slide: ViewerSlide) {
@@ -867,6 +953,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   #unload(slide: ViewerSlide) {
     slide.videoHandoff?.abort();
+    slide.sharpening?.abort();
+    slide.sharpening = undefined;
+    slide.sharpened = undefined;
     slide.previewController?.abort();
     slide.previewController = undefined;
     if (!slide.loaded) return;
@@ -903,6 +992,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.imageVersion += 1;
     const version = slide.imageVersion;
     slide.fullApplied = true;
+    slide.sharpened = undefined;
     // The full image decodes off the main thread. An image that already paints
     // a preview keeps it until the new source is ready; only an empty one hides.
     // A staged source is already decoded and swaps in on the next frame.
@@ -1010,6 +1100,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (slide.imageVersion !== version) return;
     delete image.dataset.fluidboxImagePending;
     if (slide.fullApplied) slide.error.hidden = true;
+    // Zoomed in before the full image came: sharpen it now.
+    const zoomed = this.#zoomed;
+    if (
+      zoomed &&
+      zoomed.scale > 1 &&
+      zoomed.index === this.#index &&
+      slide === this.#slides.get(zoomed.index)
+    ) {
+      this.sharpen(zoomed.scale);
+    }
   }
 
   #retry(index: number) {

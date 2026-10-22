@@ -5,6 +5,7 @@ import type {
   FluidboxItems,
   FluidboxState,
   FluidboxTarget,
+  FluidboxZoomCommandOptions,
 } from "@ogdakke/fluidbox";
 
 /** What a renderer gets: the item, its index and an abort signal. */
@@ -33,6 +34,14 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   close(options?: FluidboxCommandOptions): Promise<boolean>;
   next(options?: FluidboxCommandOptions): Promise<boolean>;
   previous(options?: FluidboxCommandOptions): Promise<boolean>;
+  /** Zoom the image on show to a scale between 1 and the zoom's `max`. */
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom in by 1.5. */
+  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom out by 1.5. */
+  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom back out to fit. */
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;

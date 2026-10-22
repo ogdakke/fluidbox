@@ -22,6 +22,7 @@ documentation is in `apps/docs/content` ([API reference](../apps/docs/content/ap
 | `@ogdakke/fluidbox/elements`    | Defines the custom elements on import. Browser only. The only entry that registers elements.                                 |
 | `@ogdakke/fluidbox/filmstrip`   | Registers the filmstrip add-on on import. Exports its types only. SSR-safe.                                                  |
 | `@ogdakke/fluidbox/sheet`       | Registers the sheet add-on on import. Exports its types only. SSR-safe. Styles in `sheet.css`.                               |
+| `@ogdakke/fluidbox/hover-zoom`  | `hoverZoom` and its options: magnifies a photo on the page under a resting mouse. No side effects. SSR-safe.                 |
 | `@ogdakke/fluidbox/kit`         | The binding kit for framework bindings. Not needed by app code.                                                              |
 | `@ogdakke/fluidbox/<framework>` | `react`, `solid`, `vue`, `angular`: built on the plain API and the kit only, never the custom elements.                      |
 
@@ -51,7 +52,7 @@ and remakes only the rest. Bindings pass their `items` straight through.
 ## The fluidbox
 
 `createFluidbox(options)` returns a `Fluidbox`, an `EventTarget` with `state`, `items`, `sheet`,
-`filmstrip`, `open`, `close`, `next`, `previous`, `setItems`, `preload`, `bind`, `bindOverlay`,
+`filmstrip`, `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `resetZoom`, `setItems`, `preload`, `bind`, `bindOverlay`,
 `subscribe` and `destroy`.
 
 - A target is an index or an id. `open(target?)` opens, or moves while open; without a target it
@@ -61,13 +62,17 @@ and remakes only the rest. Bindings pass their `items` straight through.
   rejects with a `RangeError`. After `destroy()` the commands resolve `false`, and `setItems`,
   `preload`, `bind`, `bindOverlay` and `subscribe` throw an `InvalidStateError`.
 - `destroy()` releases every `bind` and `bindOverlay`.
+- The zoom commands clamp their scale to `state.zoom`'s bounds and resolve `false` while
+  `state.zoom` is `null`. `zoomTo` with a scale that isn't finite rejects with a `RangeError`.
 - Options are read once, except `renderers` (read when a slide mounts) and `origins` (read on each
   use).
 
 ## State and events
 
 `state` is a frozen snapshot: `status`, `id`, `index`, `item`, `count`, `hasPrevious`,
-`hasNext`. `id`, `index` and `item` are where the viewer is or is going, `null` while closed.
+`hasNext`, `zoom`. `id`, `index` and `item` are where the viewer is or is going, `null` while closed.
+`zoom` is `{ scale, min, max }` while open on an image with zoom on, else `null`; its `scale` is the
+one the zoom last rested at.
 `subscribe` is called after each new snapshot, never per animation frame; per-frame values stay in
 CSS variables.
 
@@ -78,6 +83,8 @@ CSS variables.
 | `beforeitemchange` | `FluidboxChangeEvent` | yes        | Before the open viewer moves to another item.      |
 | `itemchange`       | `FluidboxChangeEvent` | no         | The active item changes, the opening one included. |
 | `settle`           | `FluidboxChangeEvent` | no         | The viewer comes to rest on an item.               |
+| `sheetchange`      | `FluidboxSheetEvent`  | no         | The sheet comes to rest at another stop.           |
+| `zoomchange`       | `FluidboxZoomEvent`   | no         | The image on show comes to rest at another zoom.   |
 
 Every event has a `reason`: `api`, `trigger`, `keyboard`, `pointer`, `wheel`, `filmstrip` or
 `items`. The before-events run synchronously for every command, whatever its source; a prevented
@@ -100,7 +107,8 @@ Custom content outside the bounded slide window is disposed and may mount again 
 ## Labels
 
 Every string the viewer shows or announces is in `FluidboxLabels` (`viewer`, `close`, `previous`,
-`next`, `position`, `slides`, `filmstrip`, `filmstripList`, `zoomed`, `sheet`), with English
+`next`, `position`, `slides`, `filmstrip`, `filmstripList`, `zoomed`, `zoomIn`, `zoomOut`,
+`zoomReset`, `zoomLevel`, `sheet`, …), with English
 defaults, overridden through `labels`.
 
 ## Styling hooks
