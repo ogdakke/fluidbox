@@ -205,6 +205,8 @@ export class DomViewerDriver<
   readonly #themeProperties = new Set<string>();
   #forceImmediateClose = false;
   #destroyed = false;
+  /** Counts opens, closes and the destroy, so an open that was called off knows whether one came after it. */
+  #operation = 0;
 
   readonly #labels: FluidboxLabels;
 
@@ -491,6 +493,14 @@ export class DomViewerDriver<
   }
 
   async open(context: ViewerSessionMotionContext<TItem>) {
+    const operation = ++this.#operation;
+    // Every wait below can end with the open called off: by a close, a destroy,
+    // new items or the caller's signal. It then stops before touching the page.
+    const abandoned = () => {
+      if (!context.signal.aborted && !this.#destroyed) return false;
+      this.#abandonOpen(operation);
+      return true;
+    };
     // The session has just hidden the card's image. Keep it painted until the
     // opening's first frame is ready to cover it, or the card blinks empty.
     this.#keepThumbnailVisible(context.origin?.thumbnail);
@@ -498,7 +508,7 @@ export class DomViewerDriver<
     // An overlay registered just before the open still travels with it.
     if (this.#overlaysLoad && !this.#thumbnailOverlays) {
       await this.#overlaysLoad;
-      if (context.signal.aborted) return;
+      if (abandoned()) return;
     }
     const previous = activeViewer.claim(this.#viewerOwner);
     if (previous && !previous.closeImmediately()) {
@@ -509,6 +519,7 @@ export class DomViewerDriver<
     this.#endWheelHandoff();
     void this.#loadZoom();
     this.#cancelAnimations(true);
+    this.#removeFlight();
     const prepared =
       !context.instant &&
       this.#preparedOpen &&
@@ -522,6 +533,7 @@ export class DomViewerDriver<
     this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
       await this.#strip?.select(context.index, false);
+      if (abandoned()) return;
       if (!context.instant) {
         this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
       }
@@ -548,7 +560,7 @@ export class DomViewerDriver<
       // Hidden until the image can paint, so it replaces the server's copy in one frame.
       this.#keepThumbnailVisible(undefined);
       await this.#mediaReady();
-      if (context.signal.aborted) return;
+      if (abandoned()) return;
       this.#clearMotionStyles();
       this.#thumbnailOverlays?.prepare(context.item, context.index, this.#frame, "open", 0);
       this.#isolation.activate();
@@ -559,7 +571,7 @@ export class DomViewerDriver<
       return;
     }
     if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    if (context.signal.aborted) return;
+    if (abandoned()) return;
     if (this.#prefersReducedMotion()) {
       this.#keepThumbnailVisible(undefined);
       for (const animation of prepared?.animations ?? []) animation.cancel();
@@ -614,7 +626,7 @@ export class DomViewerDriver<
     await this.#play(animations, context.signal, () =>
       this.#thumbnailOverlays?.set("opening", 0, new DOMMatrix()),
     );
-    if (context.signal.aborted) return;
+    if (abandoned()) return;
     const reveals = this.#portal.dialog
       .getAnimations({ subtree: true })
       .filter(
@@ -626,7 +638,7 @@ export class DomViewerDriver<
         this.#waitForAnimation(animation, context.signal),
       ),
     );
-    if (context.signal.aborted) return;
+    if (abandoned()) return;
     this.#setState("open");
     // A gesture that interrupted the opening owns the overlays until it settles.
     if (!this.#dragGesture.active) this.#thumbnailOverlays?.set("open", 0, new DOMMatrix());
@@ -655,6 +667,7 @@ export class DomViewerDriver<
       const smooth =
         !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
       await this.#strip?.select(context.index, smooth, context.step);
+      if (context.signal.aborted || this.#destroyed) return;
     }
     this.#render(context.item, context.index);
     // The overlay is invisible while open. Moving it between slide frames
@@ -664,12 +677,13 @@ export class DomViewerDriver<
   }
 
   async close(context: ViewerSessionCloseContext) {
+    ++this.#operation;
     const settling = this.#extensions
       .map((extension) => extension.beforeClose?.())
       .filter((result): result is Promise<void> => result instanceof Promise);
     if (settling.length) {
       await Promise.all(settling);
-      if (context.signal.aborted) return;
+      if (context.signal.aborted || this.#destroyed) return;
     }
     this.#zoom?.suspend();
     this.#cancelAnimations(true);
@@ -683,6 +697,11 @@ export class DomViewerDriver<
     if (
       this.#forceImmediateClose ||
       this.#prefersReducedMotion() ||
+      // An open called off before the viewer showed has nothing painted to fly
+      // back, and an emptied source has no slide; unattached media measure 0.
+      !this.#portal.overlay.isConnected ||
+      !this.#source?.count ||
+      !this.#media.offsetWidth ||
       this.#extensions.some((extension) => extension.closesInPlace?.())
     ) {
       this.#preparedFlight = undefined;
@@ -740,7 +759,11 @@ export class DomViewerDriver<
               })
             : image.decode()
         ).catch(() => {});
-        if (context.signal.aborted) return this.#removeFlight();
+        if (context.signal.aborted || this.#destroyed) {
+          // A later open or close may have its own flight by now.
+          if (this.#flightMedia === media) this.#removeFlight();
+          return;
+        }
         source.dataset.fluidboxFlightSourceHidden = "";
         this.#flightSourceFrame?.setAttribute("data-fluidbox-flight-source-hidden", "");
         this.#flight?.style.removeProperty("visibility");
@@ -818,6 +841,7 @@ export class DomViewerDriver<
   destroy() {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    ++this.#operation;
     this.#keepThumbnailVisible(undefined);
     this.#lifetime.abort();
     this.#extensionLifetime?.abort();
@@ -855,12 +879,24 @@ export class DomViewerDriver<
     await Promise.race([shown, new Promise((resolve) => setTimeout(resolve, 3000))]);
   }
 
+  /**
+   * Put the page back after an open that was called off, unless a later open or
+   * close took the viewer over: that one finishes what the page shows.
+   */
+  #abandonOpen(operation: number) {
+    if (operation !== this.#operation || this.#destroyed) return;
+    this.#cancelAnimations(false);
+    this.#discardPreparation();
+    this.#clearMotionStyles();
+    this.#finishClose();
+  }
+
   get #frame() {
-    return this.#strip?.active.frame ?? this.#portal.frame;
+    return this.#strip?.current?.frame ?? this.#portal.frame;
   }
 
   get #media() {
-    return this.#strip?.active.image ?? this.#portal.media;
+    return this.#strip?.current?.image ?? this.#portal.media;
   }
 
   #render(item: TItem, index: number) {
@@ -1331,6 +1367,8 @@ export class DomViewerDriver<
     source: HTMLElement,
     prepared?: HTMLImageElement,
   ) {
+    // A close called off while its flight decoded leaves that flight behind.
+    this.#removeFlight();
     const ownerDocument = this.#portal.overlay.ownerDocument;
     const view = ownerDocument.defaultView!;
     const bounds = source.getBoundingClientRect();

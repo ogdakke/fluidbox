@@ -516,13 +516,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   destroy() {
     if (this.#lifetime.signal.aborted) return;
+    // Closed at once, so the state, the toggle and every subscriber end closed.
+    this.#reset();
     this.#lifetime.abort();
     for (const release of this.#bindings) release();
-    this.#abortReveal();
-    if (this.#pending) {
-      this.#pending.controller.abort();
-      this.#finish(this.#pending, aborted());
-    }
     this.#origins.clear();
     for (const overlay of this.#overlays.values()) overlay.dispose?.();
     this.#viewer?.destroy();
@@ -876,7 +873,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
             if (viewer && !context.signal.aborted) return viewer.select(context);
           })),
     ).then((settled) => {
-      if (!settled) return;
+      if (!settled || !this.#owns(operation)) return;
       if (opening) {
         this.#publish("open", index);
         this.#toggle("open");
@@ -905,7 +902,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       // A viewer that never loaded has painted nothing to close.
       this.#viewer?.close({ origin, signal: operation.controller.signal, reason }),
     ).then((settled) => {
-      if (!settled) return;
+      if (!settled || !this.#owns(operation)) return;
       this.#origins.restoreThumbnail();
       // A close that the items emptied has nothing left to refresh.
       this.#flushSourceRefresh();
@@ -965,6 +962,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       this.#finish(operation, null, error);
       return false;
     }
+    return this.#owns(operation);
+  }
+
+  /**
+   * Whether a command still owns the fluidbox. Asked again where it settles: a
+   * command issued in the microtasks between can have taken over.
+   */
+  #owns(operation: PendingCommand) {
     return (
       this.#pending === operation && !operation.settled && !operation.controller.signal.aborted
     );

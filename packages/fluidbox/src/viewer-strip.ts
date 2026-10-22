@@ -136,9 +136,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   get active() {
-    const slide = this.#slides.get(this.#index);
+    const slide = this.current;
     if (!slide) throw new Error("The viewer source has no active image.");
     return slide;
+  }
+
+  /** The slide on show, or undefined while the source is empty. */
+  get current(): ViewerSlide | undefined {
+    return this.#slides.get(this.#index);
   }
 
   /**
