@@ -43,6 +43,17 @@ export interface FluidboxImageItem extends FluidboxItemBase {
   readonly width: number;
   readonly height: number;
   readonly sources?: readonly FluidboxPictureSource[];
+  /**
+   * A larger image for zoom, as a master kept apart from the `srcset`. The
+   * viewer loads it once a zoom shows more pixels than the slide's own source
+   * has, and the hover zoom add-on magnifies it.
+   */
+  readonly zoomSrc?: string;
+  /**
+   * Larger candidates for zoom, with width descriptors. The viewer loads the
+   * smallest one that is sharp at the zoom it rests at.
+   */
+  readonly zoomSrcset?: string;
 }
 
 /** A `<video>`. */

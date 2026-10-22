@@ -258,6 +258,16 @@ fluidbox.addEventListener("zoomchange", (event) => {
 createFluidbox({ items: photos, controls: ["close", "zoomIn", "zoomOut", "zoomReset"] });
 // @ts-expect-error the zoom controls are named in camel case
 createFluidbox({ items: photos, controls: ["zoom-in"] });
+const masterPhoto: FluidboxImageItem = {
+  type: "img",
+  src: "/one.jpg",
+  alt: "",
+  width: 1,
+  height: 1,
+  zoomSrc: "/one-master.jpg",
+  zoomSrcset: "/one-3200.jpg 3200w, /one-6400.jpg 6400w",
+};
+void masterPhoto;
 
 const button = document.createElement("button");
 const unbind: () => void = fluidbox.bind(button, photos[0]!, {

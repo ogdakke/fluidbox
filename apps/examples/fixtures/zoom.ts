@@ -34,6 +34,7 @@ const items: readonly FluidboxItem[] = [
     alt: "A mountain lake",
     width: 1800,
     height: 1200,
+    zoomSrc: "/photos/1016.webp?master",
   },
   {
     id: "clip",

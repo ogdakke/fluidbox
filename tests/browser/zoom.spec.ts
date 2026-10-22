@@ -234,6 +234,100 @@ test.describe("zoom by pointer", () => {
   });
 });
 
+test.describe("a sharper image as it zooms", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+  test.skip(({ isMobile }) => isMobile, "Thresholds measured at a pixel ratio of 1.");
+
+  /** The query strings of the requests for one photo, in order. */
+  function requestsOf(page: Page, path: string) {
+    const seen: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (url.pathname === path) seen.push(url.search);
+    });
+    return seen;
+  }
+
+  const box = async (page: Page) => {
+    const rect = (await page.locator(shownMedia).boundingBox())!;
+    return [rect.x, rect.y, rect.width, rect.height].map((value) => Math.round(value * 10) / 10);
+  };
+
+  test("a larger candidate loads only past its threshold, and swaps in without a move", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const requests = requestsOf(page, "/photos/1015.webp");
+    await openOn(page, "ladder");
+    const source = () =>
+      page.locator(shownMedia).evaluate((image: HTMLImageElement) => image.currentSrc);
+    await expect.poll(source).toContain("?w=2160");
+    // 1080 px across at 1.5 is 1620 px: the 2160w candidate has them.
+    await page.evaluate(() => window.zoomViewer.zoomTo(1.5));
+    await page.waitForTimeout(400);
+    expect(requests).not.toContain("?w=4320");
+    // At 2.5 it is 2700: the next candidate up, decoded before it shows.
+    await page.evaluate(() => window.zoomViewer.zoomTo(2.5));
+    const before = await box(page);
+    const scroll = await page
+      .locator("[data-fluidbox-zoom-viewport]")
+      .evaluate((viewport) => [viewport.scrollLeft, viewport.scrollTop]);
+    await expect.poll(source).toContain("?w=4320");
+    expect(await box(page)).toEqual(before);
+    expect(
+      await page
+        .locator("[data-fluidbox-zoom-viewport]")
+        .evaluate((viewport) => [viewport.scrollLeft, viewport.scrollTop]),
+    ).toEqual(scroll);
+    expect(requests.filter((search) => search === "?w=4320")).toHaveLength(1);
+    // Zoomed back out, it keeps the sharper image at the same size.
+    await page.evaluate(() => window.zoomViewer.resetZoom());
+    const fitted = await box(page);
+    expect(fitted[2]).toBeCloseTo(before[2]! / 2.5, 0);
+    expect(await source()).toContain("?w=4320");
+    // The cap: there is nothing past the largest candidate.
+    await page.evaluate(() => window.zoomViewer.zoomTo(4));
+    await page.waitForTimeout(300);
+    expect(requests.filter((search) => search === "?w=4320")).toHaveLength(1);
+  });
+
+  test("a slide that leaves drops its sharper image, and neighbours never get one", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const masters = requestsOf(page, "/photos/1016.webp");
+    await openOn(page, "ladder");
+    // The image moves into the zoom's scroller and back; follow the element.
+    await page.locator(activeMedia).evaluate((image) => (image.dataset.testLadder = ""));
+    const ladder = page.locator("img[data-test-ladder]");
+    await page.evaluate(() => window.zoomViewer.zoomTo(3));
+    await expect
+      .poll(() => ladder.evaluate((image: HTMLImageElement) => image.currentSrc))
+      .toContain("?w=4320");
+    expect(masters).not.toContain("?master");
+    await page.evaluate(() => window.zoomViewer.next());
+    await expect(page.locator(dialog)).not.toHaveAttribute("data-zoomed", "");
+    // The ladder is a neighbour now, back on its own sources.
+    await expect(ladder).toHaveAttribute("srcset", /\?w=540 540w/);
+    await expect(ladder).toHaveAttribute("sizes", "2160px");
+  });
+
+  test("zoomSrc loads once the image's own pixels run out", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const requests = requestsOf(page, "/photos/1016.webp");
+    await openOn(page, "master");
+    const source = () =>
+      page.locator(shownMedia).evaluate((image: HTMLImageElement) => image.currentSrc);
+    await expect.poll(source).toContain("?w=1080");
+    // The 1800 px photo shows 1080 px across: enough up to 1.67.
+    await page.evaluate(() => window.zoomViewer.zoomTo(1.5));
+    await page.waitForTimeout(400);
+    expect(requests).not.toContain("?master");
+    await page.evaluate(() => window.zoomViewer.zoomTo(2));
+    await expect.poll(source).toContain("?master");
+  });
+});
+
 test.describe("zoom by keyboard", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
 
