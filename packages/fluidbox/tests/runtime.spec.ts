@@ -4,6 +4,7 @@ import { hostOf } from "../src/host";
 import type {
   FluidboxItem,
   FluidboxItemChangeEvent,
+  FluidboxZoomEvent,
   FluidboxOptions,
   FluidboxToggleEvent,
 } from "../src/public-api";
@@ -42,7 +43,17 @@ class TestDriver {
   readonly steps: Deferred[] = [];
   destroyed = false;
   registerThumbnailOverlay: (...args: unknown[]) => void | (() => void) = () => {};
-  connect() {}
+  controller: { zoomed?(scale: number, reason?: string): void } | undefined;
+  readonly zooms: Array<{ scale: number; reason?: string; origin?: unknown }> = [];
+  connect(controller: TestDriver["controller"]) {
+    this.controller = controller;
+  }
+  zoomTo(scale: number, options: { reason?: string; origin?: unknown }) {
+    this.zooms.push({ scale, reason: options.reason, origin: options.origin });
+    // The zoom comes to rest at once, as with reduced motion.
+    this.controller?.zoomed?.(scale, options.reason);
+    return Promise.resolve(true);
+  }
   setZoom() {}
   setLoop() {}
   relabel() {}
@@ -382,5 +393,67 @@ describe("the fluidbox runtime", () => {
     expect(driver.destroyed).toBe(true);
     await expect(fluidbox.open("two")).resolves.toBe(false);
     expect(driver.opens).toHaveLength(1);
+  });
+});
+
+describe("zoom", () => {
+  async function opened(options: Partial<FluidboxOptions<Item>> = {}) {
+    const driver = new TestDriver();
+    const fluidbox = make(driver, options);
+    const result = fluidbox.open("one");
+    driver.steps[0]!.resolve();
+    await result;
+    return { driver, fluidbox };
+  }
+
+  it("has no zoom while closed, and resolves false", async () => {
+    const driver = new TestDriver();
+    const fluidbox = make(driver);
+    expect(fluidbox.state.zoom).toBeNull();
+    await expect(fluidbox.zoomIn()).resolves.toBe(false);
+    expect(driver.zooms).toEqual([]);
+  });
+
+  it("publishes the scale it rests at, once, with a zoomchange", async () => {
+    const { driver, fluidbox } = await opened({ zoom: { max: 3 } });
+    expect(fluidbox.state.zoom).toEqual({ scale: 1, min: 1, max: 3 });
+    const events: string[] = [];
+    fluidbox.addEventListener("zoomchange", (event) => {
+      const { scale, reason } = event as FluidboxZoomEvent;
+      events.push(`${scale}:${reason}`);
+    });
+    const states: number[] = [];
+    fluidbox.subscribe((state) => states.push(state.zoom!.scale));
+
+    await expect(fluidbox.zoomTo(2, { origin: { x: 10, y: 20 } })).resolves.toBe(true);
+    await fluidbox.zoomIn();
+    await fluidbox.zoomTo(9);
+    await fluidbox.zoomOut();
+    await fluidbox.resetZoom();
+
+    expect(driver.zooms.map(({ scale }) => scale)).toEqual([2, 3, 3, 2, 1]);
+    expect(driver.zooms[0]).toMatchObject({ reason: "api", origin: { x: 10, y: 20 } });
+    expect(states).toEqual([2, 3, 2, 1]);
+    expect(events).toEqual(["2:api", "3:api", "2:api", "1:api"]);
+    await expect(fluidbox.zoomTo(Number.NaN)).rejects.toThrow(RangeError);
+  });
+
+  it("starts another item at fit, and has none with zoom off", async () => {
+    const { fluidbox } = await opened();
+    await fluidbox.zoomTo(2);
+    expect(fluidbox.state.zoom?.scale).toBe(2);
+    void fluidbox.next();
+    expect(fluidbox.state).toMatchObject({ id: "two", zoom: { scale: 1 } });
+    fluidbox.update({ zoom: false });
+    expect(fluidbox.state.zoom).toBeNull();
+    await expect(fluidbox.zoomIn()).resolves.toBe(false);
+  });
+
+  it("resolves false after destroy and with an aborted signal", async () => {
+    const { driver, fluidbox } = await opened();
+    await expect(fluidbox.zoomIn({ signal: AbortSignal.abort() })).resolves.toBe(false);
+    fluidbox.destroy();
+    await expect(fluidbox.zoomIn()).resolves.toBe(false);
+    expect(driver.zooms).toEqual([]);
   });
 });
