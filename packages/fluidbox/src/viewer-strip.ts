@@ -212,9 +212,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const shown = previous.count ? idOf(previous.getItem(index)) : null;
     const recycled = new Map<string, { item: TItem; slide: ViewerSlide }[]>();
     for (const [position, slide] of this.#slides) {
-      const item = previous.getItem(this.#item(position));
+      const at = this.#item(position);
+      const item = previous.getItem(at);
       const id = idOf(item);
-      const next = source.getIndex(id);
+      // Most items stay where they were; a lazy list without indexOf finds an id by scanning.
+      const next = at < source.count && idOf(source.getItem(at)) === id ? at : source.getIndex(id);
       if (next !== null && sameItem(item, source.getItem(next))) {
         recycled.set(id, [...(recycled.get(id) ?? []), { item, slide }]);
       } else {
@@ -797,10 +799,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           .then(() => {
             if (controller.signal.aborted) return;
             slide.decoded = true;
-            this.#applyImage(index, slide);
+            // New items may have moved the slide while it decoded.
+            this.#applyImage(slide.position, slide);
           })
           .catch(() => {
-            if (!controller.signal.aborted) this.#fail(index, slide);
+            if (!controller.signal.aborted) this.#fail(slide.position, slide);
           })
           .finally(() => {
             controller.signal.removeEventListener("abort", abort);
