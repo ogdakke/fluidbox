@@ -104,7 +104,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#renderers = renderers;
     this.element = ownerDocument.createElement("div");
     this.element.dataset.fluidboxSlides = "";
-    this.element.setAttribute("aria-label", labels.slides);
+    this.element.setAttribute("role", "region");
+    this.#labelStrip();
     this.#renderWindow(0, 0);
     const { signal } = this.#controller;
     this.element.addEventListener("scroll", this.#onScroll, { passive: true, signal });
@@ -191,6 +192,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   setSource(source: FluidboxSource<TItem>) {
     this.#resolveSelection();
+    this.#focusable(source.count);
     this.#unfence();
     const index = this.index;
     this.#source = source;
@@ -303,15 +305,41 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   /** Show the labels again after they changed in place. */
   relabel() {
-    this.element.setAttribute("aria-label", this.#labels.slides);
+    this.#labelStrip();
     for (const [index, slide] of this.#slides) {
-      slide.element.setAttribute(
-        "aria-label",
-        this.#labels.position(this.#item(index), this.#source.count),
-      );
+      this.#labelSlide(slide.element, index);
       slide.retry.textContent = this.#labels.retry;
       slide.error.firstChild!.textContent = `${this.#labels.error} `;
     }
+  }
+
+  #labelStrip() {
+    this.element.setAttribute("aria-label", this.#labels.slides);
+    this.element.setAttribute("aria-roledescription", this.#labels.carousel);
+    this.#focusable(this.#source.count);
+  }
+
+  /**
+   * A gallery's strip scrolls, so it takes focus, where the arrow keys move
+   * through it. A single item's doesn't.
+   */
+  #focusable(count: number) {
+    this.element.tabIndex = count > 1 ? 0 : -1;
+  }
+
+  #labelSlide(element: HTMLElement, index: number) {
+    element.setAttribute(
+      "aria-label",
+      this.#labels.position(this.#item(index), this.#source.count),
+    );
+    element.setAttribute("aria-roledescription", this.#labels.slide);
+  }
+
+  /** Show one slide to assistive technology and the keyboard, and hide another. */
+  #present(slide: ViewerSlide | undefined, shown: boolean) {
+    if (!slide) return;
+    slide.element.setAttribute("aria-hidden", String(!shown));
+    slide.element.inert = !shown;
   }
 
   #makeSlide(index: number) {
@@ -319,11 +347,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const element = this.#ownerDocument.createElement("div");
     element.dataset.fluidboxSlide = "";
     element.setAttribute("role", "group");
-    element.setAttribute(
-      "aria-label",
-      this.#labels.position(this.#item(index), this.#source.count),
-    );
-    element.setAttribute("aria-hidden", String(index !== this.#index));
+    this.#labelSlide(element, index);
     const frame = this.#ownerDocument.createElement("div");
     frame.dataset.fluidboxFrame = "";
     // Size against the slide (a size container), never the viewport: 100vw
@@ -389,7 +413,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         },
         { signal: this.#controller.signal },
       );
-      image.addEventListener("error", () => this.#fail(index, slide), {
+      image.addEventListener("error", () => this.#fail(slide), {
         signal: this.#controller.signal,
       });
       picture.append(image);
@@ -403,6 +427,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       video.loop = item.loop ?? false;
       video.muted = item.muted ?? false;
       video.setAttribute("aria-label", item.title);
+      for (const track of item.tracks ?? []) {
+        const element = this.#ownerDocument.createElement("track");
+        element.src = track.src;
+        if (track.kind) element.kind = track.kind;
+        if (track.srclang) element.srclang = track.srclang;
+        if (track.label) element.label = track.label;
+        element.default = !!track.default;
+        video.append(element);
+      }
       frame.append(video);
       media = video;
     } else if (item.type === "iframe") {
@@ -418,6 +451,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     } else {
       const content = this.#ownerDocument.createElement("div");
       content.dataset.fluidboxItemContent = "";
+      content.setAttribute("role", "group");
       content.setAttribute("aria-label", item.title);
       frame.append(content);
       media = content;
@@ -441,6 +475,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       fullApplied: false,
       imageVersion: 0,
     } satisfies ViewerSlide;
+    this.#present(slide, index === this.#index);
     return slide;
   }
 
@@ -681,13 +716,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // The strip stays on the current slide and returns to it on settle.
     if (notify && !this.#ask(index)) return;
     const previous = this.#slides.get(this.#index);
-    previous?.element.setAttribute("aria-hidden", "true");
+    this.#present(previous, false);
     // A video left behind stops; one marked autoplay starts when it comes into view.
     if (previous?.image instanceof HTMLVideoElement) previous.image.pause();
-    if (previous) previous.retry.tabIndex = -1;
     this.#index = index;
-    this.active.element.setAttribute("aria-hidden", "false");
-    this.active.retry.tabIndex = 0;
+    this.#present(this.active, true);
+    // An error a hidden slide raised was not heard; say it as the slide arrives.
+    if (!this.active.error.hidden) this.#alert(this.active);
     this.#loadWindow();
     const media = this.#source.getItem(this.#item(index));
     const player = this.active.image;
@@ -719,6 +754,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     slide.error.hidden = true;
     if (item.type === "img" && slide.image instanceof HTMLImageElement && slide.picture) {
+      // Busy until the full image shows, or fails.
+      slide.element.setAttribute("aria-busy", "true");
       const current = slide.image.getAttribute("src");
       if (!current) {
         // Nothing paints yet, so the full image can stream straight in.
@@ -727,6 +764,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         // The preview is the full image. Rewriting the same source would make
         // Safari decode it again and paint nothing in between.
         slide.fullApplied = true;
+        slide.element.removeAttribute("aria-busy");
         slide.image.loading = "eager";
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
       } else {
@@ -749,7 +787,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
             this.#applyImage(index, slide);
           })
           .catch(() => {
-            if (!controller.signal.aborted) this.#fail(index, slide);
+            if (!controller.signal.aborted) this.#fail(slide);
           })
           .finally(() => {
             controller.signal.removeEventListener("abort", abort);
@@ -809,6 +847,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.decoded = false;
     slide.fullApplied = false;
     slide.error.hidden = true;
+    slide.element.removeAttribute("aria-busy");
     for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
     if (slide.image instanceof HTMLMediaElement) {
       slide.image.pause();
@@ -941,7 +980,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     if (slide.imageVersion !== version) return;
     delete image.dataset.fluidboxImagePending;
-    if (slide.fullApplied) slide.error.hidden = true;
+    if (slide.fullApplied) {
+      slide.error.hidden = true;
+      slide.element.removeAttribute("aria-busy");
+    }
   }
 
   #retry(index: number) {
@@ -959,9 +1001,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.decoded = false;
   }
 
-  #fail(index: number, slide: ViewerSlide) {
+  #fail(slide: ViewerSlide) {
+    slide.element.removeAttribute("aria-busy");
     slide.error.hidden = false;
-    slide.retry.tabIndex = index === this.#index ? 0 : -1;
+  }
+
+  /** Fill the slide's alert again, so it is announced. */
+  #alert(slide: ViewerSlide) {
+    const message = slide.error.firstChild!;
+    message.textContent = "";
+    setTimeout(() => (message.textContent = `${this.#labels.error} `), 150);
   }
 
   #onScroll = () => {

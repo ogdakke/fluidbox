@@ -265,8 +265,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** The viewer's layer: the default controls, then your viewer content. */
   #portal(): FluidboxViewerLayer {
     const { controls, viewer } = this.#settings;
-    // Like the elements and the bindings: the defaults until you draw your own viewer.
-    const shown = controls ?? !viewer;
+    // The defaults until you draw your own viewer, and Close after, until it
+    // draws its own: the one way out a screen reader's touch can count on.
+    const shown = controls ?? (viewer ? (["close"] as const) : true);
     const names = shown === true ? defaultControls : shown || [];
     return { fluidbox: this, controls: names, viewer, labels: this.#labels };
   }

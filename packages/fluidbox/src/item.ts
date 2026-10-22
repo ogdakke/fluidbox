@@ -3,6 +3,7 @@ import type {
   FluidboxPictureSource,
   FluidboxRenderer,
   FluidboxThumbnail,
+  FluidboxVideoTrack,
 } from "./public-api";
 
 export interface DeclarativeFluidboxDefinition {
@@ -144,6 +145,14 @@ export class FluidboxItemElement extends HTMLElement {
       }
       return { width, height };
     };
+    // Without a name of its own, content takes its trigger's, and the id only as a last resort.
+    const named = (name: string | null) => {
+      const fallback =
+        trigger?.getAttribute("aria-label") || triggerImage?.alt || trigger?.textContent?.trim();
+      if (name || fallback) return name || fallback!;
+      console.warn(`Fluidbox item ${id} has no accessible name; give its content an aria-label.`);
+      return id;
+    };
     const source = (element: Element, kind: string) => {
       const src = element.getAttribute("src");
       if (!src) throw new TypeError(`The ${kind} of item ${id} needs a src attribute.`);
@@ -175,12 +184,19 @@ export class FluidboxItemElement extends HTMLElement {
     if (content instanceof HTMLVideoElement) {
       const preload = content.getAttribute("preload");
       const poster = content.getAttribute("poster");
+      const tracks = Array.from(content.querySelectorAll("track"), (track) => ({
+        src: source(track, "track"),
+        ...(track.hasAttribute("kind") ? { kind: track.kind as FluidboxVideoTrack["kind"] } : {}),
+        ...(track.srclang ? { srclang: track.srclang } : {}),
+        ...(track.label ? { label: track.label } : {}),
+        ...(track.default ? { default: true } : {}),
+      }));
       // HTML's own defaults: a boolean attribute is on when present.
       return done({
         ...base,
         type: "video",
         src: source(content, "video"),
-        title: content.getAttribute("aria-label") || content.title || id,
+        title: named(content.getAttribute("aria-label") || content.title),
         ...sized(content, "video"),
         ...(poster ? { poster } : {}),
         autoplay: content.hasAttribute("autoplay"),
@@ -189,6 +205,7 @@ export class FluidboxItemElement extends HTMLElement {
         playsInline: content.hasAttribute("playsinline"),
         controls: content.hasAttribute("controls"),
         ...(preload === "none" || preload === "metadata" || preload === "auto" ? { preload } : {}),
+        ...(tracks.length ? { tracks } : {}),
       });
     }
 
@@ -200,7 +217,7 @@ export class FluidboxItemElement extends HTMLElement {
         ...base,
         type: "iframe",
         src: source(content, "iframe"),
-        title: content.title || id,
+        title: named(content.title),
         ...sized(content, "iframe"),
         ...(allow ? { allow } : {}),
         ...(referrerPolicy ? { referrerPolicy: referrerPolicy as ReferrerPolicy } : {}),
@@ -216,7 +233,7 @@ export class FluidboxItemElement extends HTMLElement {
         ...base,
         type: "custom",
         render: key,
-        title: this.getAttribute("aria-label") || id,
+        title: named(this.getAttribute("aria-label") || content.getAttribute("aria-label")),
         width: dimension(content, "width") || thumbnail?.width || 1,
         height: dimension(content, "height") || thumbnail?.height || 1,
       }),

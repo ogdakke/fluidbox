@@ -45,6 +45,17 @@ export interface FluidboxImageItem extends FluidboxItemBase {
   readonly sources?: readonly FluidboxPictureSource[];
 }
 
+/** A `<track>` of a video: captions, subtitles, descriptions or chapters. */
+export interface FluidboxVideoTrack {
+  readonly src: string;
+  /** @default "subtitles" */
+  readonly kind?: "subtitles" | "captions" | "descriptions" | "chapters" | "metadata";
+  readonly srclang?: string;
+  readonly label?: string;
+  /** Shown unless the viewer's own settings say otherwise. */
+  readonly default?: boolean;
+}
+
 /** A `<video>`. */
 export interface FluidboxVideoItem extends FluidboxItemBase {
   readonly type: "video";
@@ -64,6 +75,8 @@ export interface FluidboxVideoItem extends FluidboxItemBase {
   readonly controls?: boolean;
   /** @default "metadata" */
   readonly preload?: "none" | "metadata" | "auto";
+  /** Captions and other text tracks, drawn as `<track>` elements. */
+  readonly tracks?: readonly FluidboxVideoTrack[];
 }
 
 /** An `<iframe>`. It gets `loading="lazy"` and `allowfullscreen`. */

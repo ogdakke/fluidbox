@@ -64,7 +64,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 }
 
 :where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible) {
-  outline: 1px solid var(--fluidbox-focus-color, currentColor);
+  outline: 2px solid var(--fluidbox-focus-color, currentColor);
   outline-offset: 2px;
 }
 
@@ -189,6 +189,21 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: block;
 }
 
+/* Over a modal dialog the viewer and its flights are manual popovers in the
+   top layer. Drop the popover's own box; the rules below place them. */
+:is([data-fluidbox-overlay], [data-fluidbox-flight])[popover] {
+  inset: auto;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  color: inherit;
+  background: none;
+}
+
 [data-fluidbox-overlay][data-fluidbox-overlay] {
   position: absolute;
   top: 0;
@@ -203,6 +218,14 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
+}
+
+/* Once it is modal, focus can go into the dialog before the opening paints;
+   the overlay's opacity still hides it. */
+[data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-prepared][data-fluidbox-modal]
+  > [data-fluidbox-container]
+  > [data-fluidbox-dialog] {
+  visibility: visible;
 }
 
 [data-fluidbox-flight][data-fluidbox-flight] {
@@ -308,8 +331,14 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]:focus-visible {
-  outline: 1px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: 2px;
+  /* The dialog fills the window, so its ring goes inside. */
+  outline: 2px solid var(--fluidbox-focus-color, currentColor);
+  outline-offset: -4px;
+}
+
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slides]:focus-visible {
+  outline: 2px solid var(--fluidbox-focus-color, currentColor);
+  outline-offset: calc(-4px - var(--fluidbox-slide-gap, 0px) / 2);
 }
 
 :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-media] {
@@ -874,9 +903,48 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close]:focus-visible {
+/**
+ * The dark edge inside the controls' focus rings, which keeps a light ring
+ * visible over a bright photo.
+ * @input --fluidbox-focus-contrast
+ * @default `black`
+ * @theme
+ */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is(
+    [data-fluidbox-previous],
+    [data-fluidbox-next],
+    [data-fluidbox-close],
+    [data-fluidbox-error] button
+  ):focus-visible {
   outline: 2px solid var(--fluidbox-focus-color, currentColor);
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--fluidbox-focus-contrast, black);
+}
+
+/* Windows high contrast and other forced colours drop backgrounds and shadows,
+   so the controls get an edge, and focus and disabled states a system colour. */
+@media (forced-colors: active) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+    :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+    border: 1px solid ButtonText;
+  }
+  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+    :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
+    border-color: GrayText;
+    color: GrayText;
+  }
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* More contrast: disabled controls stay legible. */
+@media (prefers-contrast: more) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+    :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
+    --fluidbox-gallery-control-opacity: 0.6;
+  }
 }
 
 /* A viewer the server rendered covers the page until the runtime takes it over.

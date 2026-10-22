@@ -194,7 +194,8 @@ for (const framework of frameworks) {
       const caption = dialog(page).locator(".pattern-caption");
       await expect(caption.locator('[data-test="counter"]')).toHaveText("1 / 4");
       await expect(caption.locator('[data-test="title"]')).not.toBeEmpty();
-      await expect(dialog(page).locator("[data-fluidbox-close]")).toHaveCount(0);
+      // The caption's close calls close(); the default Close stays as a way out.
+      await expect(dialog(page).locator("[data-fluidbox-close]")).toHaveCount(1);
       await caption.locator('[data-test="next"]').click();
       await expect(caption.locator('[data-test="counter"]')).toHaveText("2 / 4");
       await caption.locator('[data-test="close"]').click();

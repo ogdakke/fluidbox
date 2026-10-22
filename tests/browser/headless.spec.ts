@@ -83,28 +83,33 @@ test("clicking the empty gallery slide closes the lightbox", async ({ page }, te
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
 });
 
-test("plain runtime contains focus and applies the established gallery keyboard policy", async ({
+test("plain runtime contains focus, leaves Tab to the browser and keeps page keys from closing", async ({
   page,
 }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
   const overlay = page.locator("[data-fluidbox-overlay]");
   await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
-  await expect(page.locator("[data-fluidbox-dialog]")).toBeFocused();
+  // A viewer of your own keeps the default Close, which takes focus.
+  const close = page.locator("[data-fluidbox-dialog] [data-fluidbox-close]");
+  await expect(close).toBeFocused();
 
+  // Tab is the browser's: it walks the dialog in order, and the page behind is inert.
   await page.keyboard.press("Tab");
   await expect(page.locator("[data-demo-next]")).toBeFocused();
   await page.keyboard.press("Shift+Tab");
-  await expect(page.locator("[data-demo-close]")).toBeFocused();
+  await expect(close).toBeFocused();
 
   await page.locator("h1").evaluate((heading) => {
     heading.closest("main")!.removeAttribute("inert");
     heading.setAttribute("tabindex", "-1");
     (heading as HTMLElement).focus();
   });
-  await expect(page.locator("[data-fluidbox-dialog]")).toBeFocused();
+  await expect(close).toBeFocused();
 
   await page.keyboard.press("PageDown");
+  await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
+  await page.keyboard.press("Escape");
   await expect(overlay).toHaveCount(0);
   await expect(page.locator('[data-photo-id="one"]')).toBeFocused();
 });

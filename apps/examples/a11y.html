@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fluidbox accessibility fixture</title>
+    <script type="module" src="/fixtures/a11y.ts"></script>
+  </head>
+  <body>
+    <main id="fixture">
+      <h1>Accessibility</h1>
+      <div class="a11y-triggers" data-test="triggers"></div>
+      <button type="button" data-test="quick-view">Quick view</button>
+      <dialog data-test="quick">
+        <p>Quick view</p>
+        <div data-test="quick-triggers"></div>
+        <button type="button" data-test="quick-close">Close quick view</button>
+      </dialog>
+    </main>
+    <div role="status" data-test="live"></div>
+    <div data-fluidbox-exempt data-test="exempt"><button type="button">Exempt</button></div>
+  </body>
+</html>

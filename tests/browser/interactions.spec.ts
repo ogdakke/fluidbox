@@ -69,11 +69,12 @@ test("declarative items carry placeholder images into neighboring slides", async
   ).toHaveAttribute("src", placeholder);
 });
 
-test("a viewer template replaces the default controls", async ({ page }) => {
+test("a viewer template replaces the default controls but Close", async ({ page }) => {
   await page.goto("/harness.html?viewer-template");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   await page.locator("fluidbox-item").first().click();
-  await expect(page.locator("[data-fluidbox-dialog] [data-fluidbox-close]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-dialog] [data-fluidbox-close]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-dialog] [data-fluidbox-previous]")).toHaveCount(0);
   await page.locator("[data-fluidbox-dialog] [data-test-next]").click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",

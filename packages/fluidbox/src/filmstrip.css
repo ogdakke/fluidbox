@@ -180,10 +180,33 @@
   [data-fluidbox-filmstrip-item][aria-selected="true"] {
   opacity: 1;
 }
+/* Not by opacity alone: the current thumbnail has a bar along its foot. A
+   border, so it stays in forced colours. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-filmstrip-item][aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 25%;
+  bottom: 3px;
+  border-top: 3px solid var(--fluidbox-color, white);
+  border-radius: 2px;
+  box-shadow: 0 0 2px oklch(0% 0 0 / 0.6);
+}
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-filmstrip-item]:focus-visible {
   outline: 2px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: -2px;
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+    [data-fluidbox-filmstrip-item][aria-selected="true"] {
+    outline: 2px solid SelectedItem;
+  }
+}
+@media (prefers-contrast: more) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip-item] {
+    opacity: 0.8;
+  }
 }
 @media (hover: none) and (pointer: coarse) {
   :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-filmstrip] {

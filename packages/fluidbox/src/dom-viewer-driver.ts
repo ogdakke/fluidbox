@@ -1,4 +1,4 @@
-import { drawViewerLayer } from "./viewer-layer";
+import { controlSelector, drawViewerLayer } from "./viewer-layer";
 import { idOf } from "./items";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
@@ -44,6 +44,8 @@ import type {
 } from "./runtime-types";
 import {
   createViewerPortal,
+  mountViewerPortal,
+  raiseWithViewer,
   ViewerModalIsolation,
   type ViewerPortalElements,
 } from "./viewer-portal";
@@ -64,16 +66,23 @@ const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
 const WHEEL_HANDOFF_TIMEOUT = 1200;
-/** Keys that close a gallery when pressed outside content that owns its input. */
-const verticalKeys = new Set(["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown"]);
-/** Keys that move through items: the viewer's own, or a strip's that owns its input. */
-const navigationKeys = new Set([...verticalKeys, "ArrowLeft", "ArrowRight"]);
+/**
+ * Content that handles Escape itself: a dialog or popover inside the viewer,
+ * an open menu or combobox.
+ */
+/** Content whose keys are its own: widgets that move with arrow keys, and content that owns its input. */
+const KEY_OWNERS =
+  "[data-fluidbox-owns-input], [role=radiogroup], [role=slider], [role=tablist], [role=listbox], [role=menu], [role=menubar], [role=grid], [role=treegrid], [role=tree], [role=toolbar], [role=combobox], [role=spinbutton]";
+const ESCAPE_OWNERS =
+  "dialog[open], [popover], [role=menu], [role=menubar], [role=combobox][aria-expanded=true]";
 const FOCUSABLE_HOST_SELECTOR =
   "[tabindex], a[href], button, input, select, textarea, summary, video[controls], audio[controls], iframe";
 
 function focusableHostFor(element: HTMLElement | null) {
   return element?.parentElement?.closest<HTMLElement>(FOCUSABLE_HOST_SELECTOR) ?? null;
 }
+
+let descriptions = 0;
 
 interface PaintedPose extends ImageTransitionPose {
   readonly frameOpacity: string;
@@ -205,6 +214,9 @@ export class DomViewerDriver<
   readonly #themeProperties = new Set<string>();
   #forceImmediateClose = false;
   #destroyed = false;
+  #announcement: ReturnType<typeof setTimeout> | undefined;
+  /** The element last focused in the dialog. */
+  #lastFocus: HTMLElement | null = null;
 
   readonly #labels: FluidboxLabels;
 
@@ -257,14 +269,24 @@ export class DomViewerDriver<
         signal: this.#lifetime.signal,
       });
     }
-    ownerDocument.addEventListener("keydown", this.#onKeydown, {
-      capture: true,
-      signal: this.#lifetime.signal,
-    });
+    // In the bubble phase, so content inside the viewer sees its keys first.
+    ownerDocument.addEventListener("keydown", this.#onKeydown, { signal: this.#lifetime.signal });
     ownerDocument.addEventListener("focusin", this.#onFocus, {
       capture: true,
       signal: this.#lifetime.signal,
     });
+    this.#portal.dialog.addEventListener(
+      "focusin",
+      (event) => (this.#lastFocus = event.target instanceof HTMLElement ? event.target : null),
+      { signal: this.#lifetime.signal },
+    );
+    const changes = new MutationObserver(this.#onDialogChange);
+    changes.observe(this.#portal.dialog, {
+      subtree: true,
+      childList: true,
+      attributeFilter: ["disabled", "inert", "data-fluidbox-description"],
+    });
+    this.#lifetime.signal.addEventListener("abort", () => changes.disconnect());
     const ownerWindow = ownerDocument.defaultView;
     ownerWindow?.addEventListener("resize", this.#onResize, { signal: this.#lifetime.signal });
     ownerWindow?.addEventListener("scroll", this.#onPageScroll, {
@@ -303,7 +325,7 @@ export class DomViewerDriver<
     const controller = this.#controller;
     const index = controller?.state.index ?? null;
     if (index !== null && this.#source && index < this.#source.count) {
-      this.#render(this.#source.getItem(index), index);
+      this.#render(this.#source.getItem(index), index, false);
     } else {
       this.#portal.dialog.setAttribute("aria-label", this.#labels.viewer);
     }
@@ -468,9 +490,9 @@ export class DomViewerDriver<
     this.#stage(context.origin?.trigger ?? null);
     void this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
-    this.#render(context.item, context.index);
+    this.#render(context.item, context.index, false);
     this.#portal.overlay.dataset.fluidboxPrepared = "";
-    this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
+    mountViewerPortal(this.#portal.overlay);
     this.#strip?.mount();
     for (const extension of this.#extensions) extension.attach?.();
 
@@ -526,7 +548,8 @@ export class DomViewerDriver<
         this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
       }
     }
-    this.#render(context.item, context.index);
+    // The dialog's name says what it shows, so the opening announces only where.
+    this.#render(context.item, context.index, "");
     this.#setActiveTrigger(context.origin?.trigger ?? null);
     this.#returnFocus =
       context.origin?.trigger ??
@@ -536,13 +559,17 @@ export class DomViewerDriver<
     this.#returnFocusFallback = focusableHostFor(this.#returnFocus);
     if (!this.#portal.overlay.isConnected) {
       this.#portal.overlay.dataset.fluidboxPrepared = "";
-      this.#portal.overlay.ownerDocument.body.append(this.#portal.overlay);
+      mountViewerPortal(this.#portal.overlay);
     }
     this.#strip?.mount();
     for (const extension of this.#extensions) extension.attach?.();
     // An instant open waits for its image while the server's copy, inside the
     // page, stays usable; the page goes inert once the viewer shows.
-    if (!context.instant) this.#isolation.activate();
+    if (!context.instant) {
+      this.#isolation.activate();
+      // The trigger is inert now; focus goes in before the flight starts.
+      this.#focusUnlessInside();
+    }
     this.#setState("opening");
     if (context.instant) {
       // Hidden until the image can paint, so it replaces the server's copy in one frame.
@@ -656,7 +683,7 @@ export class DomViewerDriver<
         !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
       await this.#strip?.select(context.index, smooth, context.step);
     }
-    this.#render(context.item, context.index);
+    this.#render(context.item, context.index, true);
     // The overlay is invisible while open. Moving it between slide frames
     // during native scrolling can invalidate the browser's painted snap.
     // A scrub is a direct preview. The full-size image swaps immediately
@@ -863,14 +890,26 @@ export class DomViewerDriver<
     return this.#strip?.active.image ?? this.#portal.media;
   }
 
-  #render(item: TItem, index: number) {
+  /** Name the dialog for an item, and announce it: by `name`, by its own name, or not. */
+  #render(item: TItem, index: number, announce: string | boolean) {
     const label = item.type === "img" ? item.alt : item.title;
     this.#portal.dialog.setAttribute("aria-label", label || this.#labels.viewer);
-    this.#portal.status.textContent = this.#labels.position(
-      index,
-      this.#controller?.state.count ?? 1,
-    );
+    const count = this.#controller?.state.count ?? 1;
+    if (announce !== false && count > 1) {
+      this.#announce(this.#labels.announcement(announce === true ? label : announce, index, count));
+    }
     this.#trackMedia();
+  }
+
+  #announce(text: string) {
+    const status = this.#portal.status;
+    clearTimeout(this.#announcement);
+    status.textContent = "";
+    // A live region filled as it enters the page, or twice in a moment, says
+    // nothing; the text goes in once the region has been there a while.
+    this.#announcement = setTimeout(() => {
+      if (status.isConnected) status.textContent = text;
+    }, 150);
   }
 
   // The active photo's drawn size, for consumer layers attached to it. Offset
@@ -1371,6 +1410,7 @@ export class DomViewerDriver<
     frame.append(media);
     flight.append(frame);
     ownerDocument.body.append(flight);
+    raiseWithViewer(flight);
     this.#flight = flight;
     this.#flightFrame = frame;
     this.#flightMedia = media;
@@ -1801,82 +1841,113 @@ export class DomViewerDriver<
   }
 
   #onKeydown = (event: KeyboardEvent) => {
-    if (!this.#portal.overlay.isConnected) return;
-    // Keys typed into a field in the viewer, as in a sheet's reply box, are the
-    // field's; only Escape and Tab still belong to the viewer.
-    const typing =
-      event.target instanceof Element &&
-      !!event.target.closest(
-        "input, textarea, select, [contenteditable]:not([contenteditable=false])",
-      );
-    if (typing && event.key !== "Escape" && event.key !== "Tab") return;
+    const { overlay, dialog } = this.#portal;
+    if (!overlay.isConnected || event.defaultPrevented || event.isComposing) return;
+    const page = overlay.ownerDocument;
+    // Keys pressed in the viewer, or with nothing focused. A popover or toast
+    // the page shows over the viewer keeps its own.
+    const target =
+      event.target instanceof Element && dialog.contains(event.target) ? event.target : null;
+    if (
+      !target &&
+      event.target !== page &&
+      event.target !== page.body &&
+      event.target !== page.documentElement
+    ) {
+      return;
+    }
+    if (event.key === "Escape") {
+      const owner = target?.closest(ESCAPE_OWNERS);
+      if (owner && dialog.contains(owner) && owner !== dialog) return;
+      event.preventDefault();
+      if (this.#extensions.some((extension) => extension.keydown?.(event))) return;
+      void this.#controller?.close({ reason: "keyboard" });
+      return;
+    }
+    // The other keys are the viewer's only on the viewer itself: a focused
+    // field, link, player, widget or content that owns its input keeps them.
+    if ((target && !this.#ownsKeys(target)) || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (this.#zoom?.zoomed && this.#zoom.keydown(event)) {
+      event.preventDefault();
+      return;
+    }
     if (this.#extensions.some((extension) => extension.keydown?.(event))) {
       event.preventDefault();
-      event.stopPropagation();
-    } else if (
-      navigationKeys.has(event.key) &&
-      event.target instanceof Element &&
-      event.target.closest("[data-fluidbox-owns-input]")
-    ) {
-      // Content that owns its input, as a filmstrip, moves with these itself.
-      return;
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      void this.#controller?.close({ reason: "keyboard" });
-    } else if (["+", "=", "-", "0"].includes(event.key) && !event.metaKey && !event.ctrlKey) {
+    } else if (["+", "=", "-", "0"].includes(event.key)) {
       event.preventDefault();
       void this.#loadZoom().then((zoom) => {
         if (event.key === "0") zoom?.reset();
         else zoom?.zoomBy(event.key === "-" ? 1 / 1.5 : 1.5);
       });
-    } else if (event.key === "Tab") {
-      event.preventDefault();
-      const controls = Array.from(
-        this.#portal.dialog.querySelectorAll<HTMLElement>(
-          'a[href], button, input, select, textarea, summary, video[controls], audio[controls], iframe, [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter(
-        (control) =>
-          !control.hasAttribute("disabled") &&
-          !control.hasAttribute("hidden") &&
-          !control.closest("[hidden], [aria-hidden=true], [inert]") &&
-          getComputedStyle(control).pointerEvents !== "none" &&
-          (this.#controller?.state.status !== "closing" ||
-            !control.closest("[data-fluidbox-slides]")),
-      );
-      const active = this.#portal.overlay.ownerDocument.activeElement;
-      const index = controls.findIndex((control) => control === active);
-      const nextIndex =
-        index < 0
-          ? event.shiftKey
-            ? controls.length - 1
-            : 0
-          : (index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
-      const next = controls[nextIndex];
-      if (next) next.focus({ preventScroll: true });
-      else this.#focus();
-    } else if ((this.#controller?.state.count ?? 0) > 1 && verticalKeys.has(event.key)) {
-      void this.#controller?.close({ reason: "keyboard" });
-    } else if (
-      (event.key === "ArrowRight" || event.key === "ArrowLeft") &&
-      this.#acceptsGestures()
-    ) {
+    } else if (event.shiftKey || !this.#acceptsGestures()) {
+      return;
+    } else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
       event.preventDefault();
       this.#zoom?.suspend();
       // The next slide sits on the left when the viewer reads right to left.
-      const forward = (event.key === "ArrowRight") !== (this.#portal.overlay.dir === "rtl");
-      void this.#controller?.[forward ? "next" : "previous"]({
-        reason: "keyboard",
-      });
+      const forward = (event.key === "ArrowRight") !== (overlay.dir === "rtl");
+      void this.#controller?.[forward ? "next" : "previous"]({ reason: "keyboard" });
+    } else if ((event.key === "Home" || event.key === "End") && this.#source) {
+      event.preventDefault();
+      this.#zoom?.suspend();
+      const index = event.key === "Home" ? 0 : this.#source.count - 1;
+      void this.#controller?.goTo({ index }, { reason: "keyboard" });
     }
   };
 
+  /** Whether a key pressed on an element in the dialog is the viewer's. */
+  #ownsKeys(target: Element) {
+    return (
+      (target === this.#portal.dialog ||
+        target === this.#strip?.element ||
+        target.matches(controlSelector)) &&
+      !target.closest(KEY_OWNERS)
+    );
+  }
+
+  /** Bring focus that lands on the page behind back into the viewer. */
   #onFocus = (event: FocusEvent) => {
-    if (!this.#portal.overlay.isConnected || event.composedPath().includes(this.#portal.dialog))
-      return;
-    this.#focus();
+    if (event.target instanceof Node && this.#isolation.covers(event.target)) this.#focus();
   };
+
+  #onDialogChange = () => {
+    this.#describe();
+    const { dialog } = this.#portal;
+    const last = this.#lastFocus;
+    const active = dialog.ownerDocument.activeElement;
+    if (!last || (active !== last && active !== dialog.ownerDocument.body)) return;
+    if (!last.matches(":disabled") && !last.closest("[inert]") && last.isConnected) return;
+    // A Previous or Next that disables itself at an end hands focus to the
+    // other one; focus that would fall to the page goes to Close.
+    const other = last.hasAttribute("data-fluidbox-previous")
+      ? "[data-fluidbox-next]"
+      : last.hasAttribute("data-fluidbox-next")
+        ? "[data-fluidbox-previous]"
+        : null;
+    const next = other
+      ? Array.from(dialog.querySelectorAll<HTMLButtonElement>(other)).find(
+          (button) => !button.disabled && button.checkVisibility?.() !== false,
+        )
+      : undefined;
+    if (next) next.focus({ preventScroll: true });
+    else if (this.#controller?.state.status !== "closed") this.#focus();
+  };
+
+  /** Describe the dialog by the element in it marked `data-fluidbox-description`. */
+  #describe() {
+    const { dialog } = this.#portal;
+    const description = Array.from(
+      dialog.querySelectorAll<HTMLElement>("[data-fluidbox-description]"),
+    ).find((element) => !element.closest("[inert]"));
+    if (description) {
+      description.id ||= `fluidbox-description-${++descriptions}`;
+      dialog.setAttribute("aria-describedby", description.id);
+    } else {
+      dialog.removeAttribute("aria-describedby");
+    }
+  }
 
   /** Move focus into a settled dialog, unless someone already put it there. */
   #focusUnlessInside() {
@@ -1885,10 +1956,10 @@ export class DomViewerDriver<
   }
 
   #focus() {
-    const close = this.#portal.dialog.querySelector<HTMLElement>("[data-fluidbox-close]");
-    (close && !close.hasAttribute("hidden") ? close : this.#portal.dialog).focus({
-      preventScroll: true,
-    });
+    const close = Array.from(
+      this.#portal.dialog.querySelectorAll<HTMLButtonElement>("[data-fluidbox-close]"),
+    ).find((button) => !button.disabled && button.checkVisibility?.() !== false);
+    (close ?? this.#portal.dialog).focus({ preventScroll: true });
   }
 
   #eventUsesNativeInteraction(event: Event, includeMedia = true) {

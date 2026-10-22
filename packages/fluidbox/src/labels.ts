@@ -5,10 +5,19 @@ export interface FluidboxLabels {
   readonly close: string;
   readonly previous: string;
   readonly next: string;
-  /** A slide's name, and what the viewer announces as it moves. */
+  /** A slide's name, and a filmstrip thumbnail's when its item has no name. */
   readonly position: (index: number, count: number) => string;
+  /**
+   * What the viewer announces as it moves to an item, with the item's alt text
+   * or title. As it opens, the dialog's name already says that, so `name` is "".
+   */
+  readonly announcement: (name: string, index: number, count: number) => string;
   /** The strip of slides. */
   readonly slides: string;
+  /** What the strip of slides is, to a screen reader. */
+  readonly carousel: string;
+  /** What each slide is, to a screen reader. */
+  readonly slide: string;
   readonly filmstrip: string;
   /** The filmstrip's list of thumbnails. */
   readonly filmstripList: string;
@@ -29,7 +38,11 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   previous: "Previous",
   next: "Next",
   position: (index: number, count: number) => `Item ${index + 1} of ${count}`,
+  announcement: (name: string, index: number, count: number) =>
+    name ? `${name}, ${index + 1} of ${count}` : `Item ${index + 1} of ${count}`,
   slides: "Gallery items",
+  carousel: "carousel",
+  slide: "slide",
   filmstrip: "Gallery filmstrip",
   filmstripList: "Choose a gallery item",
   zoomed: "Zoomed image",

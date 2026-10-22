@@ -197,7 +197,8 @@ for (const framework of frameworks) {
       await expect(custom).toHaveCount(1);
       await expect(custom).toHaveText("Custom viewer");
       await expect(custom).toBeVisible();
-      await expect(close).toHaveCount(0);
+      // Your own viewer keeps the default Close until it draws one.
+      await expect(close).toHaveCount(1);
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
       expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);
 
@@ -211,7 +212,7 @@ for (const framework of frameworks) {
       // And back on, so a second mount works too.
       await page.evaluate(() => window.__live.setViewer(true));
       await expect(custom).toHaveCount(1);
-      await expect(close).toHaveCount(0);
+      await expect(close).toHaveCount(1);
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 
       await page.keyboard.press("Escape");

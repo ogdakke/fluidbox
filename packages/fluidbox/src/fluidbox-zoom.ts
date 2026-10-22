@@ -683,6 +683,11 @@ export class FluidboxZoom {
     if (this.#acquire()) this.#animate(fit());
   }
 
+  /** Handle a key on a zoomed image. Returns true when it took the key. */
+  keydown(_event: KeyboardEvent): boolean {
+    return false;
+  }
+
   /** Leave the visible transform intact for the dismissal animation. */
   suspend() {
     this.#freeze();

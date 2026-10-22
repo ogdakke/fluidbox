@@ -32,6 +32,22 @@ export function drawViewerLayer(
   const buttons = controls.map((name) => controlButton(target.ownerDocument, name, labels));
   target.append(...buttons);
   const disposeViewer = viewer?.({ target, fluidbox, signal }) ?? undefined;
+  const close = buttons.find((button) => button.hasAttribute(fluidboxControls.close.attribute));
+  if (viewer && close) {
+    // Your content's own Close, whenever it draws one, stands in for the default.
+    const place = () => {
+      const own = Array.from(target.querySelectorAll(`[${fluidboxControls.close.attribute}]`)).some(
+        (button) => button !== close,
+      );
+      // By parent: the whole layer leaves the document while the viewer is closed.
+      if (own && close.parentNode) close.remove();
+      else if (!own && close.parentNode !== target) target.prepend(close);
+    };
+    const observer = new MutationObserver(place);
+    observer.observe(target, { childList: true, subtree: true });
+    signal.addEventListener("abort", () => observer.disconnect(), { once: true });
+    place();
+  }
   // A <fluidbox-controls> the content left, as a gallery's template does, stands for the defaults.
   for (const placeholder of target.querySelectorAll("fluidbox-controls")) {
     const expanded = controlNames.map((name) => controlButton(target.ownerDocument, name, labels));

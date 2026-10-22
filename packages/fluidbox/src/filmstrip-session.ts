@@ -20,7 +20,7 @@ export interface FluidboxFilmstripItemContext<TItem extends FluidboxItem = Fluid
 export interface FilmstripSessionOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Replaces the default thumbnail image. */
   readonly renderItem?: (context: FluidboxFilmstripItemContext<TItem>) => void | FluidboxDispose;
-  readonly labels: Pick<FluidboxLabels, "filmstrip" | "filmstripList">;
+  readonly labels: Pick<FluidboxLabels, "filmstrip" | "filmstripList" | "position">;
 }
 
 /** Plain DOM filmstrip, used by the filmstrip() add-on for every binding and the custom elements. */
@@ -35,6 +35,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   readonly #runtime: FilmstripRuntime;
   readonly #disposers = new Map<number, FluidboxDispose>();
   readonly #renderItem: FilmstripSessionOptions<TItem>["renderItem"];
+  readonly #labels: FilmstripSessionOptions<TItem>["labels"];
   #first = -1;
   #last = -1;
   #index: number;
@@ -50,6 +51,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   ) {
     this.#source = source;
     this.#renderItem = options.renderItem;
+    this.#labels = options.labels;
     this.#index = index;
     this.dock = ownerDocument.createElement("div");
     this.element = ownerDocument.createElement("div");
@@ -61,6 +63,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     this.element.dataset.fluidboxFilmstrip = "";
     // Its touches, wheel and keys scrub the strip, not the viewer.
     this.element.dataset.fluidboxOwnsInput = "";
+    this.element.setAttribute("role", "group");
     this.element.setAttribute("aria-label", options.labels.filmstrip);
     this.scroller.dataset.fluidboxFilmstripScroll = "";
     this.scroller.setAttribute("role", "listbox");
@@ -115,7 +118,12 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     button.dataset.fluidboxFilmstripItem = "";
     button.dataset.index = String(index);
     button.setAttribute("role", "option");
-    button.setAttribute("aria-label", item.type === "img" ? item.alt : item.title);
+    // An item without a name, as a decorative photo, is named by its place.
+    button.setAttribute(
+      "aria-label",
+      (item.type === "img" ? item.alt : item.title) ||
+        this.#labels.position(index, this.#source.count),
+    );
     button.setAttribute("aria-posinset", String(index + 1));
     button.setAttribute("aria-setsize", String(this.#source.count));
     this.#place(button, index);

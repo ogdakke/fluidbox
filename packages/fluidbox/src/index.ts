@@ -40,6 +40,7 @@ export type {
   FluidboxToggleState,
   FluidboxUpdateOptions,
   FluidboxVideoItem,
+  FluidboxVideoTrack,
   FluidboxViewerContext,
   FluidboxViewerRenderer,
 } from "./public-api";
