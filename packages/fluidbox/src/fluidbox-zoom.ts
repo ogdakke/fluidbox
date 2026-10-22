@@ -43,10 +43,7 @@ const resist = (value: number, min: number, max: number, range: number) =>
 
 const sides = ["top", "right", "bottom", "left"] as const;
 /** Whether a gesture starts on content that keeps its own, as a 3D model does its pinch. */
-const ownsInput = (event: Event) =>
-  event
-    .composedPath()
-    .some((target) => target instanceof Element && target.hasAttribute("data-fluidbox-owns-input"));
+const ownsInput = (event: Event) => (event.target as Element).closest("[data-fluidbox-owns-input]");
 
 /** Maps a scale's log-space distance beyond [1, max] through `curve`. */
 function beyondBounds(

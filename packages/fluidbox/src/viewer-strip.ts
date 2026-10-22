@@ -861,15 +861,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * the slide that leaves first, so its player stops before the next one starts.
    */
   #activate() {
-    for (const now of [false, true]) {
-      for (const [index, slide] of this.#slides) {
-        const activity = slide.activity;
-        const active = this.#mounted && !this.#hidden && index === this.#index;
-        if (!activity || activity.active === now || now !== active) continue;
-        activity.active = now;
-        for (const listener of activity.listeners) listener(now);
-      }
+    let entering: ViewerSlide["activity"];
+    for (const [index, { activity }] of this.#slides) {
+      const active = this.#mounted && !this.#hidden && index === this.#index;
+      if (!activity || activity.active === active) continue;
+      activity.active = active;
+      if (active) entering = activity;
+      else for (const listener of activity.listeners) listener(false);
     }
+    if (entering) for (const listener of entering.listeners) listener(true);
   }
 
   #applyImage(index: number, slide: ViewerSlide) {
