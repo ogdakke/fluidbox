@@ -28,10 +28,12 @@ test.describe("shop fixture, wide screen", () => {
     await expect(card.locator("img")).toHaveAttribute("data-loaded", "true");
     await card.hover();
     await page.waitForLoadState("networkidle");
-    const before = await card.screenshot();
+    // The card without its hover zoom, which the press puts away.
+    const before = await card.screenshot({ style: "[data-fluidbox-hover-zoom] { display: none }" });
     const box = (await card.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
+    await expect(page.locator("[data-fluidbox-hover-zoom]")).toHaveCount(0);
     // The prepared viewer's preview is the 160px thumbnail, set over the card.
     await expect(
       page.locator(
@@ -147,4 +149,84 @@ test.describe("shop fixture, phone", () => {
     await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
     await expect.poll(() => shownSlide(page)).toBe(4);
   });
+});
+
+test.describe("shop fixture, hover zoom", () => {
+  test.skip(({ isMobile }) => isMobile, "a resting mouse");
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  const lens = "[data-fluidbox-hover-zoom]";
+
+  test("magnifies the card under the mouse, following it, until the click opens the viewer", async ({
+    page,
+  }) => {
+    await load(page);
+    const card = page.locator(".shop-slide").first();
+    const image = card.locator("img");
+    await expect(image).toHaveAttribute("data-loaded", "true");
+    const layout = () =>
+      page.evaluate(() => {
+        const box = document.querySelector(".shop-slide img")!.getBoundingClientRect();
+        return [box.x, box.y, box.width, box.height, document.documentElement.scrollHeight];
+      });
+    const before = await layout();
+    await expect(page.locator(lens)).toHaveCount(0);
+    const box = (await image.boundingBox())!;
+    await page.mouse.move(box.x + 10, box.y + 10);
+    await expect(page.locator(lens)).toHaveCount(1);
+    await expect(card.locator(".shop-photo")).toHaveAttribute("data-fluidbox-hover-zooming", "");
+    // Over the image's box, magnified, and nothing on the page moves.
+    const shown = (await page.locator(lens).boundingBox())!;
+    expect(Math.abs(shown.x - box.x)).toBeLessThan(1);
+    expect(Math.abs(shown.width - box.width)).toBeLessThan(1);
+    expect(await layout()).toEqual(before);
+    const picture = page.locator(`${lens} img`);
+    const offset = () =>
+      picture.evaluate((element) => {
+        const { m41, m42 } = new DOMMatrix(getComputedStyle(element).transform);
+        return [m41, m42];
+      });
+    // Within 2px: the mouse lands on whole pixels, the box may not, and the zoom
+    // moves 1.5px for each.
+    const near = (expected: number[]) => async () =>
+      (await offset()).every((value, axis) => Math.abs(value - expected[axis]!) <= 2);
+    // 10px into the box is 10px into the zoom's 1.5 boxes of overhang.
+    expect(await near([-15, -15])()).toBe(true);
+    expect((await picture.boundingBox())!.width).toBeCloseTo(box.width * 2.5, 0);
+    // Further in, the zoom shows as much further into the image: at 60% across, 60%
+    // of the overhang. (The corners hold the carousel's arrows.)
+    await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.6, { steps: 4 });
+    await expect.poll(near([box.width * -0.9, box.height * -0.9])).toBe(true);
+    await page.mouse.down();
+    await expect(page.locator(lens)).toHaveCount(0);
+    await page.mouse.up();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  });
+
+  test("goes as the mouse leaves", async ({ page }) => {
+    await load(page);
+    await page.locator(".shop-slide img").first().hover();
+    await expect(page.locator(lens)).toHaveCount(1);
+    await page.mouse.move(2, 2);
+    await expect(page.locator(lens)).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-hover-zooming]")).toHaveCount(0);
+  });
+
+  test("does nothing with reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page);
+    await page.locator(".shop-slide img").first().hover();
+    await page.mouse.move(700, 400, { steps: 3 });
+    await expect(page.locator(".shop-slide").first()).toBeVisible();
+    await expect(page.locator(lens)).toHaveCount(0);
+  });
+});
+
+test("hover zoom does nothing on a touch screen", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "a touch screen");
+  await load(page);
+  await page.locator(".shop-slide").first().tap();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(page.locator("[data-fluidbox-hover-zoom]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-hover-zooming]")).toHaveCount(0);
 });

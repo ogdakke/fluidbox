@@ -735,9 +735,13 @@ function Findings() {
           under the photo, into the bottom-right corner with a rule of the fixture's own.
         </li>
         <li>
-          <strong>Click to zoom: open.</strong> Shop zooms on one click and zooms out on the next.
-          The package zooms on a double click or double tap and has no single-click option, so a
-          single click here does nothing.
+          <strong>Click to zoom: fits.</strong> Shop zooms on one click and zooms out on the next.
+          The package does the same for a mouse; touch zooms on a double tap.
+        </li>
+        <li>
+          <strong>Zoom on hover: add-on.</strong> Shop magnifies the photo in the carousel under a
+          resting mouse. The fixture calls hoverZoom from @ogdakke/fluidbox/hover-zoom on each card;
+          a click still opens the viewer.
         </li>
         <li>
           <strong>Pan with the pointer: fixture code.</strong> Shop pans a zoomed photo by moving
