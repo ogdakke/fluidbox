@@ -16,7 +16,7 @@ import "@ogdakke/fluidbox/styles.css";
 Add a gallery to the page:
 
 ```html
-<fluidbox-gallery aria-label="Photos">
+<fluidbox-gallery role="group" aria-label="Photos">
   <fluidbox-item item-id="mountain">
     <button slot="trigger" type="button">
       <img src="/photos/mountain-thumb.jpg" alt="A mountain at dusk" width="300" height="200" />

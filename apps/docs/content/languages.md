@@ -7,7 +7,7 @@ description: Translate the viewer's labels, use an i18n library, and run the vie
 
 # Languages and direction
 
-The viewer has twelve strings of its own: button names, the dialog's name, what it announces as it moves, and the error on a slide that failed to load. Everything else it shows comes from your items, such as `alt` and `title`. Fluidbox ships these strings in English and no other language. You pass your own through `labels`.
+The viewer has fifteen strings of its own: button names, the dialog's name, what it announces as it moves, what a screen reader calls the strip and its slides, and the error on a slide that failed to load. Everything else it shows comes from your items, such as `alt` and `title`. Fluidbox ships these strings in English and no other language. You pass your own through `labels`.
 
 ## Labels
 
@@ -26,7 +26,7 @@ createFluidbox({
 });
 ```
 
-`position(index, count)` names each slide, and the viewer announces it on every move. `index` counts from 0. Because it's a function, you can format the numbers for the language with `Intl.NumberFormat`:
+`position(index, count)` names each slide, and a filmstrip thumbnail whose item has no name. `announcement(name, index, count)` is what the viewer says as it moves, with the item's alt text or title as `name`; as it opens, the dialog's name already says that, so `name` is `""` there. `index` counts from 0. Because it's a function, you can format the numbers for the language with `Intl.NumberFormat`:
 
 ```ts
 const number = new Intl.NumberFormat("ar-u-nu-arab");

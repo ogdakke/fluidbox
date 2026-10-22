@@ -7,7 +7,7 @@
 Every `<fluidbox-item>` requires a stable `item-id`, one trigger, and one inert content template. The gallery compiles this markup into the same `FluidboxItem` model used by `createFluidbox()`. Standard `src`, `srcset`, `sizes`, `type`, and `media` attributes pass through to the generated viewer `<picture>`.
 
 ```html
-<fluidbox-gallery aria-label="Photos">
+<fluidbox-gallery role="group" aria-label="Photos">
   <fluidbox-item item-id="mountain">
     <button slot="trigger" type="button">
       <img src="/media/mountain-768w.webp" alt="Mountain" width="768" height="512" />

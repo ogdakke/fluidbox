@@ -31,7 +31,9 @@ Turning `filmstrip` or `sheet` on without its import throws an `Error` that name
 ## Items and lists
 
 Items are flat: `{ type: "img" | "video" | "iframe" | "custom", ... }`, with `id` (default: `src`),
-`thumbnail` and `placeholder` on every type. Users add their own fields; `TItem extends FluidboxItem`
+`thumbnail` and `placeholder` on every type. A video's `tracks` (`{ src, kind?, srclang?, label?,
+default? }`) become its `<track>` elements; `<fluidbox-item>` reads them from the `<track>` children
+of its `<video>`. Users add their own fields; `TItem extends FluidboxItem`
 flows through options, state, events and callbacks, which always hand back the original object.
 
 `items` is an array or a lazy list `{ count, get(index), indexOf?(id) }`. Arrays are copied and
@@ -54,6 +56,8 @@ their ids unique themselves; without `indexOf`, ids are found by scanning. A lis
 - `destroy()` releases every `bind` and `bindOverlay`.
 - Options are read once, except `renderers` (read when a slide mounts) and `origins` (read on each
   use).
+- `controls` defaults to all three without a `viewer`, and to `["close"]` with one; that default
+  Close steps aside while the viewer's layer holds its own `data-fluidbox-close` button.
 
 ## State and events
 
@@ -79,8 +83,16 @@ framework bindings expose them as event props, emits or outputs.
 
 The runtime owns the body-level viewer, measured frames, transforms, clipping, the native slide
 track, gesture surfaces, focus containment, the inert background and the live status. It is never
-replaced with a native `dialog`. Applications own controls, captions, thumbnail decorations and
-every framework-created descendant.
+replaced with a native `dialog`; opened from inside a modal `dialog`, it mounts inside that dialog
+and enters the top layer as a manual popover. Applications own controls, captions, thumbnail
+decorations and every framework-created descendant.
+
+The inert background is what was on the page at open, apart from live regions and elements marked
+`data-fluidbox-exempt`; nodes added later are left alone, and closing removes only the `inert` the
+viewer set. Keys reach the viewer in the document's bubble phase: Escape unless the content
+handled it, and the arrow keys, Home, End, `+`, `-` and `0` only when focus is on the dialog, a
+default control or the strip of slides. An element marked `data-fluidbox-description` in the
+dialog becomes its `aria-describedby`.
 
 One renderer type, `({ item, index, target, signal }) => void | (() => void)`, draws everything an
 application owns inside the viewer: custom slides, filmstrip thumbnails, the sheet and travelling
@@ -91,8 +103,8 @@ Custom content outside the bounded slide window is disposed and may mount again 
 ## Labels
 
 Every string the viewer shows or announces is in `FluidboxLabels` (`viewer`, `close`, `previous`,
-`next`, `position`, `slides`, `filmstrip`, `filmstripList`, `zoomed`, `sheet`), with English
-defaults, overridden through `labels`.
+`next`, `position`, `announcement`, `slides`, `carousel`, `slide`, `filmstrip`, `filmstripList`,
+`zoomed`, `sheet`, `error`, `retry`), with English defaults, overridden through `labels`.
 
 ## Styling hooks
 

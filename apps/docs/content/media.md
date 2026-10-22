@@ -64,20 +64,21 @@ Only images zoom. The viewer loads the full image for the current slide and the 
 
 `FluidboxVideoItem`, drawn as a `<video>`:
 
-| Field         | Type                             | Default      | What it does                                                       |
-| ------------- | -------------------------------- | ------------ | ------------------------------------------------------------------ |
-| `type`        | `"video"`                        |              | Required.                                                          |
-| `src`         | `string`                         |              | Required. The video file.                                          |
-| `title`       | `string`                         |              | Required. The video's accessible name, and the filmstrip button's. |
-| `width`       | `number`                         |              | Required. Intrinsic width.                                         |
-| `height`      | `number`                         |              | Required. Intrinsic height.                                        |
-| `poster`      | `string`                         |              | The poster frame's URL.                                            |
-| `autoplay`    | `boolean`                        | `false`      | Plays when its slide comes into view, and pauses when it leaves.   |
-| `loop`        | `boolean`                        | `false`      | Starts again at the end.                                           |
-| `muted`       | `boolean`                        | `false`      | Starts muted. Browsers let a video autoplay only when it is muted. |
-| `playsInline` | `boolean`                        | `true`       | Plays in the slide rather than full screen on iOS.                 |
-| `controls`    | `boolean`                        | `true`       | Shows the browser's playback controls.                             |
-| `preload`     | `"none" \| "metadata" \| "auto"` | `"metadata"` | How much to load before it plays.                                  |
+| Field         | Type                             | Default      | What it does                                                                                    |
+| ------------- | -------------------------------- | ------------ | ----------------------------------------------------------------------------------------------- |
+| `type`        | `"video"`                        |              | Required.                                                                                       |
+| `src`         | `string`                         |              | Required. The video file.                                                                       |
+| `title`       | `string`                         |              | Required. The video's accessible name, and the filmstrip button's.                              |
+| `width`       | `number`                         |              | Required. Intrinsic width.                                                                      |
+| `height`      | `number`                         |              | Required. Intrinsic height.                                                                     |
+| `poster`      | `string`                         |              | The poster frame's URL.                                                                         |
+| `autoplay`    | `boolean`                        | `false`      | Plays when its slide comes into view, and pauses when it leaves.                                |
+| `loop`        | `boolean`                        | `false`      | Starts again at the end.                                                                        |
+| `muted`       | `boolean`                        | `false`      | Starts muted. Browsers let a video autoplay only when it is muted.                              |
+| `playsInline` | `boolean`                        | `true`       | Plays in the slide rather than full screen on iOS.                                              |
+| `controls`    | `boolean`                        | `true`       | Shows the browser's playback controls.                                                          |
+| `preload`     | `"none" \| "metadata" \| "auto"` | `"metadata"` | How much to load before it plays.                                                               |
+| `tracks`      | `readonly FluidboxVideoTrack[]`  |              | Captions and other text tracks: `{ src, kind?, srclang?, label?, default? }`, each a `<track>`. |
 
 ```ts
 import type { FluidboxVideoItem } from "@ogdakke/fluidbox";
@@ -93,7 +94,7 @@ const clip: FluidboxVideoItem = {
 };
 ```
 
-A video pauses when its slide leaves, and unloads when it leaves the loaded window. Moving a playing video would restart it, so a video closes inside its own frame instead of in the flight.
+Give a video with speech `tracks` of kind `"captions"`, which the browser's controls let viewers turn on. A track on another origin needs CORS. A video pauses when its slide leaves, and unloads when it leaves the loaded window. Moving a playing video would restart it, so a video closes inside its own frame instead of in the flight.
 
 ## Iframe
 

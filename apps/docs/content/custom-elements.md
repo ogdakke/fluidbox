@@ -67,12 +67,12 @@ The gallery adds Previous, Next and Close buttons to the viewer unless you give 
 
 ## `<fluidbox-item>`
 
-| Attribute     | What it does                                                                                       |
-| ------------- | -------------------------------------------------------------------------------------------------- |
-| `item-id`     | Required, unique in the gallery. The item's id for commands, events and `returns`.                 |
-| `returns`     | Space-separated ids of more items whose close flight lands on this trigger, as for an album cover. |
-| `placeholder` | An image painted behind an image slide until it decodes, such as a tiny data URI.                  |
-| `aria-label`  | The title of custom content (see below). Defaults to `item-id`.                                    |
+| Attribute     | What it does                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `item-id`     | Required, unique in the gallery. The item's id for commands, events and `returns`.                            |
+| `returns`     | Space-separated ids of more items whose close flight lands on this trigger, as for an album cover.            |
+| `placeholder` | An image painted behind an image slide until it decodes, such as a tiny data URI.                             |
+| `aria-label`  | The title of custom content (see below). Defaults to the content's own `aria-label`, then the trigger's name. |
 
 | Child                       | What it does                                                                                                                                                                                  |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,12 +84,12 @@ The gallery adds Previous, Next and Close buttons to the viewer unless you give 
 
 The template's root element becomes a flat item, attribute for attribute:
 
-| Root element of the template            | Item type | Read from it                                                                                                                                      |
-| --------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<img>`, or `<picture>` with an `<img>` | `img`     | `src`, `srcset`, `sizes`, `alt`, and `width` and `height` (required). Each `<source>` of a `<picture>` becomes one of `sources`.                  |
-| `<video>`                               | `video`   | `src`, `width` and `height` (required), `poster`, `autoplay`, `loop`, `muted`, `playsinline`, `controls`, `preload`, and `aria-label` or `title`. |
-| `<iframe src>`                          | `iframe`  | `src`, `width` and `height` (required), `title`, `allow`, `referrerpolicy` and `sandbox`.                                                         |
-| anything else                           | `custom`  | The template is cloned into the slide. `width` and `height` on the root set its size; without them, the trigger image's size.                     |
+| Root element of the template            | Item type | Read from it                                                                                                                                                                               |
+| --------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `<img>`, or `<picture>` with an `<img>` | `img`     | `src`, `srcset`, `sizes`, `alt`, and `width` and `height` (required). Each `<source>` of a `<picture>` becomes one of `sources`.                                                           |
+| `<video>`                               | `video`   | `src`, `width` and `height` (required), `poster`, `autoplay`, `loop`, `muted`, `playsinline`, `controls`, `preload`, `aria-label` or `title`, and each `<track>` child as one of `tracks`. |
+| `<iframe src>`                          | `iframe`  | `src`, `width` and `height` (required), `title`, `allow`, `referrerpolicy` and `sandbox`.                                                                                                  |
+| anything else                           | `custom`  | The template is cloned into the slide. `width` and `height` on the root set its size; without them, the trigger image's size.                                                              |
 
 The gallery reads the boolean attributes of a `<video>` as HTML does, so an attribute that is present is on. Write `controls` and `playsinline` on it, as you would on the page. See [Media types](./media.md) for what each type does in the viewer.
 

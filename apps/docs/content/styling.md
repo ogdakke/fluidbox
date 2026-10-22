@@ -43,7 +43,13 @@ While it is open, the viewer is one element, `[data-fluidbox-overlay]`, at the e
 
 <!-- css: parts data-fluidbox-overlay data-fluidbox-backdrop data-fluidbox-container data-fluidbox-dialog data-fluidbox-slides data-fluidbox-slide data-fluidbox-frame data-fluidbox-media data-fluidbox-portal data-fluidbox-addons -->
 
-While the viewer is open, every other child of `<body>` is `inert`. The overlay's z-index is `var(--layer-fluidbox, 7)` and the flight's is `var(--layer-fluidbox-flight, 8)`. Set both on `:root` if your page has higher layers.
+The overlay's z-index is `var(--layer-fluidbox, 7)` and the flight's is `var(--layer-fluidbox-flight, 8)`. Set both on `:root` if your page has higher layers.
+
+### Layers and isolation
+
+While the viewer is open, what was on the page when it opened is `inert`: the other children of `<body>`, and, around anything kept, its neighbours. It keeps live regions (`aria-live`, `role="status"`, `"alert"` or `"log"`), so a toast region still speaks, and anything you mark `data-fluidbox-exempt`, such as the root your popovers, menus or cart drawer render into. What the page adds after the viewer opened, as a toast or a popover opened from the viewer's content, is never made inert, and focus may stay there. As it closes, the viewer takes off only the `inert` it put on.
+
+Opened from inside a modal `<dialog>`, as a quick view's, the overlay goes inside that dialog and into the top layer as a manual popover, with the flights above it, so it shows over the dialog and the dialog stays open and usable behind it. The z-index variables don't apply there: the top layer is above every z-index. Still no native `<dialog>`: the viewer stays a `div` with `role="dialog"` and `aria-modal`.
 
 The container is `position: absolute` at the page's scroll position. Don't make it `fixed` or `sticky`, because iOS Safari colours its bars from a fixed or sticky layer at the screen's edge.
 
@@ -65,6 +71,8 @@ When the viewer opens, it reads the trigger's computed styles and copies every `
 ```
 
 `--fluidbox-backdrop-background` defaults to `--fluidbox-background`. `--fluidbox-backdrop-filter` is `none` by default. Pair a blur with a see-through background.
+
+Focus rings are 2px of `--fluidbox-focus-color`, which defaults to the text colour. On the controls a 2px edge of `--fluidbox-focus-contrast`, black by default, sits inside the ring, so a white ring still shows over a bright photo. In forced colours, as Windows' contrast themes, the controls get a border and focus rings take the system's `Highlight`; with `prefers-contrast: more`, a disabled Previous or Next fades only to 0.6.
 
 ## State attributes
 
@@ -90,9 +98,9 @@ The default controls are buttons marked `data-fluidbox-previous`, `data-fluidbox
 
 You choose which controls exist:
 
-- **Plain JavaScript.** You get all three unless you pass `viewer`. Then `controls: true`, or a list such as `controls: ["close"]`, keeps some next to your own content.
-- **Frameworks.** Put the `Controls` part, or `Previous`, `Next` and `Close`, in the `Viewer` part. Without them there are no controls. Each renders the default icon and label when it is empty, or your children.
-- **Custom elements.** The gallery adds all three. A `<template slot="viewer">` replaces them. Put `<fluidbox-controls>` in it to keep them. Any button marked `data-fluidbox-close`, `-previous` or `-next` in the viewer runs that command, in every API.
+- **Plain JavaScript.** You get all three unless you pass `viewer`. Then you keep Close until your content has its own `data-fluidbox-close` button, and `controls: true`, or a list such as `controls: ["previous", "next"]`, keeps more next to your own content.
+- **Frameworks.** Put the `Controls` part, or `Previous`, `Next` and `Close`, in the `Viewer` part. Without them there is only the default Close. Each renders the default icon and label when it is empty, or your children.
+- **Custom elements.** The gallery adds all three. A `<template slot="viewer">` replaces them, apart from Close while the template has none of its own. Put `<fluidbox-controls>` in it to keep them. Any button marked `data-fluidbox-close`, `-previous` or `-next` in the viewer runs that command, in every API.
 
 The button names come from the `close`, `previous` and `next` [labels](./api.md#labels).
 

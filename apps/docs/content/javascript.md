@@ -55,7 +55,7 @@ document.querySelectorAll<HTMLButtonElement>(".gallery button").forEach((button,
 });
 ```
 
-The viewer has Previous, Next and Close buttons until you draw your own with `viewer`. To keep some of them next to yours, pass `controls: true` or a list such as `["close"]`. The same gallery, live, in every framework:
+The viewer has Previous, Next and Close buttons until you draw your own with `viewer`. Then it keeps Close, until your content draws a button of its own marked `data-fluidbox-close`: a screen reader's touch needs a way out it can count on. To keep more of them next to yours, pass `controls: true` or a list such as `["previous", "next", "close"]`. The same gallery, live, in every framework:
 
 <!-- pattern: basic -->
 
@@ -63,19 +63,19 @@ The viewer has Previous, Next and Close buttons until you draw your own with `vi
 
 Returns a `Fluidbox`. Only `items` is required.
 
-| Option      | Type                                                      | Default                               | What it does                                                                                                                                |
-| ----------- | --------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `items`     | `readonly TItem[] \| FluidboxItemList<TItem>`             |                                       | The items: an array, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                            |
-| `controls`  | `boolean \| readonly ("previous" \| "next" \| "close")[]` | `true` without `viewer`, else `false` | The default Previous, Next and Close buttons, or some of them.                                                                              |
-| `viewer`    | `({ target, fluidbox, signal }) => void \| (() => void)`  |                                       | Draw your own controls and captions into the viewer. See [Viewer content](#viewer-content).                                                 |
-| `renderers` | `Record<string, FluidboxRenderer<TItem>>`                 | `{}`                                  | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                   |
-| `zoom`      | `false \| { step?: number; max?: number }`                | `{ step: 2, max: 4 }`                 | `step` is the scale of a double-tap or double-click; `max` the largest scale. `false` turns zoom off.                                       |
-| `loop`      | `boolean`                                                 | `false`                               | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops. `update` changes it live.     |
-| `labels`    | `Partial<FluidboxLabels>`                                 | English                               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                       |
-| `filmstrip` | `boolean \| { render? }`                                  | `false`                               | A thumbnail strip. Loads its entry; needs `filmstrip.css`.                                                                                  |
-| `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                               | A panel over the photo. Loads its entry; needs `sheet.css`.                                                                                 |
-| `origins`   | `FluidboxOriginAdapter<TItem>`                            |                                       | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
-| `loading`   | `"hover" \| "press" \| "eager"`                           | `"hover"`                             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                            |
+| Option      | Type                                                      | Default                                   | What it does                                                                                                                                |
+| ----------- | --------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`     | `readonly TItem[] \| FluidboxItemList<TItem>`             |                                           | The items: an array, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                            |
+| `controls`  | `boolean \| readonly ("previous" \| "next" \| "close")[]` | `true` without `viewer`, else `["close"]` | The default Previous, Next and Close buttons, or some of them. With a `viewer`, Close steps aside while your content has its own.           |
+| `viewer`    | `({ target, fluidbox, signal }) => void \| (() => void)`  |                                           | Draw your own controls and captions into the viewer. See [Viewer content](#viewer-content).                                                 |
+| `renderers` | `Record<string, FluidboxRenderer<TItem>>`                 | `{}`                                      | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                   |
+| `zoom`      | `false \| { step?: number; max?: number }`                | `{ step: 2, max: 4 }`                     | `step` is the scale of a double-tap or double-click; `max` the largest scale. `false` turns zoom off.                                       |
+| `loop`      | `boolean`                                                 | `false`                                   | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops. `update` changes it live.     |
+| `labels`    | `Partial<FluidboxLabels>`                                 | English                                   | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                       |
+| `filmstrip` | `boolean \| { render? }`                                  | `false`                                   | A thumbnail strip. Loads its entry; needs `filmstrip.css`.                                                                                  |
+| `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`           | `false`                                   | A panel over the photo. Loads its entry; needs `sheet.css`.                                                                                 |
+| `origins`   | `FluidboxOriginAdapter<TItem>`                            |                                           | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
+| `loading`   | `"hover" \| "press" \| "eager"`                           | `"hover"`                                 | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                            |
 
 To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading`, call `update`. The open viewer stays open. To change the items, call `setItems`. The fluidbox looks up `renderers` by name each time a custom slide mounts, and reads `origins` on each use.
 
@@ -154,14 +154,14 @@ Listen with `addEventListener`. The events are typed, so `event.reason` and `eve
 
 `oldState` and `newState` are `"open"` or `"closed"`, as on a popover's toggle events. `reason`, a `FluidboxReason`, says what asked:
 
-| Reason       | From                                                                               |
-| ------------ | ---------------------------------------------------------------------------------- |
-| `"api"`      | Your code: a command, or a default control.                                        |
-| `"trigger"`  | A click on a trigger.                                                              |
-| `"keyboard"` | The arrow keys and Escape. The page-scrolling keys close the viewer with this too. |
-| `"pointer"`  | A swipe or scroll through the slides, a drag to dismiss, a tap on the backdrop.    |
-| `"wheel"`    | A wheel or trackpad scroll that dismisses the viewer.                              |
-| `"items"`    | `setItems`, when the new list moved the viewer to another item.                    |
+| Reason       | From                                                                            |
+| ------------ | ------------------------------------------------------------------------------- |
+| `"api"`      | Your code: a command, or a default control.                                     |
+| `"trigger"`  | A click on a trigger.                                                           |
+| `"keyboard"` | The arrow keys, Home and End, and Escape. See [Keyboard](#keyboard).            |
+| `"pointer"`  | A swipe or scroll through the slides, a drag to dismiss, a tap on the backdrop. |
+| `"wheel"`    | A wheel or trackpad scroll that dismisses the viewer.                           |
+| `"items"`    | `setItems`, when the new list moved the viewer to another item.                 |
 
 The before-events fire for every command that would do something, whether it comes from a key, a gesture or your code. `close()` while closed or `next()` on the last item fires nothing. An open fires `beforetoggle`, `toggle` and `itemchange`, then `settle` after the flight. Then the promise resolves.
 
@@ -248,21 +248,41 @@ Return a function to clean up, such as the one `subscribe` returns. Everything i
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
 
+const credits: Record<string, string> = { harbour: "Photo by Ana Ruiz, 2024" };
+
 const fluidbox = createFluidbox({
   items: photos,
-  controls: ["close"],
   viewer({ target, fluidbox }) {
     const caption = document.createElement("p");
     caption.className = "caption";
+    // The dialog's description: read once as the viewer opens.
+    caption.dataset.fluidboxDescription = "";
     target.append(caption);
-    return fluidbox.subscribe(({ item }) => {
-      if (item?.type === "img") caption.textContent = item.alt;
+    return fluidbox.subscribe(({ id }) => {
+      caption.textContent = (id && credits[id]) || "";
     });
   },
 });
 ```
 
+The dialog is already named by the item's `alt` or `title`, so a caption that repeats it is read twice. Show something the name doesn't say, such as a credit or a date, and mark it `data-fluidbox-description`: the dialog gets `aria-describedby` pointing at it, whether it is in the layer or in a slide.
+
 The default buttons carry `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`. Any button in the viewer with one of them runs that command, gets the default styling, and is disabled while the command can do nothing. Call `event.preventDefault()` in your own click listener to stop the command. [Headless controls](./patterns/headless.md) has a full caption bar in every framework.
+
+## Keyboard
+
+The viewer is a modal dialog. As it opens, focus moves into it before the opening flight starts, onto Close; as it closes, focus goes back to the trigger. What was on the page when it opened is `inert` (see [Layers and isolation](./styling.md#layers-and-isolation)), and Tab and Shift+Tab are the browser's own, so they reach everything in the viewer that can take focus, shadow roots and native media controls included.
+
+| Key                   | On the viewer: the dialog, its controls, or the strip of slides |
+| --------------------- | --------------------------------------------------------------- |
+| Left and Right arrows | The previous and next item, swapped right to left.              |
+| Home and End          | The first and last item.                                        |
+| `+`, `-` and `0`      | Zoom in, out and back.                                          |
+| Escape                | Closes the viewer, or lowers a raised sheet.                    |
+
+Keys belong to what has focus. With a field, a link, a button of your own, a `<video>`, or a widget that moves with the arrow keys (a slider, a radio group, a menu, tabs, a listbox, a grid) focused, only Escape reaches the viewer, and only if the content doesn't handle it first: the viewer listens on the document after your content, and leaves a key that was `preventDefault()`ed, or that a dialog, popover, menu or open combobox in the content takes. Arrow keys with Alt, Ctrl, Meta or Shift aren't the viewer's. Content marked `data-fluidbox-owns-input` keeps its keys and gestures, as the filmstrip does.
+
+The viewer announces the item it moves to, as "Blue study, 2 of 4", through a polite live region. Change the wording with the `announcement` [label](./api.md#labels).
 
 ## Add-ons
 

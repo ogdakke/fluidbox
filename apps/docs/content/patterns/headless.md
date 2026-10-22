@@ -7,7 +7,7 @@ description: Your own caption bar and buttons in the viewer, driven by the fluid
 
 # Headless controls
 
-The viewer's layer is yours to fill. Leave out the default controls and render your own caption, counter and buttons. They read the state and call the commands.
+The viewer's layer is yours to fill. Leave out the default controls and render your own caption, counter and buttons; the default Close stays until your content has a button marked `data-fluidbox-close`. They read the state and call the commands.
 
 <!-- pattern: headless -->
 

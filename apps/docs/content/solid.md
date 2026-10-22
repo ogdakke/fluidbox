@@ -152,7 +152,7 @@ It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbo
 
 ### `Fluidbox.Viewer` and `Fluidbox.Controls`
 
-`Fluidbox.Viewer` takes only `children` and renders them into the viewer's layer while the viewer exists. While a `Viewer` is mounted, the viewer has no default controls. Put `Fluidbox.Controls`, or `Previous`, `Next` and `Close`, where you want them. `Fluidbox.Controls` takes no props.
+`Fluidbox.Viewer` takes only `children` and renders them into the viewer's layer while the viewer exists. While a `Viewer` is mounted, the viewer keeps only the default Close, until your content has a `Close` of its own. Put `Fluidbox.Controls`, or `Previous`, `Next` and `Close`, where you want them. `Fluidbox.Controls` takes no props.
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
