@@ -61,6 +61,18 @@
       "types": "./dist/kit.d.ts",
       "import": "./dist/kit.js"
     },
+    "./embeds": {
+      "types": "./dist/embeds.d.ts",
+      "import": "./dist/embeds.js"
+    },
+    "./model": {
+      "types": "./dist/model.d.ts",
+      "import": "./dist/model.js"
+    },
+    "./spin": {
+      "types": "./dist/spin.d.ts",
+      "import": "./dist/spin.js"
+    },
     "./styles.css": {
       "types": "./dist/styles.css.d.ts",
       "default": "./dist/styles.css"
