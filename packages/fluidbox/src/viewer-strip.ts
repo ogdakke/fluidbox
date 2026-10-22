@@ -5,6 +5,7 @@ import type {
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
+import { fitSize } from "./fit-size";
 import { idOf, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
 import type { FluidboxThumbnail } from "./public-api";
@@ -382,17 +383,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     element.setAttribute("aria-hidden", String(index !== this.#index));
     const frame = this.#ownerDocument.createElement("div");
     frame.dataset.fluidboxFrame = "";
-    // Size against the slide (a size container), never the viewport: 100vw
-    // includes a desktop scrollbar and can differ by a fraction on iOS, which
-    // left the image a sliver wider or narrower than its slide.
-    frame.style.setProperty(
-      "--fluidbox-item-width",
-      `min(100cqw, calc(var(--fluidbox-content-height, var(--fluidbox-height, 100svh)) * ${item.width / item.height}))`,
-    );
-    frame.style.setProperty(
-      "--fluidbox-item-height",
-      `min(${(item.height / item.width) * 100}cqw, var(--fluidbox-content-height, var(--fluidbox-height, 100svh)))`,
-    );
+    const size = fitSize(item);
+    frame.style.setProperty("--fluidbox-item-width", size.width);
+    frame.style.setProperty("--fluidbox-item-height", size.height);
     const error = this.#ownerDocument.createElement("div");
     error.dataset.fluidboxError = "";
     error.hidden = true;

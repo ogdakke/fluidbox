@@ -352,3 +352,32 @@ test("new items keep the slides of the items they share, and equal items change 
   ]);
   expect(await page.evaluate(() => window.fb.state)).toMatchObject({ status: "open", index: 1 });
 });
+
+test("a photo can be kept from growing past its own size", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await setup(page);
+  const shown = async () => {
+    expect(await page.evaluate(() => window.fb.open(2))).toBe(true);
+    const size = await page
+      .locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]')
+      .evaluate((media) => [
+        media.getBoundingClientRect().width,
+        media.getBoundingClientRect().height,
+      ]);
+    await page.evaluate(() => window.fb.close());
+    return size.map(Math.round);
+  };
+  const upscale = (value: string) =>
+    page.evaluate(
+      (value) => document.documentElement.style.setProperty("--fluidbox-max-upscale", value),
+      value,
+    );
+  // Item three is declared 600×400. Unset, it fills the stage.
+  const [width, height] = await shown();
+  expect(width! / height!).toBeCloseTo(1.5, 1);
+  expect(width).toBeGreaterThan(900);
+  await upscale("1");
+  expect(await shown()).toEqual([600, 400]);
+  await upscale("1.5");
+  expect(await shown()).toEqual([900, 600]);
+});

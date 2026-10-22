@@ -1,4 +1,5 @@
 import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS } from "./control-icons";
+import { fitSize } from "./fit-size";
 import { defaultLabels, type FluidboxLabels } from "./labels";
 import type { FluidboxItem } from "./public-api";
 
@@ -59,11 +60,8 @@ export function fluidboxStaticViewer<TItem extends FluidboxItem>({
   if (!item || item.type !== "img") return null;
   const count = items.length;
   const position = labels.position(index, count);
-  const ratio = item.width / item.height;
-  const height = "var(--fluidbox-content-height, var(--fluidbox-height, 100svh))";
-  const frameStyle =
-    `--fluidbox-item-width: min(100cqw, calc(${height} * ${ratio}));` +
-    ` --fluidbox-item-height: min(${(item.height / item.width) * 100}cqw, ${height})`;
+  const size = fitSize(item);
+  const frameStyle = `--fluidbox-item-width: ${size.width}; --fluidbox-item-height: ${size.height}`;
 
   const placeholder = item.placeholder
     ? `<img${attributes({ "data-fluidbox-slide-placeholder": "", alt: "", "aria-hidden": "true", decoding: "sync", src: item.placeholder })}>`

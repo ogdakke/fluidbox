@@ -9,7 +9,7 @@ description: Every item type (img, video, iframe, custom) with all their fields,
 
 An item is one of four types: `"img"`, `"video"`, `"iframe"` or `"custom"`. They share one slide strip, one set of gestures and the same flights. Their fields are the attributes of the element the viewer draws, by DOM property name, so `srcset`, `poster` and `referrerPolicy` mean what they mean on `<img>`, `<video>` and `<iframe>`.
 
-Every type needs `width` and `height` in pixels. The viewer uses their ratio to size the slide before anything loads.
+Every type needs `width` and `height` in pixels. The viewer uses their ratio to size the slide before anything loads. A photo fills the stage at that ratio, even past its own size; to show small photos no larger than their `width` and `height`, as PhotoSwipe does, set `--fluidbox-max-upscale: 1` (or `2` to allow twice their size) on the trigger or the page, and give the items their real pixel sizes.
 
 Every type can also have:
 

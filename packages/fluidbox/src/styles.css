@@ -410,6 +410,14 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   /* A refused swipe hides the slides past the fence. */
   display: none;
 }
+/**
+ * How far past its own `width` and `height` a photo may grow to fit the stage:
+ * `1` never past its size, `2` up to twice it. Give items their real pixel
+ * sizes when you set it.
+ * @input --fluidbox-max-upscale
+ * @default unset: photos fill the stage
+ * @on Overlay
+ */
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-slide]
   :is([data-fluidbox-media], [data-fluidbox-item-content]) {
