@@ -303,7 +303,8 @@ test.describe("360° spin", () => {
     await slider.evaluate((element) =>
       element.addEventListener(
         "pointerdown",
-        (event) => ((window as { pointerId?: number }).pointerId = event.pointerId),
+        (event) =>
+          ((window as { pointerId?: number }).pointerId = (event as PointerEvent).pointerId),
         { once: true },
       ),
     );

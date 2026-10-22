@@ -299,7 +299,10 @@ function Photo({
     if (image?.complete && image.naturalWidth) setLoaded(true);
   }, []);
   const box = useRef<HTMLSpanElement>(null);
-  useEffect(() => (zoom && box.current ? hoverZoom(box.current, item) : undefined), [zoom, item]);
+  useEffect(
+    () => (zoom && item.type === "img" && box.current ? hoverZoom(box.current, item) : undefined),
+    [zoom, item],
+  );
   return (
     <span
       ref={box}
