@@ -25,8 +25,9 @@ import {
   type FluidboxLabels,
   type FluidboxOptions,
   type FluidboxOriginAdapter,
-  type FluidboxRenderContext,
   type FluidboxRenderer,
+  type FluidboxSlideRenderContext,
+  type FluidboxSlideRenderer,
   type FluidboxSheetEvent,
   type FluidboxSheetSnapPoint,
   type FluidboxState,
@@ -158,12 +159,20 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly fluidbox: Fluidbox<TItem> = createFluidbox<TItem>({
     items: [],
     // Renderers resolve by name when a slide mounts, so the newest one is used.
-    renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+    renderers: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get: (_, name) => {
         const content = typeof name === "string" ? this.renderers?.[name] : undefined;
         if (!content) return undefined;
-        return ({ item, index, target }: FluidboxRenderContext<TItem>) =>
-          mountContent(this.#zone, this.#container, content, item, index, target);
+        return (context: FluidboxSlideRenderContext<TItem>) =>
+          mountContent(
+            this.#zone,
+            this.#container,
+            content,
+            context.item,
+            context.index,
+            context.target,
+            context,
+          );
       },
       has: (_, name) => typeof name === "string" && !!this.renderers?.[name],
     }),

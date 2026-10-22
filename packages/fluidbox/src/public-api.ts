@@ -156,6 +156,25 @@ export type FluidboxRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxRenderContext<TItem>,
 ) => void | (() => void);
 
+/** What a custom slide's renderer gets: a render context that also follows the slide on show. */
+export interface FluidboxSlideRenderContext<
+  TItem extends FluidboxItem = FluidboxItem,
+> extends FluidboxRenderContext<TItem> {
+  /** Whether the slide is the one on show in the viewer. */
+  readonly active: boolean;
+  /**
+   * Call `listener` with the new `active` each time it changes: true as the slide
+   * comes to be the one on show, false as the viewer moves away from it. Use it to
+   * play and pause. Returns a function that stops listening; `signal` stops it too.
+   */
+  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
+}
+
+/** Draws a custom slide (`renderers`). It can follow whether its slide is on show. */
+export type FluidboxSlideRenderer<TItem extends FluidboxItem = FluidboxItem> = (
+  context: FluidboxSlideRenderContext<TItem>,
+) => void | (() => void);
+
 export interface FluidboxViewerContext<TItem extends FluidboxItem = FluidboxItem> {
   /** The viewer's layer for your controls and captions. */
   readonly target: HTMLElement;
@@ -388,7 +407,7 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    */
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
   /** Draw `custom` items, by the name in their `render`. Read when a slide mounts. */
-  readonly renderers?: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  readonly renderers?: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   /**
    * Go round: past the last item comes the first, and before the first the
    * last, by swipe, key, button and filmstrip alike. A single item never loops.

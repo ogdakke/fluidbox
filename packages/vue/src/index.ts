@@ -42,8 +42,9 @@ import {
   type FluidboxLabels,
   type FluidboxLoading,
   type FluidboxOriginAdapter,
-  type FluidboxRenderContext,
   type FluidboxRenderer,
+  type FluidboxSlideRenderContext,
+  type FluidboxSlideRenderer,
   type FluidboxSheetEvent,
   type FluidboxSheetOptions,
   type FluidboxSheetSnapPoint,
@@ -317,12 +318,22 @@ const Root = defineComponent(
     const labels = computed(() => resolveLabels(props.labels));
 
     // Renderers resolve by name when a slide mounts, so the newest one is used.
-    const renderers = new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+    const renderers = new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get(_, key) {
         const render = typeof key === "string" ? props.renderers?.[key] : undefined;
         if (!render) return undefined;
-        return ({ item, index, target, signal }: FluidboxRenderContext<TItem>) =>
-          mounts.mount(target, () => render({ item, index, signal }));
+        return (context: FluidboxSlideRenderContext<TItem>) =>
+          mounts.mount(context.target, () =>
+            render({
+              item: context.item,
+              index: context.index,
+              signal: context.signal,
+              get active() {
+                return context.active;
+              },
+              onActiveChange: context.onActiveChange,
+            }),
+          );
       },
       has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
     });

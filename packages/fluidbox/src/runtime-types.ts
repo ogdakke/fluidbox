@@ -64,7 +64,7 @@ export type SessionCommandResult =
 
 export type FluidboxDispose = () => void;
 
-export type { FluidboxRenderContext, FluidboxRenderer } from "./public-api";
+export type { FluidboxRenderContext, FluidboxRenderer, FluidboxSlideRenderer } from "./public-api";
 import type { FluidboxRenderer } from "./public-api";
 
 /** The viewer's layer for controls and captions: the default buttons, then your viewer content. */

@@ -29,6 +29,7 @@ import {
   type FluidboxItems,
   type FluidboxLabels,
   type FluidboxRenderer,
+  type FluidboxSlideRenderer,
   type FluidboxSheetEvent,
   type FluidboxSheetOptions,
   type FluidboxState,
@@ -260,14 +261,22 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     loading: untrack(() => props.loading),
     // Renderers resolve by key when an item renders, so the newest render
     // function is used without rebuilding the viewer.
-    renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+    renderers: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get(_, key) {
         const renderer = typeof key === "string" ? props.renderers?.[key] : undefined;
         return renderer
           ? (((context) =>
               mount(context.target, () =>
-                renderer({ item: context.item, index: context.index, signal: context.signal }),
-              )) satisfies FluidboxRenderer<TItem>)
+                renderer({
+                  item: context.item,
+                  index: context.index,
+                  signal: context.signal,
+                  get active() {
+                    return context.active;
+                  },
+                  onActiveChange: context.onActiveChange,
+                }),
+              )) satisfies FluidboxSlideRenderer<TItem>)
           : undefined;
       },
       has: (_, key) => typeof key === "string" && !!props.renderers?.[key],

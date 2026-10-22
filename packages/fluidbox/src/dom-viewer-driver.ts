@@ -31,7 +31,7 @@ import type {
   FluidboxItemId,
   FluidboxOrigin,
   FluidboxViewerLayer,
-  FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
   FluidboxZoomOptions,
@@ -130,7 +130,7 @@ export class DomViewerDriver<
   /** Loaded with the first overlay, so a viewer without overlays never loads it. */
   #thumbnailOverlays: ThumbnailOverlayRuntime<TItem> | undefined;
   #overlaysLoad: Promise<unknown> | undefined;
-  readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   readonly #viewerOwner = {
     closeImmediately: () => {
       const controller = this.#controller;
@@ -211,7 +211,7 @@ export class DomViewerDriver<
   constructor(
     ownerDocument: Document,
     zoomOptions: false | FluidboxZoomOptions | undefined,
-    renderers: Readonly<Record<string, FluidboxRenderer<TItem>>> | undefined,
+    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>> | undefined,
     labels: FluidboxLabels,
   ) {
     this.#labels = labels;
@@ -1764,6 +1764,7 @@ export class DomViewerDriver<
     activeViewer.release(this.#viewerOwner);
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
+    this.#strip?.hide();
     this.#setState("closed");
     const returnFocus = this.#returnFocus?.isConnected
       ? this.#returnFocus
