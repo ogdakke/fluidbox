@@ -102,6 +102,16 @@ export const parts: readonly CssName[] = [
    * your own scrubbers and sliders with it.
    */
   { names: ["data-fluidbox-owns-input"] },
+  /**
+   * An element in the viewer that describes the dialog: its `aria-describedby`,
+   * such as a caption that adds what the item's name doesn't say.
+   */
+  { names: ["data-fluidbox-description"] },
+  /**
+   * Outside the viewer: an element it never makes inert while open, such as the
+   * root your popovers, menus or toasts render into.
+   */
+  { names: ["data-fluidbox-exempt"] },
   /** The scroller a zoomed image pans in. `data-grabbing` while dragged. */
   { names: ["data-fluidbox-zoom-viewport"] },
   /** The filmstrip's box, in `[data-fluidbox-addons]`. Place it with your own CSS. */
@@ -254,6 +264,7 @@ export const internal: readonly string[] = [
   "data-fluidbox-flight-source-hidden",
   "data-fluidbox-frozen",
   "data-fluidbox-headless",
+  "data-fluidbox-modal",
   "data-fluidbox-image-pending",
   "data-fluidbox-image-ready",
   "data-fluidbox-managed",

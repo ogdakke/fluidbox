@@ -117,7 +117,7 @@ export function fluidboxStaticViewer<TItem extends FluidboxItem>({
     ? control("previous", step(-1)) + control("next", step(1)) + control("close", null)
     : "";
   const strip = filmstrip
-    ? `<div data-fluidbox-filmstrip-dock="" data-fluidbox-chrome=""><div${attributes({ "data-fluidbox-filmstrip": "", "aria-label": labels.filmstrip })}><div${attributes({ "data-fluidbox-filmstrip-scroll": "", role: "listbox", "aria-orientation": "horizontal", "aria-label": labels.filmstripList })}></div></div></div>`
+    ? `<div data-fluidbox-filmstrip-dock="" data-fluidbox-chrome=""><div${attributes({ "data-fluidbox-filmstrip": "", role: "group", "aria-label": labels.filmstrip })}><div${attributes({ "data-fluidbox-filmstrip-scroll": "", role: "listbox", "aria-orientation": "horizontal", "aria-label": labels.filmstripList })}></div></div></div>`
     : "";
 
   return (
@@ -135,8 +135,8 @@ export function fluidboxStaticViewer<TItem extends FluidboxItem>({
       "data-fluidbox-status": "open",
       "data-open": "",
     })}>` +
-    `<div${attributes({ "data-fluidbox-slides": "", "aria-label": labels.slides })}>` +
-    `<div${attributes({ "data-fluidbox-slide": "", role: "group", "aria-label": position, "aria-hidden": "false" })}>` +
+    `<div${attributes({ "data-fluidbox-slides": "", role: "region", "aria-roledescription": labels.carousel, "aria-label": labels.slides })}>` +
+    `<div${attributes({ "data-fluidbox-slide": "", role: "group", "aria-roledescription": labels.slide, "aria-label": position, "aria-hidden": "false" })}>` +
     `<div${attributes({ "data-fluidbox-frame": "", "data-fluidbox-image-frame": "", style: frameStyle })}>` +
     placeholder +
     preview +
