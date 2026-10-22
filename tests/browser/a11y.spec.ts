@@ -295,13 +295,11 @@ test.describe("semantics", () => {
         slide.dataset.kept = "";
       }
     });
-    // A variant: the photo on show moves to the front, the first behind it,
-    // and a new photo takes the video's place.
+    // A variant drops the photo on show: the photo kept beside it, hidden
+    // until now, comes into its place, and a new photo goes first.
     await page.evaluate(() => {
       const items = (window as any).a11yItems;
       return (window as any).a11yFluidbox.setItems([
-        items[1],
-        items[0],
         {
           id: "green",
           type: "img",
@@ -310,54 +308,38 @@ test.describe("semantics", () => {
           width: 600,
           height: 400,
         },
+        items[0],
+        items[2],
         items[3],
       ]);
     });
+    await expect(activeSlide(page)).toHaveAttribute("aria-label", "Item 2 of 4");
     const slides = await page.evaluate(() =>
-      Array.from(document.querySelectorAll<HTMLElement>("[data-fluidbox-slide]"), (slide) => ({
-        name:
-          slide.querySelector("img[data-fluidbox-media]")?.getAttribute("alt") ??
-          (slide.querySelector("[data-test=add]") ? "shop" : "?"),
-        kept: slide.hasAttribute("data-kept"),
-        label: slide.getAttribute("aria-label"),
-        description: slide.getAttribute("aria-roledescription"),
-        hidden: slide.getAttribute("aria-hidden"),
-        inert: slide.inert,
-      })).sort((a, b) => a.label!.localeCompare(b.label!)),
+      Array.from(document.querySelectorAll<HTMLElement>("[data-fluidbox-slide]"), (slide) => {
+        const media = slide.querySelector("[data-fluidbox-media]");
+        return {
+          name: media?.getAttribute("alt") ?? media?.getAttribute("aria-label"),
+          kept: slide.hasAttribute("data-kept"),
+          label: slide.getAttribute("aria-label"),
+          description: slide.getAttribute("aria-roledescription"),
+          hidden: slide.getAttribute("aria-hidden"),
+          inert: slide.inert,
+        };
+      }).sort((a, b) => a.label!.localeCompare(b.label!)),
     );
+    const slide = (name: string, kept: boolean, position: number, shown = false) => ({
+      name,
+      kept,
+      label: `Item ${position} of 4`,
+      description: "slide",
+      hidden: String(!shown),
+      inert: !shown,
+    });
     expect(slides).toEqual([
-      {
-        name: "Blue study",
-        kept: true,
-        label: "Item 1 of 4",
-        description: "slide",
-        hidden: "false",
-        inert: false,
-      },
-      {
-        name: "Red study",
-        kept: true,
-        label: "Item 2 of 4",
-        description: "slide",
-        hidden: "true",
-        inert: true,
-      },
-      {
-        name: "Green study",
-        kept: false,
-        label: "Item 3 of 4",
-        description: "slide",
-        hidden: "true",
-        inert: true,
-      },
-      {
-        name: "shop",
-        kept: true,
-        label: "Item 4 of 4",
-        description: "slide",
-        hidden: "true",
-        inert: true,
-      },
+      slide("Green study", false, 1),
+      slide("Red study", true, 2, true),
+      slide("Drifting clouds", true, 3),
+      slide("Product form", true, 4),
     ]);
   });
 
