@@ -159,8 +159,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** The add-on entries the settings need, while they load. Opening waits for them. */
   #addonsLoading: Promise<void> | undefined;
   #list: FluidboxItemList<TItem>;
-  /** The items as given, and a copy of an array, so equal items change nothing. */
-  #given: FluidboxItems<TItem>;
+  /** A copy of the array the list was made from, so equal items change nothing. */
   #array: readonly TItem[] | undefined;
   #source: FluidboxSource<TItem>;
   #state: FluidboxState<TItem>;
@@ -181,7 +180,6 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
     super();
     this.#list = toList(options.items);
-    this.#given = options.items;
     this.#array = Array.isArray(options.items)
       ? [...(options.items as readonly TItem[])]
       : undefined;
@@ -429,15 +427,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   setItems(items: FluidboxItems<TItem>) {
     this.#assertAlive();
-    // The same list, or the same items in a new array, as a binding re-rendering
+    // The same items in a new array, as a binding re-rendering
     // `items={products.map(toItem)}` passes, change nothing: they neither
-    // interrupt a move nor rebuild a slide.
+    // interrupt a move nor rebuild a slide. A lazy list always applies.
     const array = Array.isArray(items) ? [...(items as readonly TItem[])] : undefined;
-    if (items === this.#given || (array && this.#array && sameItems(array, this.#array))) {
-      return Promise.resolve(false);
-    }
+    if (array && this.#array && sameItems(array, this.#array)) return Promise.resolve(false);
     this.#list = toList(items);
-    this.#given = items;
     this.#array = array;
     // A close this update causes is reported with the reason "items".
     this.#reason = "items";

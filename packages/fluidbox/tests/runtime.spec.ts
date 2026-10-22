@@ -362,7 +362,7 @@ describe("the fluidbox runtime", () => {
     expect(fluidbox.state).toMatchObject({ status: "closed", count: 3 });
   });
 
-  it("ignores items equal to its own, in a new array or the same list", async () => {
+  it("ignores an array of items equal to its own", async () => {
     const driver = new TestDriver();
     const fluidbox = make(driver);
     const opening = fluidbox.open("two");
@@ -388,14 +388,6 @@ describe("the fluidbox runtime", () => {
     expect(driver.sourceUpdates).toHaveLength(2);
     driver.steps[2]!.resolve();
     await changed;
-
-    const list = { count: 1, get: () => items[0] };
-    const replacing = fluidbox.setItems(list);
-    driver.steps[3]?.resolve();
-    await replacing;
-    expect(driver.sourceUpdates).toHaveLength(3);
-    await expect(fluidbox.setItems(list)).resolves.toBe(false);
-    expect(driver.sourceUpdates).toHaveLength(3);
   });
 
   it("rejects unexpected driver failures without leaving a pending command", async () => {

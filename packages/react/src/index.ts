@@ -410,8 +410,15 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     sync.current(open, index);
   }, [fluidbox, open, index]);
 
-  // The fluidbox ignores items equal to its own, so a fresh array each render costs nothing.
-  useIsomorphicLayoutEffect(() => void fluidbox.setItems(items), [items, fluidbox]);
+  // The fluidbox ignores an array of items equal to its own, so a fresh array
+  // each render costs nothing. Only the first render's items are skipped: the
+  // fluidbox was made with them, and a lazy list always applies.
+  const lastItems = useRef(items);
+  useIsomorphicLayoutEffect(() => {
+    if (lastItems.current === items) return;
+    lastItems.current = items;
+    void fluidbox.setItems(items);
+  }, [items, fluidbox]);
 
   const commands = useMemo<FluidboxCommands<TItem>>(
     () => ({
