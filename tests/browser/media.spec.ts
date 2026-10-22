@@ -297,12 +297,43 @@ test.describe("360° spin", () => {
     await expect(slider).toHaveAttribute("data-fluidbox-spin-loaded", "");
     const box = (await slider.boundingBox())!;
     const y = box.y + box.height / 2;
+    // The pointer goes down for real, so the spin can capture it; the throw is
+    // then paced in the page, as a remote mouse can't time a release within the
+    // 60 ms that tells a throw from a rest.
+    await slider.evaluate((element) =>
+      element.addEventListener(
+        "pointerdown",
+        (event) => ((window as { pointerId?: number }).pointerId = event.pointerId),
+        { once: true },
+      ),
+    );
     await page.mouse.move(box.x + box.width * 0.3, y);
     await page.mouse.down();
-    for (let step = 1; step <= 4; step++) {
-      await page.mouse.move(box.x + box.width * (0.3 + step * 0.04), y);
-    }
-    const released = Number(await slider.getAttribute("aria-valuenow"));
+    const released = await slider.evaluate(
+      async (element, { x, y, width }) => {
+        const { pointerId } = window as { pointerId?: number };
+        const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+        const send = (type: string, clientX: number) =>
+          element.dispatchEvent(
+            new PointerEvent(type, {
+              pointerId,
+              isPrimary: true,
+              pointerType: "mouse",
+              clientX,
+              clientY: y,
+              bubbles: true,
+            }),
+          );
+        for (let step = 1; step <= 4; step++) {
+          await frame();
+          send("pointermove", x + width * step * 0.04);
+        }
+        const value = Number(element.getAttribute("aria-valuenow"));
+        send("pointerup", x + width * 0.16);
+        return value;
+      },
+      { x: box.x + box.width * 0.3, y, width: box.width },
+    );
     await page.mouse.up();
     await expect
       .poll(async () => Number(await slider.getAttribute("aria-valuenow")))
@@ -310,12 +341,15 @@ test.describe("360° spin", () => {
     // At rest: the frame it shows is the value it reads, and it no longer moves.
     let last = "";
     await expect
-      .poll(async () => {
-        const now = await slider.getAttribute("aria-valuenow");
-        const settled = now === last;
-        last = now!;
-        return settled;
-      })
+      .poll(
+        async () => {
+          const now = (await slider.getAttribute("aria-valuenow"))!;
+          const settled = now === last;
+          last = now;
+          return settled;
+        },
+        { intervals: [600] },
+      )
       .toBe(true);
     expect(Number(await slider.getAttribute("data-frame"))).toBe(Number(last) - 1);
     expect(await index(page)).toBe(5);
@@ -443,7 +477,11 @@ test.describe("3D model", () => {
     await expect.poll(() => index(page)).toBe(7);
   });
 
-  test("a pinch on the model zooms the model, not the slide", async ({ page }) => {
+  test("a pinch on the model zooms the model, not the slide", async ({ page }, testInfo) => {
+    test.skip(
+      ["iphone-15-pro", "ipad-pro-11"].includes(testInfo.project.name),
+      "Mobile WebKit has no wheel to pinch a trackpad with.",
+    );
     await load(page);
     await open(page, model);
     const element = page.locator(`${shown} model-viewer`);
