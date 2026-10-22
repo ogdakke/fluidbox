@@ -66,13 +66,13 @@ const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
 const WHEEL_HANDOFF_TIMEOUT = 1200;
+/** Content whose keys are its own: widgets that move with arrow keys, and content that owns its input. */
+const KEY_OWNERS =
+  "[data-fluidbox-owns-input], [role=radiogroup], [role=slider], [role=tablist], [role=listbox], [role=menu], [role=menubar], [role=grid], [role=treegrid], [role=tree], [role=toolbar], [role=combobox], [role=spinbutton]";
 /**
  * Content that handles Escape itself: a dialog or popover inside the viewer,
  * an open menu or combobox.
  */
-/** Content whose keys are its own: widgets that move with arrow keys, and content that owns its input. */
-const KEY_OWNERS =
-  "[data-fluidbox-owns-input], [role=radiogroup], [role=slider], [role=tablist], [role=listbox], [role=menu], [role=menubar], [role=grid], [role=treegrid], [role=tree], [role=toolbar], [role=combobox], [role=spinbutton]";
 const ESCAPE_OWNERS =
   "dialog[open], [popover], [role=menu], [role=menubar], [role=combobox][aria-expanded=true]";
 const FOCUSABLE_HOST_SELECTOR =
