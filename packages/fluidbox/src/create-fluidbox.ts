@@ -49,6 +49,18 @@ const defaultControls = ["previous", "next", "close"] as const;
 const reasonOf = (reason: SessionChangeReason): FluidboxReason =>
   reason === "source-update" || reason === "source-empty" ? "items" : reason;
 
+/**
+ * Report a host callback's error as an uncaught one would be, without letting it
+ * stop the command that called it.
+ */
+function report(error: unknown) {
+  if (typeof reportError === "function") reportError(error);
+  else
+    queueMicrotask(() => {
+      throw error;
+    });
+}
+
 const happened = (result: SessionCommandResult) => result.status === "completed";
 const completed = (changed: boolean): SessionCommandResult => ({ status: "completed", changed });
 const prevented = (): SessionCommandResult => ({ status: "prevented" });
@@ -1117,7 +1129,15 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #publish(status: FluidboxStatus, index: number | null) {
     this.#origins.keepThumbnail(status === "open" && !!this.#viewer?.keepsThumbnail());
     this.#state = this.#stateFor(status, index);
-    for (const listener of this.#listeners) listener(this.#state);
+    // Every binding is a subscriber: one that throws must not stop the others,
+    // or the command, which then never settles.
+    for (const listener of this.#listeners) {
+      try {
+        listener(this.#state);
+      } catch (error) {
+        report(error);
+      }
+    }
   }
 
   /** Opening and closing toggle; an aborted command lands back where it was. */

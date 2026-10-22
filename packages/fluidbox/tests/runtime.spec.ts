@@ -369,6 +369,61 @@ describe("the fluidbox runtime", () => {
     await expect(fluidbox.close()).resolves.toBe(true);
   });
 
+  it("settles commands, toggles and later subscribers when a subscriber throws", async () => {
+    const reported: unknown[] = [];
+    vi.stubGlobal("reportError", (error: unknown) => reported.push(error));
+    try {
+      const driver = new TestDriver();
+      const fluidbox = make(driver);
+      const failure = new Error("binding failed");
+      const seen: string[] = [];
+      fluidbox.subscribe(() => {
+        throw failure;
+      });
+      fluidbox.subscribe((state) => seen.push(state.status));
+      const toggles: string[] = [];
+      fluidbox.addEventListener("toggle", (event) => toggles.push(event.newState));
+
+      const opening = fluidbox.open("one");
+      driver.steps[0]!.resolve();
+      await expect(opening).resolves.toBe(true);
+      const closing = fluidbox.close();
+      driver.steps[1]!.resolve();
+      await expect(closing).resolves.toBe(true);
+
+      expect(seen).toEqual(["opening", "open", "closing", "closed"]);
+      expect(toggles).toEqual(["open", "closed"]);
+      expect(reported).toEqual([failure, failure, failure, failure]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("lets a command issued as another's motion ends take over", async () => {
+    for (let ticks = 0; ticks < 6; ticks++) {
+      const driver = new TestDriver();
+      const fluidbox = make(driver);
+      const opening = fluidbox.open("one");
+      driver.steps[0]!.resolve();
+      await opening;
+
+      const closing = fluidbox.close();
+      driver.steps[1]!.resolve();
+      for (let tick = 0; tick < ticks; tick++) await Promise.resolve();
+      const reopening = fluidbox.open("two");
+      await closing;
+      for (let tick = 0; tick < 6; tick++) await Promise.resolve();
+      // The close that finished first does not settle over the open that took over.
+      expect(fluidbox.state, `after ${ticks} microtasks`).toMatchObject({
+        status: "opening",
+        id: "two",
+      });
+      driver.steps.at(-1)!.resolve();
+      await expect(reopening).resolves.toBe(true);
+      expect(fluidbox.state).toMatchObject({ status: "open", id: "two" });
+    }
+  });
+
   it("aborts pending work on an idempotent destroy, and then does nothing", async () => {
     const driver = new TestDriver();
     const fluidbox = make(driver);
