@@ -92,7 +92,7 @@ export interface FluidboxTrigger<TItem extends FluidboxItem = FluidboxItem> {
 }
 
 /** Elements a keyboard and a screen reader can use as a trigger. */
-const INTERACTIVE = "a[href], button, input, select, textarea, summary, [role], [tabindex]";
+const INTERACTIVE = "a[href],button,input,select,textarea,summary,[role],[tabindex]";
 
 /** Whether a bundler built for development. Without one, it says no. */
 const development = () => {
@@ -203,7 +203,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
         if (!next.hasAttribute("aria-haspopup")) next.setAttribute("aria-haspopup", "dialog");
         if (development() && !next.matches(INTERACTIVE)) {
           console.warn(
-            "A fluidbox trigger should be a <button> or <a href>, or have a role and tabindex, so keyboards and screen readers can use it:",
+            "A fluidbox trigger needs to be a <button> or <a href>, or to have a role and tabindex:",
             next,
           );
         }

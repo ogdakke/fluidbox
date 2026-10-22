@@ -21,7 +21,7 @@ test("iframe items refuse script URLs and get a default sandbox", async ({ page 
       return String(error);
     }
   });
-  expect(refused).toContain("TypeError: The src of fluidbox iframe item x must be");
+  expect(refused).toContain("TypeError: The src of fluidbox iframe item x is not");
 
   // A list of one's own skips the array check; the slide refuses it instead.
   await page.evaluate(async () => {
@@ -79,7 +79,9 @@ test("<fluidbox-item> refuses an iframe with a script URL", async ({ page }) => 
     gallery.append(item);
     document.body.append(gallery);
   });
-  await expect.poll(() => errors.join("\n")).toContain("The src of fluidbox iframe item bad");
+  await expect
+    .poll(() => errors.join("\n"))
+    .toContain("The src of fluidbox iframe item bad is not");
   await page.locator("[data-test-bad]").click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   expect(await page.evaluate(() => "pwned" in window)).toBe(false);
@@ -165,6 +167,6 @@ test("a trigger that can't take focus warns in development", async ({ page }) =>
     for (const element of [button, div, named]) window.headlessViewer.bind(element, "one");
   });
   await expect
-    .poll(() => warnings.filter((text) => text.includes("A fluidbox trigger should be")))
+    .poll(() => warnings.filter((text) => text.includes("A fluidbox trigger needs to be")))
     .toHaveLength(1);
 });

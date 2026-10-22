@@ -63,7 +63,7 @@ describe("isSafeMediaUrl", () => {
 describe("checkItemUrls", () => {
   it("names the field and the URL it refuses", () => {
     expect(() => checkItemUrls(frame("javascript:alert(1)"))).toThrow(
-      "The src of fluidbox iframe item frame must be an http(s) or relative URL: javascript:alert(1)",
+      "The src of fluidbox iframe item frame is not http(s) or relative: javascript:alert(1)",
     );
     expect(() => checkItemUrls(video("/clip.mp4", "javascript:alert(1)"))).toThrow(/poster/);
     expect(() => checkItemUrls(video("/clip.mp4", "/poster.jpg"))).not.toThrow();

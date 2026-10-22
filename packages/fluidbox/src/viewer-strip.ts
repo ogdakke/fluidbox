@@ -6,7 +6,8 @@ import type {
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
 import type { FluidboxLabels } from "./labels";
-import { hasSafeUrls, IFRAME_SANDBOX_DEFAULT } from "./media-url";
+import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
+import { checkItemUrls } from "./media-url";
 import type { FluidboxThumbnail } from "./public-api";
 
 const WINDOW_SIZE = 31;
@@ -35,6 +36,15 @@ interface ViewerSlide {
 }
 
 /** Point an image at a thumbnail, its srcset and sizes included. */
+function safeUrls(item: FluidboxItem) {
+  try {
+    checkItemUrls(item);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function paintThumbnail(image: HTMLImageElement, thumbnail: FluidboxThumbnail) {
   if (thumbnail.sizes) image.sizes = thumbnail.sizes;
   else image.removeAttribute("sizes");
@@ -757,7 +767,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
             if (slide.controller === controller) slide.controller = undefined;
           });
       }
-    } else if ((item.type === "video" || item.type === "iframe") && !hasSafeUrls(item)) {
+    } else if (!safeUrls(item)) {
       // Item lists reject these already; a list of your own still stops here.
       this.#fail(index, slide);
     } else if (item.type === "video" && slide.image instanceof HTMLVideoElement) {
