@@ -707,6 +707,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (notify) this.#onSelect(this.#item(index), false);
   }
 
+  /** The scale the zoom of the image on show rests at, while it is above fit. */
+  #zoomed: { readonly index: number; readonly scale: number } | undefined;
+
   #loadWindow() {
     for (const [index, slide] of this.#slides) {
       // A slide that leaves gives back its zoom's sharper image.
@@ -724,6 +727,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    */
   sharpen(scale: number) {
     const index = this.#index;
+    // An image still loading sharpens once it shows; see #revealImage.
+    this.#zoomed = { index, scale };
     const slide = this.#slides.get(index);
     const item = this.#source.getItem(this.#item(index));
     const image = slide?.image;
@@ -1027,6 +1032,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (slide.imageVersion !== version) return;
     delete image.dataset.fluidboxImagePending;
     if (slide.fullApplied) slide.error.hidden = true;
+    // Zoomed in before the full image came: sharpen it now.
+    const zoomed = this.#zoomed;
+    if (
+      zoomed &&
+      zoomed.scale > 1 &&
+      zoomed.index === this.#index &&
+      slide === this.#slides.get(zoomed.index)
+    ) {
+      this.sharpen(zoomed.scale);
+    }
   }
 
   #retry(index: number) {

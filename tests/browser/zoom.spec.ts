@@ -235,7 +235,8 @@ test.describe("zoom by pointer", () => {
 });
 
 test.describe("a sharper image as it zooms", () => {
-  test.use({ viewport: { width: 1280, height: 720 } });
+  // Desktop Safari's device is 2x; the thresholds below are at 1x.
+  test.use({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   test.skip(({ isMobile }) => isMobile, "Thresholds measured at a pixel ratio of 1.");
 
   /** The query strings of the requests for one photo, in order. */
@@ -310,6 +311,27 @@ test.describe("a sharper image as it zooms", () => {
     // The ladder is a neighbour now, back on its own sources.
     await expect(ladder).toHaveAttribute("srcset", /\?w=540 540w/);
     await expect(ladder).toHaveAttribute("sizes", "2160px");
+  });
+
+  test("a zoom made before the image has loaded sharpens once it has", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    // Hold the slide's own candidate back until the zoom has come to rest.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/photos\/1015\.webp\?w=2160$/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await openOn(page, "ladder");
+    await page.locator(activeMedia).evaluate((image) => (image.dataset.testLadder = ""));
+    const ladder = page.locator("img[data-test-ladder]");
+    await expect(page.evaluate(() => window.zoomViewer.zoomTo(3))).resolves.toBe(true);
+    release();
+    await expect
+      .poll(() => ladder.evaluate((image: HTMLImageElement) => image.currentSrc), {
+        timeout: 10_000,
+      })
+      .toContain("?w=4320");
   });
 
   test("zoomSrc loads once the image's own pixels run out", async ({ page }) => {
