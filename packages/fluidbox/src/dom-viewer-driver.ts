@@ -715,8 +715,12 @@ export class DomViewerDriver<
     let frame = this.#frame;
     let media = this.#media;
     // Moving an iframe or video into the body-level flight would reload it or
-    // reset playback, so embedded media close inside their own frame instead.
-    const embedded = media instanceof HTMLIFrameElement || media instanceof HTMLMediaElement;
+    // reset playback, so embedded media close inside their own frame instead,
+    // as does custom content that holds them, such as a playing YouTube embed.
+    const embedded =
+      media instanceof HTMLIFrameElement ||
+      media instanceof HTMLMediaElement ||
+      !!media.querySelector("iframe, video, audio");
     if (from && originTarget && !embedded) {
       const source = media;
       const prepared =

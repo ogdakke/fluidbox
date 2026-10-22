@@ -42,6 +42,11 @@ const resist = (value: number, min: number, max: number, range: number) =>
       : value;
 
 const sides = ["top", "right", "bottom", "left"] as const;
+/** Whether a gesture starts on content that keeps its own, as a 3D model does its pinch. */
+const ownsInput = (event: Event) =>
+  event
+    .composedPath()
+    .some((target) => target instanceof Element && target.hasAttribute("data-fluidbox-owns-input"));
 
 /** Maps a scale's log-space distance beyond [1, max] through `curve`. */
 function beyondBounds(
@@ -479,6 +484,7 @@ export class FluidboxZoom {
   #touchStart = (event: TouchEvent) => {
     this.#suppressClick = false;
     if ((event.target as Element).closest("button")) return;
+    if (!this.zoomed && ownsInput(event)) return;
     if (event.touches.length === 1 && this.#viewport) {
       this.#nativeTouch = this.#nativeTouchPrevious = point(event.touches[0]!);
       // Leave the default action intact: the browser owns pan and momentum.
@@ -587,6 +593,11 @@ export class FluidboxZoom {
       return;
     }
     if (!event.ctrlKey && !this.zoomed) return;
+    // A pinch on content that owns its input is the content's; the page still doesn't zoom.
+    if (!this.zoomed && ownsInput(event)) {
+      event.preventDefault();
+      return;
+    }
     if (!event.ctrlKey) {
       this.#freeze();
       this.#settle();
@@ -609,6 +620,10 @@ export class FluidboxZoom {
   };
 
   #gestureStart = (event: Event) => {
+    if (!this.#source && !this.zoomed && ownsInput(event)) {
+      event.preventDefault();
+      return;
+    }
     if (this.#source === "touch") {
       this.#consume(event);
       return;
