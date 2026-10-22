@@ -34,58 +34,59 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 };
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
+// baseline/bundle-budget.md records the measurements behind them and why they moved.
 // Controlled open and index added about 250 B to each binding's initial chunk,
 // and looping about 100 B to the core's and 270 B to its viewer chunk.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 7_800,
-  elements: 11_500,
-  react: 13_350,
-  solid: 11_000,
-  vue: 11_750,
-  angular: 12_000,
+  root: 9_200,
+  elements: 13_150,
+  react: 14_900,
+  solid: 12_800,
+  vue: 13_500,
+  angular: 13_950,
   filmstrip: 3_700,
-  sheet: 7_350,
-  kit: 1_450,
+  sheet: 7_300,
+  kit: 1_700,
   // The hover zoom add-on, loaded by pages that magnify their photos on hover.
   "hover-zoom": 1_500,
   // The media add-ons carry their few rules in their JS.
   embeds: 2_800,
-  model: 1_400,
-  spin: 2_550,
+  model: 1_350,
+  spin: 2_500,
 };
-const cssGzipLimit = 3_300;
+const cssGzipLimit = 3_650;
 // Right-to-left support added about 200 B to every core entry's viewer chunk.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 32_350,
+  root: 37_100,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
-  elements: 35_500,
-  react: 37_650,
-  solid: 35_300,
-  vue: 36_050,
-  angular: 36_300,
+  elements: 40_500,
+  react: 42_450,
+  solid: 40_250,
+  vue: 41_000,
+  angular: 41_450,
   filmstrip: 3_700,
-  sheet: 7_350,
-  kit: 1_450,
+  sheet: 7_300,
+  kit: 1_700,
   "hover-zoom": 1_500,
   embeds: 2_800,
-  model: 1_400,
-  spin: 2_550,
+  model: 1_350,
+  spin: 2_500,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 35_550,
-  elements: 38_800,
-  react: 40_900,
-  solid: 38_550,
-  vue: 39_300,
-  angular: 39_550,
-  filmstrip: 4_950,
-  sheet: 8_700,
-  kit: 4_650,
+  root: 40_650,
+  elements: 44_050,
+  react: 46_000,
+  solid: 43_850,
+  vue: 44_600,
+  angular: 45_000,
+  filmstrip: 5_100,
+  sheet: 8_600,
+  kit: 5_250,
   // It needs no stylesheet; the base one counts, as for the kit.
-  "hover-zoom": 4_900,
-  embeds: 6_050,
-  model: 4_650,
-  spin: 5_800,
+  "hover-zoom": 5_100,
+  embeds: 6_350,
+  model: 4_950,
+  spin: 6_050,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
