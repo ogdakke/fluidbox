@@ -109,6 +109,9 @@ const fluidbox: Fluidbox = createFluidbox({
   renderers,
   loading: "eager",
   filmstrip: params.has("filmstrip"),
+  ...(params.has("zoom")
+    ? { controls: ["previous", "next", "close", "zoomIn", "zoomOut", "zoomReset"] as const }
+    : {}),
   ...(viewer ? { viewer } : {}),
 });
 

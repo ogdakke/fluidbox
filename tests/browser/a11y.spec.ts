@@ -153,6 +153,64 @@ test.describe("keyboard", () => {
     await expect(strip).toBeFocused();
   });
 
+  test("a Zoom In that disables itself at the largest scale hands focus to Zoom Out", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page, "?zoom");
+    await open(page, 0);
+    const zoomIn = dialog(page).locator("[data-fluidbox-zoom-in]");
+    await zoomIn.focus();
+    for (let step = 0; step < 10 && !(await zoomIn.isDisabled()); step++) {
+      await page.keyboard.press("Enter");
+      await page.waitForTimeout(100);
+    }
+    await expect(zoomIn).toBeDisabled();
+    await expect(dialog(page).locator("[data-fluidbox-zoom-out]")).toBeFocused();
+  });
+
+  test("the arrow keys on the focused zoomed image pan it", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page, "?zoom");
+    await open(page, 0);
+    await page.evaluate(() => (window as any).a11yFluidbox.zoomTo(3));
+    const viewport = dialog(page).locator("[data-fluidbox-zoom-viewport]");
+    await expect(viewport).toHaveAttribute("role", "group");
+    await viewport.focus();
+    const left = () => viewport.evaluate((element) => element.scrollLeft);
+    const before = await left();
+    await page.keyboard.press("ArrowRight");
+    // By the zoom's step, a fifth of the view, not the browser's line scroll.
+    const step = await page.evaluate(() => innerWidth / 5);
+    await expect.poll(async () => (await left()) - before).toBeGreaterThan(step * 0.8);
+    expect(await page.evaluate(() => (window as any).a11yFluidbox.state.index)).toBe(0);
+  });
+
+  test("Tab reaches the zoom controls and the zoomed image", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page, "?zoom");
+    await open(page, 0);
+    await page.evaluate(() => (window as any).a11yFluidbox.zoomTo(2));
+    await expect(dialog(page).locator("[data-fluidbox-zoom-viewport]")).toBeAttached();
+    await dialog(page).locator("[data-fluidbox-slides]").focus();
+    const order: string[] = [];
+    for (let step = 0; step < 8; step++) {
+      await page.keyboard.press("Tab");
+      order.push(
+        await page.evaluate(() => {
+          const element = document.activeElement!;
+          const name = ["zoom-in", "zoom-out", "zoom-reset", "zoom-viewport", "close", "next"].find(
+            (each) => element.hasAttribute(`data-fluidbox-${each}`),
+          );
+          return name ?? element.tagName;
+        }),
+      );
+    }
+    for (const stop of ["next", "close", "zoom-in", "zoom-out", "zoom-reset", "zoom-viewport"]) {
+      expect(order).toContain(stop);
+    }
+  });
+
   test("a Previous that disables itself at the start hands focus to Next", async ({ page }) => {
     await load(page);
     await open(page, 1);

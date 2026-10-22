@@ -67,3 +67,15 @@ test("the headless caption is clean open", async ({ page }) => {
   await openFrom(page, "headless");
   expect(await violations(page, "[data-fluidbox-overlay]")).toEqual([]);
 });
+
+test("a zoomed image and the zoom controls are clean", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/a11y.html?zoom");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  await page.evaluate(() => (window as any).a11yFluidbox.load());
+  await page.evaluate(() => (window as any).a11yFluidbox.open(0));
+  await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+  await page.evaluate(() => (window as any).a11yFluidbox.zoomTo(2));
+  await expect(dialog(page).locator("[data-fluidbox-zoom-viewport]")).toBeAttached();
+  expect(await violations(page, "[data-fluidbox-overlay]")).toEqual([]);
+});
