@@ -65,6 +65,18 @@
       "types": "./dist/hover-zoom.d.ts",
       "import": "./dist/hover-zoom.js"
     },
+    "./embeds": {
+      "types": "./dist/embeds.d.ts",
+      "import": "./dist/embeds.js"
+    },
+    "./model": {
+      "types": "./dist/model.d.ts",
+      "import": "./dist/model.js"
+    },
+    "./spin": {
+      "types": "./dist/spin.d.ts",
+      "import": "./dist/spin.js"
+    },
     "./styles.css": {
       "types": "./dist/styles.css.d.ts",
       "default": "./dist/styles.css"

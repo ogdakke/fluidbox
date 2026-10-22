@@ -10,6 +10,9 @@ for (const subpath of [
   "/sheet",
   "/kit",
   "/hover-zoom",
+  "/embeds",
+  "/model",
+  "/spin",
 ]) {
   const name = `@ogdakke/fluidbox${subpath}`;
   await import(name);

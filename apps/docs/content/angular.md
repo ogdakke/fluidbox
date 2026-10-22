@@ -193,7 +193,7 @@ A `(click)` on the same button runs first; `$event.preventDefault()` stops the c
 
 ### Renderers
 
-`[renderers]` maps the `render` name of `custom` items to a template or a component. A template gets the context `let-item let-index="index"` (`FluidboxItemContext`). A component gets `item` and `index` inputs, when it declares them.
+`[renderers]` maps the `render` name of `custom` items to a template or a component. A template gets the context `let-item let-index="index"` (`FluidboxItemContext`). A component gets `item` and `index` inputs, when it declares them. Both also get `active`, whether the slide is the one on show, kept up to date: `let-active="active"` in a template, an `active` input on a component. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
 
 ```html
 <div fluidboxRoot [items]="media" [renderers]="{ note: noteTemplate }">…</div>

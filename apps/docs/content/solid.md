@@ -110,6 +110,8 @@ All parts are properties of the `Fluidbox` object.
 | `onIndexChange`      | `(index: number, details: { reason }) => void`                  |                       | As the viewer moves to another item, opening included. Set `index` from it.                                                                   |
 | `children`           | `JSX.Element`                                                   |                       | Your page content and the other parts.                                                                                                        |
 
+A renderer's `ctx` also has `active` and `onActiveChange`, to play and pause as its slide comes on show and leaves it. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
+
 `TItem` comes from `items`, so the events hand back your own item objects. The [API reference](./api.md) describes the events and their `reason`.
 
 ### `Fluidbox.Trigger`

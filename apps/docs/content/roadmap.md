@@ -67,7 +67,8 @@ The opening animation and swipes should hold 60 fps on a mid-range Android phone
 - **Tiled images.** Zoom into images too large to download whole, using Deep Zoom (DZI) or IIIF tiles.
 - **A Svelte binding.**
 - **Panoramas and streaming video** as built-in renderers. You can already write your own renderer for either.
-- **3D models.** A renderer for glTF and GLB files that opens from its thumbnail like a photo, turns as you drag and zooms as you pinch. Dragging already swipes between slides and closes the viewer, so the add-on has to work out which gesture the user means.
+
+YouTube and Vimeo videos, 360° spins and 3D models, once listed here, are add-ons now. See [Product media](./product-media.md).
 
 ## Helping
 

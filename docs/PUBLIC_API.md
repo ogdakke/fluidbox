@@ -24,6 +24,9 @@ documentation is in `apps/docs/content` ([API reference](../apps/docs/content/ap
 | `@ogdakke/fluidbox/sheet`       | Registers the sheet add-on on import. Exports its types only. SSR-safe. Styles in `sheet.css`.                               |
 | `@ogdakke/fluidbox/hover-zoom`  | `hoverZoom` and its options: magnifies a photo on the page under a resting mouse. No side effects. SSR-safe.                 |
 | `@ogdakke/fluidbox/kit`         | The binding kit for framework bindings. Not needed by app code.                                                              |
+| `@ogdakke/fluidbox/embeds`      | YouTube and Vimeo facades: `youtubeItem`, `vimeoItem`, `renderEmbed`. No side effects on import. SSR-safe.                   |
+| `@ogdakke/fluidbox/spin`        | 360° spins: `spinItem`, `createSpinRenderer`. No side effects on import. SSR-safe.                                           |
+| `@ogdakke/fluidbox/model`       | 3D models: `modelItem`, `createModelRenderer`. Never bundles `<model-viewer>`; loads it through `load`. SSR-safe.            |
 | `@ogdakke/fluidbox/<framework>` | `react`, `solid`, `vue`, `angular`: built on the plain API and the kit only, never the custom elements.                      |
 
 Add-ons register into one registry per page (`Symbol.for`), however many copies a bundler makes.
@@ -103,6 +106,19 @@ application owns inside the viewer: custom slides, filmstrip thumbnails, the she
 overlays. The runtime calls the returned disposer, then empties `target`; framework bindings use
 their own portal or teleport mechanism and the runtime never reparents a framework-owned node.
 Custom content outside the bounded slide window is disposed and may mount again as a new instance.
+
+A custom slide's renderer (`FluidboxSlideRenderer`) also gets `active` and
+`onActiveChange(listener)`: mount, activate, deactivate and dispose are distinct. A slide mounts
+within one slide of the current one, inactive; it activates as it becomes the one on show in an
+open viewer, and deactivates as the viewer moves away or closes, the leaving slide first. The
+`signal` aborts on dispose. The framework bindings pass `active` and `onActiveChange` to their
+renderers; Angular as an `active` input or template context field.
+
+Content marked `data-fluidbox-owns-input` owns the touches, pinches (touch, trackpad and Safari
+gesture events), wheel and navigation keys that start on it: the viewer neither swipes, dismisses,
+zooms nor steps from them. Escape and Tab stay the viewer's. The content sets its own
+`touch-action`. Custom content that holds an iframe, a video or an audio element closes in its
+frame rather than in the flight, as embedded media items do.
 
 ## Labels
 

@@ -17,6 +17,7 @@ import type {
   FluidboxOptions,
   FluidboxOriginAdapter,
   FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxSheet,
   FluidboxSheetOptions,
   FluidboxSheetSnapPoint,
@@ -155,13 +156,13 @@ export class FluidboxGalleryElement extends HTMLElement {
   #fluidbox: Fluidbox | null = null;
   #items: FluidboxItems | null = null;
   #origins: FluidboxOriginAdapter | undefined;
-  #renderers: Readonly<Record<string, FluidboxRenderer<any>>> = {};
+  #renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>> = {};
   #viewer: FluidboxViewerRenderer<any> | undefined;
   #labels: Partial<FluidboxLabels> | undefined;
   #zoom: FluidboxOptions["zoom"] | undefined;
   #definitions = new Map<string, DeclarativeFluidboxDefinition>();
   /** The renderers the viewer looks up by name: markup content, then the renderers property. */
-  #runtimeRenderers: Record<string, FluidboxRenderer<any>> = {};
+  #runtimeRenderers: Record<string, FluidboxSlideRenderer<any>> = {};
   #triggers = new Map<HTMLElement, { element: HTMLElement; trigger: FluidboxTrigger }>();
   #overlays: (() => void)[] = [];
   #observer: MutationObserver | undefined;
@@ -298,11 +299,11 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** Renderers of `custom` items, by name. Read when a slide mounts. */
-  get renderers(): Readonly<Record<string, FluidboxRenderer<any>>> {
+  get renderers(): Readonly<Record<string, FluidboxSlideRenderer<any>>> {
     return this.#renderers;
   }
 
-  set renderers(renderers: Readonly<Record<string, FluidboxRenderer<any>>>) {
+  set renderers(renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>>) {
     this.#renderers = renderers;
     this.#syncRenderers();
   }

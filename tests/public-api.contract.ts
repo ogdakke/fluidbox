@@ -22,6 +22,7 @@ import {
   type FluidboxReason,
   type FluidboxRenderer,
   type FluidboxSheet,
+  type FluidboxSlideRenderer,
   type FluidboxState,
   type FluidboxStatus,
   type FluidboxTarget,
@@ -35,6 +36,14 @@ import type * as SheetEntry from "@ogdakke/fluidbox/sheet";
 import type * as FilmstripEntry from "@ogdakke/fluidbox/filmstrip";
 import type { FluidboxFilmstripOptions } from "@ogdakke/fluidbox/filmstrip";
 import type { FluidboxSheetOptions, FluidboxSheetSnapPoint } from "@ogdakke/fluidbox/sheet";
+import {
+  renderEmbed,
+  vimeoItem,
+  youtubeItem,
+  type FluidboxEmbedItem,
+} from "@ogdakke/fluidbox/embeds";
+import { createModelRenderer, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
+import { createSpinRenderer, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
 import {
   createTrigger,
   bindTrigger,
@@ -223,6 +232,43 @@ createFluidbox({ source: photos });
 createFluidbox({ items: photos, portal: viewer });
 // @ts-expect-error events replace callbacks
 createFluidbox({ items: photos, onEvent() {} });
+// A custom slide's renderer follows whether its slide is on show.
+const clip: FluidboxSlideRenderer<Photo | FluidboxCustomItem> = ({
+  active,
+  onActiveChange,
+  signal,
+}) => {
+  const playing: boolean = active;
+  const stop: () => void = onActiveChange((now: boolean) => void [playing, now]);
+  signal.addEventListener("abort", stop);
+};
+// Other renderers don't get it.
+// @ts-expect-error a filmstrip thumbnail is never on show as a slide
+const thumbnailActive: FluidboxRenderer = ({ active }) => void active;
+void thumbnailActive;
+// The media add-ons' items and renderers go into any gallery.
+type Shop = Photo | FluidboxEmbedItem | FluidboxModelItem | FluidboxSpinItem;
+createFluidbox<Shop>({
+  items: [
+    youtubeItem("https://youtu.be/M7lc1UVf-VE", { title: "Video" }),
+    vimeoItem("76979871", { title: "Video", poster: "/still.jpg" }),
+    modelItem({ src: "/chair.glb", title: "Chair", width: 1, height: 1, ar: true }),
+    spinItem({
+      frames: { src: "/mug/{index}.webp", count: 36 },
+      title: "Mug",
+      width: 1,
+      height: 1,
+    }),
+  ],
+  renderers: {
+    clip,
+    note: note2,
+    embed: renderEmbed,
+    spin: createSpinRenderer({ label: (frame, count) => `${frame}/${count}` }),
+    model: createModelRenderer({ load: () => Promise.resolve() }),
+  },
+});
+
 // @ts-expect-error renderers are functions, not objects with mount
 createFluidbox({ items: photos, renderers: { note: { mount: note2 } } });
 // @ts-expect-error a sheet dismissal is one of flight, scroll or none

@@ -8,19 +8,19 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { rgbaToThumbHash } from "thumbhash";
 
-const size = 1600;
-const scene = "fjord";
+export const size = 1600;
+export const scene = "fjord";
 const art = readFileSync(join(import.meta.dirname, "..", "public", "art", `${scene}.svg`), "utf8");
 const [, artWidth, artHeight] = art.match(/viewBox="0 0 (\d+) (\d+)"/)!.map(Number);
 // The scene's own markup, without its root element, to nest at any size.
 const artBody = art.slice(art.indexOf(">") + 1, art.lastIndexOf("</svg>"));
 
 /** The artwork in a box; `view` crops it. */
-function artwork(x: number, y: number, width: number, height: number, view?: string) {
+export function artwork(x: number, y: number, width: number, height: number, view?: string) {
   return `<svg x="${x}" y="${y}" width="${width}" height="${height}" viewBox="${view ?? `0 0 ${artWidth} ${artHeight}`}" preserveAspectRatio="xMidYMid slice">${artBody}</svg>`;
 }
 
-const defs = `<defs>
+export const defs = `<defs>
 <radialGradient id="p-studio" cx="0.5" cy="0.38" r="0.75"><stop offset="0" stop-color="#f7f6f3"/><stop offset="1" stop-color="#e4e2dd"/></radialGradient>
 <filter id="p-shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="26" stdDeviation="30" flood-color="#1d1a16" flood-opacity="0.26"/></filter>
 <filter id="p-contact" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#1d1a16" flood-opacity="0.35"/></filter>
@@ -42,7 +42,7 @@ const studio = `<rect width="${size}" height="${size}" fill="url(#p-studio)"/>`;
 const print = { x: 380, y: 230, width: 840, height: 1120 };
 
 /** Wood grain: thin lines along each side of a frame. */
-function grain(x: number, y: number, width: number, height: number, band: number) {
+export function grain(x: number, y: number, width: number, height: number, band: number) {
   const lines: string[] = [];
   for (let index = 1; index < 6; index++) {
     const inset = (band / 6) * index;

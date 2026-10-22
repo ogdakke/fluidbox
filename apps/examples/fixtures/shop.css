@@ -123,6 +123,24 @@
   object-fit: cover;
 }
 
+/* What a card holds besides a photo: Video, 360° or 3D. */
+.shop-slide {
+  position: relative;
+}
+.shop-kind {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.6);
+  color: white;
+  font-family: var(--fb-font-mono);
+  font-size: 11px;
+  line-height: 18px;
+  pointer-events: none;
+}
+
 /* A photo over its ThumbHash. The placeholder is the box's background and the
    image fades in over it. While the viewer has the photo, the package hides the
    image, and the placeholder goes with it so the card's slot stays empty. */

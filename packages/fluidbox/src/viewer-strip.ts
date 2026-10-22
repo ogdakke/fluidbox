@@ -1,7 +1,7 @@
 import type {
   FluidboxDispose,
   FluidboxItem,
-  FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
@@ -42,6 +42,8 @@ interface ViewerSlide {
   /** The URL of the sharper candidate the image shows for the zoom, if any. */
   sharpened?: string;
   dispose?: FluidboxDispose;
+  /** Custom content's view of whether its slide is on show, and who follows it. */
+  activity?: { active: boolean; readonly listeners: Set<(active: boolean) => void> };
 }
 
 /** Point an image at a thumbnail, its srcset and sizes included. */
@@ -71,7 +73,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   readonly #controller = new AbortController();
   readonly #onSelect: (index: number, settled: boolean) => void;
   readonly #allows: (index: number) => boolean;
-  readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   readonly #labels: FluidboxLabels;
   #source: FluidboxSource<TItem>;
   #loop: boolean;
@@ -85,6 +87,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   /** -1 when the strip runs right to left, where `scrollLeft` counts down from 0. */
   #sign = 1;
   #mounted = false;
+  /** Closed: the strip keeps its slides for the next open, but none is on show. */
+  #hidden = false;
   #rebasing = false;
   #rebaseFrame = 0;
   #instantFrame = 0;
@@ -113,7 +117,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     source: FluidboxSource<TItem>,
     onSelect: (index: number, settled: boolean) => void,
     allows: (index: number) => boolean,
-    renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>,
+    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>,
     labels: FluidboxLabels,
     loop = false,
   ) {
@@ -300,11 +304,20 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#width = this.element.getBoundingClientRect().width;
     this.#align(this.#index);
     this.#loadWindow();
+    this.#hidden = false;
+    this.#activate();
+  }
+
+  /** The viewer has closed: no slide is on show until the strip mounts again. */
+  hide() {
+    this.#hidden = true;
+    this.#activate();
   }
 
   unmount() {
     if (!this.#mounted) return;
     this.#mounted = false;
+    this.#activate();
     this.#observer.disconnect();
     this.#resolveSelection();
     for (const slide of this.#slides.values()) this.#unload(slide);
@@ -768,6 +781,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     ) {
       void player.play().catch(() => {});
     }
+    this.#activate();
     if (notify) this.#onSelect(this.#item(index), false);
   }
 
@@ -939,6 +953,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       const renderer = this.#renderers[item.render];
       if (!renderer) throw new TypeError(`Unknown fluidbox renderer: ${item.render}`);
       const controller = new AbortController();
+      // Unloading drops the activity, so its listeners are never called again.
+      const activity = (slide.activity = {
+        active: this.#mounted && !this.#hidden && index === this.#index,
+        listeners: new Set<(active: boolean) => void>(),
+      });
       slide.controller = controller;
       slide.dispose =
         renderer({
@@ -946,6 +965,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           index: this.#item(index),
           target: slide.image,
           signal: controller.signal,
+          get active() {
+            return activity.active;
+          },
+          onActiveChange(listener) {
+            activity.listeners.add(listener);
+            return () => activity.listeners.delete(listener);
+          },
         }) ?? undefined;
     }
     slide.loaded = true;
@@ -963,6 +989,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.controller = undefined;
     slide.dispose?.();
     slide.dispose = undefined;
+    slide.activity = undefined;
     slide.decoded = false;
     slide.fullApplied = false;
     slide.error.hidden = true;
@@ -984,6 +1011,22 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.replaceChildren();
     }
     slide.loaded = false;
+  }
+
+  /**
+   * Tell custom content whether its slide is the one on show in a mounted strip:
+   * the slide that leaves first, so its player stops before the next one starts.
+   */
+  #activate() {
+    let entering: ViewerSlide["activity"];
+    for (const [index, { activity }] of this.#slides) {
+      const active = this.#mounted && !this.#hidden && index === this.#index;
+      if (!activity || activity.active === active) continue;
+      activity.active = active;
+      if (active) entering = activity;
+      else for (const listener of activity.listeners) listener(false);
+    }
+    if (entering) for (const listener of entering.listeners) listener(true);
   }
 
   #applyImage(index: number, slide: ViewerSlide) {

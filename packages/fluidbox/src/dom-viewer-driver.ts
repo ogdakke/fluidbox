@@ -31,7 +31,7 @@ import type {
   FluidboxItemId,
   FluidboxOrigin,
   FluidboxViewerLayer,
-  FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
   FluidboxZoomOptions,
@@ -130,7 +130,7 @@ export class DomViewerDriver<
   /** Loaded with the first overlay, so a viewer without overlays never loads it. */
   #thumbnailOverlays: ThumbnailOverlayRuntime<TItem> | undefined;
   #overlaysLoad: Promise<unknown> | undefined;
-  readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   readonly #viewerOwner = {
     closeImmediately: () => {
       const controller = this.#controller;
@@ -213,7 +213,7 @@ export class DomViewerDriver<
   constructor(
     ownerDocument: Document,
     zoomOptions: false | FluidboxZoomOptions | undefined,
-    renderers: Readonly<Record<string, FluidboxRenderer<TItem>>> | undefined,
+    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>> | undefined,
     labels: FluidboxLabels,
   ) {
     this.#labels = labels;
@@ -759,8 +759,10 @@ export class DomViewerDriver<
     let frame = this.#frame;
     let media = this.#media;
     // Moving an iframe or video into the body-level flight would reload it or
-    // reset playback, so embedded media close inside their own frame instead.
-    const embedded = media instanceof HTMLIFrameElement || media instanceof HTMLMediaElement;
+    // reset playback, so embedded media close inside their own frame instead,
+    // as does custom content that holds them, such as a playing YouTube embed.
+    const playable = "iframe, video, audio";
+    const embedded = media.matches(playable) || !!media.querySelector(playable);
     if (from && originTarget && !embedded) {
       const source = media;
       const prepared =
@@ -1860,6 +1862,7 @@ export class DomViewerDriver<
     activeViewer.release(this.#viewerOwner);
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
+    this.#strip?.hide();
     this.#setState("closed");
     const returnFocus = this.#returnFocus?.isConnected
       ? this.#returnFocus

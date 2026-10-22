@@ -38,6 +38,8 @@ export type {
   FluidboxSheet,
   FluidboxSheetOptions,
   FluidboxSheetSnapPoint,
+  FluidboxSlideRenderContext,
+  FluidboxSlideRenderer,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,

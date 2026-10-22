@@ -22,6 +22,13 @@ export interface FluidboxReactRenderContext<TItem extends FluidboxItem = Fluidbo
   readonly item: TItem;
   readonly index: number;
   readonly signal: AbortSignal;
+  /** Whether the slide is the one on show. */
+  readonly active: boolean;
+  /**
+   * Call `listener` with the new `active` as the slide comes to be the one on
+   * show or stops being it, to play and pause. Returns a function that stops it.
+   */
+  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
 }
 
 /** Draws a `custom` item as React content, rendered in place with the app's context. */

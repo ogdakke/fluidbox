@@ -103,9 +103,10 @@ export const parts: readonly CssName[] = [
   /** A layer outside the viewer's layer that shows and hides with the controls. Content in the layer does this already. */
   { names: ["data-fluidbox-chrome"] },
   /**
-   * Content that keeps its own touches, wheel and arrow keys, as the filmstrip
-   * and the sheet do. The viewer doesn't swipe, dismiss or step from them. Mark
-   * your own scrubbers and sliders with it.
+   * Content that keeps its own touches, pinches, wheel and arrow keys, as the
+   * filmstrip, the sheet, a spin and a 3D model do. The viewer doesn't swipe,
+   * dismiss, zoom or step from them. Mark your own scrubbers and sliders with
+   * it, and give them the `touch-action` they need.
    */
   { names: ["data-fluidbox-owns-input"] },
   /** The scroller a zoomed image pans in. `data-grabbing` while dragged. */
@@ -136,6 +137,18 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-ghost"] },
   /** In a `<fluidbox-gallery>` with `items` set, makes the element a trigger of the item with that id. */
   { names: ["data-fluidbox-item-id"] },
+  /** A media add-on's box in a custom slide: a video's, a spin's or a model's. */
+  { names: ["data-fluidbox-media-addon"] },
+  /** A media add-on's poster layers: `thumbnail`, then the sharper `poster` over it. */
+  { names: ["data-fluidbox-media-poster"] },
+  /** A YouTube or Vimeo video's box; the value is the provider. */
+  { names: ["data-fluidbox-embed"] },
+  /** A video's Play button. */
+  { names: ["data-fluidbox-embed-play"] },
+  /** A 3D model's box, around `<model-viewer>`. */
+  { names: ["data-fluidbox-model"] },
+  /** A spin, `role="slider"`, with `data-frame` and `data-grabbing` while dragged. */
+  { names: ["data-fluidbox-spin"] },
 ];
 
 /** The sheet's elements, from the sheet add-on. */
@@ -199,6 +212,14 @@ export const states: readonly CssName[] = [
   { names: ["data-fluidbox-phase"], on: "Thumbnail overlays" },
   /** The current item. */
   { names: ["aria-selected", "data-fluidbox-selected"], on: "Filmstrip items" },
+  /** The poster is still decoding, and hidden. */
+  { names: ["data-fluidbox-media-pending"], on: "A media add-on's poster" },
+  /** Play was pressed; the player has loaded over the poster. */
+  { names: ["data-fluidbox-embed-playing", "data-fluidbox-embed-ready"], on: "A video's box" },
+  /** The model shows, so the poster hides; the model failed, so the poster stays. */
+  { names: ["data-fluidbox-model-ready", "data-fluidbox-model-error"], on: "A model's box" },
+  /** Every frame has loaded. */
+  { names: ["data-fluidbox-spin-loaded"], on: "A spin" },
 ];
 
 /** Names the runtime and the stylesheets use among themselves. They can change without notice. */

@@ -14,6 +14,13 @@ export interface FluidboxVueRenderContext<TItem extends FluidboxItem = FluidboxI
   readonly index: number;
   /** Aborted when the viewer lets go of the slide. */
   readonly signal: AbortSignal;
+  /** Whether the slide is the one on show. */
+  readonly active: boolean;
+  /**
+   * Call `listener` with the new `active` as the slide comes to be the one on
+   * show or stops being it, to play and pause. Returns a function that stops it.
+   */
+  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
 }
 
 /** Draws a `custom` item, keyed by its `render`. Return any Vue content, such as `h(Note)`. */

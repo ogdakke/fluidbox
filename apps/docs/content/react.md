@@ -107,6 +107,8 @@ All parts are properties of the `Fluidbox` object.
 | `onIndexChange`      | `(index: number, details: { reason }) => void`                |                       | As the viewer moves to another item, opening included. Set `index` from it.                                                                   |
 | `children`           | `ReactNode`                                                   |                       | Your page content and the other parts.                                                                                                        |
 
+A renderer's `ctx` also has `active` and `onActiveChange`, to play and pause as its slide comes on show and leaves it. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
+
 `TItem` flows from `items` to the renderers and the events. They get your own item objects back, with any fields you added.
 
 A change to `labels`, `zoom`, or the `Viewer`, `Filmstrip` and `Sheet` parts and their props goes to the viewer through `update`, even while it is open. `Root` makes the viewer once per mount.
