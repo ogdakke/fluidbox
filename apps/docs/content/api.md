@@ -48,7 +48,7 @@ fluidbox.update({
 
 ## Renderers
 
-<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxViewerRenderer, FluidboxViewerContext -->
+<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlideRenderer, FluidboxSlideRenderContext, FluidboxViewerRenderer, FluidboxViewerContext -->
 
 ## Origins
 
@@ -75,6 +75,16 @@ createFluidbox({
 ## Add-ons
 
 <!-- api: FluidboxFilmstripOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->
+
+## Media add-ons
+
+YouTube and Vimeo, 360° spins and 3D models. See [Product media](./product-media.md).
+
+<!-- api-summary: embeds -->
+
+<!-- api-summary: spin -->
+
+<!-- api-summary: model -->
 
 ## Custom elements
 

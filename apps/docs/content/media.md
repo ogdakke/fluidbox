@@ -165,6 +165,10 @@ The same renderer shape fills filmstrip thumbnails, the sheet and travelling ove
 
 A custom slide mounts when it comes within one slide of the current one, and its cleanup runs when it moves further away. Keep state you need in your app, not in the mounted nodes. Clicks on buttons, links and fields inside custom content never count as zoom taps.
 
+A custom slide's renderer also gets `active`, whether its slide is the one on show, and `onActiveChange`, to play and pause as it comes on show and leaves it. Content marked `data-fluidbox-owns-input` keeps its own drags, pinches and arrow keys. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause) and [Content that owns its gestures](./product-media.md#content-that-owns-its-gestures).
+
+[Product media](./product-media.md) has add-ons for YouTube and Vimeo videos that load their player on Play, 360° spins and 3D models.
+
 [Custom content](./patterns/renderers.md) shows a framework component, a map, a video and a YouTube embed in every framework.
 
 ## Thumbnails and placeholders

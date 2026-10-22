@@ -92,6 +92,8 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 | `origins`   | `FluidboxOriginAdapter<TItem>`                                 | triggers              | Finds the triggers of items without a mounted `Trigger`, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter). |
 | `loading`   | `"hover" \| "press" \| "eager"`                                | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                        |
 
+A renderer's `ctx` also has `active` and `onActiveChange`, to play and pause as its slide comes on show and leaves it. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
+
 | Event               | Payload                   | When                                                                                          |
 | ------------------- | ------------------------- | --------------------------------------------------------------------------------------------- |
 | `@beforetoggle`     | `FluidboxToggleEvent`     | Before the viewer opens or closes. Cancelable: `event.preventDefault()` keeps it as it is.    |
