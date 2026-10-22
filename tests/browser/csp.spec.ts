@@ -31,7 +31,7 @@ test("the plain runtime opens, navigates, zooms and closes under a strict policy
   await expect(activeSlide(page)).toHaveAttribute("aria-label", "Item 2 of 3");
   await activeSlide(page).locator("[data-fluidbox-media]").dblclick();
   await expect(dialog(page)).toHaveAttribute("data-zoomed", "");
-  await activeSlide(page).locator("[data-fluidbox-media]").first().dblclick();
+  await page.keyboard.press("0");
   await expect(dialog(page)).not.toHaveAttribute("data-zoomed", "");
 
   await page.keyboard.press("Escape");
