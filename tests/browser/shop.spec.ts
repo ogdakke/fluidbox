@@ -1,10 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
+import { playerMessages, stubMedia } from "./support/media";
 
 const dialog = "[data-fluidbox-dialog]";
+const shown = '[data-fluidbox-slide][aria-hidden="false"]';
 
 async function load(page: Page) {
+  const requests = await stubMedia(page);
   await page.goto("/shop.html");
-  await expect(page.locator(".shop-slide")).toHaveCount(7);
+  await expect(page.locator(".shop-slide")).toHaveCount(10);
+  return requests;
 }
 
 /** The carousel card whose left edge sits at the carousel's start. */
@@ -123,7 +127,7 @@ test.describe("shop fixture, wide screen", () => {
     await page.keyboard.press("ArrowDown");
     await expect(selected).toHaveAttribute("data-index", String(from));
     await page.keyboard.press("End");
-    await expect(selected).toHaveAttribute("data-index", "6");
+    await expect(selected).toHaveAttribute("data-index", "9");
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   });
 });
@@ -137,14 +141,105 @@ test.describe("shop fixture, phone", () => {
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
     await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(0);
     const dots = page.locator(".shop-dot");
-    await expect(dots).toHaveCount(7);
+    await expect(dots).toHaveCount(10);
     const sizes = () => dots.evaluateAll((all) => all.map((dot) => dot.getAttribute("data-size")));
-    await expect.poll(sizes).toEqual(["full", "full", "full", "full", "small", "hidden", "hidden"]);
+    const hidden = (count: number) => Array.from({ length: count }, () => "hidden");
+    await expect.poll(sizes).toEqual(["full", "full", "full", "full", "small", ...hidden(5)]);
     for (let step = 0; step < 4; step++) await page.keyboard.press("ArrowRight");
     await expect(dots.nth(4)).toHaveAttribute("data-active");
-    await expect.poll(sizes).toEqual(["hidden", "hidden", "small", "full", "full", "full", "full"]);
+    await expect
+      .poll(sizes)
+      .toEqual([...hidden(2), "small", "full", "full", "full", "small", ...hidden(3)]);
     await page.keyboard.press("Escape");
     await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
     await expect.poll(() => shownSlide(page)).toBe(4);
+  });
+});
+
+test.describe("shop fixture, rich media", () => {
+  /** Open the card at an index from the page's carousel. */
+  async function openCard(page: Page, at: number) {
+    await page.locator(".shop-slide").nth(at).click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  }
+  const index = (page: Page) =>
+    page
+      .locator(`${shown}`)
+      .getAttribute("aria-label")
+      .then((label) => label?.split(" ")[1]);
+
+  test("the video plays on Play, and pauses when the viewer moves on", async ({ page }) => {
+    const requests = await load(page);
+    await openCard(page, 7);
+    const slide = page.locator(shown);
+    await expect(slide.locator('[data-fluidbox-media-poster="thumbnail"]')).toHaveAttribute(
+      "src",
+      "https://i.ytimg.com/vi/M7lc1UVf-VE/mqdefault.jpg",
+    );
+    expect(requests.players).toEqual([]);
+    await slide.getByRole("button", { name: "Play Video: how the print is made" }).click();
+    await expect(slide.locator("[data-fluidbox-embed-ready] iframe")).toHaveCount(1);
+    await page.locator(dialog).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(() => index(page)).toBe("9");
+    await expect
+      .poll(async () =>
+        (await playerMessages(page, "https://www.youtube-nocookie.com/")).map(
+          (message) => (message as { data: string }).data,
+        ),
+      )
+      .toEqual([JSON.stringify({ event: "command", func: "pauseVideo", args: [] })]);
+  });
+
+  test("the spin turns by itself until someone turns it", async ({ page }) => {
+    await load(page);
+    await openCard(page, 8);
+    const slider = page.locator(shown).getByRole("slider");
+    await expect.poll(() => slider.getAttribute("aria-valuenow")).not.toBe("1");
+    await slider.focus();
+    await page.keyboard.press("Home");
+    await expect(slider).toHaveAttribute("aria-valuenow", "1");
+    await page.waitForTimeout(400);
+    await expect(slider).toHaveAttribute("aria-valuenow", "1");
+  });
+
+  test("the spin keeps still with reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page);
+    await openCard(page, 8);
+    const slider = page.locator(shown).getByRole("slider");
+    await expect(slider).toHaveAttribute("data-fluidbox-spin-loaded", "");
+    await page.waitForTimeout(400);
+    await expect(slider).toHaveAttribute("aria-valuenow", "1");
+  });
+
+  test("the model loads its element from the CDN, and opens and closes on its poster", async ({
+    page,
+  }) => {
+    const requests = await load(page);
+    await openCard(page, 9);
+    await expect(page.locator(`${shown} model-viewer`)).toHaveAttribute(
+      "src",
+      "/products/fjord-model.glb",
+    );
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    expect(requests.modelViewer).toEqual([
+      "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js",
+    ]);
+    // The closing flight carries the poster home, not the live model.
+    const flown = page.waitForSelector("[data-fluidbox-flight] [data-fluidbox-model]", {
+      state: "attached",
+    });
+    await page.locator(dialog).focus();
+    await page.keyboard.press("Escape");
+    const visible = await (
+      await flown
+    ).evaluate((box) => {
+      const poster = box.querySelector('[data-fluidbox-media-poster="poster"]')!;
+      const model = box.querySelector("model-viewer")!;
+      return [getComputedStyle(poster).visibility, getComputedStyle(model).visibility];
+    });
+    expect(visible).toEqual(["visible", "hidden"]);
+    await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
   });
 });

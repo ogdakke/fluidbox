@@ -1,8 +1,21 @@
 import { mountSite } from "../src/site";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { FluidboxImageItem, FluidboxOriginAdapter } from "@ogdakke/fluidbox";
-import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
+import type {
+  FluidboxImageItem,
+  FluidboxItem,
+  FluidboxOriginAdapter,
+  FluidboxSlideRenderer,
+} from "@ogdakke/fluidbox";
+import { renderEmbed, youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embeds";
+import { createModelRenderer, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
+import { createSpinRenderer, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
+import {
+  Fluidbox,
+  useFluidbox,
+  type FluidboxReactRenderContext,
+  type FluidboxReactRenderer,
+} from "@ogdakke/fluidbox/react";
 import { thumbHashToDataURL } from "thumbhash";
 import hashes from "./shop-photos.json";
 import { Avatar, compact, type Person } from "./social-ui";
@@ -52,6 +65,103 @@ const shots: readonly Shot[] = [
   shot("wood", "The print in a wood frame", "wood"),
   shot("white", "The print in a white frame", "white"),
 ];
+
+// After the photos, Shop's richer media: a video, the framed print all the way round,
+// and a model of it to turn and place in a room.
+
+const video = youtubeItem("https://www.youtube.com/watch?v=M7lc1UVf-VE", {
+  id: "fjord-video",
+  title: "Video: how the print is made",
+  thumbnail: { src: "https://i.ytimg.com/vi/M7lc1UVf-VE/mqdefault.jpg", width: 320, height: 180 },
+});
+
+const spin = spinItem({
+  id: "fjord-spin",
+  title: "The wood-framed print, all the way round",
+  frames: { src: "/products/spin/fjord-{index}.webp", count: 36, digits: 2 },
+  width: 800,
+  height: 800,
+  thumbnail: { src: "/products/spin/fjord-00-thumb.webp", width: 160, height: 160 },
+  autoplay: 8,
+});
+
+const model = modelItem({
+  id: "fjord-model",
+  title: "The wood-framed print in 3D",
+  src: "/products/fjord-model.glb",
+  poster: "/products/fjord-model.webp",
+  width: 800,
+  height: 800,
+  thumbnail: { src: "/products/fjord-model-thumb.webp", width: 160, height: 160 },
+  ar: true,
+  arModes: "webxr scene-viewer quick-look",
+  attributes: { "camera-orbit": "-30deg 80deg auto", "shadow-intensity": "1" },
+});
+
+type ShopItem = Shot | FluidboxEmbedItem | FluidboxSpinItem | FluidboxModelItem;
+
+const media: readonly ShopItem[] = [...shots, video, spin, model];
+
+/** The item's name for a card's label. */
+const named = (item: ShopItem) => (item.type === "img" ? item.alt : item.title);
+
+/** The picture a card shows: the photo, the video's poster, the spin's first frame or the model's poster. */
+const cover = (item: ShopItem) =>
+  item.type === "img"
+    ? item.src
+    : "frames" in item
+      ? item.frames[0]!
+      : (item.poster ?? item.thumbnail!.src);
+
+/** What a card says it holds besides a photo. */
+const badges: Record<string, string> = { embed: "Video", spin: "360°", model: "3D" };
+
+/**
+ * The add-ons' renderers draw into an element. A React slide gets a span of
+ * its own to draw them into, with the slide's signal and activity.
+ */
+function addon(render: FluidboxSlideRenderer<FluidboxItem>): FluidboxReactRenderer<ShopItem> {
+  return (context) => <AddonSlide render={render} context={context} />;
+}
+
+function AddonSlide({
+  render,
+  context,
+}: {
+  render: FluidboxSlideRenderer<FluidboxItem>;
+  context: FluidboxReactRenderContext<ShopItem>;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const target = ref.current!;
+    const controller = new AbortController();
+    const dispose = render({
+      item: context.item,
+      index: context.index,
+      target,
+      signal: AbortSignal.any([context.signal, controller.signal]),
+      get active() {
+        return context.active;
+      },
+      onActiveChange: context.onActiveChange,
+    });
+    return () => {
+      controller.abort();
+      dispose?.();
+      target.replaceChildren();
+    };
+  }, [render, context]);
+  return <span ref={ref} style={{ display: "contents" }} />;
+}
+
+// The model's element loads from a CDN only when a model slide is first on show.
+const MODEL_VIEWER = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
+
+const renderers = {
+  embed: addon(renderEmbed),
+  spin: addon(createSpinRenderer()),
+  model: addon(createModelRenderer({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) })),
+};
 
 const sizes = [
   { id: "9x12", label: "9″ × 12″", price: 32.95 },
@@ -173,7 +283,7 @@ function Photo({
   origin,
   eager,
 }: {
-  item: Shot;
+  item: ShopItem;
   src: string;
   size: number;
   origin?: boolean;
@@ -185,7 +295,10 @@ function Photo({
     if (image?.complete && image.naturalWidth) setLoaded(true);
   }, []);
   return (
-    <span className="shop-photo" style={{ backgroundImage: `url(${item.placeholder})` }}>
+    <span
+      className="shop-photo"
+      style={item.placeholder ? { backgroundImage: `url(${item.placeholder})` } : undefined}
+    >
       <img
         ref={ref}
         data-fluidbox-origin={origin || undefined}
@@ -208,12 +321,12 @@ function Gallery({ carousel }: { carousel: Carousel }) {
     <div className="shop-gallery">
       {/* Wide screens: a column of thumbnails that steps the carousel, as Shop's does. */}
       <div className="shop-thumbs" role="group" aria-label="Product photos">
-        {shots.map((item, at) => (
+        {media.map((item, at) => (
           <button
             key={item.id}
             type="button"
             className="shop-thumb"
-            aria-label={`Show ${item.alt}`}
+            aria-label={`Show ${named(item)}`}
             aria-current={at === index}
             onClick={() => scrollTo(at)}
           >
@@ -223,14 +336,19 @@ function Gallery({ carousel }: { carousel: Carousel }) {
       </div>
       <div className="shop-stage">
         <div className="shop-carousel" ref={ref} onScroll={onScroll}>
-          {shots.map((item, at) => (
+          {media.map((item, at) => (
             <Fluidbox.Trigger key={item.id} item={item} asChild>
               <button
                 type="button"
                 className="shop-slide"
-                aria-label={`Open photo ${at + 1} of ${shots.length}: ${item.alt}`}
+                aria-label={`Open ${at + 1} of ${media.length}: ${named(item)}`}
               >
-                <Photo item={item} src={item.src} size={item.width} origin eager={at < 2} />
+                <Photo item={item} src={cover(item)} size={item.width} origin eager={at < 2} />
+                {item.type === "custom" && (
+                  <span className="shop-kind" aria-hidden="true">
+                    {badges[item.render]}
+                  </span>
+                )}
               </button>
             </Fluidbox.Trigger>
           ))}
@@ -250,7 +368,7 @@ function Gallery({ carousel }: { carousel: Carousel }) {
           className="shop-arrow"
           data-side="next"
           aria-label="Next photo"
-          disabled={index === shots.length - 1}
+          disabled={index === media.length - 1}
           onClick={() => scrollTo(index + 1)}
         >
           <Icon name="next" size={18} />
@@ -667,11 +785,11 @@ function AppBars({ cart }: { cart: number }) {
 }
 
 function ProductPage() {
-  const carousel = useCarousel(shots.length);
+  const carousel = useCarousel(media.length);
   const [cart, setCart] = useState(0);
   // The viewer scrolls the carousel to the photo on show, so the close lands
   // on that card and the page is left where the viewer was.
-  const origins = useMemo<FluidboxOriginAdapter<Shot>>(
+  const origins = useMemo<FluidboxOriginAdapter<ShopItem>>(
     () => ({
       getOrigin: () => null,
       revealOrigin: (_id, index) => carousel.scrollTo(index, "instant"),
@@ -679,7 +797,12 @@ function ProductPage() {
     [carousel.scrollTo],
   );
   return (
-    <Fluidbox.Root items={shots} origins={origins} zoom={{ step: 2.5, max: 4 }}>
+    <Fluidbox.Root
+      items={media}
+      origins={origins}
+      renderers={renderers}
+      zoom={{ step: 2.5, max: 4 }}
+    >
       <article className="shop-page">
         <div className="shop-seller-row">
           <Seller />
@@ -737,6 +860,13 @@ function Findings() {
           <strong>Pan with the pointer: fixture code.</strong> Shop pans a zoomed photo by moving
           the mouse, with no drag. The fixture sets the zoom viewport's scroll from the pointer. The
           package pans by dragging, which still works.
+        </li>
+        <li>
+          <strong>Video, 360° and 3D: add-ons.</strong> After the photos come a YouTube video, a
+          spin of the framed print and a model of it, from the embeds, spin and model entries. The
+          video loads its player only when Play is pressed and pauses when the viewer moves on. A
+          drag on the spin or the model turns it instead of swiping, and the model&apos;s element
+          loads from a CDN when its slide first shows. Each opens from its card like a photo.
         </li>
         <li>
           <strong>Themes per screen: fits.</strong> The viewer copies --fluidbox-* properties from
