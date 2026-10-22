@@ -223,7 +223,13 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       if (event.defaultPrevented || !event.isPrimary || event.button !== 0) return;
       discardPreload();
       const target = openTarget();
-      if (target !== undefined) preload = fluidbox.preload(target as FluidboxTarget<TItem>);
+      if (target === undefined) return;
+      // A trigger can outlive its fluidbox; a press on it then prepares nothing.
+      try {
+        preload = fluidbox.preload(target as FluidboxTarget<TItem>);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "InvalidStateError")) throw error;
+      }
     },
     pointerUp() {
       clearTimeout(preloadTimer);

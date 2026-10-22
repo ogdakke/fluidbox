@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createFluidbox } from "../src/create-fluidbox";
 import { createFluidboxSync, unloadFluidbox } from "../src/kit";
+import { createTrigger } from "../src/trigger";
 import type { Fluidbox, FluidboxImageItem, FluidboxState } from "../src/public-api";
 
 const items: FluidboxImageItem[] = [
@@ -93,5 +94,16 @@ describe("createFluidboxSync", () => {
     sync(undefined, 1.5);
     sync(undefined, 2);
     expect(calls).toEqual(["open 2"]);
+  });
+});
+
+describe("a trigger", () => {
+  it("does nothing on a press after its fluidbox is destroyed", () => {
+    const fluidbox = createFluidbox({ items });
+    const trigger = createTrigger(fluidbox, { target: "two" });
+    fluidbox.destroy();
+    const press = { defaultPrevented: false, isPrimary: true, button: 0 } as PointerEvent;
+    expect(() => trigger.pointerDown(press)).not.toThrow();
+    trigger.destroy();
   });
 });
