@@ -283,6 +283,84 @@ test.describe("semantics", () => {
     await expect(strip).toHaveAttribute("aria-roledescription", "carousel");
   });
 
+  test("slides kept through new items are named and hidden for the places they move to", async ({
+    page,
+  }) => {
+    await load(page);
+    await page.evaluate(() => (window as any).a11yFluidbox.open(1));
+    await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+    // Mark the slides, to tell a kept one from a remade one.
+    await page.evaluate(() => {
+      for (const slide of document.querySelectorAll<HTMLElement>("[data-fluidbox-slide]")) {
+        slide.dataset.kept = "";
+      }
+    });
+    // A variant: the photo on show moves to the front, the first behind it,
+    // and a new photo takes the video's place.
+    await page.evaluate(() => {
+      const items = (window as any).a11yItems;
+      return (window as any).a11yFluidbox.setItems([
+        items[1],
+        items[0],
+        {
+          id: "green",
+          type: "img",
+          src: "/first.svg",
+          alt: "Green study",
+          width: 600,
+          height: 400,
+        },
+        items[3],
+      ]);
+    });
+    const slides = await page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLElement>("[data-fluidbox-slide]"), (slide) => ({
+        name:
+          slide.querySelector("img[data-fluidbox-media]")?.getAttribute("alt") ??
+          (slide.querySelector("[data-test=add]") ? "shop" : "?"),
+        kept: slide.hasAttribute("data-kept"),
+        label: slide.getAttribute("aria-label"),
+        description: slide.getAttribute("aria-roledescription"),
+        hidden: slide.getAttribute("aria-hidden"),
+        inert: slide.inert,
+      })).sort((a, b) => a.label!.localeCompare(b.label!)),
+    );
+    expect(slides).toEqual([
+      {
+        name: "Blue study",
+        kept: true,
+        label: "Item 1 of 4",
+        description: "slide",
+        hidden: "false",
+        inert: false,
+      },
+      {
+        name: "Red study",
+        kept: true,
+        label: "Item 2 of 4",
+        description: "slide",
+        hidden: "true",
+        inert: true,
+      },
+      {
+        name: "Green study",
+        kept: false,
+        label: "Item 3 of 4",
+        description: "slide",
+        hidden: "true",
+        inert: true,
+      },
+      {
+        name: "shop",
+        kept: true,
+        label: "Item 4 of 4",
+        description: "slide",
+        hidden: "true",
+        inert: true,
+      },
+    ]);
+  });
+
   test("the viewer announces the item it moves to, after it is in the page", async ({ page }) => {
     await load(page);
     await page.evaluate(() => (window as any).a11yFluidbox.open(0));

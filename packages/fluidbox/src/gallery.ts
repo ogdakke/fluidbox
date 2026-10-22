@@ -17,6 +17,7 @@ import type {
   FluidboxOptions,
   FluidboxOriginAdapter,
   FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxSheet,
   FluidboxSheetOptions,
   FluidboxSheetSnapPoint,
@@ -25,6 +26,7 @@ import type {
   FluidboxUpdateOptions,
   FluidboxViewerContext,
   FluidboxViewerRenderer,
+  FluidboxZoomCommandOptions,
 } from "./public-api";
 import { FluidboxToggleEvent } from "./public-api";
 import { latestOrigins } from "./origins";
@@ -85,6 +87,7 @@ const closedState: FluidboxState = Object.freeze({
   count: 0,
   hasPrevious: false,
   hasNext: false,
+  zoom: null,
 });
 
 function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined {
@@ -153,13 +156,13 @@ export class FluidboxGalleryElement extends HTMLElement {
   #fluidbox: Fluidbox | null = null;
   #items: FluidboxItems | null = null;
   #origins: FluidboxOriginAdapter | undefined;
-  #renderers: Readonly<Record<string, FluidboxRenderer<any>>> = {};
+  #renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>> = {};
   #viewer: FluidboxViewerRenderer<any> | undefined;
   #labels: Partial<FluidboxLabels> | undefined;
   #zoom: FluidboxOptions["zoom"] | undefined;
   #definitions = new Map<string, DeclarativeFluidboxDefinition>();
   /** The renderers the viewer looks up by name: markup content, then the renderers property. */
-  #runtimeRenderers: Record<string, FluidboxRenderer<any>> = {};
+  #runtimeRenderers: Record<string, FluidboxSlideRenderer<any>> = {};
   #triggers = new Map<HTMLElement, { element: HTMLElement; trigger: FluidboxTrigger }>();
   #overlays: (() => void)[] = [];
   #observer: MutationObserver | undefined;
@@ -296,11 +299,11 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   /** Renderers of `custom` items, by name. Read when a slide mounts. */
-  get renderers(): Readonly<Record<string, FluidboxRenderer<any>>> {
+  get renderers(): Readonly<Record<string, FluidboxSlideRenderer<any>>> {
     return this.#renderers;
   }
 
-  set renderers(renderers: Readonly<Record<string, FluidboxRenderer<any>>>) {
+  set renderers(renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>>) {
     this.#renderers = renderers;
     this.#syncRenderers();
   }
@@ -391,6 +394,22 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   previous(options?: FluidboxCommandOptions): Promise<boolean> {
     return this.#run((fluidbox) => fluidbox.previous(options));
+  }
+
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomTo(scale, options));
+  }
+
+  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomIn(options));
+  }
+
+  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomOut(options));
+  }
+
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.resetZoom(options));
   }
 
   /**
@@ -537,10 +556,12 @@ export class FluidboxGalleryElement extends HTMLElement {
       });
     }
     const list = toList(items);
+    // An array goes as it is, so the fluidbox can tell equal items from new ones.
+    const given = Array.isArray(items) ? items : list;
     this.#definitions = definitions;
     this.#syncRenderers();
     if (!this.#fluidbox) {
-      this.#create(list);
+      this.#create(given);
       this.#itemsResult = undefined;
     } else {
       const fluidbox = this.#fluidbox;
@@ -548,7 +569,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       // anyway would restart an open or close that is under way. Items set
       // through the property always apply.
       if (this.#items || !sameItems(fluidbox.items, list)) {
-        this.#itemsResult = fluidbox.setItems(list);
+        this.#itemsResult = fluidbox.setItems(given);
         await this.#itemsResult;
       }
       // A rebuild or disconnect during the update leaves nothing to bind.
@@ -650,9 +671,10 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   /**
    * Fill the viewer with the `viewer` property, else a `<template slot="viewer">`
-   * (where `<fluidbox-controls>` stands for the default controls), else the
-   * default controls. Buttons marked `data-fluidbox-close`, `-previous` or
-   * `-next` work wherever they are.
+   * (where `<fluidbox-controls>` stands for the default controls, and
+   * `<fluidbox-controls zoom>` adds the zoom controls), else the default
+   * controls. Buttons marked `data-fluidbox-close`, `-previous`, `-next`,
+   * `-zoom-in`, `-zoom-out` or `-zoom-reset` work wherever they are.
    */
   #mountViewer(context: FluidboxViewerContext<any>) {
     const { target } = context;

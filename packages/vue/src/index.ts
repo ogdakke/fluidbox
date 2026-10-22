@@ -42,8 +42,9 @@ import {
   type FluidboxLabels,
   type FluidboxLoading,
   type FluidboxOriginAdapter,
-  type FluidboxRenderContext,
   type FluidboxRenderer,
+  type FluidboxSlideRenderContext,
+  type FluidboxSlideRenderer,
   type FluidboxSheetEvent,
   type FluidboxSheetOptions,
   type FluidboxSheetSnapPoint,
@@ -52,6 +53,7 @@ import {
   type FluidboxToggleEvent,
   type FluidboxUpdateOptions,
   type FluidboxViewerRenderer,
+  type FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import {
   createSlots,
@@ -65,6 +67,7 @@ import {
   createFluidboxSync,
   unloadFluidbox,
   watchFluidbox,
+  zoomControlNames,
   type FluidboxChangeDetails,
   type FluidboxSlot,
   type FluidboxTriggerPreview,
@@ -106,6 +109,9 @@ export type {
   FluidboxTarget,
   FluidboxToggleEvent,
   FluidboxVideoItem,
+  FluidboxZoomCommandOptions,
+  FluidboxZoomEvent,
+  FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 
 type AnyItem = FluidboxItem;
@@ -245,13 +251,6 @@ function same(a: unknown, b: unknown): boolean {
   );
 }
 
-const sameItems = (a: FluidboxItems<AnyItem>, b: FluidboxItems<AnyItem>) =>
-  a === b ||
-  (Array.isArray(a) &&
-    Array.isArray(b) &&
-    a.length === b.length &&
-    a.every((item, index) => item === b[index]));
-
 const settingKeys = ["labels", "zoom", "loop", "viewer", "filmstrip", "sheet", "loading"] as const;
 type Settings = {
   -readonly [K in (typeof settingKeys)[number]]: FluidboxUpdateOptions<AnyItem>[K];
@@ -288,6 +287,7 @@ type RootEmits<TItem extends FluidboxItem> = {
   itemchange: (event: FluidboxItemChangeEvent<TItem>) => true;
   settle: (event: FluidboxItemChangeEvent<TItem>) => true;
   sheetchange: (event: FluidboxSheetEvent) => true;
+  zoomchange: (event: FluidboxZoomEvent) => true;
   "update:open": (open: boolean, details: FluidboxChangeDetails) => true;
   "update:index": (index: number, details: FluidboxChangeDetails) => true;
 };
@@ -317,12 +317,22 @@ const Root = defineComponent(
     const labels = computed(() => resolveLabels(props.labels));
 
     // Renderers resolve by name when a slide mounts, so the newest one is used.
-    const renderers = new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+    const renderers = new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get(_, key) {
         const render = typeof key === "string" ? props.renderers?.[key] : undefined;
         if (!render) return undefined;
-        return ({ item, index, target, signal }: FluidboxRenderContext<TItem>) =>
-          mounts.mount(target, () => render({ item, index, signal }));
+        return (context: FluidboxSlideRenderContext<TItem>) =>
+          mounts.mount(context.target, () =>
+            render({
+              item: context.item,
+              index: context.index,
+              signal: context.signal,
+              get active() {
+                return context.active;
+              },
+              onActiveChange: context.onActiveChange,
+            }),
+          );
       },
       has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
     });
@@ -369,10 +379,8 @@ const Root = defineComponent(
       // A sheet that loads or goes changes the stop too.
       sheetStop.value = fluidbox.sheet?.stop ?? 0;
     });
-    // An inline array of the same items, as `:items="[product]"`, changes nothing.
-    watch(items, (next, previous) => {
-      if (!sameItems(next, previous)) void fluidbox.setItems(next);
-    });
+    // The fluidbox ignores items equal to its own, as an inline `:items="[product]"`.
+    watch(items, (next) => void fluidbox.setItems(next));
 
     const events = new AbortController();
     for (const type of fluidboxEventTypes) {
@@ -448,10 +456,17 @@ const Root = defineComponent(
       get hasNext() {
         return state.value.hasNext;
       },
+      get zoom() {
+        return state.value.zoom;
+      },
       open: (target, options) => fluidbox.open(target, options),
       close: (options) => fluidbox.close(options),
       next: (options) => fluidbox.next(options),
       previous: (options) => fluidbox.previous(options),
+      zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
+      zoomIn: (options) => fluidbox.zoomIn(options),
+      zoomOut: (options) => fluidbox.zoomOut(options),
+      resetZoom: (options) => fluidbox.resetZoom(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
       load: () => fluidbox.load(),
@@ -718,13 +733,39 @@ const Close = control("close", "FluidboxClose");
 const Previous = control("previous", "FluidboxPrevious");
 /** Moves to the next item. */
 const Next = control("next", "FluidboxNext");
+/** Zooms the image in by 1.5. */
+const ZoomIn = control("zoomIn", "FluidboxZoomIn");
+/** Zooms the image out by 1.5. */
+const ZoomOut = control("zoomOut", "FluidboxZoomOut");
+/** Zooms the image back out to fit. */
+const ZoomReset = control("zoomReset", "FluidboxZoomReset");
 
-/** The default Previous, Next and Close, for a Viewer with content of its own. */
+/**
+ * The default Previous, Next and Close, for a Viewer with content of its own,
+ * and with `zoom` the zoom controls in their group.
+ */
 const Controls = defineComponent({
   name: "FluidboxControls",
-  setup() {
-    useRootContext("Controls");
-    return () => [Previous, Next, Close].map((part) => h(part));
+  props: { zoom: Boolean },
+  setup(props) {
+    const { labels } = useRootContext("Controls");
+    const zooms = { zoomIn: ZoomIn, zoomOut: ZoomOut, zoomReset: ZoomReset } as const;
+    return () => [
+      ...[Previous, Next, Close].map((part) => h(part)),
+      ...(props.zoom
+        ? [
+            h(
+              "div",
+              {
+                "data-fluidbox-zoom-controls": "",
+                role: "group",
+                "aria-label": labels.value.zoomed,
+              },
+              zoomControlNames.map((name) => h(zooms[name as keyof typeof zooms])),
+            ),
+          ]
+        : []),
+    ];
   },
 });
 
@@ -899,6 +940,9 @@ export const Fluidbox = {
   Close,
   Previous,
   Next,
+  ZoomIn,
+  ZoomOut,
+  ZoomReset,
   Filmstrip,
   Sheet,
   SheetStop,

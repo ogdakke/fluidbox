@@ -32,7 +32,7 @@ import {
   type FluidboxItem,
   type FluidboxLabels,
   type FluidboxOriginAdapter,
-  type FluidboxRenderer,
+  type FluidboxSlideRenderer,
   type FluidboxState,
   type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
@@ -48,19 +48,22 @@ import {
   latestOrigins,
   resolveLabels,
   createFluidboxSync,
-  fluidboxStaticViewer,
+  fluidboxStaticViewerNodes,
   takeOverFluidbox,
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
+  zoomControlNames,
   type FluidboxSlot,
   type FluidboxSlots,
+  type FluidboxStaticNode,
   type FluidboxTrigger,
 } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxCommands,
+  FluidboxControlsProps,
   FluidboxFilmstripProps,
   FluidboxFrameLayerProps,
   FluidboxRootProps,
@@ -76,6 +79,7 @@ export type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxCommands,
+  FluidboxControlsProps,
   FluidboxFilmstripProps,
   FluidboxFrameLayerProps,
   FluidboxItemContext,
@@ -112,6 +116,9 @@ export type {
   FluidboxTarget,
   FluidboxToggleEvent,
   FluidboxVideoItem,
+  FluidboxZoomCommandOptions,
+  FluidboxZoomEvent,
+  FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 
 /** Content the runtime asked for, rendered through a portal so it keeps the app's context. */
@@ -209,6 +216,7 @@ const eventProps = {
   itemchange: "onItemChange",
   settle: "onSettle",
   sheetchange: "onSheetChange",
+  zoomchange: "onZoomChange",
 } as const satisfies Record<(typeof fluidboxEventTypes)[number], keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
@@ -283,12 +291,23 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     loading,
     // Renderers are looked up by name when an item renders, so the newest
     // render function is used without telling the viewer.
-    renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+    renderers: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get(_, key) {
         const render = typeof key === "string" ? latest.current.renderers?.[key] : undefined;
         if (!render) return undefined;
-        const renderer: FluidboxRenderer<TItem> = ({ item, index, target, signal }) =>
-          mount(target, render({ item, index, signal }));
+        const renderer: FluidboxSlideRenderer<TItem> = (context) =>
+          mount(
+            context.target,
+            render({
+              item: context.item,
+              index: context.index,
+              signal: context.signal,
+              get active() {
+                return context.active;
+              },
+              onActiveChange: context.onActiveChange,
+            }),
+          );
         return renderer;
       },
       has: (_, key) => typeof key === "string" && !!latest.current.renderers?.[key],
@@ -410,6 +429,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     sync.current(open, index);
   }, [fluidbox, open, index]);
 
+  // The fluidbox ignores an array of items equal to its own, so a fresh array
+  // each render costs nothing. Only the first render's items are skipped: the
+  // fluidbox was made with them, and a lazy list always applies.
   const lastItems = useRef(items);
   useIsomorphicLayoutEffect(() => {
     if (lastItems.current === items) return;
@@ -423,6 +445,10 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       close: (options) => fluidbox.close(options),
       next: (options) => fluidbox.next(options),
       previous: (options) => fluidbox.previous(options),
+      zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
+      zoomIn: (options) => fluidbox.zoomIn(options),
+      zoomOut: (options) => fluidbox.zoomOut(options),
+      resetZoom: (options) => fluidbox.resetZoom(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
       load: () => fluidbox.load(),
@@ -481,9 +507,29 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   );
 }
 
+/** React's names for the HTML attributes the copy uses that it spells otherwise. */
+const reactNames: Record<string, string> = {
+  srcset: "srcSet",
+  fetchpriority: "fetchPriority",
+  "stroke-width": "strokeWidth",
+  "stroke-linecap": "strokeLinecap",
+  "stroke-linejoin": "strokeLinejoin",
+};
+/** Boolean attributes React takes as `true`. */
+const reactFlags = new Set(["disabled", "inert", "hidden"]);
+
+function staticElement({ tag, attributes, children }: FluidboxStaticNode): ReactElement {
+  const props: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(attributes)) {
+    props[reactNames[name] ?? name] = reactFlags.has(name) || value;
+  }
+  return createElement(tag, props, ...children.map(staticElement));
+}
+
 /**
  * The open viewer's copy, rendered after the Root's children so the parts
- * among them have said what it needs. React leaves its inner HTML alone.
+ * among them have said what it needs. It is built as elements, not HTML, so
+ * it renders under Trusted Types and a strict style-src.
  */
 function ServerViewer({
   viewerRef,
@@ -502,7 +548,7 @@ function ServerViewer({
   href: FluidboxRootProps<any>["href"];
   hints: ServerHints;
 }): ReactElement | null {
-  const html = fluidboxStaticViewer({
+  const copy = fluidboxStaticViewerNodes({
     items,
     index,
     labels,
@@ -512,13 +558,12 @@ function ServerViewer({
     sheet: hints.sheet,
     controls: !hints.viewer,
   });
-  if (!html) return null;
-  return createElement("div", {
-    ref: viewerRef,
-    "data-fluidbox-server-viewer": "",
-    style: { display: "contents" },
-    dangerouslySetInnerHTML: { __html: html },
-  });
+  if (!copy) return null;
+  return createElement(
+    "div",
+    { ref: viewerRef, "data-fluidbox-server-viewer": "" },
+    staticElement(copy),
+  );
 }
 
 type ChildHandler<E> = ((event: E) => void) | undefined;
@@ -686,14 +731,34 @@ function defaultIcon(name: FluidboxControlName) {
 const Close = action("close");
 const Previous = action("previous");
 const Next = action("next");
-const parts = { previous: Previous, next: Next, close: Close };
+const ZoomIn = action("zoomIn");
+const ZoomOut = action("zoomOut");
+const ZoomReset = action("zoomReset");
+const parts = {
+  previous: Previous,
+  next: Next,
+  close: Close,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  zoomReset: ZoomReset,
+};
 
-/** The default Previous, Next and Close buttons, for a Viewer of your own. */
-function Controls(): ReactElement {
+/**
+ * The default Previous, Next and Close buttons, for a Viewer of your own, and
+ * with `zoom` the zoom controls in their group.
+ */
+function Controls({ zoom = false }: FluidboxControlsProps): ReactElement {
+  const { labels } = useFluidboxContext();
   return createElement(
     Fragment,
     null,
     controlNames.map((name) => createElement(parts[name], { key: name })),
+    zoom &&
+      createElement(
+        "div",
+        { "data-fluidbox-zoom-controls": "", role: "group", "aria-label": labels.zoomed },
+        zoomControlNames.map((name) => createElement(parts[name], { key: name })),
+      ),
   );
 }
 
@@ -1037,6 +1102,9 @@ export const Fluidbox = {
   Close,
   Previous,
   Next,
+  ZoomIn,
+  ZoomOut,
+  ZoomReset,
   Filmstrip,
   Sheet,
   SheetStop,

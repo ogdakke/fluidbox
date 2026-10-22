@@ -12,6 +12,8 @@ import type {
   FluidboxState,
   FluidboxTarget,
   FluidboxToggleEvent,
+  FluidboxZoomCommandOptions,
+  FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
@@ -20,6 +22,13 @@ export interface FluidboxReactRenderContext<TItem extends FluidboxItem = Fluidbo
   readonly item: TItem;
   readonly index: number;
   readonly signal: AbortSignal;
+  /** Whether the slide is the one on show. */
+  readonly active: boolean;
+  /**
+   * Call `listener` with the new `active` as the slide comes to be the one on
+   * show or stops being it, to play and pause. Returns a function that stops it.
+   */
+  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
 }
 
 /** Draws a `custom` item as React content, rendered in place with the app's context. */
@@ -76,6 +85,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly onSettle?: (event: FluidboxItemChangeEvent<TItem>) => void;
   /** When the sheet comes to rest at another stop. */
   readonly onSheetChange?: (event: FluidboxSheetEvent) => void;
+  /** When the image on show comes to rest at another zoom. */
+  readonly onZoomChange?: (event: FluidboxZoomEvent) => void;
   readonly children?: ReactNode;
 }
 
@@ -98,6 +109,11 @@ export interface FluidboxViewerProps {
 }
 
 export interface FluidboxActionProps extends ButtonHTMLAttributes<HTMLButtonElement> {}
+
+export interface FluidboxControlsProps {
+  /** Add the zoom-in, zoom-out and fit controls, in their group. */
+  readonly zoom?: boolean;
+}
 
 export interface FluidboxFilmstripProps<TItem extends FluidboxItem = FluidboxItem> {
   /**
@@ -136,6 +152,14 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   readonly close: (options?: FluidboxCommandOptions) => Promise<boolean>;
   readonly next: (options?: FluidboxCommandOptions) => Promise<boolean>;
   readonly previous: (options?: FluidboxCommandOptions) => Promise<boolean>;
+  /** Zoom the image on show to a scale between 1 and the zoom's `max`. */
+  readonly zoomTo: (scale: number, options?: FluidboxZoomCommandOptions) => Promise<boolean>;
+  /** Zoom in by 1.5. */
+  readonly zoomIn: (options?: FluidboxZoomCommandOptions) => Promise<boolean>;
+  /** Zoom out by 1.5. */
+  readonly zoomOut: (options?: FluidboxZoomCommandOptions) => Promise<boolean>;
+  /** Zoom back out to fit. */
+  readonly resetZoom: (options?: Pick<FluidboxZoomCommandOptions, "signal">) => Promise<boolean>;
   readonly setItems: (items: FluidboxItems<TItem>) => Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   readonly preload: (target: FluidboxTarget<TItem>) => () => void;

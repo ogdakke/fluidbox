@@ -498,6 +498,7 @@ export function checkApiCoverage(pages: readonly { slug: string; markdown: strin
       ...entryExports("root"),
       ...entryExports("filmstrip"),
       ...entryExports("sheet"),
+      ...entryExports("hover-zoom"),
       ...entryExports("kit").filter((item) => item.kind === "value"),
     ];
     for (const { name } of required) {

@@ -31,12 +31,12 @@ import type {
   FluidboxItemId,
   FluidboxOrigin,
   FluidboxViewerLayer,
-  FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
   FluidboxZoomOptions,
 } from "./runtime-types";
-import type { FluidboxZoom } from "./fluidbox-zoom";
+import type { FluidboxZoom, ZoomReason } from "./fluidbox-zoom";
 import type {
   ViewerSessionCloseContext,
   ViewerSessionDriver,
@@ -69,6 +69,16 @@ const WHEEL_HANDOFF_TIMEOUT = 1200;
 /** Content whose keys are its own: widgets that move with arrow keys, and content that owns its input. */
 const KEY_OWNERS =
   "[data-fluidbox-owns-input], [role=radiogroup], [role=slider], [role=tablist], [role=listbox], [role=menu], [role=menubar], [role=grid], [role=treegrid], [role=tree], [role=toolbar], [role=combobox], [role=spinbutton]";
+/** The control that takes focus from one that disables itself at an end. */
+const PARTNERS = {
+  "[data-fluidbox-previous]": "[data-fluidbox-next]",
+  "[data-fluidbox-next]": "[data-fluidbox-previous]",
+  "[data-fluidbox-zoom-in]": "[data-fluidbox-zoom-out]",
+  "[data-fluidbox-zoom-out]": "[data-fluidbox-zoom-in]",
+  "[data-fluidbox-zoom-reset]": "[data-fluidbox-zoom-in]",
+};
+/** Fields whose keys are typing. */
+const EDITABLE = "input, textarea, select, [contenteditable]:not([contenteditable=false])";
 /**
  * Content that handles Escape itself: a dialog or popover inside the viewer,
  * an open menu or combobox.
@@ -139,7 +149,7 @@ export class DomViewerDriver<
   /** Loaded with the first overlay, so a viewer without overlays never loads it. */
   #thumbnailOverlays: ThumbnailOverlayRuntime<TItem> | undefined;
   #overlaysLoad: Promise<unknown> | undefined;
-  readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   readonly #viewerOwner = {
     closeImmediately: () => {
       const controller = this.#controller;
@@ -217,13 +227,15 @@ export class DomViewerDriver<
   #announcement: ReturnType<typeof setTimeout> | undefined;
   /** The element last focused in the dialog. */
   #lastFocus: HTMLElement | null = null;
+  /** Counts opens, closes and the destroy, so an open that was called off knows whether one came after it. */
+  #operation = 0;
 
   readonly #labels: FluidboxLabels;
 
   constructor(
     ownerDocument: Document,
     zoomOptions: false | FluidboxZoomOptions | undefined,
-    renderers: Readonly<Record<string, FluidboxRenderer<TItem>>> | undefined,
+    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>> | undefined,
     labels: FluidboxLabels,
   ) {
     this.#labels = labels;
@@ -297,6 +309,7 @@ export class DomViewerDriver<
       signal: this.#lifetime.signal,
     });
     this.#zoomOptions = zoomConfig(zoomOptions);
+    this.#portal.dialog.toggleAttribute("data-zoomable", !!this.#zoomOptions);
   }
 
   /** Change the zoom options. Turning zoom off zooms the photo back out. */
@@ -311,8 +324,9 @@ export class DomViewerDriver<
     const next = zoomConfig(options);
     if (next?.max === this.#zoomOptions?.max && next?.step === this.#zoomOptions?.step) return;
     this.#zoomOptions = next;
+    this.#portal.dialog.toggleAttribute("data-zoomable", !!next);
     if (next) return;
-    this.#zoom?.reset();
+    this.#zoom?.reset("api");
     this.#zoom?.destroy();
     this.#zoom = undefined;
     this.#zoomLoad = undefined;
@@ -397,11 +411,34 @@ export class DomViewerDriver<
             if (wasZoomed && this.#strip) void this.#strip.select(this.#strip.index, false);
           }
         },
-        close: () => void this.#controller?.close({ reason: "pointer" }),
+        settled: (scale, reason) => {
+          // The slide's image gets sharper as the zoom shows more of its pixels.
+          if (this.#strip?.shows(this.#strip.index)) this.#strip.sharpen(scale);
+          this.#controller?.zoomed?.(scale, reason);
+          // The open viewer says how far it is zoomed, through its live status.
+          if (this.#controller?.state.status === "open") {
+            this.#announce(labels.zoomLevel(scale));
+          }
+        },
         reducedMotion: () => this.#prefersReducedMotion(),
       }));
     });
     return this.#zoomLoad;
+  }
+
+  /**
+   * Zoom the image on show to `scale` about `origin`. Resolves true once it
+   * rests there, false when nothing can zoom or the motion was interrupted.
+   */
+  zoomTo(
+    scale: number,
+    options: {
+      readonly origin?: { readonly x: number; readonly y: number };
+      readonly signal?: AbortSignal;
+      readonly reason?: ZoomReason;
+    },
+  ): Promise<boolean> {
+    return this.#loadZoom().then((zoom) => zoom?.zoomTo(scale, options) ?? false);
   }
 
   connect(
@@ -513,14 +550,22 @@ export class DomViewerDriver<
   }
 
   async open(context: ViewerSessionMotionContext<TItem>) {
+    const operation = ++this.#operation;
+    // Every wait below can end with the open called off: by a close, a destroy,
+    // new items or the caller's signal. It then stops before touching the page.
+    const abandoned = () => {
+      if (!context.signal.aborted && !this.#destroyed) return false;
+      this.#abandonOpen(operation);
+      return true;
+    };
     // The session has just hidden the card's image. Keep it painted until the
     // opening's first frame is ready to cover it, or the card blinks empty.
     this.#keepThumbnailVisible(context.origin?.thumbnail);
     this.#preparedFlight = undefined;
     // An overlay registered just before the open still travels with it.
     if (this.#overlaysLoad && !this.#thumbnailOverlays) {
-      await this.#overlaysLoad;
-      if (context.signal.aborted) return;
+      await this.#whileWaiting(this.#overlaysLoad, context.signal);
+      if (abandoned()) return;
     }
     const previous = activeViewer.claim(this.#viewerOwner);
     if (previous && !previous.closeImmediately()) {
@@ -531,6 +576,7 @@ export class DomViewerDriver<
     this.#endWheelHandoff();
     void this.#loadZoom();
     this.#cancelAnimations(true);
+    this.#removeFlight();
     const prepared =
       !context.instant &&
       this.#preparedOpen &&
@@ -544,6 +590,7 @@ export class DomViewerDriver<
     this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
       await this.#strip?.select(context.index, false);
+      if (abandoned()) return;
       if (!context.instant) {
         this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
       }
@@ -575,7 +622,7 @@ export class DomViewerDriver<
       // Hidden until the image can paint, so it replaces the server's copy in one frame.
       this.#keepThumbnailVisible(undefined);
       await this.#mediaReady();
-      if (context.signal.aborted) return;
+      if (abandoned()) return;
       this.#clearMotionStyles();
       this.#thumbnailOverlays?.prepare(context.item, context.index, this.#frame, "open", 0);
       this.#isolation.activate();
@@ -586,7 +633,7 @@ export class DomViewerDriver<
       return;
     }
     if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    if (context.signal.aborted) return;
+    if (abandoned()) return;
     if (this.#prefersReducedMotion()) {
       this.#keepThumbnailVisible(undefined);
       for (const animation of prepared?.animations ?? []) animation.cancel();
@@ -641,7 +688,7 @@ export class DomViewerDriver<
     await this.#play(animations, context.signal, () =>
       this.#thumbnailOverlays?.set("opening", 0, new DOMMatrix()),
     );
-    if (context.signal.aborted) return;
+    if (abandoned()) return;
     const reveals = this.#portal.dialog
       .getAnimations({ subtree: true })
       .filter(
@@ -653,7 +700,7 @@ export class DomViewerDriver<
         this.#waitForAnimation(animation, context.signal),
       ),
     );
-    if (context.signal.aborted) return;
+    if (abandoned()) return;
     this.#setState("open");
     // A gesture that interrupted the opening owns the overlays until it settles.
     if (!this.#dragGesture.active) this.#thumbnailOverlays?.set("open", 0, new DOMMatrix());
@@ -682,6 +729,7 @@ export class DomViewerDriver<
       const smooth =
         !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
       await this.#strip?.select(context.index, smooth, context.step);
+      if (context.signal.aborted || this.#destroyed) return;
     }
     this.#render(context.item, context.index, true);
     // The overlay is invisible while open. Moving it between slide frames
@@ -691,12 +739,13 @@ export class DomViewerDriver<
   }
 
   async close(context: ViewerSessionCloseContext) {
+    ++this.#operation;
     const settling = this.#extensions
       .map((extension) => extension.beforeClose?.())
       .filter((result): result is Promise<void> => result instanceof Promise);
     if (settling.length) {
       await Promise.all(settling);
-      if (context.signal.aborted) return;
+      if (context.signal.aborted || this.#destroyed) return;
     }
     this.#zoom?.suspend();
     this.#cancelAnimations(true);
@@ -710,6 +759,11 @@ export class DomViewerDriver<
     if (
       this.#forceImmediateClose ||
       this.#prefersReducedMotion() ||
+      // An open called off before the viewer showed has nothing painted to fly
+      // back, and an emptied source has no slide; unattached media measure 0.
+      !this.#portal.overlay.isConnected ||
+      !this.#source?.count ||
+      !this.#media.offsetWidth ||
       this.#extensions.some((extension) => extension.closesInPlace?.())
     ) {
       this.#preparedFlight = undefined;
@@ -742,8 +796,10 @@ export class DomViewerDriver<
     let frame = this.#frame;
     let media = this.#media;
     // Moving an iframe or video into the body-level flight would reload it or
-    // reset playback, so embedded media close inside their own frame instead.
-    const embedded = media instanceof HTMLIFrameElement || media instanceof HTMLMediaElement;
+    // reset playback, so embedded media close inside their own frame instead,
+    // as does custom content that holds them, such as a playing YouTube embed.
+    const playable = "iframe, video, audio";
+    const embedded = media.matches(playable) || !!media.querySelector(playable);
     if (from && originTarget && !embedded) {
       const source = media;
       const prepared =
@@ -767,7 +823,11 @@ export class DomViewerDriver<
               })
             : image.decode()
         ).catch(() => {});
-        if (context.signal.aborted) return this.#removeFlight();
+        if (context.signal.aborted || this.#destroyed) {
+          // A later open or close may have its own flight by now.
+          if (this.#flightMedia === media) this.#removeFlight();
+          return;
+        }
         source.dataset.fluidboxFlightSourceHidden = "";
         this.#flightSourceFrame?.setAttribute("data-fluidbox-flight-source-hidden", "");
         this.#flight?.style.removeProperty("visibility");
@@ -845,6 +905,7 @@ export class DomViewerDriver<
   destroy() {
     if (this.#destroyed) return;
     this.#destroyed = true;
+    ++this.#operation;
     this.#keepThumbnailVisible(undefined);
     this.#lifetime.abort();
     this.#extensionLifetime?.abort();
@@ -882,12 +943,66 @@ export class DomViewerDriver<
     await Promise.race([shown, new Promise((resolve) => setTimeout(resolve, 3000))]);
   }
 
+  /**
+   * Put the page back after an open that was called off, unless a later open or
+   * close took the viewer over: that one finishes what the page shows.
+   */
+  #abandonOpen(operation: number) {
+    if (operation !== this.#operation || this.#destroyed) return;
+    this.#cancelAnimations(false);
+    this.#discardPreparation();
+    this.#clearMotionStyles();
+    this.#finishClose();
+  }
+
+  /**
+   * Wait for code the open needs before the viewer shows. The viewer does not
+   * have the keys yet, so Escape calls the open off and the arrows move it, as
+   * they do while the viewer's own code loads.
+   */
+  async #whileWaiting(loading: Promise<unknown>, signal: AbortSignal) {
+    const waiting = new AbortController();
+    const ownerDocument = this.#portal.overlay.ownerDocument;
+    // In the bubble phase, as the viewer's own keys: a field, widget or content
+    // that owns its input keeps its keys, and only Escape is taken from them.
+    ownerDocument.addEventListener(
+      "keydown",
+      (event) => {
+        if (signal.aborted || event.defaultPrevented || event.isComposing) return;
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        const options = { reason: "keyboard" } as const;
+        const target = event.target instanceof Element ? event.target : null;
+        if (event.key === "Escape") {
+          // An open menu or popover takes it; the page's own dialog, which a
+          // trigger may be in, does not, as the open was the last thing asked.
+          if (target?.closest(ESCAPE_OWNERS)?.matches(":not(dialog)")) return;
+          void this.#controller?.close(options);
+        } else if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && !event.shiftKey) {
+          if (target?.closest(`${KEY_OWNERS}, ${EDITABLE}, video[controls], audio[controls]`)) {
+            return;
+          }
+          const rtl = getComputedStyle(target ?? ownerDocument.documentElement).direction === "rtl";
+          void this.#controller?.[(event.key === "ArrowRight") !== rtl ? "next" : "previous"](
+            options,
+          );
+        } else return;
+        event.preventDefault();
+      },
+      { signal: waiting.signal },
+    );
+    try {
+      await loading;
+    } finally {
+      waiting.abort();
+    }
+  }
+
   get #frame() {
-    return this.#strip?.active.frame ?? this.#portal.frame;
+    return this.#strip?.current?.frame ?? this.#portal.frame;
   }
 
   get #media() {
-    return this.#strip?.active.image ?? this.#portal.media;
+    return this.#strip?.current?.image ?? this.#portal.media;
   }
 
   /** Name the dialog for an item, and announce it: by `name`, by its own name, or not. */
@@ -1200,7 +1315,6 @@ export class DomViewerDriver<
     trigger.toggleAttribute("data-open", open);
     trigger.toggleAttribute("data-closed", !open);
     trigger.setAttribute("aria-haspopup", "dialog");
-    trigger.setAttribute("aria-expanded", String(open));
   }
 
   async #play(animations: Animation[], signal: AbortSignal, settle?: () => void) {
@@ -1370,6 +1484,8 @@ export class DomViewerDriver<
     source: HTMLElement,
     prepared?: HTMLImageElement,
   ) {
+    // A close called off while its flight decoded leaves that flight behind.
+    this.#removeFlight();
     const ownerDocument = this.#portal.overlay.ownerDocument;
     const view = ownerDocument.defaultView!;
     const bounds = source.getBoundingClientRect();
@@ -1497,7 +1613,7 @@ export class DomViewerDriver<
     this.#viewportWidth = view.innerWidth;
     this.#sizeContainer(view);
     if (this.#zoom?.zoomed) {
-      this.#zoom.reset();
+      this.#zoom.reset("api");
       return;
     }
     if (this.#controller?.state.status === "opening") {
@@ -1804,6 +1920,7 @@ export class DomViewerDriver<
     activeViewer.release(this.#viewerOwner);
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
+    this.#strip?.hide();
     this.#setState("closed");
     const returnFocus = this.#returnFocus?.isConnected
       ? this.#returnFocus
@@ -1902,7 +2019,7 @@ export class DomViewerDriver<
     return (
       (target === this.#portal.dialog ||
         target === this.#strip?.element ||
-        target.matches(controlSelector)) &&
+        target.matches(`${controlSelector}, [data-fluidbox-zoom-viewport]`)) &&
       !target.closest(KEY_OWNERS)
     );
   }
@@ -1919,13 +2036,10 @@ export class DomViewerDriver<
     const active = dialog.ownerDocument.activeElement;
     if (!last || (active !== last && active !== dialog.ownerDocument.body)) return;
     if (!last.matches(":disabled") && !last.closest("[inert]") && last.isConnected) return;
-    // A Previous or Next that disables itself at an end hands focus to the
-    // other one; focus that would fall to the page goes to Close.
-    const other = last.hasAttribute("data-fluidbox-previous")
-      ? "[data-fluidbox-next]"
-      : last.hasAttribute("data-fluidbox-next")
-        ? "[data-fluidbox-previous]"
-        : null;
+    // A Previous or Next, or a zoom control, that disables itself at an end
+    // hands focus to the one going the other way; focus that would fall to the
+    // page goes to Close.
+    const other = Object.entries(PARTNERS).find(([control]) => last.matches(control))?.[1];
     const next = other
       ? Array.from(dialog.querySelectorAll<HTMLButtonElement>(other)).find(
           (button) => !button.disabled && button.checkVisibility?.() !== false,

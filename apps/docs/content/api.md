@@ -21,7 +21,7 @@ Complete API reference
 
 ## Fluidbox
 
-<!-- api: Fluidbox, FluidboxTarget, FluidboxCommandOptions, FluidboxUpdateOptions, FluidboxBindOptions, FluidboxOverlayOptions -->
+<!-- api: Fluidbox, FluidboxTarget, FluidboxCommandOptions, FluidboxZoomCommandOptions, FluidboxUpdateOptions, FluidboxBindOptions, FluidboxOverlayOptions -->
 
 ```ts
 fluidbox.update({
@@ -32,11 +32,11 @@ fluidbox.update({
 
 ## FluidboxState
 
-<!-- api: FluidboxState, FluidboxStatus -->
+<!-- api: FluidboxState, FluidboxStatus, FluidboxZoomState -->
 
 ## Events
 
-<!-- api: FluidboxEventMap, FluidboxToggleEvent, FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxReason, FluidboxToggleState -->
+<!-- api: FluidboxEventMap, FluidboxToggleEvent, FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxReason, FluidboxToggleState -->
 
 ## Items
 
@@ -48,7 +48,7 @@ fluidbox.update({
 
 ## Renderers
 
-<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxViewerRenderer, FluidboxViewerContext -->
+<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlideRenderer, FluidboxSlideRenderContext, FluidboxViewerRenderer, FluidboxViewerContext -->
 
 ## Origins
 
@@ -75,6 +75,22 @@ createFluidbox({
 ## Add-ons
 
 <!-- api: FluidboxFilmstripOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->
+
+### Hover zoom
+
+`@ogdakke/fluidbox/hover-zoom` magnifies a photo on the page under a resting mouse. See [Zoom](./patterns/zoom.md#hover-zoom).
+
+<!-- api: hoverZoom, FluidboxHoverZoomOptions -->
+
+## Media add-ons
+
+YouTube and Vimeo, 360° spins and 3D models. See [Product media](./product-media.md).
+
+<!-- api-summary: embeds -->
+
+<!-- api-summary: spin -->
+
+<!-- api-summary: model -->
 
 ## Custom elements
 

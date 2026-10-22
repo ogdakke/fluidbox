@@ -64,7 +64,7 @@ export type SessionCommandResult =
 
 export type FluidboxDispose = () => void;
 
-export type { FluidboxRenderContext, FluidboxRenderer } from "./public-api";
+export type { FluidboxRenderContext, FluidboxRenderer, FluidboxSlideRenderer } from "./public-api";
 import type { FluidboxRenderer } from "./public-api";
 
 /** The viewer's layer for controls and captions: the default buttons, then your viewer content. */
@@ -166,6 +166,8 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   /** Fire the before-event for a move to `target` without making it. False when it was prevented. */
   allows(target: SessionTarget, reason: SessionReason): boolean;
   subscribe(listener: (state: FluidboxState<TItem>) => void): FluidboxDispose;
+  /** The zoom came to rest at another scale, for the reason given or the last command's. */
+  zoomed?(scale: number, reason: SessionReason | undefined): void;
 }
 
 export interface ViewerSessionMotionContext<TItem extends FluidboxItem = FluidboxItem> {

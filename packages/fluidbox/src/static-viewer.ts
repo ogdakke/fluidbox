@@ -19,32 +19,64 @@ export interface FluidboxStaticViewerOptions<TItem extends FluidboxItem = Fluidb
   readonly dir?: "ltr" | "rtl";
   /**
    * The address each control leads to before JavaScript runs: `null` for
-   * Close, an index for Previous and Next. Without it the controls are inert
-   * buttons until the viewer takes over.
+   * Close, an index for Previous and Next. A control without one is drawn but
+   * inert until the viewer takes over.
    */
   readonly href?: (index: number | null) => string | undefined;
 }
 
-const escape = (value: string | number) =>
-  String(value).replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
+/**
+ * An element of the server's copy, by HTML attribute names. A boolean
+ * attribute that is on has the value `""`.
+ */
+export interface FluidboxStaticNode {
+  readonly tag: string;
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly children: readonly FluidboxStaticNode[];
+}
 
-const attributes = (values: Record<string, string | number | boolean | undefined>) =>
-  Object.entries(values)
-    .filter(([, value]) => value !== undefined && value !== false)
-    .map(([name, value]) => (value === true ? ` ${name}` : ` ${name}="${escape(value as string)}"`))
-    .join("");
+type Attributes = Record<string, string | number | boolean | undefined>;
+
+const node = (
+  tag: string,
+  values: Attributes,
+  ...children: (FluidboxStaticNode | null)[]
+): FluidboxStaticNode => {
+  const attributes: Record<string, string> = {};
+  for (const [name, value] of Object.entries(values)) {
+    if (value !== undefined && value !== false)
+      attributes[name] = value === true ? "" : String(value);
+  }
+  return { tag, attributes, children: children.filter((child) => child !== null) };
+};
 
 const icon = (name: keyof typeof CONTROL_ICON_PATHS) =>
-  `<svg${attributes(CONTROL_ICON_ATTRIBUTES)} data-fluidbox-icon=""><path d="${CONTROL_ICON_PATHS[name]}"></path></svg>`;
+  node(
+    "svg",
+    { ...CONTROL_ICON_ATTRIBUTES, "data-fluidbox-icon": "" },
+    node("path", { d: CONTROL_ICON_PATHS[name] }),
+  );
 
 /**
- * The open viewer as HTML, for a server to render where the viewer's root is.
- * It uses the viewer's own markup and stylesheet, absolute at the top of the page, and
- * the viewer takes it over once it loads.
- * Render it outside any positioned or transformed element, which it would sit inside. Only image items have one; for any
- * other item this returns `null` and the viewer opens as usual.
+ * The image's `width` and `height` in its own ratio, scaled past any screen.
+ * The copy carries no inline styles, so a strict `style-src` never blocks it:
+ * the stylesheet fits the image within the slide by `max-width` and
+ * `max-height` alone, which only scale an image down. A page's
+ * `--fluidbox-max-upscale` therefore applies once the viewer takes over, not to
+ * this copy.
  */
-export function fluidboxStaticViewer<TItem extends FluidboxItem>({
+const STATIC_SIZE = 10_000;
+const staticSize = (width: number, height: number) => {
+  const scale = STATIC_SIZE / Math.min(width, height);
+  return { width: Math.round(width * scale), height: Math.round(height * scale) };
+};
+
+/**
+ * The open viewer as elements, for a framework to render as its own where the
+ * viewer's root is. `fluidboxStaticViewer` gives the same as HTML. Only image
+ * items have one; for any other item this returns `null`.
+ */
+export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   items,
   index,
   labels = defaultLabels,
@@ -54,23 +86,24 @@ export function fluidboxStaticViewer<TItem extends FluidboxItem>({
   controls: showControls = true,
   dir,
   href,
-}: FluidboxStaticViewerOptions<TItem>): string | null {
+}: FluidboxStaticViewerOptions<TItem>): FluidboxStaticNode | null {
   const item = items[index];
   if (!item || item.type !== "img") return null;
   const count = items.length;
   const position = labels.position(index, count);
-  const ratio = item.width / item.height;
-  const height = "var(--fluidbox-content-height, var(--fluidbox-height, 100svh))";
-  const frameStyle =
-    `--fluidbox-item-width: min(100cqw, calc(${height} * ${ratio}));` +
-    ` --fluidbox-item-height: min(${(item.height / item.width) * 100}cqw, ${height})`;
 
   const placeholder = item.placeholder
-    ? `<img${attributes({ "data-fluidbox-slide-placeholder": "", alt: "", "aria-hidden": "true", decoding: "sync", src: item.placeholder })}>`
-    : "";
+    ? node("img", {
+        "data-fluidbox-slide-placeholder": "",
+        alt: "",
+        "aria-hidden": "true",
+        decoding: "sync",
+        src: item.placeholder,
+      })
+    : null;
   const thumbnail = item.thumbnail;
   const preview = thumbnail
-    ? `<img${attributes({
+    ? node("img", {
         "data-fluidbox-slide-preview": "",
         "data-fluidbox-image-ready": "",
         alt: "",
@@ -79,33 +112,34 @@ export function fluidboxStaticViewer<TItem extends FluidboxItem>({
         srcset: thumbnail.srcset,
         sizes: thumbnail.sizes,
         src: thumbnail.src,
-      })}>`
-    : "";
-  const sources = (item.sources ?? [])
-    .map((source) => `<source${attributes({ ...source })}>`)
-    .join("");
-  const media = `<img${attributes({
+      })
+    : null;
+  const sources = (item.sources ?? []).map((source) => node("source", { ...source }));
+  const media = node("img", {
     "data-fluidbox-media": "",
     alt: item.alt,
-    width: item.width,
-    height: item.height,
+    ...staticSize(item.width, item.height),
     draggable: "false",
     decoding: "async",
     fetchpriority: "high",
-    style: `--fluidbox-media-aspect: ${item.width} / ${item.height}`,
     srcset: item.srcset,
     sizes: item.sizes,
     src: item.src,
-  })}>`;
+  });
 
+  // Until the viewer takes over, a control is a link where there is an address
+  // to go to, and otherwise drawn but inert, so it never offers what it can't do.
   const control = (name: "previous" | "next" | "close", target: number | null) => {
     const label = labels[name];
     const link = target === null && name !== "close" ? undefined : href?.(target);
-    const disabled = name !== "close" && target === null;
     const common = { [`data-fluidbox-${name}`]: "", "aria-label": label };
-    return link && !disabled
-      ? `<a${attributes({ ...common, href: link })}>${icon(name)}</a>`
-      : `<button${attributes({ ...common, type: "button", disabled })}>${icon(name)}</button>`;
+    return link
+      ? node("a", { ...common, href: link }, icon(name))
+      : node(
+          "button",
+          { ...common, type: "button", disabled: name !== "close" && target === null, inert: true },
+          icon(name),
+        );
   };
   const step = (by: number) => {
     const next = index + by;
@@ -114,37 +148,93 @@ export function fluidboxStaticViewer<TItem extends FluidboxItem>({
     return next >= 0 && next < count ? next : null;
   };
   const controls = showControls
-    ? control("previous", step(-1)) + control("next", step(1)) + control("close", null)
-    : "";
+    ? [control("previous", step(-1)), control("next", step(1)), control("close", null)]
+    : [];
+  // An empty stand-in that keeps the filmstrip's room. Its orientation is what
+  // the stylesheet keys the room on; it is hidden, having nothing to offer yet.
   const strip = filmstrip
-    ? `<div data-fluidbox-filmstrip-dock="" data-fluidbox-chrome=""><div${attributes({ "data-fluidbox-filmstrip": "", role: "group", "aria-label": labels.filmstrip })}><div${attributes({ "data-fluidbox-filmstrip-scroll": "", role: "listbox", "aria-orientation": "horizontal", "aria-label": labels.filmstripList })}></div></div></div>`
-    : "";
+    ? node(
+        "div",
+        { "data-fluidbox-filmstrip-dock": "", "data-fluidbox-chrome": "", "aria-hidden": "true" },
+        node(
+          "div",
+          { "data-fluidbox-filmstrip": "" },
+          node("div", { "data-fluidbox-filmstrip-scroll": "", "aria-orientation": "horizontal" }),
+        ),
+      )
+    : null;
 
-  return (
-    `<div${attributes({ "data-fluidbox-overlay": "", "data-fluidbox-static": "", dir })}>` +
-    `<div data-fluidbox-backdrop=""></div>` +
-    `<div data-fluidbox-container="">` +
-    `<div${attributes({
-      "data-fluidbox-dialog": "",
-      role: "dialog",
-      "aria-modal": "true",
-      "aria-label": item.alt || labels.viewer,
-      "data-fluidbox-headless": "",
-      "data-fluidbox-sheet-host": sheet && "",
-      "data-gallery": count > 1,
-      "data-fluidbox-status": "open",
-      "data-open": "",
-    })}>` +
-    `<div${attributes({ "data-fluidbox-slides": "", role: "region", "aria-roledescription": labels.carousel, "aria-label": labels.slides })}>` +
-    `<div${attributes({ "data-fluidbox-slide": "", role: "group", "aria-roledescription": labels.slide, "aria-label": position, "aria-hidden": "false" })}>` +
-    `<div${attributes({ "data-fluidbox-frame": "", "data-fluidbox-image-frame": "", style: frameStyle })}>` +
-    placeholder +
-    preview +
-    `<picture data-fluidbox-picture="" style="display: contents">${sources}${media}</picture>` +
-    `</div></div></div>` +
-    `<span data-fluidbox-announcer="" role="status" aria-live="polite" aria-atomic="true"></span>` +
-    `<div data-fluidbox-portal="">${controls}</div>` +
-    `<div data-fluidbox-addons="">${strip}</div>` +
-    `</div></div></div>`
+  // Not a dialog yet: nothing traps focus or hides the page until the viewer
+  // takes over, so the copy is a labelled region of the page.
+  return node(
+    "div",
+    { "data-fluidbox-overlay": "", "data-fluidbox-static": "", dir },
+    node("div", { "data-fluidbox-backdrop": "" }),
+    node(
+      "div",
+      { "data-fluidbox-container": "" },
+      node(
+        "div",
+        {
+          "data-fluidbox-dialog": "",
+          role: "region",
+          "aria-label": item.alt || labels.viewer,
+          "data-fluidbox-headless": "",
+          "data-fluidbox-sheet-host": sheet && "",
+          "data-gallery": count > 1,
+          "data-fluidbox-status": "open",
+          "data-open": "",
+        },
+        node(
+          "div",
+          { "data-fluidbox-slides": "" },
+          node(
+            "div",
+            {
+              "data-fluidbox-slide": "",
+              role: "group",
+              "aria-label": position,
+              "aria-hidden": "false",
+            },
+            node(
+              "div",
+              { "data-fluidbox-frame": "", "data-fluidbox-image-frame": "" },
+              placeholder,
+              preview,
+              node("picture", { "data-fluidbox-picture": "" }, ...sources, media),
+            ),
+          ),
+        ),
+        node("div", { "data-fluidbox-portal": "" }, ...controls),
+        node("div", { "data-fluidbox-addons": "" }, strip),
+      ),
+    ),
   );
+}
+
+const escape = (value: string) =>
+  value.replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
+
+const VOID = new Set(["img", "source"]);
+
+const html = ({ tag, attributes, children }: FluidboxStaticNode): string => {
+  const open = `<${tag}${Object.entries(attributes)
+    .map(([name, value]) => (value === "" ? ` ${name}` : ` ${name}="${escape(value)}"`))
+    .join("")}>`;
+  return VOID.has(tag) ? open : `${open}${children.map(html).join("")}</${tag}>`;
+};
+
+/**
+ * The open viewer as HTML, for a server to render where the viewer's root is.
+ * It uses the viewer's own markup and stylesheet, absolute at the top of the page, and
+ * the viewer takes it over once it loads. It has no inline styles or scripts, so it
+ * renders under a strict Content Security Policy.
+ * Render it outside any positioned or transformed element, which it would sit inside. Only image
+ * items have one; for any other item this returns `null` and the viewer opens as usual.
+ */
+export function fluidboxStaticViewer<TItem extends FluidboxItem>(
+  options: FluidboxStaticViewerOptions<TItem>,
+): string | null {
+  const root = fluidboxStaticViewerNodes(options);
+  return root && html(root);
 }

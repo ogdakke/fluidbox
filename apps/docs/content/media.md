@@ -9,15 +9,15 @@ description: Every item type (img, video, iframe, custom) with all their fields,
 
 An item is one of four types: `"img"`, `"video"`, `"iframe"` or `"custom"`. They share one slide strip, one set of gestures and the same flights. Their fields are the attributes of the element the viewer draws, by DOM property name, so `srcset`, `poster` and `referrerPolicy` mean what they mean on `<img>`, `<video>` and `<iframe>`.
 
-Every type needs `width` and `height` in pixels. The viewer uses their ratio to size the slide before anything loads.
+Every type needs `width` and `height` in pixels. The viewer uses their ratio to size the slide before anything loads. A photo fills the stage at that ratio, even past its own size; to show small photos no larger than their `width` and `height`, as PhotoSwipe does, set `--fluidbox-max-upscale: 1` (or `2` to allow twice their size) on the trigger or the page, and give the items their real pixel sizes.
 
 Every type can also have:
 
-| Field         | Type                | What it does                                                                                                    |
-| ------------- | ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `id`          | `string`            | The item's identity across updates, for `open("id")`, events and triggers. Defaults to `src`. Unique in a list. |
-| `thumbnail`   | `FluidboxThumbnail` | A small image of the item. See [Thumbnails and placeholders](#thumbnails-and-placeholders).                     |
-| `placeholder` | `string`            | An image URL, such as a data URI, painted at once behind an image slide.                                        |
+| Field         | Type                | What it does                                                                                                                                                                               |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`          | `string`            | The item's identity across updates, for `open("id")`, events and triggers. Defaults to `src`, or `src#2`, `src#3` for an item in an array that repeats an earlier `src`. Unique in a list. |
+| `thumbnail`   | `FluidboxThumbnail` | A small image of the item. See [Thumbnails and placeholders](#thumbnails-and-placeholders).                                                                                                |
+| `placeholder` | `string`            | An image URL, such as a data URI, painted at once behind an image slide.                                                                                                                   |
 
 ## Image
 
@@ -64,21 +64,21 @@ Only images zoom. The viewer loads the full image for the current slide and the 
 
 `FluidboxVideoItem`, drawn as a `<video>`:
 
-| Field         | Type                             | Default      | What it does                                                                                    |
-| ------------- | -------------------------------- | ------------ | ----------------------------------------------------------------------------------------------- |
-| `type`        | `"video"`                        |              | Required.                                                                                       |
-| `src`         | `string`                         |              | Required. The video file.                                                                       |
-| `title`       | `string`                         |              | Required. The video's accessible name, and the filmstrip button's.                              |
-| `width`       | `number`                         |              | Required. Intrinsic width.                                                                      |
-| `height`      | `number`                         |              | Required. Intrinsic height.                                                                     |
-| `poster`      | `string`                         |              | The poster frame's URL.                                                                         |
-| `autoplay`    | `boolean`                        | `false`      | Plays when its slide comes into view, and pauses when it leaves.                                |
-| `loop`        | `boolean`                        | `false`      | Starts again at the end.                                                                        |
-| `muted`       | `boolean`                        | `false`      | Starts muted. Browsers let a video autoplay only when it is muted.                              |
-| `playsInline` | `boolean`                        | `true`       | Plays in the slide rather than full screen on iOS.                                              |
-| `controls`    | `boolean`                        | `true`       | Shows the browser's playback controls.                                                          |
-| `preload`     | `"none" \| "metadata" \| "auto"` | `"metadata"` | How much to load before it plays.                                                               |
-| `tracks`      | `readonly FluidboxVideoTrack[]`  |              | Captions and other text tracks: `{ src, kind?, srclang?, label?, default? }`, each a `<track>`. |
+| Field         | Type                             | Default      | What it does                                                                                                                              |
+| ------------- | -------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`        | `"video"`                        |              | Required.                                                                                                                                 |
+| `src`         | `string`                         |              | Required. The video file: an http(s), relative or `blob:` URL.                                                                            |
+| `title`       | `string`                         |              | Required. The video's accessible name, and the filmstrip button's.                                                                        |
+| `width`       | `number`                         |              | Required. Intrinsic width.                                                                                                                |
+| `height`      | `number`                         |              | Required. Intrinsic height.                                                                                                               |
+| `poster`      | `string`                         |              | The poster frame's URL, with the same schemes as `src`.                                                                                   |
+| `autoplay`    | `boolean`                        | `false`      | Plays when its slide comes into view, and pauses when it leaves.                                                                          |
+| `loop`        | `boolean`                        | `false`      | Starts again at the end.                                                                                                                  |
+| `muted`       | `boolean`                        | `false`      | Starts muted. Browsers let a video autoplay only when it is muted.                                                                        |
+| `playsInline` | `boolean`                        | `true`       | Plays in the slide rather than full screen on iOS.                                                                                        |
+| `controls`    | `boolean`                        | `true`       | Shows the browser's playback controls.                                                                                                    |
+| `preload`     | `"none" \| "metadata" \| "auto"` | `"metadata"` | How much to load before it plays.                                                                                                         |
+| `tracks`      | `readonly FluidboxVideoTrack[]`  |              | Captions and other text tracks: `{ src, kind?, srclang?, label?, default? }`, each a `<track>`, its `src` with the same schemes as `src`. |
 
 ```ts
 import type { FluidboxVideoItem } from "@ogdakke/fluidbox";
@@ -100,16 +100,16 @@ Give a video with speech `tracks` of kind `"captions"`, which the browser's cont
 
 `FluidboxIframeItem`, drawn as an `<iframe>`:
 
-| Field            | Type             | What it does                      |
-| ---------------- | ---------------- | --------------------------------- |
-| `type`           | `"iframe"`       | Required.                         |
-| `src`            | `string`         | Required. The embedded page.      |
-| `title`          | `string`         | Required. The iframe's `title`.   |
-| `width`          | `number`         | Required. The frame's width.      |
-| `height`         | `number`         | Required. The frame's height.     |
-| `allow`          | `string`         | The iframe's `allow` attribute.   |
-| `referrerPolicy` | `ReferrerPolicy` | The iframe's `referrerpolicy`.    |
-| `sandbox`        | `string`         | The iframe's `sandbox` attribute. |
+| Field            | Type             | What it does                                                   |
+| ---------------- | ---------------- | -------------------------------------------------------------- |
+| `type`           | `"iframe"`       | Required.                                                      |
+| `src`            | `string`         | Required. The embedded page: an http(s) or relative URL.       |
+| `title`          | `string`         | Required. The iframe's `title`.                                |
+| `width`          | `number`         | Required. The frame's width.                                   |
+| `height`         | `number`         | Required. The frame's height.                                  |
+| `allow`          | `string`         | The iframe's `allow` attribute.                                |
+| `referrerPolicy` | `ReferrerPolicy` | The iframe's `referrerpolicy`.                                 |
+| `sandbox`        | `string`         | The iframe's `sandbox` attribute. See [Safe URLs](#safe-urls). |
 
 ```ts
 import type { FluidboxIframeItem } from "@ogdakke/fluidbox";
@@ -126,6 +126,18 @@ const map: FluidboxIframeItem = {
 ```
 
 The iframe gets `loading="lazy"` and `allowfullscreen`. An embedded page paints well after the opening flight starts, so the viewer covers the frame with a still image until the page has loaded, then fades it out. On close it fades the still back in, so the frame lands as the picture it left from. The still is the item's `thumbnail`, else the trigger's image. Use a screenshot of what the embed first shows.
+
+## Safe URLs
+
+Embed and video URLs often come from merchants or users, so the viewer only loads what can't run script in your page. An iframe's `src` must be an `http:`, `https:` or relative URL; a video's `src` and `poster` may also be `blob:` object URLs. Anything else (`javascript:`, `data:`, `vbscript:`, `file:`, an iframe's `blob:`) throws a `TypeError` naming the item when the items are read, in `createFluidbox`, `setItems`, `createItemList` and `<fluidbox-item>`. A list of your own that skips those checks shows the slide's load error instead.
+
+An iframe item without `sandbox` gets
+
+```text
+allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation
+```
+
+which YouTube, Vimeo and map embeds need, and which stops the embedded page navigating your page, opening dialogs or starting downloads. Fullscreen comes from `allow="fullscreen"` and `allowfullscreen`, not the sandbox. A `sandbox` of your own replaces the default as written; `sandbox: ""` turns everything off. The sandbox is a boundary only for a page on another origin: a same-origin page with `allow-scripts allow-same-origin` can lift it, so frame untrusted pages from their own origin.
 
 ## Custom
 
@@ -165,6 +177,10 @@ const fluidbox = createFluidbox({
 The same renderer shape fills filmstrip thumbnails, the sheet and travelling overlays. The framework roots take `renderers` as framework components, keyed the same way, and they keep your app's context. When a binding needs a wrapper, as React does, the wrapper has `data-fluidbox-mount` and `display: contents`, so your component's element still sizes to the slide as plain content does. An item whose renderer is missing throws a `TypeError` when its slide loads.
 
 A custom slide mounts when it comes within one slide of the current one, and its cleanup runs when it moves further away. Keep state you need in your app, not in the mounted nodes. Clicks on buttons, links and fields inside custom content never count as zoom taps.
+
+A custom slide's renderer also gets `active`, whether its slide is the one on show, and `onActiveChange`, to play and pause as it comes on show and leaves it. Content marked `data-fluidbox-owns-input` keeps its own drags, pinches and arrow keys. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause) and [Content that owns its gestures](./product-media.md#content-that-owns-its-gestures).
+
+[Product media](./product-media.md) has add-ons for YouTube and Vimeo videos that load their player on Play, 360° spins and 3D models.
 
 [Custom content](./patterns/renderers.md) shows a framework component, a map, a video and a YouTube embed in every framework.
 

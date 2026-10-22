@@ -1,0 +1,25 @@
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.media-grid button {
+  padding: 0;
+  border: 0;
+  background: var(--fb-surface-2);
+  cursor: zoom-in;
+}
+.media-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.media-probe {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--fb-surface-2);
+  color: var(--fb-fg);
+}

@@ -9,7 +9,7 @@ import { defaultLabels, resolveLabels } from "./labels";
 import { fluidboxEventTypes } from "./events";
 import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "./public-api";
 
-export { controlNames, fluidboxControls, type FluidboxControl } from "./controls";
+export { controlNames, fluidboxControls, zoomControlNames, type FluidboxControl } from "./controls";
 export { defaultLabels, resolveLabels };
 export {
   bindTrigger,
@@ -46,7 +46,12 @@ export function unloadFluidbox(fluidbox: Fluidbox<any>) {
 export { indexIn };
 
 export { createFluidboxSync, watchFluidbox, type FluidboxChangeDetails } from "./controlled";
-export { fluidboxStaticViewer, type FluidboxStaticViewerOptions } from "./static-viewer";
+export {
+  fluidboxStaticViewer,
+  fluidboxStaticViewerNodes,
+  type FluidboxStaticNode,
+  type FluidboxStaticViewerOptions,
+} from "./static-viewer";
 
 /** The newest takeover of each fluidbox, so a stale one never hides the copy. */
 const takeovers = new WeakMap<Fluidbox<any>, object>();

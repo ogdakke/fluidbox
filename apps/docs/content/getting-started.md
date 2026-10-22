@@ -44,7 +44,7 @@ export const photos: FluidboxItem[] = [
 ];
 ```
 
-Each item is known by its `id`, which defaults to its `src`. Give items an `id` of your own when two share a `src`, or when you want to open one by a name. See [Media types](./media.md) for video, iframes and custom content.
+Each item is known by its `id`, which defaults to its `src`. When two items in an array share a `src`, the later ones are `src#2`, `src#3` and so on. Give items an `id` of your own when you want to open one by a name. See [Media types](./media.md) for video, iframes and custom content.
 
 ## A first gallery
 
@@ -103,6 +103,20 @@ import "@ogdakke/fluidbox/sheet.css";
 
 Each needs its stylesheet, `filmstrip.css` or `sheet.css`, whichever way you turn it on. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
 
+## A link as the trigger
+
+Make each trigger a link to its full image, and the gallery works before its JavaScript has loaded, or without it:
+
+```html
+<a href="/photos/canyon-2400.jpg" class="thumb">
+  <img src="/photos/canyon-480.jpg" alt="Canyon walls at dusk" width="480" height="320" />
+</a>
+```
+
+Once the viewer binds the link, a click opens the viewer and the page stays where it is. A click with Cmd, Ctrl, Shift or Alt held, or with the middle button, still opens the image in a new tab or window, as links do. A `click` listener that calls `preventDefault()` before the trigger's own stops the open, and the link with it. If the viewer can't open, as when its code fails to load offline, the link is followed after all. This works the same in every binding and in `<fluidbox-item>`.
+
+A `<button>` is the other good trigger. A `<div>` or a bare `<img>` can't take focus or say what it does, so a keyboard or a screen reader can't use it; in development the trigger warns about one that has no `role` and `tabindex`.
+
 ## Server rendering
 
 The package root, `@ogdakke/fluidbox`, is safe to import on the server. It has no side effects and touches no browser globals until you call `createFluidbox()`. The add-on entries are safe there too. The framework bindings create the viewer only in the browser, after mount, so they render on the server as plain markup. [Next.js](./nextjs.md) walks through one server-rendered setup end to end.
@@ -112,6 +126,12 @@ Importing `@ogdakke/fluidbox/elements` defines the custom elements, so that entr
 ```ts
 if (typeof customElements !== "undefined") await import("@ogdakke/fluidbox/elements");
 ```
+
+### Content Security Policy
+
+The viewer runs under a strict policy such as `default-src 'self'; style-src 'self'; script-src 'self'; require-trusted-types-for 'script'`. It builds its DOM node by node, never from HTML strings, so Trusted Types has nothing to refuse, and it sets styles through the CSSOM, which `style-src` allows. Serve the stylesheets as files, with `<link>`.
+
+A React `Root` that renders open draws the open viewer on the server, for the viewer to take over once it loads. That copy has no inline styles either: the stylesheet places it, and its image's `width` and `height` carry the photo's shape. Until the viewer takes over, the copy is a labelled region rather than a dialog, since nothing holds focus in it yet. Its controls are links where `href` gives them an address, and inert where it doesn't.
 
 ## Next
 

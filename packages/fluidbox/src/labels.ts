@@ -23,6 +23,14 @@ export interface FluidboxLabels {
   readonly filmstripList: string;
   /** The scroller of a zoomed image. */
   readonly zoomed: string;
+  /** The zoom-in control. */
+  readonly zoomIn: string;
+  /** The zoom-out control. */
+  readonly zoomOut: string;
+  /** The control that zooms back out to fit. */
+  readonly zoomReset: string;
+  /** What the viewer announces as the zoom comes to rest at a scale. */
+  readonly zoomLevel: (scale: number) => string;
   /** The sheet the runtime makes when the sheet has a `render`. */
   readonly sheet: string;
   /** Shown on a slide whose media failed to load. */
@@ -46,6 +54,10 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   filmstrip: "Gallery filmstrip",
   filmstripList: "Choose a gallery item",
   zoomed: "Zoomed image",
+  zoomIn: "Zoom in",
+  zoomOut: "Zoom out",
+  zoomReset: "Fit to screen",
+  zoomLevel: (scale: number) => `Zoom ${Math.round(scale * 100)}%`,
   sheet: "Details",
   error: "Unable to load media.",
   retry: "Retry",

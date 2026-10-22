@@ -4,7 +4,10 @@ export type { FluidboxLabels } from "./labels";
 
 /** What every item can carry besides its media. */
 export interface FluidboxItemBase {
-  /** Stable identity across item updates. Defaults to `src`. Unique in a list. */
+  /**
+   * Stable identity across item updates. Defaults to `src`; in an array, an item
+   * without one whose `src` repeats gets `src#2`, `src#3` in order. Unique in a list.
+   */
   readonly id?: string;
   /**
    * A small image of the item: the filmstrip's thumbnail, an iframe's still, and
@@ -43,6 +46,17 @@ export interface FluidboxImageItem extends FluidboxItemBase {
   readonly width: number;
   readonly height: number;
   readonly sources?: readonly FluidboxPictureSource[];
+  /**
+   * A larger image for zoom, as a master kept apart from the `srcset`. The
+   * viewer loads it once a zoom shows more pixels than the slide's own source
+   * has, and the hover zoom add-on magnifies it.
+   */
+  readonly zoomSrc?: string;
+  /**
+   * Larger candidates for zoom, with width descriptors. The viewer loads the
+   * smallest one that is sharp at the zoom it rests at.
+   */
+  readonly zoomSrcset?: string;
 }
 
 /** A `<track>` of a video: captions, subtitles, descriptions or chapters. */
@@ -139,8 +153,9 @@ export interface FluidboxItemListOptions<TItem extends FluidboxItem = FluidboxIt
 }
 
 /**
- * An array, which the fluidbox copies and checks for empty and duplicate ids, or
- * a lazy list it reads on demand and doesn't check.
+ * An array, which the fluidbox copies and checks for empty and duplicate ids of
+ * the items' own (a repeated `src` gets `src#2`), or a lazy list it reads on
+ * demand and doesn't check.
  */
 export type FluidboxItems<TItem extends FluidboxItem = FluidboxItem> =
   | readonly TItem[]
@@ -167,6 +182,25 @@ export interface FluidboxRenderContext<TItem extends FluidboxItem = FluidboxItem
  */
 export type FluidboxRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxRenderContext<TItem>,
+) => void | (() => void);
+
+/** What a custom slide's renderer gets: a render context that also follows the slide on show. */
+export interface FluidboxSlideRenderContext<
+  TItem extends FluidboxItem = FluidboxItem,
+> extends FluidboxRenderContext<TItem> {
+  /** Whether the slide is the one on show in the viewer. */
+  readonly active: boolean;
+  /**
+   * Call `listener` with the new `active` each time it changes: true as the slide
+   * comes to be the one on show, false as the viewer moves away from it. Use it to
+   * play and pause. Returns a function that stops listening; `signal` stops it too.
+   */
+  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
+}
+
+/** Draws a custom slide (`renderers`). It can follow whether its slide is on show. */
+export type FluidboxSlideRenderer<TItem extends FluidboxItem = FluidboxItem> = (
+  context: FluidboxSlideRenderContext<TItem>,
 ) => void | (() => void);
 
 export interface FluidboxViewerContext<TItem extends FluidboxItem = FluidboxItem> {
@@ -219,6 +253,16 @@ export interface FluidboxOriginAdapter<TItem extends FluidboxItem = FluidboxItem
 
 export type FluidboxStatus = "closed" | "opening" | "open" | "closing";
 
+/** The zoom of the image on show. */
+export interface FluidboxZoomState {
+  /** The scale the image rests at: 1 when it fits the stage. */
+  readonly scale: number;
+  /** The smallest scale, 1. */
+  readonly min: number;
+  /** The largest scale, the `zoom` option's `max`. */
+  readonly max: number;
+}
+
 /** A frozen snapshot. */
 export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly status: FluidboxStatus;
@@ -229,6 +273,11 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly count: number;
   readonly hasPrevious: boolean;
   readonly hasNext: boolean;
+  /**
+   * The zoom of the open viewer's image, or null while closed, on media that
+   * doesn't zoom, or with zoom off. It changes as the zoom comes to rest.
+   */
+  readonly zoom: FluidboxZoomState | null;
 }
 
 /**
@@ -308,6 +357,24 @@ export class FluidboxSheetEvent extends Event {
 }
 
 /**
+ * Fired when the image on show comes to rest at another zoom, back at 1 as
+ * the viewer moves on or closes included. Never fired per frame. A pinch or a
+ * double-tap has the reason "pointer", a ctrl-wheel or trackpad pinch
+ * "wheel", the `+`, `-`, `0` and arrow keys "keyboard", and a command "api".
+ */
+export class FluidboxZoomEvent extends Event {
+  /** The scale the image rests at. */
+  readonly scale: number;
+  readonly reason: FluidboxReason;
+
+  constructor(type: "zoomchange", init: EventInit & { scale: number; reason: FluidboxReason }) {
+    super(type, init);
+    this.scale = init.scale;
+    this.reason = init.reason;
+  }
+}
+
+/**
  * The events a fluidbox and `<fluidbox-gallery>` fire. The before-events fire
  * synchronously for every command that would do something, from a key, a gesture
  * or your code. `preventDefault()` cancels the command, and its promise resolves
@@ -327,6 +394,8 @@ export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   settle: FluidboxItemChangeEvent<TItem>;
   /** The sheet comes to rest at another stop. */
   sheetchange: FluidboxSheetEvent;
+  /** The image on show comes to rest at another zoom. */
+  zoomchange: FluidboxZoomEvent;
 }
 
 // Add-ons. Each needs its entry imported once: `import "@ogdakke/fluidbox/sheet"`.
@@ -377,7 +446,17 @@ export interface FluidboxFilmstripOptions<TItem extends FluidboxItem = FluidboxI
 
 // The fluidbox.
 
-export type FluidboxControlName = "previous" | "next" | "close";
+/**
+ * A default control. `previous`, `next` and `close` show by default; the zoom
+ * controls only when you list them in `controls`.
+ */
+export type FluidboxControlName =
+  | "previous"
+  | "next"
+  | "close"
+  | "zoomIn"
+  | "zoomOut"
+  | "zoomReset";
 
 /**
  * When the viewer's code loads. `"hover"` loads it when a mouse rests on a
@@ -394,14 +473,15 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Your strings for the viewer, over the defaults. */
   readonly labels?: Partial<FluidboxLabels>;
   /**
-   * Pinch, double-tap, wheel and keyboard zoom of images. `step` is the scale of a
-   * double-click or double-tap, and `max` the largest scale for pinch, wheel and
-   * keyboard. The `+` and `-` keys zoom by 1.5. `false` turns zoom off.
+   * Pinch, double-tap, click, wheel and keyboard zoom of images. `step` is the
+   * scale of a click or double-tap, and `max` the largest scale for every
+   * input. The `+` and `-` keys, `zoomIn`, `zoomOut` and the zoom controls zoom
+   * by 1.5. `false` turns zoom off.
    * @default { step: 2, max: 4 }
    */
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
   /** Draw `custom` items, by the name in their `render`. Read when a slide mounts. */
-  readonly renderers?: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  readonly renderers?: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   /**
    * Go round: past the last item comes the first, and before the first the
    * last, by swipe, key, button and filmstrip alike. A single item never loops.
@@ -411,7 +491,8 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Draw your own controls and captions into the viewer. */
   readonly viewer?: FluidboxViewerRenderer<TItem>;
   /**
-   * The default Previous, Next and Close buttons, or some of them.
+   * The default Previous, Next and Close buttons, or a list of the controls to
+   * show, the zoom controls included: `["close", "zoomIn", "zoomOut", "zoomReset"]`.
    * @default true without a `viewer`, else false
    */
   readonly controls?: boolean | readonly FluidboxControlName[];
@@ -462,6 +543,17 @@ export interface FluidboxCommandOptions {
   readonly scrub?: boolean;
 }
 
+export interface FluidboxZoomCommandOptions {
+  /** Aborting it stops the zoom where it is, and the command resolves false. */
+  readonly signal?: AbortSignal;
+  /**
+   * The point that stays put as the image scales, in client pixels, as a
+   * pointer event's `clientX` and `clientY`.
+   * @default the centre of the stage
+   */
+  readonly origin?: { readonly x: number; readonly y: number };
+}
+
 export interface FluidboxBindOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Unbinds when aborted. */
   readonly signal?: AbortSignal;
@@ -509,6 +601,19 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   next(options?: FluidboxCommandOptions): Promise<boolean>;
   previous(options?: FluidboxCommandOptions): Promise<boolean>;
   /**
+   * Zoom the image on show to `scale`, kept between 1 and the `zoom` option's
+   * `max`. Resolves true once it rests there, and false while no image can
+   * zoom (`state.zoom` is null), or when a gesture or another zoom interrupts it.
+   * A scale that isn't a finite number rejects with a RangeError.
+   */
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom in by 1.5, as the `+` key does. */
+  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom out by 1.5, as the `-` key does. */
+  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom back out to fit, as the `0` key does. */
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
+  /**
    * Change options without closing the viewer. Labels and zoom apply in place, so
    * a zoomed photo zooms out when zoom turns off. A change of `controls`, `viewer`
    * or the labels redraws the viewer's layer, and a change of `filmstrip` or
@@ -537,12 +642,14 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   load(): Promise<boolean>;
   /**
    * Make an element a trigger that opens the viewer on an item. The item, and any
-   * in `returns`, close back onto it. It sets `data-fluidbox-trigger`,
-   * `aria-haspopup="dialog"` and `aria-expanded` on the element, loads the viewer's
+   * in `returns`, close back onto it. It sets `data-fluidbox-trigger` and
+   * `aria-haspopup="dialog"` on the element, loads the viewer's
    * code as the `loading` option says, preloads on a primary-button `pointerdown`,
-   * and drops that work 250 ms after the pointer lifts without a click. A click
-   * opens the item the trigger shows, its target or the item of `returns` it last
-   * closed onto, unless the click was prevented.
+   * and drops that work 250 ms after the pointer lifts without a click. A plain
+   * primary click opens the item the trigger shows, its target or the item of
+   * `returns` it last closed onto, unless the click was prevented, and prevents
+   * it, so an `<a href>` trigger stays on the page. A click with a modifier key
+   * is left to the link, and a link is followed when the viewer fails to open.
    * Returns a function that unbinds.
    */
   bind(

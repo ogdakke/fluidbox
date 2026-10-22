@@ -12,6 +12,8 @@ import type {
   FluidboxState,
   FluidboxTarget,
   FluidboxToggleEvent,
+  FluidboxZoomCommandOptions,
+  FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
@@ -22,6 +24,13 @@ export interface FluidboxSolidRenderContext<TItem extends FluidboxItem = Fluidbo
   readonly index: number;
   /** Aborted when the content is no longer shown. */
   readonly signal: AbortSignal;
+  /** Whether the slide is the one on show. */
+  readonly active: boolean;
+  /**
+   * Call `listener` with the new `active` as the slide comes to be the one on
+   * show or stops being it, to play and pause. Returns a function that stops it.
+   */
+  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
 }
 
 /** Renders a custom item. It runs under Root, so context provided around Root reaches it. */
@@ -67,6 +76,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly onSettle?: (event: FluidboxItemChangeEvent<TItem>) => void;
   /** When the sheet comes to rest at another stop. */
   readonly onSheetChange?: (event: FluidboxSheetEvent) => void;
+  /** When the image on show comes to rest at another zoom. */
+  readonly onZoomChange?: (event: FluidboxZoomEvent) => void;
   readonly children?: JSX.Element;
 }
 
@@ -95,6 +106,11 @@ export interface FluidboxViewerProps {
 }
 
 export interface FluidboxActionProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {}
+
+export interface FluidboxControlsProps {
+  /** Add the zoom-in, zoom-out and fit controls, in their group. */
+  readonly zoom?: boolean;
+}
 
 export interface FluidboxSheetStopProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   /** The stop to move the sheet to. Pressed at that stop, it lowers the sheet to 0. */
@@ -145,6 +161,14 @@ export interface FluidboxApi<
   close(options?: FluidboxCommandOptions): Promise<boolean>;
   next(options?: FluidboxCommandOptions): Promise<boolean>;
   previous(options?: FluidboxCommandOptions): Promise<boolean>;
+  /** Zoom the image on show to a scale between 1 and the zoom's `max`. */
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom in by 1.5. */
+  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom out by 1.5. */
+  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom back out to fit. */
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
@@ -163,10 +187,13 @@ export interface FluidboxSolidParts {
   Root: <TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>) => JSX.Element;
   Trigger: <TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>) => JSX.Element;
   Viewer: (props: FluidboxViewerProps) => JSX.Element;
-  Controls: () => JSX.Element;
+  Controls: (props?: FluidboxControlsProps) => JSX.Element;
   Close: (props: FluidboxActionProps) => JSX.Element;
   Previous: (props: FluidboxActionProps) => JSX.Element;
   Next: (props: FluidboxActionProps) => JSX.Element;
+  ZoomIn: (props: FluidboxActionProps) => JSX.Element;
+  ZoomOut: (props: FluidboxActionProps) => JSX.Element;
+  ZoomReset: (props: FluidboxActionProps) => JSX.Element;
   Filmstrip: <TItem extends FluidboxItem>(props: FluidboxFilmstripProps<TItem>) => JSX.Element;
   Sheet: <TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>) => JSX.Element;
   SheetStop: (props: FluidboxSheetStopProps) => JSX.Element;

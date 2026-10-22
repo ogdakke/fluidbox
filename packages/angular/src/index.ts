@@ -11,6 +11,9 @@ import {
   FluidboxThumbnailOverlayComponent,
   FluidboxTriggerDirective,
   FluidboxViewerDirective,
+  FluidboxZoomInDirective,
+  FluidboxZoomOutDirective,
+  FluidboxZoomResetDirective,
 } from "./parts.js";
 import { FluidboxRootDirective } from "./root.js";
 import { FluidboxSheetDirective } from "./sheet.js";
@@ -28,6 +31,9 @@ export {
   FluidboxThumbnailOverlayComponent,
   FluidboxTriggerDirective,
   FluidboxViewerDirective,
+  FluidboxZoomInDirective,
+  FluidboxZoomOutDirective,
+  FluidboxZoomResetDirective,
 } from "./parts.js";
 export {
   FluidboxRootDirective,
@@ -42,6 +48,7 @@ export {
   FluidboxItemChangeEvent,
   FluidboxSheetEvent,
   FluidboxToggleEvent,
+  FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 export type {
   Fluidbox,
@@ -63,6 +70,8 @@ export type {
   FluidboxStatus,
   FluidboxTarget,
   FluidboxVideoItem,
+  FluidboxZoomCommandOptions,
+  FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
@@ -76,6 +85,9 @@ const parts = [
   FluidboxCloseDirective,
   FluidboxPreviousDirective,
   FluidboxNextDirective,
+  FluidboxZoomInDirective,
+  FluidboxZoomOutDirective,
+  FluidboxZoomResetDirective,
   FluidboxFilmstripDirective,
   FluidboxSheetDirective,
   FluidboxSheetStopDirective,

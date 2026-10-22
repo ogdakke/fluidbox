@@ -21,6 +21,10 @@ export function packageSource(command: "build" | "serve"): Alias[] {
     { find: "@ogdakke/fluidbox/filmstrip", replacement: core("filmstrip-entry.ts") },
     { find: "@ogdakke/fluidbox/sheet", replacement: core("sheet-entry.ts") },
     { find: "@ogdakke/fluidbox/kit", replacement: core("kit.ts") },
+    { find: "@ogdakke/fluidbox/hover-zoom", replacement: core("hover-zoom.ts") },
+    { find: "@ogdakke/fluidbox/embeds", replacement: core("embeds.ts") },
+    { find: "@ogdakke/fluidbox/model", replacement: core("model.ts") },
+    { find: "@ogdakke/fluidbox/spin", replacement: core("spin.ts") },
     { find: "@ogdakke/fluidbox/elements", replacement: core("elements.ts") },
     ...bindings.map((name) => ({
       find: `@ogdakke/fluidbox/${name}`,

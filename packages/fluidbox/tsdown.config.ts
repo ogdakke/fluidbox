@@ -7,6 +7,10 @@ export default defineConfig({
     filmstrip: "src/filmstrip-entry.ts",
     sheet: "src/sheet-entry.ts",
     kit: "src/kit.ts",
+    "hover-zoom": "src/hover-zoom.ts",
+    embeds: "src/embeds.ts",
+    model: "src/model.ts",
+    spin: "src/spin.ts",
   },
   format: "esm",
   platform: "browser",
@@ -15,6 +19,8 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   report: true,
+  // Left for the app's bundler, so development-only warnings drop out of its production build.
+  define: { "process.env.NODE_ENV": "process.env.NODE_ENV" },
   copy: [
     { from: "src/styles.css", to: "dist", rename: "styles.css" },
     { from: "src/styles.css.d.ts", to: "dist", rename: "styles.css.d.ts" },

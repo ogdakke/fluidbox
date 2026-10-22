@@ -13,37 +13,36 @@ export interface ViewerPortalElements {
 
 /** Create the runtime-owned body portal without registering custom elements. */
 export function createViewerPortal(ownerDocument: Document, label: string): ViewerPortalElements {
-  const overlay = ownerDocument.createElement("div");
-  overlay.dataset.fluidboxOverlay = "";
-  overlay.innerHTML = `
-    <div data-fluidbox-backdrop></div>
-    <div data-fluidbox-container>
-      <div data-fluidbox-dialog role="dialog" aria-modal="true"
-           tabindex="-1">
-        <div data-fluidbox-frame><img data-fluidbox-media part="image" /></div>
-        <span data-fluidbox-announcer role="status" aria-live="polite" aria-atomic="true"></span>
-        <div data-fluidbox-portal></div>
-        <div data-fluidbox-addons></div>
-      </div>
-    </div>
-  `;
-  // The markup above is static, so every part is there.
-  const part = <TElement extends Element>(name: string) =>
-    overlay.querySelector<TElement>(`[data-fluidbox-${name}]`)!;
-  const dialog = part<HTMLDivElement>("dialog");
+  // Built node by node, never from HTML, so Trusted Types has nothing to refuse.
+  const part = <TName extends keyof HTMLElementTagNameMap>(
+    tag: TName,
+    name: string,
+    ...children: Element[]
+  ) => {
+    const element = ownerDocument.createElement(tag);
+    element.setAttribute(`data-fluidbox-${name}`, "");
+    element.append(...children);
+    return element;
+  };
+  const media = part("img", "media");
+  media.setAttribute("part", "image");
+  const frame = part("div", "frame", media);
+  const status = part("span", "announcer");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  status.setAttribute("aria-atomic", "true");
+  const portalTarget = part("div", "portal");
+  const addons = part("div", "addons");
+  const dialog = part("div", "dialog", frame, status, portalTarget, addons);
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.tabIndex = -1;
   // The dialog's name until an item names it.
   dialog.setAttribute("aria-label", label);
-  return {
-    overlay,
-    container: part("container"),
-    backdrop: part("backdrop"),
-    dialog,
-    frame: part("frame"),
-    media: part("media"),
-    status: part("announcer"),
-    portalTarget: part("portal"),
-    addons: part("addons"),
-  };
+  const backdrop = part("div", "backdrop");
+  const container = part("div", "container", dialog);
+  const overlay = part("div", "overlay", backdrop, container);
+  return { overlay, container, backdrop, dialog, frame, media, status, portalTarget, addons };
 }
 
 /**

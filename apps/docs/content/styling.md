@@ -90,7 +90,7 @@ The dialog alone also has `data-zoomed` while an image is zoomed, and `data-gall
 }
 ```
 
-The trigger of the open item gets `data-fluidbox-status="open"`, `data-open` and `aria-expanded="true"`. Every trigger has `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded`.
+The trigger of the open item gets `data-fluidbox-status="open"` and `data-open`. Every trigger has `data-fluidbox-trigger` and `aria-haspopup="dialog"`. It has no `aria-expanded`: the viewer is a modal dialog, not something the trigger expands.
 
 ## Controls
 

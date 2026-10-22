@@ -12,17 +12,22 @@ interface View {
   image: HTMLElement;
   frame: HTMLElement;
 }
+/** What zoomed the image: a public reason, as the zoomchange event reports it. */
+export type ZoomReason = "api" | "keyboard" | "pointer" | "wheel";
 interface Options {
   prepare: () => View | null;
   config: () => { step: number; max: number };
   /** The zoomed image scroller's name. */
   label: string;
   state: (locked: boolean) => void;
-  close: () => void;
+  /** The zoom came to rest at another scale. Never called per frame. */
+  settled: (scale: number, reason: ZoomReason | undefined) => void;
   reducedMotion: () => boolean;
 }
 type SafariGesture = Event & { scale: number; clientX?: number; clientY?: number };
 const fit = (): Pose => ({ scale: 1, x: 0, y: 0 });
+/** The longest gap between the taps of a double-tap, in milliseconds. */
+const DOUBLE_TAP = 350;
 const point = (touch: Touch): Point => ({ x: touch.clientX, y: touch.clientY });
 const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -42,6 +47,8 @@ const resist = (value: number, min: number, max: number, range: number) =>
       : value;
 
 const sides = ["top", "right", "bottom", "left"] as const;
+/** Whether a gesture starts on content that keeps its own, as a 3D model does its pinch. */
+const ownsInput = (event: Event) => (event.target as Element).closest("[data-fluidbox-owns-input]");
 
 /** Maps a scale's log-space distance beyond [1, max] through `curve`. */
 function beyondBounds(
@@ -113,6 +120,15 @@ export class FluidboxZoom {
   #touchMoved = false;
   #cursor: Point = { x: innerWidth / 2, y: innerHeight / 2 };
   #suppressClick = false;
+  /** The pointer that pressed last: a mouse zooms with one click, a finger with two taps. */
+  #pointerType = "";
+  /** What started the zoom on its way, reported when it comes to rest. */
+  #reason: ZoomReason | undefined;
+  /** The scale last reported as settled. */
+  #settledScale = 1;
+  #refocus = false;
+  /** Resolves the command whose motion is running: true once it rests, false if interrupted. */
+  #command: ((rested: boolean) => void) | undefined;
 
   constructor(root: HTMLElement, options: Options) {
     this.#options = options;
@@ -138,6 +154,10 @@ export class FluidboxZoom {
       },
       { signal },
     );
+    root.addEventListener("pointerdown", (event) => (this.#pointerType = event.pointerType), {
+      capture: true,
+      signal,
+    });
     root.addEventListener("dblclick", (event) => event.preventDefault(), { signal });
   }
 
@@ -156,7 +176,15 @@ export class FluidboxZoom {
     this.#pose.x = this.#nativeOrigin.x - viewport.scrollLeft - (g.left - g.stage.left);
     this.#pose.y = this.#nativeOrigin.y - viewport.scrollTop - (g.top - g.stage.top);
     this.#placeholder.replaceWith(carrier(image));
+    // Focus on the scroller goes back to the dialog rather than the page, and
+    // returns to the scroller if the image comes to rest zoomed.
+    this.#refocus = viewport.contains(viewport.ownerDocument.activeElement);
     viewport.remove();
+    if (this.#refocus) {
+      this.#root
+        .querySelector<HTMLElement>("[data-fluidbox-dialog]")
+        ?.focus({ preventScroll: true });
+    }
     this.#viewport = null;
     this.#placeholder = null;
     this.#paint();
@@ -179,7 +207,11 @@ export class FluidboxZoom {
     viewport.addEventListener("pointerup", this.#finishMousePan);
     viewport.addEventListener("pointercancel", this.#finishMousePan);
     viewport.addEventListener("lostpointercapture", this.#finishMousePan);
+    // A named, focusable scroller, so it reads as part of the dialog and the
+    // keys can reach it.
+    viewport.setAttribute("role", "group");
     viewport.setAttribute("aria-label", this.#options.label);
+    viewport.tabIndex = 0;
     const canvas = document.createElement("div");
     canvas.dataset.fluidboxZoomCanvas = "";
     viewport.style.setProperty("--fluidbox-zoom-chrome", `${chromeReach(window)}px`);
@@ -211,9 +243,9 @@ export class FluidboxZoom {
     anchor.append(moved);
     canvas.append(anchor);
     viewport.append(canvas);
-    // A sibling of the dialog, so the container sizes it and the
-    // dialog's own box and clip never constrain it.
-    this.#root.querySelector("[data-fluidbox-dialog]")!.after(viewport);
+    // Inside the dialog, so focus stays in it and aria-modal keeps it in the
+    // accessibility tree. Last, so it paints over the slides as the image did.
+    this.#root.querySelector("[data-fluidbox-dialog]")!.append(viewport);
     image.style.setProperty("--fluidbox-media-transform", `scale(${this.#pose.scale})`);
     this.#nativeOrigin = { x, y };
     this.#viewport = viewport;
@@ -279,7 +311,15 @@ export class FluidboxZoom {
       this.#animation.cancel();
       this.#animation = null;
     }
+    this.#answer(false);
     if (this.#image) this.#paint();
+  }
+
+  /** Settle the running command, if there is one. */
+  #answer(rested: boolean) {
+    const command = this.#command;
+    this.#command = undefined;
+    command?.(rested);
   }
 
   #acquire() {
@@ -381,6 +421,17 @@ export class FluidboxZoom {
     this.#paint();
     this.#options.state(target.scale > 1.001);
     this.#enterNative();
+    if (this.#refocus) this.#viewport?.focus({ preventScroll: true });
+    this.#refocus = false;
+    this.#report(target.scale, this.#reason);
+    this.#answer(true);
+  }
+
+  #report(scale: number, reason: ZoomReason | undefined) {
+    const rounded = Math.round(scale * 1000) / 1000;
+    if (rounded === this.#settledScale) return;
+    this.#settledScale = rounded;
+    this.#options.settled(rounded, reason);
   }
 
   #target(scale: number, anchor: Point): Pose {
@@ -479,6 +530,7 @@ export class FluidboxZoom {
   #touchStart = (event: TouchEvent) => {
     this.#suppressClick = false;
     if ((event.target as Element).closest("button")) return;
+    if (!this.zoomed && ownsInput(event)) return;
     if (event.touches.length === 1 && this.#viewport) {
       this.#nativeTouch = this.#nativeTouchPrevious = point(event.touches[0]!);
       // Leave the default action intact: the browser owns pan and momentum.
@@ -491,6 +543,7 @@ export class FluidboxZoom {
     if (!this.#acquire()) return;
     this.#consume(event);
     this.#source = "touch";
+    this.#reason = "pointer";
     this.#touchTap = event.touches.length === 1 ? point(event.touches[0]!) : null;
     this.#touchMoved = event.touches.length > 1;
     this.#suppressClick = true;
@@ -587,6 +640,11 @@ export class FluidboxZoom {
       return;
     }
     if (!event.ctrlKey && !this.zoomed) return;
+    // A pinch on content that owns its input is the content's; the page still doesn't zoom.
+    if (!this.zoomed && ownsInput(event)) {
+      event.preventDefault();
+      return;
+    }
     if (!event.ctrlKey) {
       this.#freeze();
       this.#settle();
@@ -598,6 +656,7 @@ export class FluidboxZoom {
     if (source !== "wheel") {
       if (!this.#acquire()) return;
       this.#source = "wheel";
+      this.#reason = "wheel";
     }
     const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
     this.#rawScale *= Math.exp(Math.max(-0.5, Math.min(0.5, -event.deltaY * unit * 0.008)));
@@ -609,6 +668,10 @@ export class FluidboxZoom {
   };
 
   #gestureStart = (event: Event) => {
+    if (!this.#source && !this.zoomed && ownsInput(event)) {
+      event.preventDefault();
+      return;
+    }
     if (this.#source === "touch") {
       this.#consume(event);
       return;
@@ -616,6 +679,7 @@ export class FluidboxZoom {
     if (!this.#acquire()) return;
     this.#consume(event);
     this.#source = "safari";
+    this.#reason = "pointer";
     this.#options.state(true);
   };
   #gestureChange = (event: Event) => {
@@ -646,13 +710,23 @@ export class FluidboxZoom {
     if (target.closest("button, a[href], input, select, textarea, label, [contenteditable]")) {
       return false;
     }
+    // A click beside the zoomed image zooms out, rather than closing the viewer
+    // on someone who only meant to let go of the picture.
     if (target.matches("[data-fluidbox-zoom-canvas], [data-fluidbox-zoom-viewport]")) {
-      this.#options.close();
+      if (this.#acquire()) {
+        this.#reason = "pointer";
+        this.#animate(fit());
+      }
       return true;
     }
     if (!onMedia) return false;
     if (event.detail === 0) return false;
-    this.#tapAt({ x: event.clientX, y: event.clientY });
+    const anchor = { x: event.clientX, y: event.clientY };
+    // A mouse zooms with one click, as on a product page: the cursor says so.
+    // The second click of a double-click is the same intent, not a toggle back.
+    if (this.#pointerType === "mouse") {
+      if (event.detail === 1) this.#toggleAt(anchor);
+    } else this.#tapAt(anchor);
     return true;
   }
 
@@ -660,32 +734,116 @@ export class FluidboxZoom {
     const now = performance.now();
     const previous = this.#tap;
     clearTimeout(this.#clickTimer);
-    if (previous && now - previous.time < 250 && distance(previous, anchor) < 40) {
+    // A generous window, near the platforms' own double-tap timing, for hands
+    // slower than the default 250 ms.
+    if (previous && now - previous.time < DOUBLE_TAP && distance(previous, anchor) < 40) {
       this.#tap = undefined;
-      if (this.#acquire()) {
-        const scale = this.#pose.scale > 1.01 ? 1 : this.#options.config().step;
-        this.#animate(this.#target(scale, anchor));
-      }
+      this.#toggleAt(anchor);
     } else {
       this.#tap = { ...anchor, time: now };
       this.#clickTimer = setTimeout(() => {
         this.#tap = undefined;
-      }, 250);
+      }, DOUBLE_TAP);
     }
   }
 
-  zoomBy(factor: number) {
+  #toggleAt(anchor: Point) {
     if (!this.#acquire()) return;
+    this.#reason = "pointer";
+    const scale = this.#pose.scale > 1.01 ? 1 : this.#options.config().step;
+    this.#animate(this.#target(scale, anchor));
+  }
+
+  /** Zoom by a factor about the stage's centre, as the + and - keys do. */
+  zoomBy(factor: number, reason: ZoomReason = "keyboard") {
+    if (!this.#acquire()) return;
+    this.#reason = reason;
     const scale = Math.max(1, Math.min(this.#options.config().max, this.#pose.scale * factor));
     this.#animate(this.#target(scale, this.#stageCenter()));
   }
-  reset() {
-    if (this.#acquire()) this.#animate(fit());
+  /** Zoom back out to fit, as the 0 key does. */
+  reset(reason: ZoomReason = "keyboard") {
+    if (!this.#acquire()) return;
+    this.#reason = reason;
+    this.#animate(fit());
   }
 
-  /** Handle a key on a zoomed image. Returns true when it took the key. */
-  keydown(_event: KeyboardEvent): boolean {
-    return false;
+  /**
+   * Zoom to `scale`, clamped to [1, max], keeping `origin` (client pixels, the
+   * stage's centre by default) where it is. Resolves true once the image rests
+   * there, false when there is no image to zoom or the motion was interrupted.
+   */
+  zoomTo(
+    scale: number,
+    {
+      origin,
+      reason = "api",
+      signal,
+    }: { origin?: Point; reason?: ZoomReason; signal?: AbortSignal },
+  ): Promise<boolean> {
+    // Acquiring freezes any motion under way, which answers its command false.
+    if (signal?.aborted || !this.#acquire()) return Promise.resolve(false);
+    this.#reason = reason;
+    const bounded = Math.max(1, Math.min(this.#options.config().max, scale));
+    const target = this.#target(bounded, origin ?? this.#stageCenter());
+    const pose = this.#pose;
+    let answer!: (rested: boolean) => void;
+    const done = new Promise<boolean>((resolve) => (answer = resolve));
+    if (
+      Math.abs(target.scale - pose.scale) < 0.0001 &&
+      Math.abs(target.x - pose.x) < 0.1 &&
+      Math.abs(target.y - pose.y) < 0.1
+    ) {
+      this.#command = answer;
+      this.#rest(target);
+      return done;
+    }
+    this.#animate(target);
+    // Without motion to wait for, as with reduced motion, it has already rested.
+    if (!this.#animation) answer(true);
+    else this.#command = answer;
+    signal?.addEventListener(
+      "abort",
+      () => {
+        if (this.#command !== answer) return;
+        this.#freeze();
+        this.#settle();
+      },
+      { once: true },
+    );
+    return done;
+  }
+
+  /**
+   * Pan the zoomed image with the arrow keys, a step of a fifth of the view,
+   * or a half with Shift. True when it took the key.
+   */
+  keydown(event: KeyboardEvent): boolean {
+    const x = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    const y = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+    if ((!x && !y) || event.altKey || event.ctrlKey || event.metaKey || !this.zoomed) return false;
+    const g = this.#geometry;
+    const share = event.shiftKey ? 0.5 : 0.2;
+    const dx = x * g.viewportWidth * share;
+    const dy = y * g.viewportHeight * share;
+    // A pinch or a wheel under way owns the image until it ends.
+    if (this.#source !== null) return true;
+    const viewport = this.#viewport;
+    if (viewport && !this.#animation) {
+      viewport.scrollBy({
+        left: dx,
+        top: dy,
+        behavior: this.#options.reducedMotion() ? "instant" : "smooth",
+      });
+      return true;
+    }
+    // Mid-motion, pan from wherever the image is now.
+    if (!this.#acquire()) return false;
+    this.#reason = "keyboard";
+    this.#animate(
+      this.#bounded({ ...this.#pose, x: this.#pose.x - dx, y: this.#pose.y - dy }, false),
+    );
+    return true;
   }
 
   /** Leave the visible transform intact for the dismissal animation. */
@@ -698,7 +856,9 @@ export class FluidboxZoom {
     this.#tap = undefined;
     this.#pose = fit();
     this.#image = null;
+    this.#refocus = false;
     this.#options.state(false);
+    this.#report(1, undefined);
   }
   destroy() {
     this.suspend();

@@ -1,17 +1,24 @@
 import type {
   FluidboxDispose,
   FluidboxItem,
-  FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
+import { fitSize } from "./fit-size";
+import { idOf, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
+import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
+import { checkItemUrls } from "./media-url";
 import type { FluidboxThumbnail } from "./public-api";
+import { sharperCandidate, srcsetCandidates } from "./srcset";
 
 const WINDOW_SIZE = 31;
 const LOAD_RADIUS = 1;
 
 interface ViewerSlide {
+  /** Where the slide sits in the strip; new items can move it. */
+  position: number;
   readonly element: HTMLDivElement;
   readonly frame: HTMLDivElement;
   readonly picture?: HTMLPictureElement;
@@ -30,10 +37,25 @@ interface ViewerSlide {
   controller?: AbortController;
   /** A playing origin's picture, shown until the slide's player catches up with it. */
   videoHandoff?: AbortController;
+  /** The load of a sharper candidate for the zoom, until it swaps in. */
+  sharpening?: AbortController;
+  /** The URL of the sharper candidate the image shows for the zoom, if any. */
+  sharpened?: string;
   dispose?: FluidboxDispose;
+  /** Custom content's view of whether its slide is on show, and who follows it. */
+  activity?: { active: boolean; readonly listeners: Set<(active: boolean) => void> };
 }
 
 /** Point an image at a thumbnail, its srcset and sizes included. */
+function safeUrls(item: FluidboxItem) {
+  try {
+    checkItemUrls(item);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function paintThumbnail(image: HTMLImageElement, thumbnail: FluidboxThumbnail) {
   if (thumbnail.sizes) image.sizes = thumbnail.sizes;
   else image.removeAttribute("sizes");
@@ -51,7 +73,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   readonly #controller = new AbortController();
   readonly #onSelect: (index: number, settled: boolean) => void;
   readonly #allows: (index: number) => boolean;
-  readonly #renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>;
+  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   readonly #labels: FluidboxLabels;
   #source: FluidboxSource<TItem>;
   #loop: boolean;
@@ -65,6 +87,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   /** -1 when the strip runs right to left, where `scrollLeft` counts down from 0. */
   #sign = 1;
   #mounted = false;
+  /** Closed: the strip keeps its slides for the next open, but none is on show. */
+  #hidden = false;
   #rebasing = false;
   #rebaseFrame = 0;
   #instantFrame = 0;
@@ -85,13 +109,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #selection:
     | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
     | undefined;
+  /** While new items are laid out: the old slides whose item is unchanged, by id. */
+  #recycled: Map<string, { item: TItem; slide: ViewerSlide }[]> | undefined;
 
   constructor(
     ownerDocument: Document,
     source: FluidboxSource<TItem>,
     onSelect: (index: number, settled: boolean) => void,
     allows: (index: number) => boolean,
-    renderers: Readonly<Record<string, FluidboxRenderer<TItem>>>,
+    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>,
     labels: FluidboxLabels,
     loop = false,
   ) {
@@ -137,9 +163,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   get active() {
-    const slide = this.#slides.get(this.#index);
+    const slide = this.current;
     if (!slide) throw new Error("The viewer source has no active image.");
     return slide;
+  }
+
+  /** The slide on show, or undefined while the source is empty. */
+  get current(): ViewerSlide | undefined {
+    return this.#slides.get(this.#index);
   }
 
   /**
@@ -190,27 +221,71 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.element.scrollTo({ left: this.#sign * left, behavior });
   }
 
+  /**
+   * Show new items. A slide whose item is unchanged stays, loaded, wherever its
+   * item moved to, so swapping a product's variant keeps the photos it shares.
+   */
   setSource(source: FluidboxSource<TItem>) {
     this.#resolveSelection();
     this.#focusable(source.count);
     this.#unfence();
+    const previous = this.#source;
     const index = this.index;
+    const shown = previous.count ? idOf(previous.getItem(index)) : null;
+    const recycled = new Map<string, { item: TItem; slide: ViewerSlide }[]>();
+    for (const [position, slide] of this.#slides) {
+      const at = this.#item(position);
+      const item = previous.getItem(at);
+      const id = idOf(item);
+      // Most items stay where they were; a lazy list without indexOf finds an id by scanning.
+      const next = at < source.count && idOf(source.getItem(at)) === id ? at : source.getIndex(id);
+      if (next !== null && sameItem(item, source.getItem(next))) {
+        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide }]);
+      } else {
+        this.#unload(slide);
+        slide.element.remove();
+      }
+    }
+    this.#slides.clear();
     this.#source = source;
-    this.#index = Math.max(0, Math.min(index, source.count - 1));
-    for (const slide of this.#slides.values()) {
+    // The strip stays on the item it shows, wherever that went.
+    this.#index =
+      (shown === null ? null : source.getIndex(shown)) ??
+      Math.max(0, Math.min(index, source.count - 1));
+    this.#base = 0;
+    this.#recycled = recycled;
+    this.#renderWindow(this.#index, this.#index);
+    this.#recycled = undefined;
+    for (const { slide } of [...recycled.values()].flat()) {
       this.#unload(slide);
       slide.element.remove();
     }
-    this.#slides.clear();
-    this.#base = 0;
-    this.#renderWindow(this.#index, this.#index);
     this.#align(this.#index);
+  }
+
+  /** An unchanged old slide for the item at a position, moved there. */
+  #recycle(position: number) {
+    const item = this.#source.getItem(this.#item(position));
+    const kept = this.#recycled?.get(idOf(item));
+    const found = kept?.findIndex((each) => sameItem(each.item, item)) ?? -1;
+    if (!kept || found < 0) return undefined;
+    const { slide } = kept.splice(found, 1)[0]!;
+    slide.position = position;
+    this.#labelSlide(slide.element, position);
+    this.#present(slide, position === this.#index);
+    return slide;
   }
 
   /** Go round, or stop at the ends. The slides are made again around the item on show. */
   setLoop(loop: boolean) {
     if (loop === this.#loop) return;
     const index = this.index;
+    // Positions mean something else now, so no slide carries over.
+    for (const slide of this.#slides.values()) {
+      this.#unload(slide);
+      slide.element.remove();
+    }
+    this.#slides.clear();
     this.#loop = loop;
     this.#index = index;
     this.setSource(this.#source);
@@ -227,11 +302,20 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#width = this.element.getBoundingClientRect().width;
     this.#align(this.#index);
     this.#loadWindow();
+    this.#hidden = false;
+    this.#activate();
+  }
+
+  /** The viewer has closed: no slide is on show until the strip mounts again. */
+  hide() {
+    this.#hidden = true;
+    this.#activate();
   }
 
   unmount() {
     if (!this.#mounted) return;
     this.#mounted = false;
+    this.#activate();
     this.#observer.disconnect();
     this.#resolveSelection();
     for (const slide of this.#slides.values()) this.#unload(slide);
@@ -350,17 +434,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#labelSlide(element, index);
     const frame = this.#ownerDocument.createElement("div");
     frame.dataset.fluidboxFrame = "";
-    // Size against the slide (a size container), never the viewport: 100vw
-    // includes a desktop scrollbar and can differ by a fraction on iOS, which
-    // left the image a sliver wider or narrower than its slide.
-    frame.style.setProperty(
-      "--fluidbox-item-width",
-      `min(100cqw, calc(var(--fluidbox-content-height, var(--fluidbox-height, 100svh)) * ${item.width / item.height}))`,
-    );
-    frame.style.setProperty(
-      "--fluidbox-item-height",
-      `min(${(item.height / item.width) * 100}cqw, var(--fluidbox-content-height, var(--fluidbox-height, 100svh)))`,
-    );
+    const size = fitSize(item);
+    frame.style.setProperty("--fluidbox-item-width", size.width);
+    frame.style.setProperty("--fluidbox-item-height", size.height);
     const error = this.#ownerDocument.createElement("div");
     error.dataset.fluidboxError = "";
     error.hidden = true;
@@ -368,7 +444,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const retry = this.#ownerDocument.createElement("button");
     retry.type = "button";
     retry.textContent = this.#labels.retry;
-    retry.addEventListener("click", () => this.#retry(index));
+    retry.addEventListener("click", () => this.#retry(slide.position));
     error.append(`${this.#labels.error} `, retry);
     let picture: HTMLPictureElement | undefined;
     let placeholder: HTMLImageElement | undefined;
@@ -461,6 +537,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     frame.append(error);
     element.append(frame);
     const slide = {
+      position: index,
       element,
       frame,
       picture,
@@ -609,12 +686,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     for (let index = base; index < base + size; index++) {
       let slide = this.#slides.get(index);
       if (!slide) {
-        slide = this.#makeSlide(index);
+        slide = this.#recycle(index) ?? this.#makeSlide(index);
         this.#slides.set(index, slide);
-        this.element.insertBefore(slide.element, insertionPoint);
-      } else {
-        insertionPoint = slide.element.nextSibling;
       }
+      // Only a slide out of place moves: moving an embed reloads it.
+      if (slide.element !== insertionPoint)
+        this.element.insertBefore(slide.element, insertionPoint);
+      insertionPoint = slide.element.nextSibling;
     }
     this.#rebasing = true;
     this.#base = base;
@@ -734,14 +812,96 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     ) {
       void player.play().catch(() => {});
     }
+    this.#activate();
     if (notify) this.#onSelect(this.#item(index), false);
   }
 
+  /** The scale the zoom of the image on show rests at, while it is above fit. */
+  #zoomed: { readonly index: number; readonly scale: number } | undefined;
+
   #loadWindow() {
     for (const [index, slide] of this.#slides) {
+      // A slide that leaves gives back its zoom's sharper image.
+      if (index !== this.#index) this.#blunt(index, slide);
       if (Math.abs(index - this.#index) <= LOAD_RADIUS) this.#load(index, slide);
       else this.#unload(slide);
     }
+  }
+
+  /**
+   * Show the image on show sharper for a zoom resting at `scale`: once its
+   * pixels on screen outnumber its candidate's, decode the smallest larger
+   * candidate of the same source, or of `zoomSrcset` and `zoomSrc`, off screen,
+   * then swap it in at the same size. The largest one caps it.
+   */
+  sharpen(scale: number) {
+    const index = this.#index;
+    // An image still loading sharpens once it shows; see #revealImage.
+    this.#zoomed = { index, scale };
+    const slide = this.#slides.get(index);
+    const item = this.#source.getItem(this.#item(index));
+    const image = slide?.image;
+    if (
+      !slide ||
+      item.type !== "img" ||
+      !(image instanceof HTMLImageElement) ||
+      !slide.fullApplied ||
+      !this.#painted(image)
+    )
+      return;
+    const base = this.#ownerDocument.baseURI;
+    const shown = image.currentSrc;
+    // The candidates of the source the browser chose, so a format it took stays.
+    const sets = [
+      ...[...(slide.picture?.querySelectorAll("source") ?? [])].map((source) => source.srcset),
+      image.srcset,
+    ].map(srcsetCandidates);
+    const href = (src: string) => new URL(src, base).href;
+    const chosen = sets.find((set) => set.some((each) => href(each.src) === shown)) ?? [];
+    const current = chosen.find((each) => href(each.src) === shown)?.width || image.naturalWidth;
+    const view = this.#ownerDocument.defaultView;
+    const needed = image.offsetWidth * scale * (view?.devicePixelRatio ?? 1);
+    const next = sharperCandidate(
+      [
+        ...chosen,
+        ...srcsetCandidates(item.zoomSrcset),
+        ...(item.zoomSrc ? [{ src: item.zoomSrc, width: Infinity }] : []),
+      ],
+      current,
+      needed,
+    );
+    if (!next || href(next.src) === shown || next.src === slide.sharpened) return;
+    slide.sharpening?.abort();
+    const controller = new AbortController();
+    slide.sharpening = controller;
+    const version = slide.imageVersion;
+    const loader = this.#ownerDocument.createElement("img");
+    loader.src = next.src;
+    void loader
+      .decode()
+      .then(() => {
+        if (controller.signal.aborted || slide.imageVersion !== version) return;
+        // The same size on screen: the candidate's density keeps the image's
+        // natural size, which the slide's layout reads unzoomed.
+        const width = image.naturalWidth;
+        image.decoding = "sync";
+        for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
+        image.sizes = `${width}px`;
+        image.srcset = `${next.src} ${loader.naturalWidth}w`;
+        slide.sharpened = next.src;
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (slide.sharpening === controller) slide.sharpening = undefined;
+      });
+  }
+
+  /** Drop a slide's sharper zoom image, going back to its own sources. */
+  #blunt(index: number, slide: ViewerSlide) {
+    slide.sharpening?.abort();
+    slide.sharpening = undefined;
+    if (slide.sharpened && slide.loaded) this.#applyImage(index, slide);
+    slide.sharpened = undefined;
   }
 
   #load(index: number, slide: ViewerSlide) {
@@ -784,7 +944,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           .then(() => {
             if (controller.signal.aborted) return;
             slide.decoded = true;
-            this.#applyImage(index, slide);
+            // New items may have moved the slide while it decoded.
+            this.#applyImage(slide.position, slide);
           })
           .catch(() => {
             if (!controller.signal.aborted) this.#fail(slide);
@@ -794,6 +955,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
             if (slide.controller === controller) slide.controller = undefined;
           });
       }
+    } else if (!safeUrls(item)) {
+      // Item lists reject these already; a list of your own still stops here.
+      this.#fail(slide);
     } else if (item.type === "video" && slide.image instanceof HTMLVideoElement) {
       slide.image.src = item.src;
       if (item.poster) slide.image.poster = item.poster;
@@ -817,12 +981,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       // Policy attributes apply to the navigation that src starts, so they go first.
       if (item.allow) slide.image.allow = item.allow;
       if (item.referrerPolicy) slide.image.referrerPolicy = item.referrerPolicy;
-      if (item.sandbox !== undefined) slide.image.setAttribute("sandbox", item.sandbox);
+      slide.image.setAttribute("sandbox", item.sandbox ?? IFRAME_SANDBOX_DEFAULT);
       slide.image.src = item.src;
     } else if (item.type === "custom") {
       const renderer = this.#renderers[item.render];
       if (!renderer) throw new TypeError(`Unknown fluidbox renderer: ${item.render}`);
       const controller = new AbortController();
+      // Unloading drops the activity, so its listeners are never called again.
+      const activity = (slide.activity = {
+        active: this.#mounted && !this.#hidden && index === this.#index,
+        listeners: new Set<(active: boolean) => void>(),
+      });
       slide.controller = controller;
       slide.dispose =
         renderer({
@@ -830,6 +999,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           index: this.#item(index),
           target: slide.image,
           signal: controller.signal,
+          get active() {
+            return activity.active;
+          },
+          onActiveChange(listener) {
+            activity.listeners.add(listener);
+            return () => activity.listeners.delete(listener);
+          },
         }) ?? undefined;
     }
     slide.loaded = true;
@@ -837,6 +1013,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   #unload(slide: ViewerSlide) {
     slide.videoHandoff?.abort();
+    slide.sharpening?.abort();
+    slide.sharpening = undefined;
+    slide.sharpened = undefined;
     slide.previewController?.abort();
     slide.previewController = undefined;
     if (!slide.loaded) return;
@@ -844,6 +1023,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.controller = undefined;
     slide.dispose?.();
     slide.dispose = undefined;
+    slide.activity = undefined;
     slide.decoded = false;
     slide.fullApplied = false;
     slide.error.hidden = true;
@@ -868,12 +1048,29 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.loaded = false;
   }
 
+  /**
+   * Tell custom content whether its slide is the one on show in a mounted strip:
+   * the slide that leaves first, so its player stops before the next one starts.
+   */
+  #activate() {
+    let entering: ViewerSlide["activity"];
+    for (const [index, { activity }] of this.#slides) {
+      const active = this.#mounted && !this.#hidden && index === this.#index;
+      if (!activity || activity.active === active) continue;
+      activity.active = active;
+      if (active) entering = activity;
+      else for (const listener of activity.listeners) listener(false);
+    }
+    if (entering) for (const listener of entering.listeners) listener(true);
+  }
+
   #applyImage(index: number, slide: ViewerSlide) {
     const item = this.#source.getItem(this.#item(index));
     if (item.type !== "img" || !(slide.image instanceof HTMLImageElement) || !slide.picture) return;
     slide.imageVersion += 1;
     const version = slide.imageVersion;
     slide.fullApplied = true;
+    slide.sharpened = undefined;
     // The full image decodes off the main thread. An image that already paints
     // a preview keeps it until the new source is ready; only an empty one hides.
     // A staged source is already decoded and swaps in on the next frame.
@@ -983,6 +1180,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (slide.fullApplied) {
       slide.error.hidden = true;
       slide.element.removeAttribute("aria-busy");
+    }
+    // Zoomed in before the full image came: sharpen it now.
+    const zoomed = this.#zoomed;
+    if (
+      zoomed &&
+      zoomed.scale > 1 &&
+      zoomed.index === this.#index &&
+      slide === this.#slides.get(zoomed.index)
+    ) {
+      this.sharpen(zoomed.scale);
     }
   }
 

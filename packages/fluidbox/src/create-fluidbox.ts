@@ -1,6 +1,6 @@
 import { addon, loadAddons, type Addon } from "./addons";
 import { hostKey, type FluidboxHost } from "./host";
-import { idOf, idsIn, targetKey, targetKeys, toList, toSource } from "./items";
+import { idOf, idsIn, sameItems, targetKey, targetKeys, toList, toSource } from "./items";
 import { resolveLabels, type FluidboxLabels } from "./labels";
 import type { DomViewerDriver } from "./dom-viewer-driver";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
@@ -25,7 +25,10 @@ import {
   type FluidboxStatus,
   type FluidboxTarget,
   type FluidboxUpdateOptions,
+  type FluidboxZoomCommandOptions,
+  type FluidboxZoomState,
   FluidboxSheetEvent,
+  FluidboxZoomEvent,
 } from "./public-api";
 import type {
   FluidboxDispose,
@@ -45,9 +48,23 @@ import type {
 import { bindTrigger } from "./trigger";
 
 const defaultControls = ["previous", "next", "close"] as const;
+/** The factor of zoomIn, zoomOut and the zoom controls, as of the + and - keys. */
+const ZOOM_FACTOR = 1.5;
 
 const reasonOf = (reason: SessionChangeReason): FluidboxReason =>
   reason === "source-update" || reason === "source-empty" ? "items" : reason;
+
+/**
+ * Report a host callback's error as an uncaught one would be, without letting it
+ * stop the command that called it.
+ */
+function report(error: unknown) {
+  if (typeof reportError === "function") reportError(error);
+  else
+    queueMicrotask(() => {
+      throw error;
+    });
+}
 
 const happened = (result: SessionCommandResult) => result.status === "completed";
 const completed = (changed: boolean): SessionCommandResult => ({ status: "completed", changed });
@@ -105,7 +122,7 @@ type Settings<TItem extends FluidboxItem> = Pick<
 /**
  * Create a fluidbox: a viewer at the end of `<body>`, and the commands, state and
  * events that drive it. Browser only. Throws a TypeError for an array of items
- * with an empty or duplicate id.
+ * with an empty id or a duplicate of one an item names itself by.
  */
 export function createFluidbox<TItem extends FluidboxItem = FluidboxItem>(
   options: FluidboxOptions<TItem>,
@@ -147,6 +164,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** The add-on entries the settings need, while they load. Opening waits for them. */
   #addonsLoading: Promise<void> | undefined;
   #list: FluidboxItemList<TItem>;
+  /** A copy of the array the list was made from, so equal items change nothing. */
+  #array: readonly TItem[] | undefined;
   #source: FluidboxSource<TItem>;
   #state: FluidboxState<TItem>;
   readonly #origins: OriginRegistry;
@@ -161,11 +180,17 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #announced: "open" | "closed" = "closed";
   /** The reason of the request whose status change comes next. */
   #reason: FluidboxReason = "api";
+  /** The scale the zoom last rested at, and the item it belongs to. */
+  #zoomScale = 1;
+  #zoomId: string | null = null;
   readonly [hostKey]: FluidboxHost;
 
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
     super();
     this.#list = toList(options.items);
+    this.#array = Array.isArray(options.items)
+      ? [...(options.items as readonly TItem[])]
+      : undefined;
     this.#source = toSource(this.#list);
     this.#labels = { ...resolveLabels(options.labels) };
     const { sheet, filmstrip, controls, viewer } = options;
@@ -285,6 +310,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       previous: (options = {}) => this.#step("previous", options),
       allows: (target, reason) => this.#allowed("goTo", target, reason),
       subscribe: (listener) => this.subscribe(listener),
+      zoomed: (scale, reason) => this.#zoomed(scale, reason),
     };
   }
 
@@ -346,6 +372,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     if (has("zoom")) {
       this.#zoom = options.zoom;
       this.#viewer?.setZoom(options.zoom);
+      // The zoom state may gain, lose or change its bounds.
+      const { status, index, item, zoom } = this.#state;
+      if (this.#zoomFor(status, item)?.max !== zoom?.max) this.#publish(status, index);
     }
     if (has("loop") && !!options.loop !== this.#loop) {
       this.#loop = !!options.loop;
@@ -401,6 +430,59 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return this.#command("close", undefined, "api", options);
   }
 
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions) {
+    if (!Number.isFinite(scale)) {
+      return Promise.reject(new RangeError(`Fluidbox zoom scale must be finite: ${scale}`));
+    }
+    return this.#zoomCommand(() => scale, "api", options);
+  }
+
+  zoomIn(options?: FluidboxZoomCommandOptions) {
+    return this.#zoomCommand((zoom) => zoom.scale * ZOOM_FACTOR, "api", options);
+  }
+
+  zoomOut(options?: FluidboxZoomCommandOptions) {
+    return this.#zoomCommand((zoom) => zoom.scale / ZOOM_FACTOR, "api", options);
+  }
+
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">) {
+    return this.#zoomCommand(() => 1, "api", options);
+  }
+
+  #zoomCommand(
+    scale: (zoom: FluidboxZoomState) => number,
+    reason: "api" | "keyboard" | "pointer",
+    options: FluidboxZoomCommandOptions = {},
+  ): Promise<boolean> {
+    const zoom = this.#state.zoom;
+    if (this.#lifetime.signal.aborted || !zoom || !this.#viewer || options.signal?.aborted) {
+      return Promise.resolve(false);
+    }
+    const target = Math.max(zoom.min, Math.min(zoom.max, scale(zoom)));
+    return this.#viewer.zoomTo(target, { ...options, reason });
+  }
+
+  /** The zoom came to rest at another scale on the item on show. */
+  #zoomed(scale: number, reason: FluidboxReason | undefined) {
+    this.#zoomId = this.#state.id;
+    if (scale === this.#zoomScale) return;
+    this.#zoomScale = scale;
+    if (this.#state.zoom && this.#state.zoom.scale !== scale) {
+      this.#publish(this.#state.status, this.#state.index);
+    }
+    this.dispatchEvent(
+      new FluidboxZoomEvent("zoomchange", { scale, reason: reason ?? this.#reason }),
+    );
+  }
+
+  /** The zoom of the item on show: open on an image, with zoom on. */
+  #zoomFor(status: FluidboxStatus, item: TItem | null): FluidboxZoomState | null {
+    if (status !== "open" || item?.type !== "img" || this.#zoom === false) return null;
+    // The scale belongs to the item it rested on; another item starts fitted.
+    const scale = this.#zoomId === idOf(item) ? this.#zoomScale : 1;
+    return Object.freeze({ scale, min: 1, max: this.#zoom?.max ?? 4 });
+  }
+
   next(options?: FluidboxCommandOptions) {
     return this.#command("next", undefined, "api", options);
   }
@@ -410,8 +492,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   setItems(items: FluidboxItems<TItem>) {
-    if (this.#lifetime.signal.aborted) return Promise.resolve(false);
+    this.#assertAlive();
+    // The same items in a new array, as a binding re-rendering
+    // `items={products.map(toItem)}` passes, change nothing: they neither
+    // interrupt a move nor rebuild a slide. A lazy list always applies.
+    const array = Array.isArray(items) ? [...(items as readonly TItem[])] : undefined;
+    if (array && this.#array && sameItems(array, this.#array)) return Promise.resolve(false);
     this.#list = toList(items);
+    this.#array = array;
     // A close this update causes is reported with the reason "items".
     this.#reason = "items";
     const result = this.#setSource(toSource(this.#list));
@@ -421,9 +509,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   preload(target: FluidboxTarget<TItem>) {
+    this.#assertAlive();
     const index = this.#resolve(this.#target(target));
     if (index instanceof RangeError) throw index;
-    if (this.#lifetime.signal.aborted || this.#state.status !== "closed") return () => {};
+    if (this.#state.status !== "closed") return () => {};
     const item = this.#source.getItem(index);
     const context = { item, index, origin: this.#origins.get(idOf(item)) };
     if (this.#viewer) return this.#viewer.prepare(context);
@@ -446,6 +535,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     target: FluidboxTarget<TItem>,
     options: FluidboxBindOptions<TItem> = {},
   ) {
+    // Before anything is attached, so a destroyed fluidbox holds no listeners.
+    this.#assertAlive();
     const trigger = bindTrigger(this, element, {
       target,
       returns: options.returns,
@@ -464,6 +555,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     target: FluidboxTarget<TItem>,
     options: FluidboxOverlayOptions<TItem> = {},
   ) {
+    this.#assertAlive();
     const { travel, frameLayer } = options;
     const registration: FluidboxThumbnailOverlayRegistration<TItem> = travel
       ? {
@@ -508,7 +600,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   subscribe(listener: (state: FluidboxState<TItem>) => void) {
-    if (this.#lifetime.signal.aborted) return () => {};
+    this.#assertAlive();
     this.#listeners.add(listener);
     return () => {
       this.#listeners.delete(listener);
@@ -517,13 +609,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   destroy() {
     if (this.#lifetime.signal.aborted) return;
+    // Closed at once, so the state, the toggle and every subscriber end closed.
+    this.#reset();
     this.#lifetime.abort();
     for (const release of this.#bindings) release();
-    this.#abortReveal();
-    if (this.#pending) {
-      this.#pending.controller.abort();
-      this.#finish(this.#pending, aborted());
-    }
     this.#origins.clear();
     for (const overlay of this.#overlays.values()) overlay.dispose?.();
     this.#viewer?.destroy();
@@ -531,6 +620,13 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     for (const overlay of this.#overlays.values()) resetOverlayPhase(overlay.registration.element);
     this.#overlays.clear();
     this.#listeners.clear();
+  }
+
+  /** What a destroyed fluidbox throws for anything that would hold on to it. */
+  #assertAlive() {
+    if (this.#lifetime.signal.aborted) {
+      throw new DOMException("The fluidbox was destroyed.", "InvalidStateError");
+    }
   }
 
   /** Track a binding, so destroy releases it, and release it when its signal aborts. */
@@ -599,6 +695,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
       takeOver: (index) => this.#command("open", index, "api", { instant: true }),
+      zoom: (name, reason) =>
+        this.#zoomCommand(
+          (zoom) =>
+            name === "zoomReset"
+              ? 1
+              : zoom.scale * (name === "zoomIn" ? ZOOM_FACTOR : 1 / ZOOM_FACTOR),
+          reason,
+        ),
       // Drop the viewer, keeping what it needs, so the next press or open makes a new one.
       unload: () => {
         this.#reset();
@@ -877,7 +981,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
             if (viewer && !context.signal.aborted) return viewer.select(context);
           })),
     ).then((settled) => {
-      if (!settled) return;
+      if (!settled || !this.#owns(operation)) return;
       if (opening) {
         this.#publish("open", index);
         this.#toggle("open");
@@ -906,7 +1010,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       // A viewer that never loaded has painted nothing to close.
       this.#viewer?.close({ origin, signal: operation.controller.signal, reason }),
     ).then((settled) => {
-      if (!settled) return;
+      if (!settled || !this.#owns(operation)) return;
       this.#origins.restoreThumbnail();
       // A close that the items emptied has nothing left to refresh.
       this.#flushSourceRefresh();
@@ -966,6 +1070,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       this.#finish(operation, null, error);
       return false;
     }
+    return this.#owns(operation);
+  }
+
+  /**
+   * Whether a command still owns the fluidbox. Asked again where it settles: a
+   * command issued in the microtasks between can have taken over.
+   */
+  #owns(operation: PendingCommand) {
     return (
       this.#pending === operation && !operation.settled && !operation.controller.signal.aborted
     );
@@ -1102,6 +1214,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       count: this.#source.count,
       hasPrevious: index !== null && (index > 0 || this.#loops),
       hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
+      zoom: this.#zoomFor(status, item),
     });
   }
 
@@ -1113,7 +1226,15 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #publish(status: FluidboxStatus, index: number | null) {
     this.#origins.keepThumbnail(status === "open" && !!this.#viewer?.keepsThumbnail());
     this.#state = this.#stateFor(status, index);
-    for (const listener of this.#listeners) listener(this.#state);
+    // Every binding is a subscriber: one that throws must not stop the others,
+    // or the command, which then never settles.
+    for (const listener of this.#listeners) {
+      try {
+        listener(this.#state);
+      } catch (error) {
+        report(error);
+      }
+    }
   }
 
   /** Opening and closing toggle; an aborted command lands back where it was. */

@@ -36,7 +36,8 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   );
   await expect(overlay).toHaveCSS("--fluidbox-control-background", "rgb(78 90 123)");
   await expect(first).toHaveAttribute("aria-haspopup", "dialog");
-  await expect(first).toHaveAttribute("aria-expanded", "true");
+  // A modal trigger is never "expanded"; aria-haspopup says what it opens.
+  await expect(first).not.toHaveAttribute("aria-expanded", /.*/);
   await expect(first).toHaveAttribute("data-fluidbox-status", "open");
 
   await page.locator("[data-demo-next]").click();
@@ -47,13 +48,19 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   ).toHaveCount(0);
   await expect(activeMedia).not.toHaveAttribute("srcset", /.+/);
   await expect(activeMedia).not.toHaveAttribute("sizes", /.+/);
-  await expect(first).toHaveAttribute("aria-expanded", "false");
-  await expect(page.locator('[data-photo-id="two"]')).toHaveAttribute("aria-expanded", "true");
+  await expect(first).toHaveAttribute("data-fluidbox-status", "closed");
+  await expect(page.locator('[data-photo-id="two"]')).toHaveAttribute(
+    "data-fluidbox-status",
+    "open",
+  );
 
   await page.locator("[data-demo-close]").click();
   await expect(overlay).toHaveCount(0);
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
-  await expect(page.locator('[data-photo-id="two"]')).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator('[data-photo-id="two"]')).toHaveAttribute(
+    "data-fluidbox-status",
+    "closed",
+  );
 });
 
 test("clicking the empty gallery slide closes the lightbox", async ({ page }, testInfo) => {
@@ -202,7 +209,7 @@ test("plain runtime owns video and iframe media while custom renderers own desce
       {
         id: "video",
         type: "video",
-        src: "data:video/mp4;base64,",
+        src: "/video/missing.mp4",
         title: "Video study",
         width: 800,
         height: 450,
@@ -210,7 +217,7 @@ test("plain runtime owns video and iframe media while custom renderers own desce
       {
         id: "iframe",
         type: "iframe",
-        src: "about:blank",
+        src: "/map-panel.html",
         title: "Iframe study",
         width: 800,
         height: 600,

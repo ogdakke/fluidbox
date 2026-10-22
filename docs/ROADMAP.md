@@ -311,7 +311,7 @@ Test slow, failed, retried, cached, and out-of-order loads; rapid direction chan
 
 ### Video, iframe, and custom content
 
-Prove these through the same descriptor and renderer lifecycle before claiming media parity between DOM and indexed sources. Distinguish mount, activate, deactivate, and dispose. Make zoom eligibility and gesture ownership explicit per content kind.
+Prove these through the same descriptor and renderer lifecycle before claiming media parity between DOM and indexed sources. Distinguish mount, activate, deactivate, and dispose: custom slides now do, through `active` and `onActiveChange` on their render context. Make zoom eligibility and gesture ownership explicit per content kind; `data-fluidbox-owns-input` now covers pinch as well as drags, wheel and keys.
 
 - Video retains native control interaction, pauses on deactivation, and has tested playback/fullscreen behavior on physical mobile devices. A renderer may provide provider-specific control later.
 - Iframes have dimensions, an accessible title, explicit embedding attributes, and an external close control. Cross-origin frame interiors are not a universal drag/keyboard interception area. Define whether eviction reloads content; do not promise persistence merely because an element is reused.

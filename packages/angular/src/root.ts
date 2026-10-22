@@ -25,8 +25,9 @@ import {
   type FluidboxLabels,
   type FluidboxOptions,
   type FluidboxOriginAdapter,
-  type FluidboxRenderContext,
   type FluidboxRenderer,
+  type FluidboxSlideRenderContext,
+  type FluidboxSlideRenderer,
   type FluidboxSheetEvent,
   type FluidboxSheetSnapPoint,
   type FluidboxState,
@@ -34,6 +35,8 @@ import {
   type FluidboxToggleEvent,
   type FluidboxUpdateOptions,
   type FluidboxViewerRenderer,
+  type FluidboxZoomCommandOptions,
+  type FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import {
   fluidboxEventTypes,
@@ -54,6 +57,14 @@ export interface FluidboxApi<
   close(options?: FluidboxCommandOptions): Promise<boolean>;
   next(options?: FluidboxCommandOptions): Promise<boolean>;
   previous(options?: FluidboxCommandOptions): Promise<boolean>;
+  /** Zoom the image on show to a scale between 1 and the zoom's `max`. */
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom in by 1.5. */
+  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom out by 1.5. */
+  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
+  /** Zoom back out to fit. */
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
@@ -146,6 +157,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   @Output() readonly settle = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
   /** When the sheet comes to rest at another stop. */
   @Output() readonly sheetChange = new EventEmitter<FluidboxSheetEvent>();
+  /** When the image on show comes to rest at another zoom. */
+  @Output() readonly zoomChange = new EventEmitter<FluidboxZoomEvent>();
   /** As the viewer opens or closes, from any input. Half of `[(open)]`. */
   @Output() readonly openChange = new EventEmitter<boolean>();
   /** As the viewer moves to another item, opening included. Half of `[(index)]`. */
@@ -158,12 +171,20 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly fluidbox: Fluidbox<TItem> = createFluidbox<TItem>({
     items: [],
     // Renderers resolve by name when a slide mounts, so the newest one is used.
-    renderers: new Proxy({} as Record<string, FluidboxRenderer<TItem>>, {
+    renderers: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get: (_, name) => {
         const content = typeof name === "string" ? this.renderers?.[name] : undefined;
         if (!content) return undefined;
-        return ({ item, index, target }: FluidboxRenderContext<TItem>) =>
-          mountContent(this.#zone, this.#container, content, item, index, target);
+        return (context: FluidboxSlideRenderContext<TItem>) =>
+          mountContent(
+            this.#zone,
+            this.#container,
+            content,
+            context.item,
+            context.index,
+            context.target,
+            context,
+          );
       },
       has: (_, name) => typeof name === "string" && !!this.renderers?.[name],
     }),
@@ -200,6 +221,10 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       close: (options?: FluidboxCommandOptions) => fluidbox.close(options),
       next: (options?: FluidboxCommandOptions) => fluidbox.next(options),
       previous: (options?: FluidboxCommandOptions) => fluidbox.previous(options),
+      zoomTo: (scale: number, options?: FluidboxZoomCommandOptions) => this.zoomTo(scale, options),
+      zoomIn: (options?: FluidboxZoomCommandOptions) => this.zoomIn(options),
+      zoomOut: (options?: FluidboxZoomCommandOptions) => this.zoomOut(options),
+      resetZoom: (options?: Pick<FluidboxZoomCommandOptions, "signal">) => this.resetZoom(options),
       setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
       preload: (target: FluidboxTarget<TItem>) => this.preload(target),
       load: () => this.load(),
@@ -221,6 +246,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       itemchange: this.itemChange,
       settle: this.settle,
       sheetchange: this.sheetChange,
+      zoomchange: this.zoomChange,
     } as const;
     for (const type of fluidboxEventTypes) {
       const output = outputs[type] as unknown as EventEmitter<Event>;
@@ -277,6 +303,23 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
 
   previous(options?: FluidboxCommandOptions): Promise<boolean> {
     return this.fluidbox.previous(options);
+  }
+
+  // A zoom can load the zoom's code, whose listeners stay outside the zone.
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#zone.runOutsideAngular(() => this.fluidbox.zoomTo(scale, options));
+  }
+
+  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#zone.runOutsideAngular(() => this.fluidbox.zoomIn(options));
+  }
+
+  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#zone.runOutsideAngular(() => this.fluidbox.zoomOut(options));
+  }
+
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
+    return this.#zone.runOutsideAngular(() => this.fluidbox.resetZoom(options));
   }
 
   setItems(items: FluidboxItems<TItem>): Promise<boolean> {

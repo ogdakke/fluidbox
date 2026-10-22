@@ -439,6 +439,14 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   /* A refused swipe hides the slides past the fence. */
   display: none;
 }
+/**
+ * How far past its own `width` and `height` a photo may grow to fit the stage:
+ * `1` never past its size, `2` up to twice it. Give items their real pixel
+ * sizes when you set it.
+ * @input --fluidbox-max-upscale
+ * @default unset: photos fill the stage
+ * @on Overlay
+ */
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-slide]
   :is([data-fluidbox-media], [data-fluidbox-item-content]) {
@@ -869,6 +877,54 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   user-select: none;
   -webkit-user-select: none;
 }
+/* A mouse zooms an image with one click; the cursor says so. */
+@media (hover: hover) and (pointer: fine) {
+  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-zoomable]
+    [data-fluidbox-slide]
+    [data-fluidbox-image-frame]
+    [data-fluidbox-media] {
+    cursor: zoom-in;
+  }
+}
+/* The zoom controls, when `controls` lists them, sit together under the photo. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-controls] {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(var(--fluidbox-stage-bottom) + 16px);
+  left: 50%;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 22px;
+  background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
+  transform: translateX(-50%);
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  [data-fluidbox-zoom-controls]
+  > :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]) {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--fluidbox-color, white);
+  font: inherit;
+  cursor: pointer;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]):disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]):focus-visible {
+  outline: 1px solid var(--fluidbox-focus-color, currentColor);
+  outline-offset: 2px;
+}
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
   [data-fluidbox-zoom-viewport][data-grabbing],
 :where([data-fluidbox-overlay], [data-fluidbox-flight])
@@ -952,6 +1008,15 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
    tints its bars from fixed layers. The takeover moves it to the scroll position. */
 [data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-static][hidden] {
   display: none;
+}
+/* The copy has no inline styles, for a strict style-src. Its image's width and
+   height are its ratio scaled past any screen; these limits fit it to the slide. */
+[data-fluidbox-server-viewer],
+:where([data-fluidbox-overlay][data-fluidbox-static]) [data-fluidbox-picture] {
+  display: contents;
+}
+:where([data-fluidbox-overlay][data-fluidbox-static]) [data-fluidbox-slide] [data-fluidbox-media] {
+  max-height: var(--fluidbox-content-height);
 }
 :where([data-fluidbox-overlay][data-fluidbox-static])
   a:is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {

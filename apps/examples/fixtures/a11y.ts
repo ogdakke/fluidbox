@@ -130,5 +130,5 @@ document
   .addEventListener("click", () => quick.showModal());
 document.querySelector("[data-test=quick-close]")!.addEventListener("click", () => quick.close());
 
-Object.assign(window, { a11yFluidbox: fluidbox });
+Object.assign(window, { a11yFluidbox: fluidbox, a11yItems: items });
 document.documentElement.dataset.fixtureReady = "";
