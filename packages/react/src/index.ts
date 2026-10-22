@@ -48,13 +48,14 @@ import {
   latestOrigins,
   resolveLabels,
   createFluidboxSync,
-  fluidboxStaticViewer,
+  fluidboxStaticViewerNodes,
   takeOverFluidbox,
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
   type FluidboxSlot,
   type FluidboxSlots,
+  type FluidboxStaticNode,
   type FluidboxTrigger,
 } from "@ogdakke/fluidbox/kit";
 import type {
@@ -481,9 +482,29 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   );
 }
 
+/** React's names for the HTML attributes the copy uses that it spells otherwise. */
+const reactNames: Record<string, string> = {
+  srcset: "srcSet",
+  fetchpriority: "fetchPriority",
+  "stroke-width": "strokeWidth",
+  "stroke-linecap": "strokeLinecap",
+  "stroke-linejoin": "strokeLinejoin",
+};
+/** Boolean attributes React takes as `true`. */
+const reactFlags = new Set(["disabled", "inert", "hidden"]);
+
+function staticElement({ tag, attributes, children }: FluidboxStaticNode): ReactElement {
+  const props: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(attributes)) {
+    props[reactNames[name] ?? name] = reactFlags.has(name) || value;
+  }
+  return createElement(tag, props, ...children.map(staticElement));
+}
+
 /**
  * The open viewer's copy, rendered after the Root's children so the parts
- * among them have said what it needs. React leaves its inner HTML alone.
+ * among them have said what it needs. It is built as elements, not HTML, so
+ * it renders under Trusted Types and a strict style-src.
  */
 function ServerViewer({
   viewerRef,
@@ -502,7 +523,7 @@ function ServerViewer({
   href: FluidboxRootProps<any>["href"];
   hints: ServerHints;
 }): ReactElement | null {
-  const html = fluidboxStaticViewer({
+  const copy = fluidboxStaticViewerNodes({
     items,
     index,
     labels,
@@ -512,13 +533,12 @@ function ServerViewer({
     sheet: hints.sheet,
     controls: !hints.viewer,
   });
-  if (!html) return null;
-  return createElement("div", {
-    ref: viewerRef,
-    "data-fluidbox-server-viewer": "",
-    style: { display: "contents" },
-    dangerouslySetInnerHTML: { __html: html },
-  });
+  if (!copy) return null;
+  return createElement(
+    "div",
+    { ref: viewerRef, "data-fluidbox-server-viewer": "" },
+    staticElement(copy),
+  );
 }
 
 type ChildHandler<E> = ((event: E) => void) | undefined;

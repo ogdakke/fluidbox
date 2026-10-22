@@ -113,6 +113,12 @@ Importing `@ogdakke/fluidbox/elements` defines the custom elements, so that entr
 if (typeof customElements !== "undefined") await import("@ogdakke/fluidbox/elements");
 ```
 
+### Content Security Policy
+
+The viewer runs under a strict policy such as `default-src 'self'; style-src 'self'; script-src 'self'; require-trusted-types-for 'script'`. It builds its DOM node by node, never from HTML strings, so Trusted Types has nothing to refuse, and it sets styles through the CSSOM, which `style-src` allows. Serve the stylesheets as files, with `<link>`.
+
+A React `Root` that renders open draws the open viewer on the server, for the viewer to take over once it loads. That copy has no inline styles either: the stylesheet places it, and its image's `width` and `height` carry the photo's shape. Until the viewer takes over, the copy is a labelled region rather than a dialog, since nothing holds focus in it yet. Its controls are links where `href` gives them an address, and inert where it doesn't.
+
 ## Next
 
 - The [patterns](./patterns/index.md) show nine common setups in every framework.

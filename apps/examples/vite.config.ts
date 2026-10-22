@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import { highlight, highlightHtml } from "../design/highlight";
 import { packageSource, watchPackageSource } from "../design/package-source";
+import { fluidboxStaticViewer } from "../../packages/fluidbox/src/static-viewer";
+import { cspItems } from "./fixtures/csp-items";
 import { exampleRegions } from "./src/patterns/regions";
 
 // Every HTML file is a page: index.html and */index.html are the site, the rest are test fixtures.
@@ -68,6 +70,29 @@ function delayedResponses(): Plugin {
   };
 }
 
+/**
+ * The strict-CSP fixture, `csp.html`: `?ssr=1` renders the open viewer's copy
+ * into it, as a server would. The page allows no inline script, so the dev
+ * server's inline preambles come out; the fixture loads none of their modules.
+ */
+function cspFixture(): Plugin {
+  return {
+    name: "csp-fixture",
+    transformIndexHtml: {
+      order: "post",
+      handler(html, context) {
+        if (context.path !== "/csp.html") return html;
+        const ssr = new URL(context.originalUrl ?? "/", "http://host").searchParams.get("ssr");
+        const copy =
+          ssr === null ? "" : fluidboxStaticViewer({ items: cspItems, index: Number(ssr) || 0 });
+        return html
+          .replace("<!--fluidbox-static-viewer-->", copy ?? "")
+          .replace(/<script type="module">[\s\S]*?<\/script>/g, "");
+      },
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
   plugins: [
     react({ include: [/(photo-library|social|shop)\.tsx$/, /patterns\/react\/.*\.tsx$/] }),
@@ -75,6 +100,7 @@ export default defineConfig(({ command }) => ({
     vue(),
     highlightedSource(),
     delayedResponses(),
+    cspFixture(),
     highlightHtml(),
     watchPackageSource(),
   ],
