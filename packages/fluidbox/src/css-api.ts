@@ -92,6 +92,10 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-addons"] },
   /** The controls. On a button of yours in the viewer, it runs that command. */
   { names: ["data-fluidbox-close", "data-fluidbox-previous", "data-fluidbox-next"] },
+  /** The zoom controls. On a button of yours in the viewer, it zooms the image on show. */
+  { names: ["data-fluidbox-zoom-in", "data-fluidbox-zoom-out", "data-fluidbox-zoom-reset"] },
+  /** The group of the default zoom controls, under the photo. */
+  { names: ["data-fluidbox-zoom-controls"] },
   /** The SVG inside a default control. */
   { names: ["data-fluidbox-icon"] },
   /** A layer outside the viewer's layer that shows and hides with the controls. Content in the layer does this already. */
@@ -166,6 +170,8 @@ export const states: readonly CssName[] = [
   { names: ["data-dismissing"], on: "Overlay, dialog" },
   /** An image is zoomed. */
   { names: ["data-zoomed"], on: "Dialog" },
+  /** Zoom is on: a mouse click zooms an image, and the cursor says so. */
+  { names: ["data-zoomable"], on: "Dialog" },
   /** There is more than one item. */
   { names: ["data-gallery"], on: "Dialog" },
   /** The sheet's stop number. */

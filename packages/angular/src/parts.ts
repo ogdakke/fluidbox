@@ -410,16 +410,53 @@ export class FluidboxNextDirective extends FluidboxControlDirective {
   protected readonly control = "next";
 }
 
+/** Zooms the image in by 1.5. Shows the default icon and label when empty. */
+@Directive({ selector: "button[fluidboxZoomIn]", standalone: true })
+export class FluidboxZoomInDirective extends FluidboxControlDirective {
+  protected readonly control = "zoomIn";
+}
+
+/** Zooms the image out by 1.5. Shows the default icon and label when empty. */
+@Directive({ selector: "button[fluidboxZoomOut]", standalone: true })
+export class FluidboxZoomOutDirective extends FluidboxControlDirective {
+  protected readonly control = "zoomOut";
+}
+
+/** Zooms the image back out to fit. Shows the default icon and label when empty. */
+@Directive({ selector: "button[fluidboxZoomReset]", standalone: true })
+export class FluidboxZoomResetDirective extends FluidboxControlDirective {
+  protected readonly control = "zoomReset";
+}
+
 /**
  * The default Previous, Next and Close buttons, for a `fluidboxViewer`
- * template: `<div fluidboxControls></div>`. Its element takes no box.
+ * template: `<div fluidboxControls></div>`, and with `zoom` the zoom controls
+ * in their group: `<div fluidboxControls zoom></div>`. Its element takes no box.
  */
 @Component({
   selector: "[fluidboxControls]",
   standalone: true,
-  imports: [FluidboxPreviousDirective, FluidboxNextDirective, FluidboxCloseDirective],
+  imports: [
+    FluidboxPreviousDirective,
+    FluidboxNextDirective,
+    FluidboxCloseDirective,
+    FluidboxZoomInDirective,
+    FluidboxZoomOutDirective,
+    FluidboxZoomResetDirective,
+  ],
   host: { style: "display: contents" },
   template: `<button fluidboxPrevious></button><button fluidboxNext></button
-    ><button fluidboxClose></button>`,
+    ><button fluidboxClose></button>
+    @if (zoom) {
+      <div data-fluidbox-zoom-controls role="group" [attr.aria-label]="label()">
+        <button fluidboxZoomIn></button><button fluidboxZoomOut></button
+        ><button fluidboxZoomReset></button>
+      </div>
+    }`,
 })
-export class FluidboxControlsComponent {}
+export class FluidboxControlsComponent {
+  /** Add the zoom-in, zoom-out and fit controls, in their group. */
+  @Input({ transform: booleanAttribute }) zoom = false;
+  readonly #root = injectRoot("fluidboxControls");
+  protected readonly label = computed(() => this.#root.resolvedLabels().zoomed);
+}

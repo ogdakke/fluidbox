@@ -6,6 +6,7 @@ import {
   FluidboxItemChangeEvent,
   FluidboxSheetEvent,
   FluidboxToggleEvent,
+  FluidboxZoomEvent,
   idOf,
   itemLabel as rootItemLabel,
   type Fluidbox,
@@ -27,6 +28,7 @@ import {
   type FluidboxUpdateOptions,
   type FluidboxVideoItem,
   type FluidboxViewerRenderer,
+  type FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 import type * as Root from "@ogdakke/fluidbox";
 import type * as SheetEntry from "@ogdakke/fluidbox/sheet";
@@ -240,6 +242,22 @@ fluidbox.preload(photos[0]!)();
 void fluidbox.open({ id: "one" });
 // @ts-expect-error commands take no reason
 void fluidbox.open(0, { reason: "trigger" });
+void fluidbox.zoomTo(2.5, { origin: { x: 120, y: 80 }, signal: new AbortController().signal });
+void fluidbox.zoomIn().then((zoomed: boolean) => zoomed);
+void fluidbox.zoomOut({ origin: { x: 0, y: 0 } });
+void fluidbox.resetZoom();
+// @ts-expect-error the origin is a point, not a keyword
+void fluidbox.zoomTo(2, { origin: "center" });
+const zoomState: FluidboxZoomState | null = fluidbox.state.zoom;
+void zoomState?.scale;
+fluidbox.addEventListener("zoomchange", (event) => {
+  assert<Equal<typeof event, FluidboxZoomEvent>>();
+  const reason: FluidboxReason = event.reason;
+  void [event.scale, reason];
+});
+createFluidbox({ items: photos, controls: ["close", "zoomIn", "zoomOut", "zoomReset"] });
+// @ts-expect-error the zoom controls are named in camel case
+createFluidbox({ items: photos, controls: ["zoom-in"] });
 
 const button = document.createElement("button");
 const unbind: () => void = fluidbox.bind(button, photos[0]!, {
@@ -288,7 +306,8 @@ const change = new FluidboxItemChangeEvent("itemchange", {
   reason: "api",
 });
 const sheetChange = new FluidboxSheetEvent("sheetchange", { stop: 1, reason: "pointer" });
-void [toggle, change, sheetChange];
+const zoomChange = new FluidboxZoomEvent("zoomchange", { scale: 2, reason: "wheel" });
+void [toggle, change, sheetChange, zoomChange];
 
 const update: FluidboxUpdateOptions<Photo> = { labels: { close: "Sulje" }, zoom: undefined };
 fluidbox.update(update);
@@ -323,6 +342,7 @@ assert<
     | "FluidboxItemChangeEvent"
     | "FluidboxSheetEvent"
     | "FluidboxToggleEvent"
+    | "FluidboxZoomEvent"
   >
 >();
 
@@ -364,6 +384,7 @@ unloadFluidbox(stand);
 const label: string = itemLabel(note);
 const close: Promise<boolean> = fluidboxControls.close.run(stand);
 const disabled: boolean = fluidboxControls.next.disabled(stand.state);
+void fluidboxControls.zoomIn.run(stand);
 void [label, close, disabled, fluidboxControlIcon.paths, defaultLabels.viewer, fluidboxEventTypes];
 const adapter: FluidboxOriginAdapter = latestOrigins(() => origins as FluidboxOriginAdapter);
 const resolved: FluidboxOrigin = resolveOrigin(button);
@@ -400,6 +421,11 @@ void gallery.open(2);
 void gallery.open("one");
 void gallery.next();
 void gallery.previous();
+void gallery.zoomTo(2).then((zoomed: boolean) => zoomed);
+void gallery.zoomIn();
+void gallery.zoomOut();
+void gallery.resetZoom();
+gallery.addEventListener("zoomchange", (event) => void event.scale);
 void gallery.close();
 void gallery.whenReady().then((ready: Fluidbox) => ready.state);
 gallery.subscribe((state) => void state.index)();

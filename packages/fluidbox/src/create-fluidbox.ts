@@ -25,7 +25,10 @@ import {
   type FluidboxStatus,
   type FluidboxTarget,
   type FluidboxUpdateOptions,
+  type FluidboxZoomCommandOptions,
+  type FluidboxZoomState,
   FluidboxSheetEvent,
+  FluidboxZoomEvent,
 } from "./public-api";
 import type {
   FluidboxDispose,
@@ -45,6 +48,8 @@ import type {
 import { bindTrigger } from "./trigger";
 
 const defaultControls = ["previous", "next", "close"] as const;
+/** The factor of zoomIn, zoomOut and the zoom controls, as of the + and - keys. */
+const ZOOM_FACTOR = 1.5;
 
 const reasonOf = (reason: SessionChangeReason): FluidboxReason =>
   reason === "source-update" || reason === "source-empty" ? "items" : reason;
@@ -161,6 +166,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #announced: "open" | "closed" = "closed";
   /** The reason of the request whose status change comes next. */
   #reason: FluidboxReason = "api";
+  /** The scale the zoom last rested at, and the item it belongs to. */
+  #zoomScale = 1;
+  #zoomId: string | null = null;
   readonly [hostKey]: FluidboxHost;
 
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
@@ -284,6 +292,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       previous: (options = {}) => this.#step("previous", options),
       allows: (target, reason) => this.#allowed("goTo", target, reason),
       subscribe: (listener) => this.subscribe(listener),
+      zoomed: (scale, reason) => this.#zoomed(scale, reason),
     };
   }
 
@@ -345,6 +354,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     if (has("zoom")) {
       this.#zoom = options.zoom;
       this.#viewer?.setZoom(options.zoom);
+      // The zoom state may gain, lose or change its bounds.
+      const { status, index, item, zoom } = this.#state;
+      if (this.#zoomFor(status, item)?.max !== zoom?.max) this.#publish(status, index);
     }
     if (has("loop") && !!options.loop !== this.#loop) {
       this.#loop = !!options.loop;
@@ -398,6 +410,59 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   close(options?: FluidboxCommandOptions) {
     return this.#command("close", undefined, "api", options);
+  }
+
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions) {
+    if (!Number.isFinite(scale)) {
+      return Promise.reject(new RangeError(`Fluidbox zoom scale must be finite: ${scale}`));
+    }
+    return this.#zoomCommand(() => scale, "api", options);
+  }
+
+  zoomIn(options?: FluidboxZoomCommandOptions) {
+    return this.#zoomCommand((zoom) => zoom.scale * ZOOM_FACTOR, "api", options);
+  }
+
+  zoomOut(options?: FluidboxZoomCommandOptions) {
+    return this.#zoomCommand((zoom) => zoom.scale / ZOOM_FACTOR, "api", options);
+  }
+
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">) {
+    return this.#zoomCommand(() => 1, "api", options);
+  }
+
+  #zoomCommand(
+    scale: (zoom: FluidboxZoomState) => number,
+    reason: "api" | "keyboard" | "pointer",
+    options: FluidboxZoomCommandOptions = {},
+  ): Promise<boolean> {
+    const zoom = this.#state.zoom;
+    if (this.#lifetime.signal.aborted || !zoom || !this.#viewer || options.signal?.aborted) {
+      return Promise.resolve(false);
+    }
+    const target = Math.max(zoom.min, Math.min(zoom.max, scale(zoom)));
+    return this.#viewer.zoomTo(target, { ...options, reason });
+  }
+
+  /** The zoom came to rest at another scale on the item on show. */
+  #zoomed(scale: number, reason: FluidboxReason | undefined) {
+    this.#zoomId = this.#state.id;
+    if (scale === this.#zoomScale) return;
+    this.#zoomScale = scale;
+    if (this.#state.zoom && this.#state.zoom.scale !== scale) {
+      this.#publish(this.#state.status, this.#state.index);
+    }
+    this.dispatchEvent(
+      new FluidboxZoomEvent("zoomchange", { scale, reason: reason ?? this.#reason }),
+    );
+  }
+
+  /** The zoom of the item on show: open on an image, with zoom on. */
+  #zoomFor(status: FluidboxStatus, item: TItem | null): FluidboxZoomState | null {
+    if (status !== "open" || item?.type !== "img" || this.#zoom === false) return null;
+    // The scale belongs to the item it rested on; another item starts fitted.
+    const scale = this.#zoomId === idOf(item) ? this.#zoomScale : 1;
+    return Object.freeze({ scale, min: 1, max: this.#zoom?.max ?? 4 });
   }
 
   next(options?: FluidboxCommandOptions) {
@@ -598,6 +663,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
       takeOver: (index) => this.#command("open", index, "api", { instant: true }),
+      zoom: (name, reason) =>
+        this.#zoomCommand(
+          (zoom) =>
+            name === "zoomReset"
+              ? 1
+              : zoom.scale * (name === "zoomIn" ? ZOOM_FACTOR : 1 / ZOOM_FACTOR),
+          reason,
+        ),
       // Drop the viewer, keeping what it needs, so the next press or open makes a new one.
       unload: () => {
         this.#reset();
@@ -1101,6 +1174,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       count: this.#source.count,
       hasPrevious: index !== null && (index > 0 || this.#loops),
       hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
+      zoom: this.#zoomFor(status, item),
     });
   }
 

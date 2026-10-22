@@ -25,6 +25,7 @@ import type {
   FluidboxUpdateOptions,
   FluidboxViewerContext,
   FluidboxViewerRenderer,
+  FluidboxZoomCommandOptions,
 } from "./public-api";
 import { FluidboxToggleEvent } from "./public-api";
 import { latestOrigins } from "./origins";
@@ -85,6 +86,7 @@ const closedState: FluidboxState = Object.freeze({
   count: 0,
   hasPrevious: false,
   hasNext: false,
+  zoom: null,
 });
 
 function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined {
@@ -393,6 +395,22 @@ export class FluidboxGalleryElement extends HTMLElement {
     return this.#run((fluidbox) => fluidbox.previous(options));
   }
 
+  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomTo(scale, options));
+  }
+
+  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomIn(options));
+  }
+
+  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomOut(options));
+  }
+
+  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.resetZoom(options));
+  }
+
   /**
    * Run a command at once when nothing is queued to rebuild or update the
    * fluidbox, as a press or a key does, so it lands in order with them.
@@ -650,9 +668,10 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   /**
    * Fill the viewer with the `viewer` property, else a `<template slot="viewer">`
-   * (where `<fluidbox-controls>` stands for the default controls), else the
-   * default controls. Buttons marked `data-fluidbox-close`, `-previous` or
-   * `-next` work wherever they are.
+   * (where `<fluidbox-controls>` stands for the default controls, and
+   * `<fluidbox-controls zoom>` adds the zoom controls), else the default
+   * controls. Buttons marked `data-fluidbox-close`, `-previous`, `-next`,
+   * `-zoom-in`, `-zoom-out` or `-zoom-reset` work wherever they are.
    */
   #mountViewer(context: FluidboxViewerContext<any>) {
     const { target } = context;

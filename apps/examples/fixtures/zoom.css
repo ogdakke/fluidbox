@@ -1,0 +1,30 @@
+/* Zoom fixture. Tokens come from src/design. */
+
+.zoom-page {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  padding: 40px var(--fb-gutter) 56px;
+}
+
+.zoom-page h1 {
+  margin-bottom: 20px;
+  font-size: 1.8rem;
+}
+
+.zoom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.zoom-grid button {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.zoom-grid img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

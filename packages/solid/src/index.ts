@@ -47,11 +47,13 @@ import {
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
+  zoomControlNames,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxActionProps,
   FluidboxApi,
+  FluidboxControlsProps,
   FluidboxFilmstripProps,
   FluidboxFrameLayerProps,
   FluidboxRootProps,
@@ -67,6 +69,7 @@ import type {
 export type {
   FluidboxActionProps,
   FluidboxApi,
+  FluidboxControlsProps,
   FluidboxFilmstripProps,
   FluidboxFrameLayerProps,
   FluidboxRootProps,
@@ -102,6 +105,9 @@ export type {
   FluidboxTarget,
   FluidboxToggleEvent,
   FluidboxVideoItem,
+  FluidboxZoomCommandOptions,
+  FluidboxZoomEvent,
+  FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 
 interface FilmstripRegistration {
@@ -213,6 +219,7 @@ const eventProps = {
   itemchange: "onItemChange",
   settle: "onSettle",
   sheetchange: "onSheetChange",
+  zoomchange: "onZoomChange",
 } as const satisfies Record<keyof FluidboxEventMap, keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.Element {
@@ -555,11 +562,38 @@ function defaultIcon(name: FluidboxControlName): JSX.Element {
 const Close = action("close");
 const Previous = action("previous");
 const Next = action("next");
-const actions = { close: Close, previous: Previous, next: Next };
+const ZoomIn = action("zoomIn");
+const ZoomOut = action("zoomOut");
+const ZoomReset = action("zoomReset");
+const actions = {
+  close: Close,
+  previous: Previous,
+  next: Next,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  zoomReset: ZoomReset,
+};
 
-/** The default Previous, Next and Close buttons, for a Viewer of your own. */
-function Controls(): JSX.Element {
-  return controlNames.map((name) => createComponent(actions[name], {}));
+/**
+ * The default Previous, Next and Close buttons, for a Viewer of your own, and
+ * with `zoom` the zoom controls in their group.
+ */
+function Controls(props: FluidboxControlsProps = {}): JSX.Element {
+  const context = useFluidboxContext();
+  const buttons = controlNames.map((name) => createComponent(actions[name], {}));
+  if (!props.zoom) return buttons;
+  const group = createComponent(Dynamic, {
+    component: "div",
+    "data-fluidbox-zoom-controls": "",
+    role: "group",
+    get "aria-label"() {
+      return context.labels().zoomed;
+    },
+    get children() {
+      return zoomControlNames.map((name) => createComponent(actions[name], {}));
+    },
+  } as never);
+  return [...buttons, group];
 }
 
 /**
@@ -738,7 +772,14 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
     open: (target, options) => fluidbox.open(target, options),
     close: (options) => fluidbox.close(options),
     next: (options) => fluidbox.next(options),
+    get zoom() {
+      return state().zoom;
+    },
     previous: (options) => fluidbox.previous(options),
+    zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
+    zoomIn: (options) => fluidbox.zoomIn(options),
+    zoomOut: (options) => fluidbox.zoomOut(options),
+    resetZoom: (options) => fluidbox.resetZoom(options),
     setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
     preload: (target) => fluidbox.preload(target),
     load: () => fluidbox.load(),
@@ -772,6 +813,9 @@ export const Fluidbox: FluidboxSolidParts = {
   Close,
   Previous,
   Next,
+  ZoomIn,
+  ZoomOut,
+  ZoomReset,
   Filmstrip,
   Sheet,
   SheetStop,
