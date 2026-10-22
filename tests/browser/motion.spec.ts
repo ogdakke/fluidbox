@@ -1197,7 +1197,7 @@ test("unfinished open and close hand off the painted media pose", async ({ page 
     page.locator("[data-fluidbox-flight], [data-fluidbox-transition-content]"),
   ).toHaveCount(0);
   await expect(trigger).toBeFocused();
-  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(trigger).toHaveAttribute("data-fluidbox-status", "closed");
   await expect(page.locator("#already-inert")).toHaveAttribute("inert", "");
   await expect(page.locator("#fixture")).not.toHaveAttribute("inert", "");
 });

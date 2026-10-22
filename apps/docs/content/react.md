@@ -121,7 +121,7 @@ A change to `labels`, `zoom`, or the `Viewer`, `Filmstrip` and `Sheet` parts and
 
 An item's id is its `id`, else its `src`. The render function gets a `FluidboxTriggerPreview`: `item: TItem | null`, `index: number | null` and `status`. `item` is the item the trigger shows. While the viewer is open, that is the item the viewer is on. After it closes, it is the last one the trigger showed, and the trigger opens on that item again. It is `null` when the trigger's items have left the list.
 
-The trigger adds `data-fluidbox-trigger`, `aria-haspopup="dialog"` and `aria-expanded` to its element. It starts loading the item on pointer down, so the click opens without waiting.
+The trigger adds `data-fluidbox-trigger` and `aria-haspopup="dialog"` to its element. It starts loading the item on pointer down, so the click opens without waiting. An `asChild` `<a href>` stays on the page when the viewer opens; see [A link as the trigger](./getting-started.md#a-link-as-the-trigger).
 
 ### `Fluidbox.ThumbnailOverlay`
 

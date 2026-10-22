@@ -180,7 +180,7 @@ export const states: readonly CssName[] = [
   { names: ["data-sheet-dismissed"], on: "Overlay" },
   /** The trigger's item is open. */
   {
-    names: ["data-fluidbox-status", "data-open", "data-closed", "aria-expanded"],
+    names: ["data-fluidbox-status", "data-open", "data-closed"],
     on: "The active trigger",
   },
   /** Its item is open, so it is hidden. */

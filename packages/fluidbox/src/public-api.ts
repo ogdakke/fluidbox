@@ -524,12 +524,14 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   load(): Promise<boolean>;
   /**
    * Make an element a trigger that opens the viewer on an item. The item, and any
-   * in `returns`, close back onto it. It sets `data-fluidbox-trigger`,
-   * `aria-haspopup="dialog"` and `aria-expanded` on the element, loads the viewer's
+   * in `returns`, close back onto it. It sets `data-fluidbox-trigger` and
+   * `aria-haspopup="dialog"` on the element, loads the viewer's
    * code as the `loading` option says, preloads on a primary-button `pointerdown`,
-   * and drops that work 250 ms after the pointer lifts without a click. A click
-   * opens the item the trigger shows, its target or the item of `returns` it last
-   * closed onto, unless the click was prevented.
+   * and drops that work 250 ms after the pointer lifts without a click. A plain
+   * primary click opens the item the trigger shows, its target or the item of
+   * `returns` it last closed onto, unless the click was prevented, and prevents
+   * it, so an `<a href>` trigger stays on the page. A click with a modifier key
+   * is left to the link, and a link is followed when the viewer fails to open.
    * Returns a function that unbinds.
    */
   bind(

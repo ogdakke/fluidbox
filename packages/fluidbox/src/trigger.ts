@@ -53,6 +53,17 @@ export interface FluidboxTriggerPointer {
   readonly defaultPrevented: boolean;
 }
 
+/** Click details a trigger reads. DOM and framework events both fit. */
+export interface FluidboxTriggerClick {
+  readonly defaultPrevented: boolean;
+  readonly button?: number;
+  readonly metaKey?: boolean;
+  readonly ctrlKey?: boolean;
+  readonly shiftKey?: boolean;
+  readonly altKey?: boolean;
+  preventDefault?(): void;
+}
+
 /**
  * The behaviour of a trigger, apart from its element and events, so each
  * framework can wire it into its own event system.
@@ -70,10 +81,27 @@ export interface FluidboxTrigger<TItem extends FluidboxItem = FluidboxItem> {
   pointerDown(event: FluidboxTriggerPointer): void;
   pointerUp(): void;
   pointerCancel(): void;
-  /** Open the viewer, unless the event was prevented. */
-  click(event: { readonly defaultPrevented: boolean }): void;
+  /**
+   * Open the viewer on a plain primary click that nothing prevented, and
+   * prevent the click so a link trigger stays on the page. A click with a
+   * modifier key is left to the link. When the viewer fails to open, a link
+   * trigger is followed after all.
+   */
+  click(event: FluidboxTriggerClick): void;
   destroy(): void;
 }
+
+/** Elements a keyboard and a screen reader can use as a trigger. */
+const INTERACTIVE = "a[href], button, input, select, textarea, summary, [role], [tabindex]";
+
+/** Whether a bundler built for development. Without one, it says no. */
+const development = () => {
+  try {
+    return process.env.NODE_ENV !== "production";
+  } catch {
+    return false;
+  }
+};
 
 /** How long a preload waits for a click after the pointer lifts. */
 const PRELOAD_GRACE = 250;
@@ -96,6 +124,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   let hoverTimer: ReturnType<typeof setTimeout> | undefined;
   let intents: AbortController | undefined;
   let lastPreviewId: string | null = null;
+  let following = false;
 
   const ids = () => idsIn(fluidbox.items, targets);
   const register = () => {
@@ -172,7 +201,12 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
         listenForIntent(next);
         next.dataset.fluidboxTrigger = "";
         if (!next.hasAttribute("aria-haspopup")) next.setAttribute("aria-haspopup", "dialog");
-        if (!next.hasAttribute("aria-expanded")) next.setAttribute("aria-expanded", "false");
+        if (development() && !next.matches(INTERACTIVE)) {
+          console.warn(
+            "A fluidbox trigger should be a <button> or <a href>, or have a role and tabindex, so keyboards and screen readers can use it:",
+            next,
+          );
+        }
       }
       register();
     },
@@ -198,9 +232,21 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     pointerCancel: discardPreload,
     click(event) {
       const target = openTarget();
-      if (!event.defaultPrevented && target !== undefined) {
-        void host.command("open", target, "trigger");
-      }
+      const modified = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+      if (following || event.defaultPrevented || modified || (event.button ?? 0) !== 0) return;
+      if (target === undefined) return;
+      event.preventDefault?.();
+      const link = element?.closest<HTMLAnchorElement>("a[href]");
+      void host.command("open", target, "trigger").catch((error: unknown) => {
+        if (!link?.isConnected) throw error;
+        // The link's own click, which this one gave up; this trigger lets it through.
+        following = true;
+        try {
+          link.click();
+        } finally {
+          following = false;
+        }
+      });
     },
     destroy() {
       discardPreload();

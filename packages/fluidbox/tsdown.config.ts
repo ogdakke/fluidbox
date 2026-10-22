@@ -15,6 +15,8 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   report: true,
+  // Left for the app's bundler, so development-only warnings drop out of its production build.
+  define: { "process.env.NODE_ENV": "process.env.NODE_ENV" },
   copy: [
     { from: "src/styles.css", to: "dist", rename: "styles.css" },
     { from: "src/styles.css.d.ts", to: "dist", rename: "styles.css.d.ts" },
