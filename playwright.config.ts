@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const baseURL = "http://127.0.0.1:4173";
+// FLUIDBOX_PORT lets several checkouts run the suite at once without sharing a server.
+const port = Number(process.env.FLUIDBOX_PORT) || 4173;
+const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: "./tests/browser",
@@ -27,7 +29,7 @@ export default defineConfig({
     { name: "ipad-pro-11", use: { ...devices["iPad Pro 11"] } },
   ],
   webServer: {
-    command: "bun run --cwd apps/examples dev --port 4173 --strictPort",
+    command: `bun run --cwd apps/examples dev --port ${port} --strictPort`,
     url: `${baseURL}/harness.html`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
