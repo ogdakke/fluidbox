@@ -36,7 +36,10 @@ flows through options, state, events and callbacks, which always hand back the o
 
 `items` is an array or a lazy list `{ count, get(index), indexOf?(id) }`. Arrays are copied and
 checked: an empty or duplicate id throws a `TypeError`. Lazy lists are read synchronously and keep
-their ids unique themselves; without `indexOf`, ids are found by scanning. A list is a snapshot:
+their ids unique themselves; without `indexOf`, ids are found by scanning. An iframe's `src`
+must be http(s) or relative, and a video's `src` and `poster` http(s), relative or `blob:`; any other
+scheme throws a `TypeError` when the item is read. An iframe without `sandbox` gets a default one
+([Safe URLs](../apps/docs/content/media.md#safe-urls)). A list is a snapshot:
 `setItems` replaces it, keeping an open viewer on the same id when it survives.
 
 ## The fluidbox

@@ -197,7 +197,7 @@ test("plain runtime owns video and iframe media while custom renderers own desce
       {
         id: "video",
         type: "video",
-        src: "data:video/mp4;base64,",
+        src: "/video/missing.mp4",
         title: "Video study",
         width: 800,
         height: 450,
@@ -205,7 +205,7 @@ test("plain runtime owns video and iframe media while custom renderers own desce
       {
         id: "iframe",
         type: "iframe",
-        src: "about:blank",
+        src: "/map-panel.html",
         title: "Iframe study",
         width: 800,
         height: 600,
