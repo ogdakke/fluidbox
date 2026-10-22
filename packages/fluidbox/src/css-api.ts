@@ -96,6 +96,8 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-zoom-in", "data-fluidbox-zoom-out", "data-fluidbox-zoom-reset"] },
   /** The group of the default zoom controls, under the photo. */
   { names: ["data-fluidbox-zoom-controls"] },
+  /** The hover zoom add-on's magnified view, over the hovered image. */
+  { names: ["data-fluidbox-hover-zoom"] },
   /** The SVG inside a default control. */
   { names: ["data-fluidbox-icon"] },
   /** A layer outside the viewer's layer that shows and hides with the controls. Content in the layer does this already. */
@@ -172,6 +174,8 @@ export const states: readonly CssName[] = [
   { names: ["data-zoomed"], on: "Dialog" },
   /** Zoom is on: a mouse click zooms an image, and the cursor says so. */
   { names: ["data-zoomable"], on: "Dialog" },
+  /** The hover zoom add-on magnifies its image. */
+  { names: ["data-fluidbox-hover-zooming"], on: "An element given to `hoverZoom`" },
   /** There is more than one item. */
   { names: ["data-gallery"], on: "Dialog" },
   /** The sheet's stop number. */

@@ -61,6 +61,10 @@
       "types": "./dist/kit.d.ts",
       "import": "./dist/kit.js"
     },
+    "./hover-zoom": {
+      "types": "./dist/hover-zoom.d.ts",
+      "import": "./dist/hover-zoom.js"
+    },
     "./styles.css": {
       "types": "./dist/styles.css.d.ts",
       "default": "./dist/styles.css"

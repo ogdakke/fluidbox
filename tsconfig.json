@@ -18,6 +18,7 @@
       "@ogdakke/fluidbox/filmstrip": ["./packages/fluidbox/src/filmstrip-entry.ts"],
       "@ogdakke/fluidbox/sheet": ["./packages/fluidbox/src/sheet-entry.ts"],
       "@ogdakke/fluidbox/kit": ["./packages/fluidbox/src/kit.ts"],
+      "@ogdakke/fluidbox/hover-zoom": ["./packages/fluidbox/src/hover-zoom.ts"],
       "@ogdakke/fluidbox/styles.css": ["./packages/fluidbox/src/styles.css.d.ts"],
       "@ogdakke/fluidbox/sheet.css": ["./packages/fluidbox/src/styles.css.d.ts"],
       "@ogdakke/fluidbox/react": ["./packages/react/src/index.ts"],

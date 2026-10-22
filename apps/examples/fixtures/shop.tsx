@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createRoot } from "react-dom/client";
 import type { FluidboxImageItem, FluidboxOriginAdapter } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
+import { hoverZoom } from "@ogdakke/fluidbox/hover-zoom";
 import { thumbHashToDataURL } from "thumbhash";
 import hashes from "./shop-photos.json";
 import { Avatar, compact, type Person } from "./social-ui";
@@ -172,20 +173,25 @@ function Photo({
   size,
   origin,
   eager,
+  zoom,
 }: {
   item: Shot;
   src: string;
   size: number;
   origin?: boolean;
   eager?: boolean;
+  /** Magnify the photo in place under a resting mouse, as Shop's product page does. */
+  zoom?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   // A cached image can finish before React attaches onLoad.
   const ref = useCallback((image: HTMLImageElement | null) => {
     if (image?.complete && image.naturalWidth) setLoaded(true);
   }, []);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => (zoom && box.current ? hoverZoom(box.current, item) : undefined), [zoom, item]);
   return (
-    <span className="shop-photo" style={{ backgroundImage: `url(${item.placeholder})` }}>
+    <span ref={box} className="shop-photo" style={{ backgroundImage: `url(${item.placeholder})` }}>
       <img
         ref={ref}
         data-fluidbox-origin={origin || undefined}
@@ -230,7 +236,7 @@ function Gallery({ carousel }: { carousel: Carousel }) {
                 className="shop-slide"
                 aria-label={`Open photo ${at + 1} of ${shots.length}: ${item.alt}`}
               >
-                <Photo item={item} src={item.src} size={item.width} origin eager={at < 2} />
+                <Photo item={item} src={item.src} size={item.width} origin eager={at < 2} zoom />
               </button>
             </Fluidbox.Trigger>
           ))}

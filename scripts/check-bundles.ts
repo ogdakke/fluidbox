@@ -11,6 +11,7 @@ const entrypoints = [
   "filmstrip",
   "sheet",
   "kit",
+  "hover-zoom",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -23,6 +24,7 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   filmstrip: [],
   sheet: [],
   kit: [],
+  "hover-zoom": [],
 };
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
@@ -38,6 +40,8 @@ const initialGzipLimits: Record<Entry, number> = {
   filmstrip: 3_700,
   sheet: 7_350,
   kit: 1_450,
+  // The hover zoom add-on, loaded by pages that magnify their photos on hover.
+  "hover-zoom": 1_500,
 };
 const cssGzipLimit = 3_300;
 // Right-to-left support added about 200 B to every core entry's viewer chunk.
@@ -52,6 +56,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   filmstrip: 3_700,
   sheet: 7_350,
   kit: 1_450,
+  "hover-zoom": 1_500,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 35_550,
@@ -63,6 +68,8 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   filmstrip: 4_950,
   sheet: 8_700,
   kit: 4_650,
+  // It needs no stylesheet; the base one counts, as for the kit.
+  "hover-zoom": 4_900,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
