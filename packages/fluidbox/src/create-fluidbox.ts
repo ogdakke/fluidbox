@@ -117,7 +117,7 @@ type Settings<TItem extends FluidboxItem> = Pick<
 /**
  * Create a fluidbox: a viewer at the end of `<body>`, and the commands, state and
  * events that drive it. Browser only. Throws a TypeError for an array of items
- * with an empty or duplicate id.
+ * with an empty id or a duplicate of one an item names itself by.
  */
 export function createFluidbox<TItem extends FluidboxItem = FluidboxItem>(
   options: FluidboxOptions<TItem>,

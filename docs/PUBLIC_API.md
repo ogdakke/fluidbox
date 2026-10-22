@@ -35,7 +35,10 @@ Items are flat: `{ type: "img" | "video" | "iframe" | "custom", ... }`, with `id
 flows through options, state, events and callbacks, which always hand back the original object.
 
 `items` is an array or a lazy list `{ count, get(index), indexOf?(id) }`. Arrays are copied and
-checked: an empty or duplicate id throws a `TypeError`. Lazy lists are read synchronously and keep
+checked: an empty id, or a duplicate of an id an item names itself by, throws a `TypeError`. In an
+array, an item without an `id` whose `src` an earlier item already has gets the next free
+`src#2`, `src#3` (in order, around the ids items name themselves by), so media that repeats a
+photo needs no ids; the same object twice is handed back as a copy the second time. Lazy lists are read synchronously and keep
 their ids unique themselves; without `indexOf`, ids are found by scanning. A list is a snapshot:
 `setItems` replaces it, keeping an open viewer on the same id when it survives.
 

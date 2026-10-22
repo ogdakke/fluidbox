@@ -382,7 +382,9 @@ describe("the fluidbox runtime", () => {
       });
       fluidbox.subscribe((state) => seen.push(state.status));
       const toggles: string[] = [];
-      fluidbox.addEventListener("toggle", (event) => toggles.push(event.newState));
+      fluidbox.addEventListener("toggle", (event) =>
+        toggles.push((event as FluidboxToggleEvent).newState),
+      );
 
       const opening = fluidbox.open("one");
       driver.steps[0]!.resolve();

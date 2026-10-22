@@ -44,7 +44,7 @@ export const photos: FluidboxItem[] = [
 ];
 ```
 
-Each item is known by its `id`, which defaults to its `src`. Give items an `id` of your own when two share a `src`, or when you want to open one by a name. See [Media types](./media.md) for video, iframes and custom content.
+Each item is known by its `id`, which defaults to its `src`. When two items in an array share a `src`, the later ones are `src#2`, `src#3` and so on. Give items an `id` of your own when you want to open one by a name. See [Media types](./media.md) for video, iframes and custom content.
 
 ## A first gallery
 

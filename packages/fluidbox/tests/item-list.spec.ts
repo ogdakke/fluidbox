@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createItemList, toSource } from "../src/items";
+import { createItemList, idOf, toList, toSource } from "../src/items";
 import type { FluidboxImageItem } from "../src/public-api";
 
 const photo = (index: number): FluidboxImageItem => ({
@@ -63,5 +63,56 @@ describe("createItemList", () => {
     expect(source.count).toBe(3);
     expect(source.getIndex("photo-2")).toBe(2);
     expect(source.getItem(1)).toBe(source.getItem(1));
+  });
+});
+
+describe("an array of items", () => {
+  const media = (src: string, id?: string): FluidboxImageItem => ({
+    type: "img",
+    ...(id === undefined ? {} : { id }),
+    src,
+    alt: src,
+    width: 4,
+    height: 3,
+  });
+
+  it("gives items without an id that repeat a src the next free src#n", () => {
+    const items = [media("/a.jpg"), media("/b.jpg"), media("/a.jpg"), media("/a.jpg")];
+    const list = toList(items);
+    expect(items.map(idOf)).toEqual(["/a.jpg", "/b.jpg", "/a.jpg#2", "/a.jpg#3"]);
+    expect(list.indexOf!("/a.jpg#3")).toBe(3);
+    expect(list.get(2)).toBe(items[2]);
+  });
+
+  it("derives around the ids items name themselves by", () => {
+    const items = [
+      media("/a.jpg"),
+      media("/b.jpg", "/a.jpg#2"),
+      media("/a.jpg"),
+      media("/c.jpg", "/a.jpg"),
+    ];
+    toList(items);
+    expect(items.map(idOf)).toEqual(["/a.jpg#3", "/a.jpg#2", "/a.jpg#4", "/a.jpg"]);
+  });
+
+  it("gives the same object twice two ids", () => {
+    const repeated = media("/a.jpg");
+    const list = toList([repeated, repeated]);
+    expect([0, 1].map((index) => idOf(list.get(index)))).toEqual(["/a.jpg", "/a.jpg#2"]);
+    expect(list.get(0)).toBe(repeated);
+  });
+
+  it("derives again from each array, by position", () => {
+    const first = media("/a.jpg");
+    const second = media("/a.jpg");
+    toList([first, second]);
+    expect(idOf(second)).toBe("/a.jpg#2");
+    toList([second, first]);
+    expect([second, first].map(idOf)).toEqual(["/a.jpg", "/a.jpg#2"]);
+  });
+
+  it("still throws for a duplicate id of an item's own", () => {
+    expect(() => toList([media("/a.jpg", "x"), media("/b.jpg", "x")])).toThrow(TypeError);
+    expect(() => toList([media("/a.jpg", "")])).toThrow(TypeError);
   });
 });

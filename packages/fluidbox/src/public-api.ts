@@ -4,7 +4,10 @@ export type { FluidboxLabels } from "./labels";
 
 /** What every item can carry besides its media. */
 export interface FluidboxItemBase {
-  /** Stable identity across item updates. Defaults to `src`. Unique in a list. */
+  /**
+   * Stable identity across item updates. Defaults to `src`; in an array, an item
+   * without one whose `src` repeats gets `src#2`, `src#3` in order. Unique in a list.
+   */
   readonly id?: string;
   /**
    * A small image of the item: the filmstrip's thumbnail, an iframe's still, and
@@ -126,8 +129,9 @@ export interface FluidboxItemListOptions<TItem extends FluidboxItem = FluidboxIt
 }
 
 /**
- * An array, which the fluidbox copies and checks for empty and duplicate ids, or
- * a lazy list it reads on demand and doesn't check.
+ * An array, which the fluidbox copies and checks for empty and duplicate ids of
+ * the items' own (a repeated `src` gets `src#2`), or a lazy list it reads on
+ * demand and doesn't check.
  */
 export type FluidboxItems<TItem extends FluidboxItem = FluidboxItem> =
   | readonly TItem[]

@@ -25,7 +25,7 @@ import { createFluidbox } from "@ogdakke/fluidbox";
 const fluidbox = createFluidbox({ items: photos });
 ```
 
-The viewer copies the array, so later changes to `photos` don't reach it. It throws a `TypeError` for an item with neither an `id` nor a `src`, and for a duplicate id. An empty array is a valid, empty gallery.
+The viewer copies the array, so later changes to `photos` don't reach it. It throws a `TypeError` for an item with neither an `id` nor a `src`, and for two items with the same `id` of their own. Items without an `id` may share a `src`, as product media that shows one photo twice: the first is known by its `src`, the next by `src#2`, then `src#3`, counted in order and skipping ids items name themselves by. Such an id depends on the item's place in the array, so a copy of a later one names the first; target it by index, or give it an `id`. An empty array is a valid, empty gallery.
 
 ### Lazy lists
 

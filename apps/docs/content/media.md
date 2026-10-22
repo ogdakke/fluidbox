@@ -13,11 +13,11 @@ Every type needs `width` and `height` in pixels. The viewer uses their ratio to 
 
 Every type can also have:
 
-| Field         | Type                | What it does                                                                                                    |
-| ------------- | ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `id`          | `string`            | The item's identity across updates, for `open("id")`, events and triggers. Defaults to `src`. Unique in a list. |
-| `thumbnail`   | `FluidboxThumbnail` | A small image of the item. See [Thumbnails and placeholders](#thumbnails-and-placeholders).                     |
-| `placeholder` | `string`            | An image URL, such as a data URI, painted at once behind an image slide.                                        |
+| Field         | Type                | What it does                                                                                                                                                                               |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`          | `string`            | The item's identity across updates, for `open("id")`, events and triggers. Defaults to `src`, or `src#2`, `src#3` for an item in an array that repeats an earlier `src`. Unique in a list. |
+| `thumbnail`   | `FluidboxThumbnail` | A small image of the item. See [Thumbnails and placeholders](#thumbnails-and-placeholders).                                                                                                |
+| `placeholder` | `string`            | An image URL, such as a data URI, painted at once behind an image slide.                                                                                                                   |
 
 ## Image
 

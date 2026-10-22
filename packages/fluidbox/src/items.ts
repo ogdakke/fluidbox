@@ -7,9 +7,18 @@ import type {
 } from "./public-api";
 import type { FluidboxSource } from "./runtime-types";
 
-/** The id of an item: its own, else its src. Throws a TypeError when it has neither. */
+/**
+ * The ids an array gave items of its own that have no id and repeat an earlier
+ * item's src, as product media that shows one photo twice: `src#2`, `src#3`.
+ */
+const derivedIds = new WeakMap<FluidboxItem, string>();
+
+/**
+ * The id of an item: its own, else its src, or the one its array derived when
+ * that src repeats. Throws a TypeError when it has neither id nor src.
+ */
 export function idOf(item: FluidboxItem): string {
-  const id = item.id ?? ("src" in item ? item.src : undefined);
+  const id = item.id ?? derivedIds.get(item) ?? ("src" in item ? item.src : undefined);
   if (typeof id !== "string" || !id.trim())
     throw new TypeError("A fluidbox item needs an id or a src.");
   return id;
@@ -87,7 +96,10 @@ export function createItemList<TItem extends FluidboxItem>(
   });
 }
 
-/** A list over arrays and lazy lists alike. Arrays are checked for unique ids. */
+/**
+ * A list over arrays and lazy lists alike. An array's own ids must be unique;
+ * an item without one whose src repeats gets the next free `src#n`, in order.
+ */
 export function toList<TItem extends FluidboxItem>(
   items: FluidboxItems<TItem>,
 ): FluidboxItemList<TItem> {
@@ -96,12 +108,28 @@ export function toList<TItem extends FluidboxItem>(
     checkCount(list.count);
     return list;
   }
-  const snapshot: readonly TItem[] = [...(items as readonly TItem[])];
+  const snapshot: TItem[] = [...(items as readonly TItem[])];
   const indices = new Map<string, number>();
+  // Own ids first, so a derived one never takes an id an item named itself by.
   for (const [index, item] of snapshot.entries()) {
+    if (item.id === undefined) continue;
     const id = idOf(item);
     if (indices.has(id)) throw new TypeError(`Duplicate fluidbox item id: ${id}`);
     indices.set(id, index);
+  }
+  const seen = new Set<TItem>();
+  for (const [index, item] of snapshot.entries()) {
+    if (item.id !== undefined) continue;
+    // The same object twice in one array needs two ids, so the second is a copy.
+    const again = seen.has(item);
+    seen.add(item);
+    if (!again) derivedIds.delete(item);
+    const src = again && "src" in item ? item.src : idOf(item);
+    let id = src;
+    for (let count = 2; indices.has(id); count++) id = `${src}#${count}`;
+    indices.set(id, index);
+    if (again) snapshot[index] = { ...item, id };
+    else if (id !== src) derivedIds.set(item, id);
   }
   return Object.freeze({
     count: snapshot.length,

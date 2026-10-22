@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 declare global {
   interface Window {
-    fb: import("@ogdakke/fluidbox").Fluidbox;
+    fb: import("@ogdakke/fluidbox").Fluidbox<import("@ogdakke/fluidbox").FluidboxImageItem>;
   }
 }
 
