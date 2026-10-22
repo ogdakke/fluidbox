@@ -45,6 +45,9 @@ test.describe("keyboard", () => {
   }) => {
     await load(page);
     await open(page, 3);
+    // From the dialog's first stop: past the last, Firefox tabs out to its own
+    // toolbar, as from a modal <dialog>, where Chromium wraps to the page.
+    await dialog(page).locator("[data-fluidbox-slides]").focus();
     const order: string[] = [];
     for (let step = 0; step < 14; step++) {
       await page.keyboard.press("Tab");
@@ -68,6 +71,7 @@ test.describe("keyboard", () => {
     await open(page, 2);
     const video = activeSlide(page).locator("video");
     await expect(video).toHaveAttribute("controls", "");
+    await dialog(page).locator("[data-fluidbox-slides]").focus();
     let reached = false;
     for (let step = 0; step < 8 && !reached; step++) {
       await page.keyboard.press("Tab");
