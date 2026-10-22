@@ -119,14 +119,19 @@ for (const reducedMotion of [false, true]) {
           const pick = <T>(choices: readonly T[]) =>
             choices[Math.floor(random() * choices.length)]!;
           const { createFluidbox, items, origins } = window.lifecycle;
+          // Every third seed goes round the gallery.
+          const loop = seed % 3 === 0;
           const make = () => {
-            const fluidbox = createFluidbox({ items, origins });
+            const fluidbox = createFluidbox({ items, origins, loop });
             for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
               fluidbox.bind(trigger, trigger.dataset.photoId!);
             }
             return fluidbox;
           };
-          let fluidbox = window.fb;
+          window.fb.destroy();
+          let fluidbox = make();
+          window.fb = fluidbox;
+          await fluidbox.load();
           const pending = new Map<number, string>();
           const promises: Promise<unknown>[] = [];
           const errors: string[] = [];
@@ -276,4 +281,74 @@ test("keys pressed while the overlay code loads act on the opening viewer", asyn
   expect(await page.evaluate(() => window.fb.state.status)).toBe("closed");
   await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
   expect(await leftovers(page)).toEqual(clean);
+});
+
+test("new items keep the slides of the items they share, and equal items change nothing", async ({
+  page,
+}) => {
+  await setup(page);
+  expect(await page.evaluate(() => window.fb.open(0))).toBe(true);
+  // Mark each slide and its image, to tell a kept one from a remade one.
+  const marked = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>("[data-fluidbox-slide]")].map((slide) => {
+        const image = slide.querySelector<HTMLImageElement>("img[data-fluidbox-media]");
+        const kept = (slide as unknown as { mark?: string }).mark ?? "new";
+        (slide as unknown as { mark?: string }).mark = image?.alt ?? "";
+        return `${image?.alt}:${kept}`;
+      }),
+    );
+  expect(await marked()).toEqual(["Study one:new", "Study two:new", "Study three:new"]);
+
+  // A move under way survives the same items in a fresh array.
+  const results = await page.evaluate(async () => {
+    const { items } = window.lifecycle;
+    const moving = window.fb.next();
+    const same = window.fb.setItems(items.map((item) => ({ ...item })));
+    return Promise.all([moving, same]);
+  });
+  expect(results).toEqual([true, false]);
+  expect(await marked()).toEqual([
+    "Study one:Study one",
+    "Study two:Study two",
+    "Study three:Study three",
+  ]);
+
+  // A variant swaps one photo: the others keep their slides, loaded.
+  const before = await page.evaluate(() => {
+    const image = document.querySelector<HTMLImageElement>(
+      '[data-fluidbox-slide][aria-hidden="false"] img[data-fluidbox-media]',
+    )!;
+    return { src: image.currentSrc, complete: image.complete };
+  });
+  const swapped = await page.evaluate(() => {
+    const { items, item } = window.lifecycle;
+    return window.fb.setItems([
+      { ...items[0]! },
+      { ...items[1]! },
+      item("four", "/second.svg", 600, 400),
+    ]);
+  });
+  expect(swapped).toBe(true);
+  expect(await marked()).toEqual(["Study one:Study one", "Study two:Study two", "Study four:new"]);
+  expect(await page.evaluate(() => window.fb.state)).toMatchObject({ status: "open", id: "two" });
+  expect(
+    await page.evaluate(() => {
+      const image = document.querySelector<HTMLImageElement>(
+        '[data-fluidbox-slide][aria-hidden="false"] img[data-fluidbox-media]',
+      )!;
+      return { src: image.currentSrc, complete: image.complete };
+    }),
+  ).toEqual(before);
+  // A reordered list keeps them too, in their new places.
+  await page.evaluate(() => {
+    const { items, item } = window.lifecycle;
+    return window.fb.setItems([item("four", "/second.svg", 600, 400), items[1]!, items[0]!]);
+  });
+  expect(await marked()).toEqual([
+    "Study four:Study four",
+    "Study two:Study two",
+    "Study one:Study one",
+  ]);
+  expect(await page.evaluate(() => window.fb.state)).toMatchObject({ status: "open", index: 1 });
 });

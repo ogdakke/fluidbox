@@ -24,6 +24,41 @@ export function idOf(item: FluidboxItem): string {
   return id;
 }
 
+/** Values compared by their content: plain objects and arrays. */
+function plain(value: object) {
+  const prototype: unknown = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null || Array.isArray(value);
+}
+
+/**
+ * Whether two items are the same by their fields: plain objects and arrays, as
+ * `thumbnail` and `sources`, compare by content, anything else by identity.
+ */
+export function sameItem(a: unknown, b: unknown, depth = 0): boolean {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  // A cycle, or data this deep, is not an item's; it counts as changed.
+  if (depth > 8 || !plain(a) || !plain(b) || Array.isArray(a) !== Array.isArray(b)) return false;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every(
+      (key) =>
+        Object.hasOwn(b, key) &&
+        sameItem(
+          (a as Record<string, unknown>)[key],
+          (b as Record<string, unknown>)[key],
+          depth + 1,
+        ),
+    )
+  );
+}
+
+/** Whether two arrays hold the same items, in order. */
+export function sameItems(a: readonly FluidboxItem[], b: readonly FluidboxItem[]) {
+  return a.length === b.length && a.every((item, index) => sameItem(item, b[index]));
+}
+
 /** The text an item is named by: its alt text or title. */
 export function itemLabel(item: FluidboxItem): string {
   return item.type === "img" ? item.alt : item.title;

@@ -344,7 +344,11 @@ describe("the fluidbox runtime", () => {
     await opening;
 
     const closing = fluidbox.close();
-    const update = fluidbox.setItems([...items]);
+    const update = fluidbox.setItems([
+      { ...items[0], src: "/one-again.jpg" } as unknown as Item,
+      items[1],
+      items[2],
+    ]);
 
     await expect(update).resolves.toBe(true);
     expect(driver.closes).toHaveLength(1);
@@ -356,6 +360,42 @@ describe("the fluidbox runtime", () => {
     await expect(closing).resolves.toBe(true);
     expect(driver.sourceUpdates).toHaveLength(2);
     expect(fluidbox.state).toMatchObject({ status: "closed", count: 3 });
+  });
+
+  it("ignores items equal to its own, in a new array or the same list", async () => {
+    const driver = new TestDriver();
+    const fluidbox = make(driver);
+    const opening = fluidbox.open("two");
+    driver.steps[0]!.resolve();
+    await opening;
+    const selecting = fluidbox.next();
+
+    // Fresh copies, as a binding that maps its data on every render makes.
+    const copies = items.map((item) => ({ ...item }));
+    await expect(fluidbox.setItems(copies)).resolves.toBe(false);
+    expect(driver.selections[0]!.signal.aborted).toBe(false);
+    expect(driver.sourceUpdates).toHaveLength(1);
+    driver.steps[1]!.resolve();
+    await expect(selecting).resolves.toBe(true);
+    expect(fluidbox.items.get(0)).toBe(items[0]);
+
+    // A changed field is a change.
+    const changed = fluidbox.setItems([
+      items[0],
+      { ...items[1], width: 600 } as unknown as Item,
+      items[2],
+    ]);
+    expect(driver.sourceUpdates).toHaveLength(2);
+    driver.steps[2]!.resolve();
+    await changed;
+
+    const list = { count: 1, get: () => items[0] };
+    const replacing = fluidbox.setItems(list);
+    driver.steps[3]?.resolve();
+    await replacing;
+    expect(driver.sourceUpdates).toHaveLength(3);
+    await expect(fluidbox.setItems(list)).resolves.toBe(false);
+    expect(driver.sourceUpdates).toHaveLength(3);
   });
 
   it("rejects unexpected driver failures without leaving a pending command", async () => {

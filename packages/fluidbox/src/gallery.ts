@@ -537,10 +537,12 @@ export class FluidboxGalleryElement extends HTMLElement {
       });
     }
     const list = toList(items);
+    // An array goes as it is, so the fluidbox can tell equal items from new ones.
+    const given = Array.isArray(items) ? items : list;
     this.#definitions = definitions;
     this.#syncRenderers();
     if (!this.#fluidbox) {
-      this.#create(list);
+      this.#create(given);
       this.#itemsResult = undefined;
     } else {
       const fluidbox = this.#fluidbox;
@@ -548,7 +550,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       // anyway would restart an open or close that is under way. Items set
       // through the property always apply.
       if (this.#items || !sameItems(fluidbox.items, list)) {
-        this.#itemsResult = fluidbox.setItems(list);
+        this.#itemsResult = fluidbox.setItems(given);
         await this.#itemsResult;
       }
       // A rebuild or disconnect during the update leaves nothing to bind.

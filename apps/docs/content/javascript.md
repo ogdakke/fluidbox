@@ -90,7 +90,7 @@ To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip`, `sheet` or `loadi
 | `next(options?)`                         | `Promise<boolean>`        | Moves to the next item while open.                                                                                     |
 | `previous(options?)`                     | `Promise<boolean>`        | Moves to the previous item while open.                                                                                 |
 | `update(options)`                        | `void`                    | Changes `labels`, `zoom`, `loop`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading` live. See [update](#update). |
-| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there.                                        |
+| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there. Equal items change nothing.            |
 | `preload(target)`                        | `() => void`              | Starts loading an item a press is likely to open, while the viewer is closed. Call the result to let go.               |
 | `load()`                                 | `Promise<boolean>`        | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                        |
 | `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                                 |

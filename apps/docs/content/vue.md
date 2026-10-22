@@ -239,7 +239,7 @@ The entry exports the parts' types (`FluidboxApi`, `FluidboxCommands`, `Fluidbox
 
 ## Vue notes
 
-**Reactive items.** `items` can be a plain, `ref` or `reactive` array. Assigning a new array and changing a reactive array in place (`push`, `splice`, replacing an element) both replace the items. An array of the same objects, as an inline `:items="[product]"`, changes nothing. An open viewer stays on the same item id if the new items still have it. `useFluidbox().setItems` replaces them too, until `items` changes.
+**Reactive items.** `items` can be a plain, `ref` or `reactive` array. Assigning a new array and changing a reactive array in place (`push`, `splice`, replacing an element) both replace the items. An array of equal items, as an inline `:items="[product]"` or a fresh `products.map(toItem)`, changes nothing. An open viewer stays on the same item id if the new items still have it. `useFluidbox().setItems` replaces them too, until `items` changes.
 
 **Provide and inject reach custom content.** Renderers, viewer content, travelling overlays and the filmstrip and sheet content render through `Teleport` from inside `Fluidbox.Root`, so they see what is provided around it, as the [Custom content](./patterns/renderers.md) example does with a theme.
 

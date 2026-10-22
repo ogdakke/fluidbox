@@ -410,12 +410,8 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     sync.current(open, index);
   }, [fluidbox, open, index]);
 
-  const lastItems = useRef(items);
-  useIsomorphicLayoutEffect(() => {
-    if (lastItems.current === items) return;
-    lastItems.current = items;
-    void fluidbox.setItems(items);
-  }, [items, fluidbox]);
+  // The fluidbox ignores items equal to its own, so a fresh array each render costs nothing.
+  useIsomorphicLayoutEffect(() => void fluidbox.setItems(items), [items, fluidbox]);
 
   const commands = useMemo<FluidboxCommands<TItem>>(
     () => ({

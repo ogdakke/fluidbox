@@ -245,13 +245,6 @@ function same(a: unknown, b: unknown): boolean {
   );
 }
 
-const sameItems = (a: FluidboxItems<AnyItem>, b: FluidboxItems<AnyItem>) =>
-  a === b ||
-  (Array.isArray(a) &&
-    Array.isArray(b) &&
-    a.length === b.length &&
-    a.every((item, index) => item === b[index]));
-
 const settingKeys = ["labels", "zoom", "loop", "viewer", "filmstrip", "sheet", "loading"] as const;
 type Settings = {
   -readonly [K in (typeof settingKeys)[number]]: FluidboxUpdateOptions<AnyItem>[K];
@@ -369,10 +362,8 @@ const Root = defineComponent(
       // A sheet that loads or goes changes the stop too.
       sheetStop.value = fluidbox.sheet?.stop ?? 0;
     });
-    // An inline array of the same items, as `:items="[product]"`, changes nothing.
-    watch(items, (next, previous) => {
-      if (!sameItems(next, previous)) void fluidbox.setItems(next);
-    });
+    // The fluidbox ignores items equal to its own, as an inline `:items="[product]"`.
+    watch(items, (next) => void fluidbox.setItems(next));
 
     const events = new AbortController();
     for (const type of fluidboxEventTypes) {

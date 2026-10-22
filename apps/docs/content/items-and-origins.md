@@ -80,6 +80,8 @@ Pass new items with `fluidbox.setItems(items)`, a new `items` prop in a framewor
 
 A move fires `itemchange` and `settle` with the reason `"items"`. A command still running when the items change resolves `false`.
 
+Items equal to the current ones change nothing: the same lazy list, or an array whose items match the current ones in order, field by field (`thumbnail`, `sources` and other plain objects and arrays by their contents). So a framework can pass `items={products.map(toItem)}` on every render without interrupting a move or reloading a slide; `setItems` resolves `false`. When the items do change, a slide whose item is unchanged stays, loaded, wherever its item moved to, and only the changed ones are made again. Swapping a product's variant keeps the photos the variants share. To change an item, pass a new object: one changed in place compares equal to itself.
+
 ## Origins
 
 An origin is where an item lives on the page, `FluidboxOrigin<TItem>`:

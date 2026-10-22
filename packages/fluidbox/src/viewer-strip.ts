@@ -5,6 +5,7 @@ import type {
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
+import { idOf, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
 import type { FluidboxThumbnail } from "./public-api";
 
@@ -12,6 +13,8 @@ const WINDOW_SIZE = 31;
 const LOAD_RADIUS = 1;
 
 interface ViewerSlide {
+  /** Where the slide sits in the strip; new items can move it. */
+  position: number;
   readonly element: HTMLDivElement;
   readonly frame: HTMLDivElement;
   readonly picture?: HTMLPictureElement;
@@ -85,6 +88,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #selection:
     | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
     | undefined;
+  /** While new items are laid out: the old slides whose item is unchanged, by id. */
+  #recycled: Map<string, { item: TItem; slide: ViewerSlide }[]> | undefined;
 
   constructor(
     ownerDocument: Document,
@@ -194,26 +199,72 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.element.scrollTo({ left: this.#sign * left, behavior });
   }
 
+  /**
+   * Show new items. A slide whose item is unchanged stays, loaded, wherever its
+   * item moved to, so swapping a product's variant keeps the photos it shares.
+   */
   setSource(source: FluidboxSource<TItem>) {
     this.#resolveSelection();
     this.#unfence();
+    const previous = this.#source;
     const index = this.index;
+    const shown = previous.count ? idOf(previous.getItem(index)) : null;
+    const recycled = new Map<string, { item: TItem; slide: ViewerSlide }[]>();
+    for (const [position, slide] of this.#slides) {
+      const item = previous.getItem(this.#item(position));
+      const id = idOf(item);
+      const next = source.getIndex(id);
+      if (next !== null && sameItem(item, source.getItem(next))) {
+        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide }]);
+      } else {
+        this.#unload(slide);
+        slide.element.remove();
+      }
+    }
+    this.#slides.clear();
     this.#source = source;
-    this.#index = Math.max(0, Math.min(index, source.count - 1));
-    for (const slide of this.#slides.values()) {
+    // The strip stays on the item it shows, wherever that went.
+    this.#index =
+      (shown === null ? null : source.getIndex(shown)) ??
+      Math.max(0, Math.min(index, source.count - 1));
+    this.#base = 0;
+    this.#recycled = recycled;
+    this.#renderWindow(this.#index, this.#index);
+    this.#recycled = undefined;
+    for (const { slide } of [...recycled.values()].flat()) {
       this.#unload(slide);
       slide.element.remove();
     }
-    this.#slides.clear();
-    this.#base = 0;
-    this.#renderWindow(this.#index, this.#index);
     this.#align(this.#index);
+  }
+
+  /** An unchanged old slide for the item at a position, moved there. */
+  #recycle(position: number) {
+    const item = this.#source.getItem(this.#item(position));
+    const kept = this.#recycled?.get(idOf(item));
+    const found = kept?.findIndex((each) => sameItem(each.item, item)) ?? -1;
+    if (!kept || found < 0) return undefined;
+    const { slide } = kept.splice(found, 1)[0]!;
+    slide.position = position;
+    slide.element.setAttribute(
+      "aria-label",
+      this.#labels.position(this.#item(position), this.#source.count),
+    );
+    slide.element.setAttribute("aria-hidden", String(position !== this.#index));
+    slide.retry.tabIndex = position === this.#index ? 0 : -1;
+    return slide;
   }
 
   /** Go round, or stop at the ends. The slides are made again around the item on show. */
   setLoop(loop: boolean) {
     if (loop === this.#loop) return;
     const index = this.index;
+    // Positions mean something else now, so no slide carries over.
+    for (const slide of this.#slides.values()) {
+      this.#unload(slide);
+      slide.element.remove();
+    }
+    this.#slides.clear();
     this.#loop = loop;
     this.#index = index;
     this.setSource(this.#source);
@@ -349,7 +400,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const retry = this.#ownerDocument.createElement("button");
     retry.type = "button";
     retry.textContent = this.#labels.retry;
-    retry.addEventListener("click", () => this.#retry(index));
+    retry.addEventListener("click", () => this.#retry(slide.position));
     error.append(`${this.#labels.error} `, retry);
     let picture: HTMLPictureElement | undefined;
     let placeholder: HTMLImageElement | undefined;
@@ -394,7 +445,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         },
         { signal: this.#controller.signal },
       );
-      image.addEventListener("error", () => this.#fail(index, slide), {
+      image.addEventListener("error", () => this.#fail(slide.position, slide), {
         signal: this.#controller.signal,
       });
       picture.append(image);
@@ -432,6 +483,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     frame.append(error);
     element.append(frame);
     const slide = {
+      position: index,
       element,
       frame,
       picture,
@@ -579,12 +631,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     for (let index = base; index < base + size; index++) {
       let slide = this.#slides.get(index);
       if (!slide) {
-        slide = this.#makeSlide(index);
+        slide = this.#recycle(index) ?? this.#makeSlide(index);
         this.#slides.set(index, slide);
-        this.element.insertBefore(slide.element, insertionPoint);
-      } else {
-        insertionPoint = slide.element.nextSibling;
       }
+      // Only a slide out of place moves: moving an embed reloads it.
+      if (slide.element !== insertionPoint)
+        this.element.insertBefore(slide.element, insertionPoint);
+      insertionPoint = slide.element.nextSibling;
     }
     this.#rebasing = true;
     this.#base = base;
