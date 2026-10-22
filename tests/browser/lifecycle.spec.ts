@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { Fluidbox, FluidboxImageItem } from "@ogdakke/fluidbox";
 
 declare global {
   interface Window {
-    fb: import("@ogdakke/fluidbox").Fluidbox<import("@ogdakke/fluidbox").FluidboxImageItem>;
+    fb: Fluidbox<FluidboxImageItem>;
   }
 }
 
@@ -153,7 +154,7 @@ for (const reducedMotion of [false, true]) {
                   // Unknown targets after new items are the caller's mistake, not the viewer's.
                   const unknown =
                     error instanceof RangeError &&
-                    /^Fluidbox item index is out of range/.test(error.message);
+                    error.message.startsWith("Fluidbox item index is out of range");
                   if (!unknown) errors.push(`${label}: ${String(error)}`);
                 },
               ),
