@@ -480,4 +480,24 @@ describe("the fluidbox runtime", () => {
     await expect(fluidbox.open("two")).resolves.toBe(false);
     expect(driver.opens).toHaveLength(1);
   });
+
+  it("throws an InvalidStateError for anything that would hold on to it after destroy", () => {
+    const driver = new TestDriver();
+    const fluidbox = make(driver);
+    fluidbox.destroy();
+    // A stand-in element: a call that got as far as binding it would fail on it.
+    const element = {} as HTMLElement;
+    for (const call of [
+      () => fluidbox.setItems([items[0]]),
+      () => fluidbox.preload("one"),
+      () => fluidbox.bind(element, "one"),
+      () => fluidbox.bindOverlay(element, "one"),
+      () => fluidbox.subscribe(() => {}),
+    ]) {
+      expect(call).toThrow(expect.objectContaining({ name: "InvalidStateError" }));
+    }
+    expect(() => fluidbox.preload("missing")).toThrow(
+      expect.objectContaining({ name: "InvalidStateError" }),
+    );
+  });
 });

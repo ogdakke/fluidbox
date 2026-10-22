@@ -428,7 +428,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   setItems(items: FluidboxItems<TItem>) {
-    if (this.#lifetime.signal.aborted) return Promise.resolve(false);
+    this.#assertAlive();
     // The same list, or the same items in a new array, as a binding re-rendering
     // `items={products.map(toItem)}` passes, change nothing: they neither
     // interrupt a move nor rebuild a slide.
@@ -448,9 +448,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   preload(target: FluidboxTarget<TItem>) {
+    this.#assertAlive();
     const index = this.#resolve(this.#target(target));
     if (index instanceof RangeError) throw index;
-    if (this.#lifetime.signal.aborted || this.#state.status !== "closed") return () => {};
+    if (this.#state.status !== "closed") return () => {};
     const item = this.#source.getItem(index);
     const context = { item, index, origin: this.#origins.get(idOf(item)) };
     if (this.#viewer) return this.#viewer.prepare(context);
@@ -473,6 +474,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     target: FluidboxTarget<TItem>,
     options: FluidboxBindOptions<TItem> = {},
   ) {
+    // Before anything is attached, so a destroyed fluidbox holds no listeners.
+    this.#assertAlive();
     const trigger = bindTrigger(this, element, {
       target,
       returns: options.returns,
@@ -491,6 +494,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     target: FluidboxTarget<TItem>,
     options: FluidboxOverlayOptions<TItem> = {},
   ) {
+    this.#assertAlive();
     const { travel, frameLayer } = options;
     const registration: FluidboxThumbnailOverlayRegistration<TItem> = travel
       ? {
@@ -535,7 +539,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   subscribe(listener: (state: FluidboxState<TItem>) => void) {
-    if (this.#lifetime.signal.aborted) return () => {};
+    this.#assertAlive();
     this.#listeners.add(listener);
     return () => {
       this.#listeners.delete(listener);
@@ -555,6 +559,13 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     for (const overlay of this.#overlays.values()) resetOverlayPhase(overlay.registration.element);
     this.#overlays.clear();
     this.#listeners.clear();
+  }
+
+  /** What a destroyed fluidbox throws for anything that would hold on to it. */
+  #assertAlive() {
+    if (this.#lifetime.signal.aborted) {
+      throw new DOMException("The fluidbox was destroyed.", "InvalidStateError");
+    }
   }
 
   /** Track a binding, so destroy releases it, and release it when its signal aborts. */
