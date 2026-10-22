@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { activeViewer } from "../src/viewer-ownership";
 
 const owner = () => ({ closeImmediately: () => true });
@@ -35,5 +35,20 @@ describe("activeViewer", () => {
     activeViewer.claim(viewer);
     expect(activeViewer.claim(viewer)).toBeNull();
     expect(activeViewer.active).toBe(viewer);
+  });
+
+  it("is one owner for every copy of the package on the page", async () => {
+    vi.resetModules();
+    const other = (await import("../src/viewer-ownership")).activeViewer;
+    expect(other).not.toBe(activeViewer);
+    const first = owner();
+    const second = owner();
+
+    activeViewer.claim(first);
+    expect(other.active).toBe(first);
+    expect(other.claim(second)).toBe(first);
+    expect(activeViewer.active).toBe(second);
+    other.release(second);
+    expect(activeViewer.active).toBeNull();
   });
 });
