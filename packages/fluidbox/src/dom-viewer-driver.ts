@@ -507,7 +507,7 @@ export class DomViewerDriver<
     this.#preparedFlight = undefined;
     // An overlay registered just before the open still travels with it.
     if (this.#overlaysLoad && !this.#thumbnailOverlays) {
-      await this.#overlaysLoad;
+      await this.#whileWaiting(this.#overlaysLoad, context.signal);
       if (abandoned()) return;
     }
     const previous = activeViewer.claim(this.#viewerOwner);
@@ -889,6 +889,40 @@ export class DomViewerDriver<
     this.#discardPreparation();
     this.#clearMotionStyles();
     this.#finishClose();
+  }
+
+  /**
+   * Wait for code the open needs before the viewer shows. The viewer does not
+   * have the keys yet, so Escape calls the open off and the arrows move it, as
+   * they do while the viewer's own code loads.
+   */
+  async #whileWaiting(loading: Promise<unknown>, signal: AbortSignal) {
+    const waiting = new AbortController();
+    const ownerDocument = this.#portal.overlay.ownerDocument;
+    ownerDocument.addEventListener(
+      "keydown",
+      (event) => {
+        if (signal.aborted) return;
+        const options = { reason: "keyboard" } as const;
+        if (event.key === "Escape") void this.#controller?.close(options);
+        else if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+          const source =
+            event.target instanceof Element ? event.target : ownerDocument.documentElement;
+          const rtl = getComputedStyle(source).direction === "rtl";
+          void this.#controller?.[(event.key === "ArrowRight") !== rtl ? "next" : "previous"](
+            options,
+          );
+        } else return;
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      { capture: true, signal: waiting.signal },
+    );
+    try {
+      await loading;
+    } finally {
+      waiting.abort();
+    }
   }
 
   get #frame() {

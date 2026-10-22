@@ -249,3 +249,31 @@ for (const reducedMotion of [false, true]) {
     });
   }
 }
+
+test("keys pressed while the overlay code loads act on the opening viewer", async ({ page }) => {
+  await setup(page);
+  // Hold the thumbnail overlay runtime back, so the open waits for it.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/thumbnail-overlay-runtime/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.evaluate(() => {
+    const badge = document.createElement("span");
+    document.querySelector('[data-photo-id="one"]')!.append(badge);
+    window.fb.bindOverlay(badge, "one");
+    Object.assign(window, { opening: window.fb.open(0) });
+  });
+  await expect.poll(() => page.evaluate(() => window.fb.state.status)).toBe("opening");
+  await page.keyboard.press("ArrowRight");
+  expect(await page.evaluate(() => window.fb.state.index)).toBe(1);
+  await page.keyboard.press("Escape");
+  release();
+  expect(
+    await page.evaluate(() => (window as unknown as { opening: Promise<boolean> }).opening),
+  ).toBe(false);
+  expect(await page.evaluate(() => window.fb.state.status)).toBe("closed");
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+  expect(await leftovers(page)).toEqual(clean);
+});
