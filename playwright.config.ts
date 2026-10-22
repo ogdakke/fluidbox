@@ -3,6 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 // FLUIDBOX_PORT lets several checkouts run the suite at once without sharing a server.
 const port = Number(process.env.FLUIDBOX_PORT) || 4173;
 const baseURL = `http://127.0.0.1:${port}`;
+// FLUIDBOX_SERVER=preview serves the built examples (bun run build:examples) instead of the dev server.
+const preview = process.env.FLUIDBOX_SERVER === "preview";
+// FLUIDBOX_RECORD=off records no trace or video; first-retry records them on a retry only.
+const record = process.env.FLUIDBOX_RECORD;
+const recording =
+  record === "off" ? "off" : record === "first-retry" ? "on-first-retry" : "retain-on-failure";
 
 export default defineConfig({
   testDir: "./tests/browser",
@@ -16,9 +22,9 @@ export default defineConfig({
   outputDir: "test-results",
   use: {
     baseURL,
-    trace: "retain-on-failure",
+    trace: recording,
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: recording,
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
@@ -29,7 +35,7 @@ export default defineConfig({
     { name: "ipad-pro-11", use: { ...devices["iPad Pro 11"] } },
   ],
   webServer: {
-    command: `bun run --cwd apps/examples dev --port ${port} --strictPort`,
+    command: `bun run --cwd apps/examples ${preview ? "preview" : "dev"} --port ${port} --strictPort`,
     url: `${baseURL}/harness.html`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
