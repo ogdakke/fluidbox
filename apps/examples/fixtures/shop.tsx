@@ -88,12 +88,14 @@ const spin = spinItem({
 
 const model = modelItem({
   id: "fjord-model",
-  title: "The wood-framed print in 3D",
-  src: "/products/fjord-model.glb",
-  poster: "/products/fjord-model.webp",
+  // Khronos's glTF sample, as a stand-in product: CC BY-NC 4.0 © 2016 theblueturtle_,
+  // CC BY 4.0 © 2018 ctxwing (public/products/damaged-helmet/LICENSE.md).
+  title: "Damaged Helmet in 3D",
+  src: "/products/damaged-helmet/damaged-helmet.glb",
+  poster: "/products/damaged-helmet/damaged-helmet.webp",
   width: 800,
   height: 800,
-  thumbnail: { src: "/products/fjord-model-thumb.webp", width: 160, height: 160 },
+  thumbnail: { src: "/products/damaged-helmet/damaged-helmet-thumb.webp", width: 160, height: 160 },
   ar: true,
   arModes: "webxr scene-viewer quick-look",
   attributes: { "camera-orbit": "-30deg 80deg auto", "shadow-intensity": "1" },
@@ -884,7 +886,7 @@ function Findings() {
         </li>
         <li>
           <strong>Video, 360° and 3D: add-ons.</strong> After the photos come a YouTube video, a
-          spin of the framed print and a model of it, from the embeds, spin and model entries. The
+          spin of the framed print and a 3D model, from the embeds, spin and model entries. The
           video loads its player only when Play is pressed and pauses when the viewer moves on. A
           drag on the spin or the model turns it instead of swiping, and the model&apos;s element
           loads from a CDN when its slide first shows. Each opens from its card like a photo.
@@ -895,6 +897,16 @@ function Findings() {
           and the wide screen a white one.
         </li>
       </ol>
+      <p className="fb-muted">
+        3D model:{" "}
+        <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet">
+          Damaged Helmet
+        </a>
+        , from the Khronos glTF Sample Assets. © 2016 theblueturtle_,{" "}
+        <a href="https://creativecommons.org/licenses/by-nc/4.0/">CC BY-NC 4.0</a>; glTF rebuild ©
+        2018 ctxwing, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. For
+        non-commercial use only.
+      </p>
     </section>
   );
 }
