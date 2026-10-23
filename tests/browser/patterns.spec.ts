@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { stubMedia } from "./support/media";
 
 /**
- * Every framework page implements the same eleven patterns (apps/examples/src/patterns/CONTRACT.md).
+ * Every framework page implements the same thirteen patterns (apps/examples/src/patterns/CONTRACT.md).
  * Set PATTERNS=react,vue to run some of them.
  */
 const all = ["react", "vue", "solid", "angular", "elements", "javascript"] as const;
@@ -11,6 +12,11 @@ const frameworks = process.env.PATTERNS
 
 const dialog = (page: Page) => page.locator("[data-fluidbox-dialog]");
 const activeSlide = (page: Page) => page.locator('[data-fluidbox-slide][aria-hidden="false"]');
+/** The image on show, in its slide or, zoomed, in the zoom's scroller. */
+const shownMedia = (page: Page) =>
+  page.locator(
+    '[data-fluidbox-zoom-viewport] [data-fluidbox-media], [data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
+  );
 const expectSlide = (page: Page, label: string) =>
   expect(activeSlide(page)).toHaveAttribute("aria-label", label);
 
@@ -27,7 +33,11 @@ async function close(page: Page) {
 
 for (const framework of frameworks) {
   test.describe(framework, () => {
+    let media: Awaited<ReturnType<typeof stubMedia>>;
+
     test.beforeEach(async ({ page }) => {
+      // YouTube, its stills and <model-viewer> come from the test, so the page stays offline.
+      media = await stubMedia(page);
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
       await page.goto(`/${framework}/`);
@@ -133,12 +143,32 @@ for (const framework of frameworks) {
     });
 
     test("zoom", async ({ page }) => {
-      // Two galleries of four: zoom on, then zoom off.
+      // Two galleries of four: zoom on with its controls and readout, then zoom off.
       const triggers = pattern(page, "zoom").locator('[data-test="trigger"]');
       await expect(triggers).toHaveCount(8);
       await open(page, triggers.nth(0), "Item 1 of 4");
+      const level = dialog(page).locator('[data-test="zoom-level"]');
+      await expect(level).toHaveText("100%");
+      await expect(dialog(page).locator("[data-fluidbox-zoom-reset]")).toBeDisabled();
+      await dialog(page).locator("[data-fluidbox-zoom-in]").click();
+      await expect(dialog(page)).toHaveAttribute("data-zoomed", "");
+      await expect(level).toHaveText("150%");
+      // The readout stays over the zoomed image.
+      const center = await level.boundingBox();
+      await expect
+        .poll(() =>
+          level.evaluate(
+            (output, [x, y]) => output.contains(document.elementFromPoint(x!, y!)),
+            [center!.x + center!.width / 2, center!.y + center!.height / 2],
+          ),
+        )
+        .toBe(true);
+      await dialog(page).locator("[data-fluidbox-zoom-reset]").click();
+      await expect(level).toHaveText("100%");
+      await expect(dialog(page)).not.toHaveAttribute("data-zoomed", "");
       await activeSlide(page).locator("img").last().dblclick();
       await expect(dialog(page)).toHaveAttribute("data-zoomed", "");
+      await expect(level).toHaveText("300%");
       await page.keyboard.press("Escape");
       await close(page);
       await open(page, triggers.nth(4), "Item 1 of 4");
@@ -146,6 +176,28 @@ for (const framework of frameworks) {
       await page.waitForTimeout(400);
       await expect(dialog(page)).not.toHaveAttribute("data-zoomed", "");
       await close(page);
+    });
+
+    test.describe("zoom at a pixel ratio of 1", () => {
+      // The candidates' thresholds below are at 1x and 1280 px across, as in zoom.spec.ts.
+      test.use({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
+      test.skip(({ isMobile }) => isMobile, "Thresholds measured at a pixel ratio of 1.");
+
+      test("zoom loads the sharper image", async ({ page }) => {
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        const triggers = pattern(page, "zoom").locator('[data-test="trigger"]');
+        await open(page, triggers.nth(0), "Item 1 of 4");
+        const source = () =>
+          shownMedia(page).evaluate(
+            (image: HTMLImageElement) => new URL(image.currentSrc).pathname,
+          );
+        // At fit the photo is under 1280 px across, so the 1280w candidate has the pixels.
+        await expect.poll(source).toBe("/photos/1015-1280.webp");
+        // Zoomed by 1.5 it needs more than the srcset has: zoomSrc, the full-size file.
+        await dialog(page).locator("[data-fluidbox-zoom-in]").click();
+        await expect.poll(source).toBe("/photos/1015.webp");
+        await close(page);
+      });
     });
 
     test("filmstrip", async ({ page }) => {
@@ -302,6 +354,65 @@ for (const framework of frameworks) {
       }
       await expect(dialog(page)).toHaveAttribute("data-dismissing", "");
       await expect(caption).toHaveCSS("opacity", "0");
+    });
+
+    test("hover", async ({ page, isMobile }) => {
+      const product = pattern(page, "hover").locator('[data-test="product"]');
+      const image = product.locator("img");
+      // A resting mouse magnifies the photo; touch screens get no hover zoom.
+      if (!isMobile) {
+        await product.scrollIntoViewIfNeeded();
+        // Let the scroll settle first: a scroll takes the hover zoom away.
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+        await product.hover();
+        await expect(image).toHaveAttribute("data-fluidbox-hover-zooming", "");
+        const lens = page.locator("[data-fluidbox-hover-zoom] img");
+        await expect
+          .poll(() => lens.evaluate((picture: HTMLImageElement) => new URL(picture.src).pathname))
+          .toBe("/products/fjord-wood.webp");
+      }
+      // A click still opens the viewer, and the hover zoom goes.
+      await open(page, product, "Item 1 of 1");
+      await expect(page.locator("[data-fluidbox-hover-zoom]")).toHaveCount(0);
+      await expect(image).not.toHaveAttribute("data-fluidbox-hover-zooming", "");
+      await close(page);
+    });
+
+    test("media", async ({ page }) => {
+      const triggers = pattern(page, "media").locator('[data-test="trigger"]');
+      await expect(triggers).toHaveCount(4);
+      await open(page, triggers.nth(0), "Item 1 of 4");
+      await expect(activeSlide(page).locator("img").last()).toHaveAttribute(
+        "alt",
+        "The print in a wood frame",
+      );
+      const next = dialog(page).locator("[data-fluidbox-next]");
+      // The YouTube facade: nothing loads from YouTube until Play.
+      await next.click();
+      await expectSlide(page, "Item 2 of 4");
+      expect(media.players).toEqual([]);
+      await activeSlide(page).getByRole("button", { name: "Play" }).click();
+      await expect(activeSlide(page).locator("iframe")).toHaveAttribute(
+        "src",
+        /^https:\/\/www\.youtube-nocookie\.com\/embed\/M7lc1UVf-VE\?/,
+      );
+      expect(media.players).toHaveLength(1);
+      // The spin: a slider that turns a frame per arrow key.
+      await next.click();
+      await expectSlide(page, "Item 3 of 4");
+      const spin = activeSlide(page).locator("[data-fluidbox-spin]");
+      await expect(spin).toHaveAttribute("data-frame", "0");
+      await spin.focus();
+      await page.keyboard.press("ArrowRight");
+      await expect(spin).toHaveAttribute("data-frame", "1");
+      // The model: <model-viewer> loads once, from the URL the example gives load().
+      await next.click();
+      await expectSlide(page, "Item 4 of 4");
+      await expect(activeSlide(page).locator("[data-fluidbox-model-ready]")).toHaveCount(1);
+      expect(media.modelViewer).toEqual([
+        "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js",
+      ]);
+      await close(page);
     });
   });
 }

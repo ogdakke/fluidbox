@@ -8,6 +8,8 @@ import { Filmstrip } from "./filmstrip";
 import { Rtl } from "./rtl";
 import { Url } from "./url";
 import { Headless } from "./headless";
+import { Hover } from "./hover";
+import { Media } from "./media";
 import { Origins } from "./origins";
 import { Overlay } from "./overlay";
 import { Programmatic } from "./programmatic";
@@ -32,4 +34,6 @@ export const patterns: Record<PatternName, MountPattern> = {
   url: mount(Url),
   sheet: mount(Sheet),
   headless: mount(Headless),
+  hover: mount(Hover),
+  media: mount(Media),
 };

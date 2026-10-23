@@ -11,6 +11,8 @@ Images zoom with pinch (or Ctrl + wheel), a click or double-tap, the zoom contro
 
 <!-- pattern: zoom -->
 
+The first gallery zooms to 3× on a double-click and stops at 6×. Its viewer has the zoom controls, and a readout of `state.zoom` in each framework's own way: a selector hook, a signal, the root's slot, an injected signal, or `subscribe`. Its photos list two widths in `srcset` and the full-size file as `zoomSrc`, so a zoom past the 1280w candidate loads the sharper file (see [A sharper image as the zoom grows](#a-sharper-image-as-the-zoom-grows)). The second gallery turns zoom off.
+
 - `zoom: { step, max }` or `zoom: false` on the viewer. The custom elements also read the `zoom-step`, `zoom-max` and `nozoom` attributes.
 - Zoom options apply live, even while the viewer is open. Call `fluidbox.update({ zoom })`, or set a new `zoom` prop or property. Turning zoom off zooms a zoomed photo back out.
 - `step` defaults to `2` and `max` to `4`.
@@ -88,8 +90,8 @@ const stop = hoverZoom(card, photo, { scale: 2.5 });
 
 `hoverZoom(element, item, options?)` shows `item` magnified inside the box of the first `<img>` in `element` (or `options.image`), following the pointer. It starts from the image already on the page, then swaps in the candidate of `srcset`, `zoomSrcset` or `zoomSrc` sharp at that scale once it has decoded. It sits over the page in its own `[data-fluidbox-hover-zoom]` layer (`--layer-fluidbox-hover-zoom`, default `2`), so nothing moves, and takes no pointer events, so a click still reaches the trigger and opens the viewer. `element` has `data-fluidbox-hover-zooming` while it shows.
 
-It does nothing on touch screens, for a pen, and with reduced motion, and loads nothing until the first hover, so it doesn't compete with the page's largest image. It goes as the pointer leaves or presses, or the page scrolls. Call the returned function, or abort `options.signal`, to remove it. In React:
+It does nothing on touch screens, for a pen, and with reduced motion, and loads nothing until the first hover, so it doesn't compete with the page's largest image. It goes as the pointer leaves or presses, or the page scrolls. Call the returned function, or abort `options.signal`, to remove it: from an effect's cleanup, `onCleanup`, `watchEffect`'s `onCleanup` or a directive's `ngOnDestroy`.
 
-```tsx
-useEffect(() => hoverZoom(box.current!, photo), [photo]);
-```
+Hover over the photo with a mouse, then click it. The page shows the 640w candidate. The hover zoom magnifies it 2.5× and swaps in the 1600w one, and the click opens the viewer as before.
+
+<!-- pattern: hover -->

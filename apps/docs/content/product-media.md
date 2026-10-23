@@ -15,6 +15,12 @@ A product page mixes photos with a video, a spin of the product and a model of i
 | `@ogdakke/fluidbox/spin`   | `spinItem`, `createSpinRenderer`, `spinFrames`                                                 |
 | `@ogdakke/fluidbox/model`  | `modelItem`, `createModelRenderer`                                                             |
 
+Here is one gallery with all three beside a photo. Press Play on the video: only then does YouTube's player load. Drag the spin, or focus it and press the arrow keys. The model loads `<model-viewer>` from a pinned CDN build the first time it comes on show.
+
+<!-- pattern: media -->
+
+<small>3D model: <a href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/DamagedHelmet">Damaged Helmet</a>, from the Khronos glTF Sample Assets. © 2016 theblueturtle\_, <a href="https://creativecommons.org/licenses/by-nc/4.0/">CC BY-NC 4.0</a>; glTF rebuild © 2018 ctxwing, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. For non-commercial use only. It is a sample for these docs: don't ship it in a product page of your own.</small>
+
 The entries are safe to import on the server. They add their few rules to the page in `:where()`, so any rule of yours wins.
 
 ```ts
@@ -133,45 +139,10 @@ The framework bindings hand a custom slide's component the same `active` and `on
 
 ### The add-ons in a framework
 
-The add-ons' renderers draw into an element. In a framework, give one an element of your own inside the slide's component, as the shop fixture in `apps/examples/fixtures/shop.tsx` does in React:
+The add-ons' renderers are plain renderers: they draw into an element. The custom elements and the plain JS API take them as they are, in `renderers`. The framework bindings' `renderers` take the framework's own content instead, so each example above gives the add-on an element inside a slide component of its own, and passes on the slide's `item`, `index`, `signal` and activity:
 
-```tsx
-import { useLayoutEffect, useRef } from "react";
-import type { FluidboxItem, FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { renderEmbed } from "@ogdakke/fluidbox/embeds";
-import type { FluidboxReactRenderContext, FluidboxReactRenderer } from "@ogdakke/fluidbox/react";
+- **React** and **Vue**: a small component that calls the renderer on its `<span style="display: contents">` once it mounts, aborts its signal and calls the cleanup as it unmounts.
+- **Solid**: the renderer returns the `<span>` itself, and calls the add-on in `onMount` with `onCleanup`.
+- **Angular**: a slide component gets only `item`, `index` and `active` inputs, so each add-on is a component of its own, extending a small base directive that makes the `signal` and `onActiveChange` from its lifecycle and from the `active` input.
 
-function AddonSlide({
-  render,
-  context,
-}: {
-  render: FluidboxSlideRenderer<FluidboxItem>;
-  context: FluidboxReactRenderContext;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const target = ref.current!;
-    const controller = new AbortController();
-    const dispose = render({
-      item: context.item,
-      index: context.index,
-      target,
-      signal: AbortSignal.any([context.signal, controller.signal]),
-      get active() {
-        return context.active;
-      },
-      onActiveChange: context.onActiveChange,
-    });
-    return () => {
-      controller.abort();
-      dispose?.();
-      target.replaceChildren();
-    };
-  }, [render, context]);
-  return <span ref={ref} style={{ display: "contents" }} />;
-}
-
-const embed: FluidboxReactRenderer = (context) => (
-  <AddonSlide render={renderEmbed} context={context} />
-);
-```
+Pick the tab of your framework above for the code. The loading of `<model-viewer>` is the same everywhere: the example loads a pinned build from Google's CDN, as `load: () => import(/* @vite-ignore */ url)`. In an app, install it and pass `load: () => import("@google/model-viewer")`, or load it yourself.

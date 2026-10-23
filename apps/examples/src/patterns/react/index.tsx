@@ -5,6 +5,8 @@ import type { PatternName } from "../shared";
 import { Basic } from "./basic";
 import { Filmstrip } from "./filmstrip";
 import { Headless } from "./headless";
+import { Hover } from "./hover";
+import { Media } from "./media";
 import { Origins } from "./origins";
 import { Overlay } from "./overlay";
 import { Programmatic } from "./programmatic";
@@ -38,4 +40,6 @@ export const patterns: Record<PatternName, MountPattern> = {
   headless: mount(Headless),
   rtl: mount(Rtl),
   url: mount(Url),
+  hover: mount(Hover),
+  media: mount(Media),
 };

@@ -5,6 +5,8 @@ import { mountFilmstrip } from "./filmstrip";
 import { mountRtl } from "./rtl";
 import { mountUrl } from "./url";
 import { mountHeadless } from "./headless";
+import { mountHover } from "./hover";
+import { mountMedia } from "./media";
 import { mountOrigins } from "./origins";
 import { mountOverlay } from "./overlay";
 import { mountProgrammatic } from "./programmatic";
@@ -24,4 +26,6 @@ export const patterns: Record<PatternName, MountPattern> = {
   url: mountUrl,
   sheet: mountSheet,
   headless: mountHeadless,
+  hover: mountHover,
+  media: mountMedia,
 };

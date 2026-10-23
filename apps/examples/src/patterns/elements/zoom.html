@@ -1,38 +1,24 @@
 <!-- #region example -->
+<!-- Double-click zooms to 3x; pinch, wheel and the controls stop at 6x. -->
 <fluidbox-gallery class="pattern-grid" zoom-step="3" zoom-max="6">
-  <fluidbox-item item-id="photo-aurora">
-    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
-      <img src="/art/aurora.svg" alt="Aurora over the tundra" />
-    </button>
-    <template slot="content">
-      <img src="/art/aurora.svg" alt="Aurora over the tundra" width="1100" height="1650" />
-    </template>
-  </fluidbox-item>
-  <fluidbox-item item-id="photo-ridge">
-    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
-      <img src="/art/ridge.svg" alt="Night ridge" />
-    </button>
-    <template slot="content">
-      <img src="/art/ridge.svg" alt="Night ridge" width="1200" height="1500" />
-    </template>
-  </fluidbox-item>
-  <fluidbox-item item-id="photo-fjord">
-    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
-      <img src="/art/fjord.svg" alt="Fjord in the blue hour" />
-    </button>
-    <template slot="content">
-      <img src="/art/fjord.svg" alt="Fjord in the blue hour" width="1200" height="1600" />
-    </template>
-  </fluidbox-item>
-  <fluidbox-item item-id="photo-lagoon">
-    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
-      <img src="/art/lagoon.svg" alt="Lagoon after sunset" />
-    </button>
-    <template slot="content">
-      <img src="/art/lagoon.svg" alt="Lagoon after sunset" width="1800" height="1200" />
-    </template>
-  </fluidbox-item>
+  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-item-id="zoom-1015">
+    <img src="/photos/1015-thumb.webp" alt="Fjord from the cliff edge" />
+  </button>
+  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-item-id="zoom-883">
+    <img src="/photos/883-thumb.webp" alt="Still lake" />
+  </button>
+  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-item-id="zoom-1016">
+    <img src="/photos/1016-thumb.webp" alt="Red rock canyon" />
+  </button>
+  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-item-id="zoom-1043">
+    <img src="/photos/1043-thumb.webp" alt="Granite valley" />
+  </button>
 </fluidbox-gallery>
+<template>
+  <!-- Previous, Next and Close, then Zoom in, Zoom out and Fit. -->
+  <fluidbox-controls zoom></fluidbox-controls>
+  <output class="pattern-zoom-level" data-test="zoom-level"></output>
+</template>
 <fluidbox-gallery class="pattern-grid" nozoom>
   <fluidbox-item item-id="photo-aurora">
     <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">

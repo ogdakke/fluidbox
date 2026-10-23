@@ -36,7 +36,10 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
     title: "Programmatic control",
     note: "Open from code, read the state, log events, and veto navigation.",
   },
-  zoom: { title: "Zoom", note: "Custom zoom steps, or zoom off." },
+  zoom: {
+    title: "Zoom",
+    note: "Zoom controls, a zoom readout, and a sharper image as the zoom grows. Or zoom off.",
+  },
   filmstrip: { title: "Filmstrip", note: "The default strip, and one with your own thumbnails." },
   sheet: {
     title: "Sheet",
@@ -50,6 +53,14 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
   url: {
     title: "Photo in the address",
     note: "The open photo lives in ?photo=, so a link opens it and Back closes it.",
+  },
+  hover: {
+    title: "Hover zoom",
+    note: "A product photo that magnifies under a resting mouse, and opens the viewer on a click.",
+  },
+  media: {
+    title: "Product media",
+    note: "A photo, a YouTube video that loads on Play, a 360° spin and a 3D model in one gallery. The model is Damaged Helmet from the Khronos glTF Sample Assets: © 2016 theblueturtle_, CC BY-NC 4.0; glTF rebuild © 2018 ctxwing, CC BY 4.0. Non-commercial use only.",
   },
 };
 
