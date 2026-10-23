@@ -244,8 +244,11 @@ export class FluidboxZoom {
     canvas.append(anchor);
     viewport.append(canvas);
     // Inside the dialog, so focus stays in it and aria-modal keeps it in the
-    // accessibility tree. Last, so it paints over the slides as the image did.
-    this.#root.querySelector("[data-fluidbox-dialog]")!.append(viewport);
+    // accessibility tree. After the slides, so it paints over them as the image
+    // did, and before the viewer's layer and the add-ons, so your controls and
+    // captions, the filmstrip and the sheet stay over it.
+    const dialog = this.#root.querySelector("[data-fluidbox-dialog]")!;
+    dialog.insertBefore(viewport, dialog.querySelector(":scope > [data-fluidbox-portal]"));
     image.style.setProperty("--fluidbox-media-transform", `scale(${this.#pose.scale})`);
     this.#nativeOrigin = { x, y };
     this.#viewport = viewport;

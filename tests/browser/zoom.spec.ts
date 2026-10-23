@@ -146,6 +146,42 @@ test.describe("zoom controls", () => {
     await page.evaluate(() => window.zoomViewer.open("clip"));
     await expect(zoomIn).toBeDisabled();
   });
+  test("your viewer content stays over the zoomed image", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openOn(page, "ladder");
+    await page.evaluate(() =>
+      window.zoomViewer.update({
+        viewer({ target }) {
+          const caption = document.createElement("p");
+          caption.id = "caption";
+          caption.textContent = "A caption";
+          Object.assign(caption.style, {
+            position: "fixed",
+            left: "40%",
+            top: "40%",
+            margin: "0",
+            padding: "8px",
+            background: "black",
+            color: "white",
+          });
+          target.append(caption);
+        },
+      }),
+    );
+    const onTop = () =>
+      page.locator("#caption").evaluate((caption) => {
+        const box = caption.getBoundingClientRect();
+        return caption.contains(
+          document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+        );
+      });
+    expect(await onTop()).toBe(true);
+    await page.evaluate(() => window.zoomViewer.zoomTo(3));
+    await expect(page.locator(dialog)).toHaveAttribute("data-zoomed", "");
+    await expect(page.locator("[data-fluidbox-zoom-viewport]")).toHaveCount(1);
+    expect(await onTop()).toBe(true);
+  });
+
   test("steps taken before a zoom rests add up", async ({ page }) => {
     await openOn(page, "ladder");
     const zoomIn = page
