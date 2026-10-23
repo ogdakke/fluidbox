@@ -216,6 +216,8 @@ export class DomViewerDriver<
   );
   #zoomOptions: Required<FluidboxZoomOptions> | undefined;
   #zoom: FluidboxZoom | undefined;
+  /** The zoom command under way, until it settles. */
+  #zoomCommand: { readonly scale: number } | undefined;
   #zoomLoad: Promise<FluidboxZoom | undefined> | undefined;
   #returnFocus: HTMLElement | null = null;
   #returnFocusFallback: HTMLElement | null = null;
@@ -427,6 +429,14 @@ export class DomViewerDriver<
   }
 
   /**
+   * The scale a zoom under way is heading to, whether a command, a key or a
+   * click started it; undefined while none is.
+   */
+  zoomGoal(): number | undefined {
+    return this.#zoomCommand?.scale ?? this.#zoom?.goal;
+  }
+
+  /**
    * Zoom the image on show to `scale` about `origin`. Resolves true once it
    * rests there, false when nothing can zoom or the motion was interrupted.
    */
@@ -438,7 +448,16 @@ export class DomViewerDriver<
       readonly reason?: ZoomReason;
     },
   ): Promise<boolean> {
-    return this.#loadZoom().then((zoom) => zoom?.zoomTo(scale, options) ?? false);
+    // Its scale is the goal from now, before the zoom has loaded and started to move.
+    const command = { scale };
+    this.#zoomCommand = command;
+    const settle = (rested: boolean) => {
+      if (this.#zoomCommand === command) this.#zoomCommand = undefined;
+      return rested;
+    };
+    return this.#loadZoom()
+      .then((zoom) => zoom?.zoomTo(scale, options) ?? false)
+      .then(settle);
   }
 
   connect(

@@ -146,6 +146,35 @@ test.describe("zoom controls", () => {
     await page.evaluate(() => window.zoomViewer.open("clip"));
     await expect(zoomIn).toBeDisabled();
   });
+  test("steps taken before a zoom rests add up", async ({ page }) => {
+    await openOn(page, "ladder");
+    const zoomIn = page
+      .getByRole("group", { name: "Zoomed image" })
+      .getByRole("button", { name: "Zoom in" });
+    const scale = async () => (await zoomState(page))!.scale;
+    const rest = () => expect.poll(() => page.evaluate(() => window.zoomEvents.at(-1)?.scale));
+    // A zoom takes 320 ms, so a second press often lands while the first is under way.
+    await zoomIn.click();
+    await zoomIn.click();
+    await expect.poll(scale).toBe(2.25);
+    await page.keyboard.press("0");
+    await rest().toBe(1);
+    await page.keyboard.press("+");
+    await page.keyboard.press("+");
+    await expect.poll(scale).toBe(2.25);
+    await page.keyboard.press("0");
+    await rest().toBe(1);
+    // Commands in the same task, before any zoom has started to move.
+    await page.evaluate(() => {
+      void window.zoomViewer.zoomIn();
+      void window.zoomViewer.zoomIn();
+    });
+    await expect.poll(scale).toBe(2.25);
+    // The keys while a command's zoom is under way.
+    await page.evaluate(() => void window.zoomViewer.zoomOut());
+    await page.keyboard.press("-");
+    await expect.poll(scale).toBe(1);
+  });
 });
 
 test.describe("zoom accessibility", () => {

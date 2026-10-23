@@ -754,11 +754,22 @@ export class FluidboxZoom {
     this.#animate(this.#target(scale, anchor));
   }
 
+  /**
+   * The scale a zoom under way is heading to, so a step taken before it rests
+   * adds to it rather than to where it was. Undefined while nothing animates.
+   */
+  get goal(): number | undefined {
+    // While an animation runs, the pose is already its target.
+    return this.#animation ? this.#pose.scale : undefined;
+  }
+
   /** Zoom by a factor about the stage's centre, as the + and - keys do. */
   zoomBy(factor: number, reason: ZoomReason = "keyboard") {
+    const goal = this.goal;
     if (!this.#acquire()) return;
     this.#reason = reason;
-    const scale = Math.max(1, Math.min(this.#options.config().max, this.#pose.scale * factor));
+    const from = goal ?? this.#pose.scale;
+    const scale = Math.max(1, Math.min(this.#options.config().max, from * factor));
     this.#animate(this.#target(scale, this.#stageCenter()));
   }
   /** Zoom back out to fit, as the 0 key does. */
