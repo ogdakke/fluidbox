@@ -4,6 +4,8 @@ import type { PatternName } from "../shared";
 import Basic from "./Basic.vue";
 import Filmstrip from "./Filmstrip.vue";
 import Headless from "./Headless.vue";
+import Hover from "./Hover.vue";
+import Media from "./Media.vue";
 import Origins from "./Origins.vue";
 import Overlay from "./Overlay.vue";
 import Programmatic from "./Programmatic.vue";
@@ -33,4 +35,6 @@ export const patterns: Record<PatternName, MountPattern> = {
   url: mount(Url),
   sheet: mount(Sheet),
   headless: mount(Headless),
+  hover: mount(Hover),
+  media: mount(Media),
 };

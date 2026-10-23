@@ -45,6 +45,8 @@ class TestDriver {
   registerThumbnailOverlay: (...args: unknown[]) => void | (() => void) = () => {};
   controller: { zoomed?(scale: number, reason?: string): void } | undefined;
   readonly zooms: Array<{ scale: number; reason?: string; origin?: unknown }> = [];
+  /** The scale a zoom under way is heading to, as the zoom engine reports it. */
+  goal: number | undefined;
   connect(controller: TestDriver["controller"]) {
     this.controller = controller;
   }
@@ -53,6 +55,9 @@ class TestDriver {
     // The zoom comes to rest at once, as with reduced motion.
     this.controller?.zoomed?.(scale, options.reason);
     return Promise.resolve(true);
+  }
+  zoomGoal() {
+    return this.goal;
   }
   setZoom() {}
   setLoop() {}
@@ -545,6 +550,18 @@ describe("zoom", () => {
     expect(states).toEqual([2, 3, 2, 1]);
     expect(events).toEqual(["2:api", "3:api", "2:api", "1:api"]);
     await expect(fluidbox.zoomTo(Number.NaN)).rejects.toThrow(RangeError);
+  });
+
+  it("steps from the scale a zoom under way is heading to", async () => {
+    const { driver, fluidbox } = await opened({ zoom: { max: 6 } });
+    // Zoom in, and press again while the first zoom is still on its way to 1.5.
+    driver.goal = 1.5;
+    await fluidbox.zoomIn();
+    driver.goal = 1.5 * 1.5;
+    await fluidbox.zoomOut();
+    driver.goal = undefined;
+    await fluidbox.zoomIn();
+    expect(driver.zooms.map(({ scale }) => scale)).toEqual([2.25, 1.5, 2.25]);
   });
 
   it("starts another item at fit, and has none with zoom off", async () => {

@@ -6,6 +6,10 @@ import filmstripMarkup from "./filmstrip.html?raw";
 import { filmstrip } from "./filmstrip";
 import headlessMarkup from "./headless.html?raw";
 import { headless } from "./headless";
+import hoverMarkup from "./hover.html?raw";
+import { hover } from "./hover";
+import mediaMarkup from "./media.html?raw";
+import { media } from "./media";
 import origins from "./origins.html?raw";
 import overlayMarkup from "./overlay.html?raw";
 import { overlay } from "./overlay";
@@ -19,7 +23,8 @@ import sheetMarkup from "./sheet.html?raw";
 import { sheet } from "./sheet";
 import urlMarkup from "./url.html?raw";
 import { url } from "./url";
-import zoom from "./zoom.html?raw";
+import zoomMarkup from "./zoom.html?raw";
+import { zoom } from "./zoom";
 
 const mount =
   (markup: string, setup?: (root: HTMLElement) => void | (() => void)): MountPattern =>
@@ -39,10 +44,12 @@ export const patterns: Record<PatternName, MountPattern> = {
   origins: mount(origins),
   renderers: mount(renderersMarkup, renderers),
   programmatic: mount(programmaticMarkup, programmatic),
-  zoom: mount(zoom),
+  zoom: mount(zoomMarkup, zoom),
   filmstrip: mount(filmstripMarkup, filmstrip),
   sheet: mount(sheetMarkup, sheet),
   headless: mount(headlessMarkup, headless),
   rtl: mount(rtlMarkup, rtl),
   url: mount(urlMarkup, url),
+  hover: mount(hoverMarkup, hover),
+  media: mount(mediaMarkup, media),
 };

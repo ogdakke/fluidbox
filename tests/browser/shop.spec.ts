@@ -302,7 +302,7 @@ test.describe("shop fixture, rich media", () => {
     await openCard(page, 9);
     await expect(page.locator(`${shown} model-viewer`)).toHaveAttribute(
       "src",
-      "/products/fjord-model.glb",
+      "/products/damaged-helmet/damaged-helmet.glb",
     );
     await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
     expect(requests.modelViewer).toEqual([

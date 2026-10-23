@@ -1,6 +1,6 @@
 # Pattern examples contract
 
-Every framework implements the same eleven patterns in `src/patterns/<framework>/`, where
+Every framework implements the same thirteen patterns in `src/patterns/<framework>/`, where
 `<framework>` is `react`, `vue`, `solid`, `angular`, `elements` or `javascript`. The page
 `/<framework>/` mounts them through `mountPatternPage` (`src/patterns/page.ts`), and
 `tests/browser/patterns.spec.ts` checks every page against the hooks below. The docs show the same
@@ -23,7 +23,8 @@ props or parameters; the spec finds things by position or by the shared class na
     A file may have several regions; the docs show them in order. Keep imports inside the region
     so a snippet is complete.
 - Data comes from `src/patterns/shared.ts` (`photos`, `album`, `product`, `strip`,
-  `media`, `theme`, `label`). The docs rewrite
+  `media`, `theme`, `thumbnailSrc`, `arabic`, `zoomPhotos`, `productPhoto`, `productMedia`,
+  `modelViewerUrl`). The docs rewrite
   `../shared` to `./data` and show those exports in the "example data" section of
   `apps/docs/content/patterns/index.md`; keep that section in step when you add or reshape one.
   Import nothing else that is local to the examples. Styles come from
@@ -36,7 +37,8 @@ props or parameters; the spec finds things by position or by the shared class na
 (row of buttons and status text), `.pattern-log` (event log list), `.pattern-sheet` (sheet
 content), `.pattern-caption` (headless caption bar), `.pattern-note` (custom renderer content),
 `.pattern-filmstrip-thumb` (custom filmstrip thumbnail), `.pattern-sheet-toggle` (the sheet
-pattern's button in the viewer).
+pattern's button in the viewer), `.pattern-zoom-level` (the zoom pattern's readout in the viewer),
+`.pattern-product` (the hover pattern's product photo button).
 
 ## Patterns and hooks
 
@@ -73,10 +75,20 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    keep 20). Thumbnails as in basic. Test: click open-third → "Item 3 of 4", status `open 2`, log
    contains `itemchange`; Escape → status `closed -`; check lock; click open-third;
    ArrowRight, then a horizontal wheel swipe → still "Item 3 of 4".
-6. **zoom** — two galleries of `photos`, each with one trigger per photo, in this order: the first
-   with zoom `{ step: 3, max: 6 }`, the second with zoom off. Test: open trigger 1 (zoom on),
-   double-click the slide image → dialog has `data-zoomed`; Escape twice; open trigger 5 (zoom
-   off), double-click → no `data-zoomed`.
+6. **zoom** — two galleries, each with one trigger per item, in this order: the first of
+   `zoomPhotos` (raster photos with a `srcset` of 640w and 1280w and the full-size file as
+   `zoomSrc`; the triggers show `thumbnailSrc`) with zoom `{ step: 3, max: 6 }`, the second of
+   `photos` with zoom off. The first gallery's viewer has the default controls and the zoom
+   controls (`controls` with `zoomIn`, `zoomOut`, `zoomReset`; the framework Controls part with
+   `zoom`; `<fluidbox-controls zoom>` for elements), and an
+   `output.pattern-zoom-level[data-test="zoom-level"]` showing `state.zoom.scale` as a rounded
+   percentage (`100%`), empty without a zoom, read the framework's way (selector hook, signal,
+   the Root's slot, an injected signal; `subscribe` in elements and JS). Test: open trigger 1 →
+   level `100%`, Fit disabled; click `[data-fluidbox-zoom-in]` → `data-zoomed`, `150%`; click
+   `[data-fluidbox-zoom-reset]` → `100%`, no `data-zoomed`; double-click the slide image →
+   `data-zoomed`, `300%`; Escape twice; open trigger 5 (zoom off), double-click → no
+   `data-zoomed`. At 1280 × 720 and a pixel ratio of 1 (desktop projects), the image on show
+   has `currentSrc` `/photos/1015-1280.webp`, and after Zoom in `/photos/1015.webp`.
 7. **filmstrip** — two galleries of `photos`, in this order: the first with the default
    filmstrip (the example imports `@ogdakke/fluidbox/filmstrip.css`, the strip's stylesheet), the second with your own thumbnails (`filmstrip: { render }`, or the framework's
    Filmstrip part with a child) holding
@@ -122,3 +134,23 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
     `photo=2`; ArrowRight → `photo=3`; Back → closed, no `photo`; Forward → "Item 3 of 4";
     Escape → no `photo`; load `?photo=4` → "Item 4 of 4"; Escape → no `photo`, focus on
     trigger 4.
+12. **hover** — one `button.pattern-product[data-test="product"]` that opens `productPhoto`
+    (a gallery of one), holding the photo at its 640w `thumbnailSrc`, with `hoverZoom` from
+    `@ogdakke/fluidbox/hover-zoom` on that `<img>` and removed with the example (effect cleanup,
+    `onCleanup`, `ngOnDestroy`, the mount's cleanup). Test, with a mouse (desktop projects):
+    hover → the image has `data-fluidbox-hover-zooming` and the `[data-fluidbox-hover-zoom]`
+    layer's image ends up at `/products/fjord-wood.webp`. On every project: click → "Item 1 of
+    1", the layer is gone; Escape.
+13. **media** — a gallery of `productMedia` (a photo, a YouTube facade from `youtubeItem`, a spin
+    from `spinItem`, a model from `modelItem`) with a trigger per item (`thumbnailSrc`). The
+    renderers are the add-ons' own: `renderEmbed`, `createSpinRenderer()` and
+    `createModelRenderer({ load })` loading `modelViewerUrl`. Elements and JS pass them as they
+    are; React, Vue, Solid and Angular wrap each in the framework's renderer API (a component, or
+    in Solid a returned element, that calls the add-on on an element of its own with the slide's
+    item, index, signal and activity). The spec stubs YouTube, its stills and the CDN
+    `<model-viewer>` (`tests/browser/support/media.ts`). Test: open trigger 1 → "Item 1 of 4",
+    the photo; Next → "Item 2 of 4", no player requested yet; click the slide's "Play" → an
+    `iframe` from `https://www.youtube-nocookie.com/embed/M7lc1UVf-VE?`; Next → "Item 3 of 4",
+    `[data-fluidbox-spin]` at `data-frame="0"`; focus it, ArrowRight → `data-frame="1"`; Next →
+    "Item 4 of 4", `[data-fluidbox-model-ready]` in the slide and `<model-viewer>` requested once
+    from `modelViewerUrl`.

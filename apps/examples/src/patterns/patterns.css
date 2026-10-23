@@ -35,6 +35,7 @@
 }
 
 .pattern-thumb:focus-visible,
+.pattern-product:focus-visible,
 .pattern-card:focus-visible {
   outline: 2px solid var(--fb-fg);
   outline-offset: 2px;
@@ -211,4 +212,38 @@
   font: 600 13px / 1.4 var(--fb-font-sans);
   pointer-events: auto;
   cursor: pointer;
+}
+
+/* The zoom pattern's readout in the viewer: the zoom the image rests at. */
+.pattern-zoom-level {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 16px;
+  min-width: 4.5em;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: white;
+  background: #000a;
+  font: 600 13px / 1.4 var(--fb-font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* The hover pattern's product photo: a square that magnifies under the mouse. */
+.pattern-product {
+  display: block;
+  width: min(100%, 360px);
+  padding: 0;
+  border: 1px solid var(--fb-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--fb-bg);
+  cursor: zoom-in;
+}
+
+.pattern-product img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }

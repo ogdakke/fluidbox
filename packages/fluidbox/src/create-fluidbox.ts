@@ -438,11 +438,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   zoomIn(options?: FluidboxZoomCommandOptions) {
-    return this.#zoomCommand((zoom) => zoom.scale * ZOOM_FACTOR, "api", options);
+    return this.#zoomCommand((from) => from * ZOOM_FACTOR, "api", options);
   }
 
   zoomOut(options?: FluidboxZoomCommandOptions) {
-    return this.#zoomCommand((zoom) => zoom.scale / ZOOM_FACTOR, "api", options);
+    return this.#zoomCommand((from) => from / ZOOM_FACTOR, "api", options);
   }
 
   resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">) {
@@ -450,7 +450,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   #zoomCommand(
-    scale: (zoom: FluidboxZoomState) => number,
+    /** The scale to zoom to, from the one the zoom rests at or is heading to. */
+    scale: (from: number) => number,
     reason: "api" | "keyboard" | "pointer",
     options: FluidboxZoomCommandOptions = {},
   ): Promise<boolean> {
@@ -458,7 +459,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     if (this.#lifetime.signal.aborted || !zoom || !this.#viewer || options.signal?.aborted) {
       return Promise.resolve(false);
     }
-    const target = Math.max(zoom.min, Math.min(zoom.max, scale(zoom)));
+    // A zoom under way counts as where it is heading, so steps in quick succession add up.
+    const from = this.#viewer.zoomGoal() ?? zoom.scale;
+    const target = Math.max(zoom.min, Math.min(zoom.max, scale(from)));
     return this.#viewer.zoomTo(target, { ...options, reason });
   }
 
@@ -697,10 +700,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       takeOver: (index) => this.#command("open", index, "api", { instant: true }),
       zoom: (name, reason) =>
         this.#zoomCommand(
-          (zoom) =>
-            name === "zoomReset"
-              ? 1
-              : zoom.scale * (name === "zoomIn" ? ZOOM_FACTOR : 1 / ZOOM_FACTOR),
+          (from) =>
+            name === "zoomReset" ? 1 : from * (name === "zoomIn" ? ZOOM_FACTOR : 1 / ZOOM_FACTOR),
           reason,
         ),
       // Drop the viewer, keeping what it needs, so the next press or open makes a new one.

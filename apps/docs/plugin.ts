@@ -133,9 +133,10 @@ const dataImports = (code: string) =>
 
 /**
  * The patterns overview's "The example data" section is the `./data` every example imports, so a
- * pattern that imports a name the section doesn't define fails the build.
+ * pattern that imports a name the section doesn't define fails the build. `patterns` are the ones
+ * the pages embed, wherever they are.
  */
-function checkExampleData(overview: string) {
+function checkExampleData(overview: string, patterns: readonly string[]) {
   const section = /^## The example data\n([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(overview)?.[1] ?? "";
   const defined = new Set(
     [...section.matchAll(/^export (?:const|function|type|interface) (\w+)/gm)].map(
@@ -143,7 +144,6 @@ function checkExampleData(overview: string) {
     ),
   );
   const missing = new Set<string>();
-  const patterns = [...overview.matchAll(/\]\(\.\/([\w-]+)\.md\)/g)].map((match) => match[1]!);
   for (const { key } of frameworks) {
     for (const pattern of patterns) {
       for (const { file, code } of patternFiles(key, pattern)) {
@@ -216,8 +216,8 @@ function patternMarkdown(pattern: string): string {
 }
 
 /** A pattern as a pointer to its page's Markdown, which has the code in every framework. */
-function patternLink(pattern: string): string {
-  const url = `${site}${routeFor(`patterns/${pattern}`).replace(/\/$/, "")}.md`;
+function patternLink(slug: string): string {
+  const url = `${site}${routeFor(slug).replace(/\/$/, "")}.md`;
   return `The code for this example in every framework (${frameworks.map(({ label }) => label).join(", ")}) is in [${url}](${url}).`;
 }
 
@@ -293,7 +293,7 @@ function renderPage(md: MarkdownIt, slug: string, source: string): DocPage {
       .replace(/^\|.*\|$/gm, (row) => row.replace(/ {2,}\|/g, " |").replace(/-{4,}/g, "---"))
       .trim();
   const markdown = copy(patternMarkdown);
-  const summary = copy(patternLink);
+  const summary = copy(() => patternLink(slug));
   return {
     slug,
     path: routeFor(slug),
@@ -317,7 +317,12 @@ function contentFiles(directory = contentDir): string[] {
 }
 
 export function loadPages(): DocPage[] {
-  checkExampleData(readFileSync(join(contentDir, "patterns/index.md"), "utf8"));
+  const embedded = contentFiles().flatMap((file) =>
+    [...readFileSync(file, "utf8").matchAll(PATTERN_DIRECTIVE)].map((match) => match[1]!),
+  );
+  checkExampleData(readFileSync(join(contentDir, "patterns/index.md"), "utf8"), [
+    ...new Set(embedded),
+  ]);
   const md = createRenderer();
   const pages = contentFiles()
     .map((file) =>

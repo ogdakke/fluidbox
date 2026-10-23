@@ -408,7 +408,7 @@ test.describe("360° spin", () => {
 });
 
 test.describe("3D model", () => {
-  const model = "/products/fjord-model.glb";
+  const model = "/products/damaged-helmet/damaged-helmet.glb";
 
   test("loads model-viewer only once its slide is on show, and shows its poster till then", async ({
     page,
@@ -417,7 +417,7 @@ test.describe("3D model", () => {
     await open(page, "/products/spin/fjord-00.webp");
     // The neighbour shows its poster, and nothing loads for it.
     const poster = page.locator('[data-fluidbox-model] [data-fluidbox-media-poster="poster"]');
-    await expect(poster).toHaveAttribute("src", "/products/fjord-model.webp");
+    await expect(poster).toHaveAttribute("src", "/products/damaged-helmet/damaged-helmet.webp");
     await page.waitForTimeout(200);
     expect(requests.modelViewer).toEqual([]);
     await expect(page.locator("model-viewer")).toHaveCount(0);
@@ -428,12 +428,12 @@ test.describe("3D model", () => {
     expect(requests.modelViewer).toHaveLength(1);
     for (const [name, value] of [
       ["src", model],
-      ["alt", "Framed print in 3D"],
+      ["alt", "Damaged Helmet in 3D"],
       ["camera-controls", ""],
       ["touch-action", "none"],
       ["ar", ""],
       ["ar-modes", "webxr quick-look"],
-      ["ios-src", "/products/fjord-model.usdz"],
+      ["ios-src", "/products/damaged-helmet/damaged-helmet.usdz"],
       ["data-fluidbox-owns-input", ""],
     ]) {
       await expect(element).toHaveAttribute(name!, value!);
