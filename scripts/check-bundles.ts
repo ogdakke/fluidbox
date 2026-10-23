@@ -56,15 +56,16 @@ const initialGzipLimits: Record<Entry, number> = {
 };
 const cssGzipLimit = 3_650;
 // Right-to-left support added about 200 B to every core entry's viewer chunk, and
-// zoom steps that add up before a zoom rests about 90 B.
+// zoom steps that add up before a zoom rests about 90 B, and fitting an image a
+// zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 37_200,
+  root: 37_300,
   // The gallery loads the filmstrip and sheet entries when it holds their elements.
-  elements: 40_600,
-  react: 42_500,
-  solid: 40_350,
-  vue: 41_100,
-  angular: 41_550,
+  elements: 40_700,
+  react: 42_600,
+  solid: 40_450,
+  vue: 41_200,
+  angular: 41_650,
   filmstrip: 3_700,
   sheet: 7_300,
   kit: 1_700,
@@ -74,12 +75,12 @@ const activationJsGzipLimits: Record<Entry, number> = {
   spin: 2_500,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 40_750,
-  elements: 44_150,
-  react: 46_100,
-  solid: 43_900,
-  vue: 44_650,
-  angular: 45_100,
+  root: 40_850,
+  elements: 44_250,
+  react: 46_200,
+  solid: 44_000,
+  vue: 44_750,
+  angular: 45_200,
   filmstrip: 5_100,
   sheet: 8_600,
   kit: 5_250,

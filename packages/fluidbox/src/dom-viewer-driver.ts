@@ -457,7 +457,10 @@ export class DomViewerDriver<
     };
     return this.#loadZoom()
       .then((zoom) => zoom?.zoomTo(scale, options) ?? false)
-      .then(settle);
+      .then(settle, (error: unknown) => {
+        settle(false);
+        throw error;
+      });
   }
 
   connect(

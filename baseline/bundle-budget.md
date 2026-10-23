@@ -6,12 +6,12 @@ The check builds one small consumer per public entry with tsdown as minified bro
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | -----------------------: |
-| Root           |         9,124 B |           37,137 B |                 40,702 B |
-| Elements       |        13,083 B |           40,528 B |                 44,093 B |
-| React          |        14,864 B |           42,459 B |                 46,024 B |
-| Solid          |        12,722 B |           40,287 B |                 43,852 B |
-| Vue            |        13,443 B |           41,045 B |                 44,610 B |
-| Angular        |        13,897 B |           41,485 B |                 45,050 B |
+| Root           |         9,126 B |           37,231 B |                 40,796 B |
+| Elements       |        13,082 B |           40,620 B |                 44,185 B |
+| React          |        14,864 B |           42,551 B |                 46,116 B |
+| Solid          |        12,723 B |           40,379 B |                 43,944 B |
+| Vue            |        13,443 B |           41,138 B |                 44,703 B |
+| Angular        |        13,898 B |           41,578 B |                 45,143 B |
 | Filmstrip      |         3,644 B |            3,644 B |                  5,016 B |
 | Sheet          |         7,249 B |            7,249 B |                  8,559 B |
 | Kit            |         1,635 B |            1,635 B |                  5,200 B |
@@ -30,6 +30,6 @@ The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each cor
 - Zoom: the zoom commands, state and event, zoom controls, keyboard pan, and the sharper image when zoomed.
 - Media: slide activity for custom renderers and owned-input arbitration. The hover zoom, embeds, model and spin add-ons have budgets of their own and add nothing to a page that doesn't import them.
 
-On 2026-10-23 zoom steps taken before a zoom rests (Zoom in pressed twice, `+ +`, `zoomIn()` twice) started adding up instead of repeating the first step. That moved each core entry about 10 B initial and 90 B activation, in the viewer driver and the zoom engine.
+On 2026-10-23 zoom steps taken before a zoom rests (Zoom in pressed twice, `+ +`, `zoomIn()` twice) started adding up instead of repeating the first step. That moved each core entry about 10 B initial and 90 B activation, in the viewer driver and the zoom engine. Fitting the image a zoom left once the viewer closes or moves to another item, so it doesn't open or come back still zoomed, added about 100 B activation more.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.
