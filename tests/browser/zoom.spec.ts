@@ -194,6 +194,50 @@ test.describe("zoom accessibility", () => {
   });
 });
 
+test.describe("zoom resets", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    test(`a zoomed image closes, and opens again at fit (${reducedMotion})`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion });
+      await openOn(page, "ladder");
+      await page.locator("[data-fluidbox-zoom-in]").click();
+      await expect.poll(() => paintedScale(page)).toBeCloseTo(1.5, 2);
+      await page.keyboard.press("Escape");
+      // Settled: the closing flight is over and the viewer has left the page.
+      await expect.poll(() => page.evaluate(() => window.zoomViewer.state.status)).toBe("closed");
+      await expect(page.locator(dialog)).toHaveCount(0);
+      await page.locator('[data-zoom-id="ladder"]').click();
+      await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+      expect(await paintedScale(page)).toBe(1);
+      expect(await zoomState(page)).toMatchObject({ scale: 1 });
+      await expect(page.locator("[data-fluidbox-zoom-out]")).toBeDisabled();
+      // And it zooms from there, rather than from the pose it closed in.
+      await page.locator("[data-fluidbox-zoom-in]").click();
+      await expect.poll(() => paintedScale(page)).toBeCloseTo(1.5, 2);
+    });
+  }
+
+  test("an image left zoomed shows at fit when the viewer comes back to it", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await openOn(page, "ladder");
+    await page.locator("[data-fluidbox-zoom-in]").click();
+    await expect.poll(() => paintedScale(page)).toBeCloseTo(1.5, 2);
+    await page.locator("[data-fluidbox-next]").click();
+    await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
+      "aria-label",
+      /^Item 2 of/,
+    );
+    await page.locator("[data-fluidbox-previous]").click();
+    await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
+      "aria-label",
+      /^Item 1 of/,
+    );
+    await expect.poll(() => paintedScale(page)).toBe(1);
+    expect(await zoomState(page)).toMatchObject({ scale: 1 });
+  });
+});
+
 test.describe("zoom by pointer", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
 

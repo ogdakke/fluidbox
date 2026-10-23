@@ -97,6 +97,8 @@ export class FluidboxZoom {
   } | null = null;
   #controller = new AbortController();
   #image: HTMLElement | null = null;
+  /** An image a suspend left in its zoomed pose, for a closing flight or a move to start from. */
+  #left: HTMLElement | null = null;
   #pose = fit();
   #geometry = {
     left: 0,
@@ -846,9 +848,13 @@ export class FluidboxZoom {
     return true;
   }
 
-  /** Leave the visible transform intact for the dismissal animation. */
+  /**
+   * Leave the visible transform intact for the dismissal animation, until
+   * `release` puts the image back at fit.
+   */
   suspend() {
     this.#freeze();
+    if (this.#image) this.#left = this.#image;
     clearTimeout(this.#idle);
     clearTimeout(this.#clickTimer);
     this.#source = null;
@@ -860,8 +866,19 @@ export class FluidboxZoom {
     this.#options.state(false);
     this.#report(1, undefined);
   }
+  /**
+   * Fit the image a suspend left zoomed, once nothing shows it: the viewer has
+   * closed, or moved to another item. Otherwise it would open, or come back
+   * into view, still zoomed while the zoom reads as fitted.
+   */
+  release() {
+    const image = this.#left;
+    this.#left = null;
+    if (image && image !== this.#image) image.style.removeProperty("--fluidbox-media-transform");
+  }
   destroy() {
     this.suspend();
+    this.release();
     this.#controller.abort();
   }
 }

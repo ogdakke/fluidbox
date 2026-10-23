@@ -731,6 +731,8 @@ export class DomViewerDriver<
       await this.#strip?.select(context.index, smooth, context.step);
       if (context.signal.aborted || this.#destroyed) return;
     }
+    // The item left behind scrolled away zoomed; coming back, it shows at fit.
+    this.#zoom?.release();
     this.#render(context.item, context.index, true);
     // The overlay is invisible while open. Moving it between slide frames
     // during native scrolling can invalidate the browser's painted snap.
@@ -1921,6 +1923,8 @@ export class DomViewerDriver<
     this.#isolation.deactivate();
     this.#portal.overlay.remove();
     this.#strip?.hide();
+    // The closing flight started from the zoomed pose; the next opening starts at fit.
+    this.#zoom?.release();
     this.#setState("closed");
     const returnFocus = this.#returnFocus?.isConnected
       ? this.#returnFocus
