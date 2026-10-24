@@ -5,10 +5,19 @@ const port = Number(process.env.FLUIDBOX_PORT) || 4173;
 const baseURL = `http://127.0.0.1:${port}`;
 // FLUIDBOX_SERVER=preview serves the built examples (bun run build:examples) instead of the dev server.
 const preview = process.env.FLUIDBOX_SERVER === "preview";
-// FLUIDBOX_RECORD=off records no trace or video; first-retry records them on a retry only.
-const record = process.env.FLUIDBOX_RECORD;
-const recording =
-  record === "off" ? "off" : record === "first-retry" ? "on-first-retry" : "retain-on-failure";
+// FLUIDBOX_RECORD chooses when to record a trace and video. Locally nothing is recorded unless
+// asked for; CI records the retry of a failure.
+const recordings = {
+  off: "off",
+  on: "on",
+  "retain-on-failure": "retain-on-failure",
+  "first-retry": "on-first-retry",
+} as const;
+const record = process.env.FLUIDBOX_RECORD || (process.env.CI ? "first-retry" : "off");
+if (!Object.hasOwn(recordings, record)) {
+  throw new Error(`FLUIDBOX_RECORD must be one of ${Object.keys(recordings).join(", ")}.`);
+}
+const recording = recordings[record as keyof typeof recordings];
 
 export default defineConfig({
   testDir: "./tests/browser",
