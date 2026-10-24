@@ -463,13 +463,32 @@ test.describe("video sources and attach", () => {
     const player = page.locator(video);
     await expect(player).toHaveAttribute("src", "/video/drift.mp4");
     await expect(player.locator("source")).toHaveCount(0);
-    for (const position of [2, 3]) {
+    for (const position of [2, 3, 4]) {
       await page.keyboard.press("ArrowRight");
-      await expect(page.locator(shown)).toHaveAttribute("aria-label", `Item ${position} of 3`);
+      await expect(page.locator(shown)).toHaveAttribute("aria-label", `Item ${position} of 4`);
     }
     await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.slidesFixture.attached.filter((entry) => entry.split(" ")[1] === "stream"),
+        ),
+      )
+      .toEqual(["attach stream 0", "load stream", "abort stream /video/drift.mp4"]);
+  });
+
+  test("attach tells a neighbour's engine to wait until its slide shows", async ({ page }) => {
+    await load(page);
+    await open(page, "#streamed", "stream");
+    // The neighbour mounted beside the opened video: attached, but not loading.
+    await expect
       .poll(() => page.evaluate(() => window.slidesFixture.attached))
-      .toEqual(["attach stream 0", "abort stream /video/drift.mp4"]);
+      .toContain("attach stream-2 0");
+    const neighbour = page.locator('[data-fluidbox-slide][aria-hidden="true"] video').first();
+    await expect(neighbour).not.toHaveAttribute("src");
+    expect(await page.evaluate(() => window.slidesFixture.attached)).not.toContain("load stream-2");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator(video)).toHaveAttribute("src", "/video/drift.webm");
+    expect(await page.evaluate(() => window.slidesFixture.attached)).toContain("load stream-2");
   });
 });
 

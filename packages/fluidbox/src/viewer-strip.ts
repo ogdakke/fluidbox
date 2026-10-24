@@ -16,6 +16,7 @@ import type {
   FluidboxImageItem,
   FluidboxThumbnail,
   FluidboxVideoItem,
+  FluidboxVideoAttachSlide,
   FluidboxVideoOptions,
   FluidboxZoomableOptions,
   FluidboxZoomPose,
@@ -110,8 +111,8 @@ interface ViewerSlide {
   controller?: AbortController;
   /** A playing origin's picture, shown until the slide's player catches up with it. */
   videoHandoff?: AbortController;
-  /** How a custom slide's drawn video loads: `attach` from `drawVideo`. */
-  videoOptions?: FluidboxVideoOptions;
+  /** How a custom slide's drawn video loads: `attach` from `drawVideo`, and the slide it tells. */
+  videoOptions?: FluidboxVideoOptions & { readonly slide: FluidboxVideoAttachSlide };
   /** The load of a sharper candidate for the zoom, until it swaps in. */
   sharpening?: AbortController;
   /** The URL of the sharper candidate the image shows for the zoom, if any. */
@@ -1302,7 +1303,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #loadVideo(slide: ViewerSlide, item: FluidboxVideoItem, video: HTMLVideoElement) {
     for (const source of video.querySelectorAll(":scope > source")) source.remove();
     if (item.poster) video.poster = item.poster;
-    const attach = slide.videoOptions?.attach;
+    const { attach, slide: shown } = slide.videoOptions ?? {};
     if (!attach && !item.sources?.length) {
       video.src = item.src;
       return;
@@ -1311,7 +1312,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.controller = controller;
     if (attach) {
       try {
-        attach(video, controller.signal, item);
+        attach(video, controller.signal, item, shown!);
       } catch (error) {
         console.error(error);
         this.#fail(slide);
@@ -1427,7 +1428,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       },
       drawImage: (image?: FluidboxItem) => this.#draw(slide, signal, "image", image ?? item),
       drawVideo: (video?: FluidboxItem, options?: FluidboxVideoOptions) =>
-        this.#draw(slide, signal, "video", video ?? item, options),
+        this.#draw(
+          slide,
+          signal,
+          "video",
+          video ?? item,
+          options && { ...options, slide: context },
+        ),
       drawIframe: (iframe?: FluidboxItem) => this.#draw(slide, signal, "iframe", iframe ?? item),
     };
     try {
@@ -1447,7 +1454,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     signal: AbortSignal,
     type: DrawnItem["type"],
     item: FluidboxItem,
-    videoOptions?: FluidboxVideoOptions,
+    videoOptions?: ViewerSlide["videoOptions"],
   ) {
     if (item.type !== type) {
       throw new TypeError(`Fluidbox draws ${type} items here, not "${item.type}" ones.`);

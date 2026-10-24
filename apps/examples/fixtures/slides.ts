@@ -237,6 +237,7 @@ const attached: string[] = [];
 
 const streamedItems: FluidboxItem[] = [
   { ...clip("stream", [], "/video/drift.mp4"), sources: undefined },
+  { ...clip("stream-2", [], "/video/drift.webm"), sources: undefined },
   photo("frame-1", "/photo-square.svg"),
   photo("frame-2", "/photo-square.svg"),
 ];
@@ -244,11 +245,21 @@ const streamedItems: FluidboxItem[] = [
 const streamed: Fluidbox = createFluidbox({
   items: streamedItems,
   slides: {
-    // As an engine would: it sets the src itself, and lets go as the signal aborts.
+    // As an engine would: it loads only once its slide shows or opens, sets
+    // the src itself, and lets go as the signal aborts.
     video: videoSlide({
-      attach(video, signal, item) {
+      attach(video, signal, item, slide) {
         attached.push(`attach ${item.id} ${video.querySelectorAll("source").length}`);
-        video.src = item.src;
+        const start = () => {
+          if (video.hasAttribute("src")) return;
+          attached.push(`load ${item.id}`);
+          video.src = item.src;
+        };
+        if (slide.active || slide.opening) start();
+        else {
+          const stop = slide.onActiveChange((active) => active && start());
+          signal.addEventListener("abort", stop);
+        }
         signal.addEventListener("abort", () =>
           attached.push(`abort ${item.id} ${video.getAttribute("src")}`),
         );

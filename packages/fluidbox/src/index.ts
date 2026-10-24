@@ -48,6 +48,7 @@ export type {
   FluidboxValueChangeAction,
   FluidboxValueChangeDetails,
   FluidboxVideoItem,
+  FluidboxVideoAttachSlide,
   FluidboxVideoOptions,
   FluidboxVideoSource,
   FluidboxVideoTrack,

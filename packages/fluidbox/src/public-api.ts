@@ -84,15 +84,30 @@ export interface FluidboxVideoSource {
   readonly media?: string;
 }
 
+/**
+ * Whether the slide an attached video is in shows, so an engine can hold its
+ * downloads for a neighbour, as a built-in video only fetches what `preload`
+ * allows until it plays.
+ */
+export type FluidboxVideoAttachSlide = Pick<FluidboxSlide, "active" | "opening" | "onActiveChange">;
+
 /** How the built-in video loads. */
 export interface FluidboxVideoOptions {
   /**
    * Load the media yourself: the runtime sets no `src` and no `<source>`.
-   * Called when the slide loads, neighbours too; clean up when `signal`
-   * aborts, which happens before the runtime empties the video. The item's
-   * URLs are still checked; what `attach` loads is yours to trust.
+   * Called when the slide loads, neighbours too, so start fetching segments
+   * once `slide.active` or `slide.opening` is true or `onActiveChange` says
+   * so, as hls.js does with `autoStartLoad: false` and `startLoad()`. Clean
+   * up when `signal` aborts, which happens before the runtime empties the
+   * video. The item's URLs are still checked; what `attach` loads is yours
+   * to trust.
    */
-  readonly attach?: (video: HTMLVideoElement, signal: AbortSignal, item: FluidboxVideoItem) => void;
+  readonly attach?: (
+    video: HTMLVideoElement,
+    signal: AbortSignal,
+    item: FluidboxVideoItem,
+    slide: FluidboxVideoAttachSlide,
+  ) => void;
 }
 
 /** A `<video>`. */
