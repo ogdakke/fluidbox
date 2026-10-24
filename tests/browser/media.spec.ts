@@ -452,6 +452,61 @@ test.describe("3D model", () => {
     ).toBe(1);
   });
 
+  test("opens again on a model that draws: each show gets an element that never left the page", async ({
+    page,
+  }) => {
+    await load(page);
+    const ready = page.locator(`${shown} [data-fluidbox-model-ready]`);
+    const element = page.locator(`${shown} model-viewer`);
+    // A slow load, so an opening that didn't wait for the model would land first.
+    await page.evaluate(
+      () => ((window as { __modelViewerDelay?: number }).__modelViewerDelay = 900),
+    );
+    for (let round = 0; round < 3; round++) {
+      // Whether the model had drawn when the opening landed.
+      const landed = page.evaluate(
+        () =>
+          new Promise<boolean>((resolve) => {
+            const observer = new MutationObserver(() => {
+              const dialog = document.querySelector("[data-fluidbox-dialog]");
+              if (dialog?.getAttribute("data-fluidbox-status") !== "open") return;
+              observer.disconnect();
+              resolve(!!dialog.querySelector("[data-fluidbox-model-ready] model-viewer"));
+            });
+            observer.observe(document.body, {
+              subtree: true,
+              childList: true,
+              attributeFilter: ["data-fluidbox-status"],
+            });
+          }),
+      );
+      await open(page, model);
+      expect(await landed).toBe(true);
+      await expect(ready).toHaveCount(1);
+      await expect(element).toHaveCount(1);
+      await expect(element).toHaveAttribute("data-connections", "1");
+      await expect(element).toBeVisible();
+      await expect(page.locator(`${shown} [data-fluidbox-media-poster="poster"]`)).toBeHidden();
+      await page.evaluate(() => window.mediaFixture.fluidbox.close());
+      await expect(page.locator(dialog)).toHaveCount(0);
+      // Off show, the slide keeps its poster and no element.
+      expect(await page.locator("model-viewer").count()).toBe(0);
+    }
+    // Away and back: a new element, on the poster until it loads.
+    await open(page, model);
+    await expect(ready).toHaveCount(1);
+    await page.evaluate(() => window.mediaFixture.fluidbox.next());
+    await expect(page.locator("model-viewer")).toHaveCount(0);
+    await page.evaluate(() => window.mediaFixture.fluidbox.previous());
+    await expect(page.locator(`${shown} [data-fluidbox-media-poster="poster"]`)).toBeVisible();
+    await expect(ready).toHaveCount(1);
+    await expect(element).toHaveAttribute("data-connections", "1");
+    await expect(page.locator(`${shown} [data-fluidbox-media-poster="poster"]`)).toBeHidden();
+    expect(
+      await page.evaluate(() => (window as { __modelViewerLoads?: number }).__modelViewerLoads),
+    ).toBe(1);
+  });
+
   test("a drag turns the model, and the arrow keys turn it while focused", async ({ page }) => {
     await load(page);
     await open(page, model);

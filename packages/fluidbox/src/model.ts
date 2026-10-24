@@ -96,17 +96,21 @@ const modelStyles = `
 
 /**
  * Make the slide for model items. The slide shows the thumbnail, then the
- * poster. A model being opened loads `<model-viewer>` and the model at once,
- * and the opening waits for its first frame; a neighbour loads when it first
- * comes on show. The model shows once it has loaded. It owns its input: a drag
- * on it turns it, a pinch zooms it, and the arrow keys turn it while it has
- * focus, rather than moving the viewer.
+ * poster. Each time the slide comes on show it makes a `<model-viewer>`,
+ * loading the element the first time, and shows the model once it has loaded;
+ * an opening waits for its first frame. When the slide leaves the show the
+ * element goes and the poster returns: `<model-viewer>` draws nothing, or a
+ * clipped frame, once it has left the page and come back, as a closed
+ * viewer's slides do. The model owns its input: a drag on it turns it, a pinch
+ * zooms it, and the arrow keys turn it while it has focus, rather than moving
+ * the viewer.
  */
 export function createModelSlide(
   options: FluidboxModelSlideOptions = {},
 ): FluidboxSlideRenderer<FluidboxModelItem> {
   let loading: Promise<unknown> | undefined;
-  return ({ item, media: target, signal, active, opening, onActiveChange, waitUntil }) => {
+  return (slide) => {
+    const { item, media: target, signal, onActiveChange, waitUntil } = slide;
     const ownerDocument = target.ownerDocument;
     addStyles(ownerDocument, "model", posterStyles + modelStyles);
     const box = ownerDocument.createElement("div");
@@ -116,7 +120,9 @@ export function createModelSlide(
     target.append(box);
     let model: ModelViewerElement | undefined;
     let shown: Promise<void> | undefined;
-    const show = async () => {
+    // Each show counts, so one the slide has left stops making its element.
+    let shows = 0;
+    const show = async (run: number) => {
       const registry = ownerDocument.defaultView?.customElements;
       if (!registry) return;
       if (options.load && !registry.get("model-viewer")) {
@@ -128,8 +134,9 @@ export function createModelSlide(
         await loading;
       }
       await registry.whenDefined("model-viewer");
-      if (signal.aborted || model) return;
-      model = ownerDocument.createElement("model-viewer") as ModelViewerElement;
+      if (signal.aborted || run !== shows) return;
+      const element = ownerDocument.createElement("model-viewer") as ModelViewerElement;
+      model = element;
       // Content that owns its input: the viewer neither swipes, dismisses,
       // zooms nor steps from a gesture or a key that starts on the model.
       model.dataset.fluidboxOwnsInput = "";
@@ -144,39 +151,59 @@ export function createModelSlide(
       }
       // Its first frame: the load event, then a frame painted with it.
       const loaded = new Promise<void>((resolve, reject) => {
-        model!.addEventListener(
+        element.addEventListener(
           "load",
           () => {
+            if (model !== element) return resolve();
             box.dataset.fluidboxModelReady = "";
             ownerDocument.defaultView!.requestAnimationFrame(() => resolve());
           },
           { once: true, signal },
         );
-        model!.addEventListener("error", () => reject(new Error(`${item.src} didn't load`)), {
+        element.addEventListener("error", () => reject(new Error(`${item.src} didn't load`)), {
           once: true,
           signal,
         });
       });
-      model.addEventListener("error", () => (box.dataset.fluidboxModelError = ""), { signal });
+      element.addEventListener(
+        "error",
+        () => {
+          if (model === element) box.dataset.fluidboxModelError = "";
+        },
+        { signal },
+      );
       model.setAttribute("src", item.src);
       box.append(model);
       await loaded;
     };
     const start = () => {
-      shown ??= show().catch(() => {
+      if (shown) return shown;
+      const run = ++shows;
+      return (shown = show(run).catch(() => {
+        if (run !== shows) return;
         // A failed load of the element tries again when the slide next comes on show.
         if (!model) shown = undefined;
         box.dataset.fluidboxModelError = "";
-      });
-      return shown;
+      }));
     };
-    // The model being opened starts now and holds the flight for its first
-    // frame; neighbouring slides keep their posters until they come on show.
-    if (opening) waitUntil(start());
-    else if (active) void start();
+    const hide = () => {
+      shows += 1;
+      shown = undefined;
+      model?.pause?.();
+      model?.remove();
+      model = undefined;
+      delete box.dataset.fluidboxModelReady;
+      delete box.dataset.fluidboxModelError;
+    };
+    // The model being opened, or opened again, starts now and holds the flight
+    // for its first frame; neighbouring slides keep their posters until they
+    // come on show.
+    if (slide.opening) waitUntil(start());
+    else if (slide.active) void start();
     return onActiveChange((now) => {
-      if (now) void start();
-      else model?.pause?.();
+      if (!now) hide();
+      else if (slide.opening) waitUntil(start());
+      else void start();
     });
   };
 }

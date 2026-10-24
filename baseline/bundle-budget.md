@@ -19,10 +19,10 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | Kit            |         1,499 B |            1,499 B |               0 B |           1,499 B |                  4,309 B |
 | Hover zoom     |         1,453 B |            1,453 B |               0 B |           1,453 B |                  4,263 B |
 | Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
-| Model          |         1,375 B |            1,375 B |               0 B |           1,375 B |                  4,185 B |
+| Model          |         1,449 B |            1,449 B |               0 B |           1,449 B |                  4,259 B |
 | Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
 | React embed    |        19,665 B |           53,268 B |           1,151 B |          54,419 B |                 56,078 B |
-| React model    |        18,229 B |           51,774 B |           1,151 B |          52,925 B |                 54,584 B |
+| React model    |        18,308 B |           51,852 B |           1,151 B |          53,003 B |                 54,662 B |
 | React spin     |        19,072 B |           52,595 B |           1,151 B |          53,746 B |                 55,405 B |
 
 `styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
@@ -57,6 +57,8 @@ The size pass after step 3 took back most of the React binding's growth:
 React's initial chunk ends at 17,149 B, 634 B under the step's peak, and still above the spec's estimate of 15,600–16,300 B. What is left is the parts themselves: `Root` with the slide host, the server viewer's take-over and the value sync is about 3.7 KB of the binding's 14 KB minified, `Trigger` 1.1 KB, and the attribute and status helpers that `Media`, `Loading` and `Error` need about 1.6 KB. `baseline.css` grew 24 B: the selected thumbnail's bar and the forced-colours edges are outlines now, which a reset that zeroes borders leaves alone.
 
 The trigger video's playback for custom players and the click and tap zoom modes added about 420 B to every viewer's activation, against the spec's estimate of 150–250 B: `origin` and its live view, `returnPlayback` and the built-in video's registration, the origin video found at open and close, the zoom option's two modes and the `data-fluidbox-zoom-click` mark. The custom elements' `zoom-click` and `zoom-tap` attributes added 80 B to their initial chunk.
+
+The model slide grew 74 B, to 1,449 B, when it began to make a fresh `<model-viewer>` each time its slide comes on show and remove it when the slide leaves, holding a reopen for the new element's first frame: the element draws nothing, or a clipped frame, once it has left the page and come back.
 
 The React add-on parts are entries of their own, `react/embed`, `react/model` and `react/spin`. Each consumer imports `Fluidbox` and the part, so it measures the binding, the part and the add-on together; each also checks that it carries no other add-on.
 
