@@ -38,23 +38,23 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 // Controlled open and index added about 250 B to each binding's initial chunk,
 // and looping about 100 B to the core's and 270 B to its viewer chunk.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 9_200,
-  elements: 13_150,
-  react: 14_950,
-  solid: 12_800,
-  vue: 13_500,
-  angular: 13_950,
-  thumbnails: 3_700,
-  sheet: 7_300,
-  kit: 1_700,
+  root: 10_350,
+  elements: 14_400,
+  react: 16_350,
+  solid: 14_200,
+  vue: 14_850,
+  angular: 15_250,
+  thumbnails: 3_850,
+  sheet: 7_350,
+  kit: 1_750,
   // The hover zoom add-on, loaded by pages that magnify their photos on hover.
   "hover-zoom": 1_500,
   // The media add-ons carry their few rules in their JS.
-  embeds: 2_800,
-  model: 1_350,
-  spin: 2_500,
+  embeds: 2_600,
+  model: 1_400,
+  spin: 2_550,
 };
-const cssGzipLimit = 3_650;
+const cssGzipLimit = 2_800;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
 // entry's activation total.
 const baselineCssGzipLimit = 3_300;
@@ -62,36 +62,36 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 37_300,
+  root: 44_600,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 40_700,
-  react: 42_600,
-  solid: 40_450,
-  vue: 41_200,
-  angular: 41_650,
-  thumbnails: 3_700,
-  sheet: 7_300,
-  kit: 1_700,
+  elements: 47_850,
+  react: 49_950,
+  solid: 47_750,
+  vue: 48_450,
+  angular: 48_800,
+  thumbnails: 3_850,
+  sheet: 7_350,
+  kit: 1_750,
   "hover-zoom": 1_500,
-  embeds: 2_800,
-  model: 1_350,
-  spin: 2_500,
+  embeds: 2_600,
+  model: 1_400,
+  spin: 2_550,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 40_850,
-  elements: 44_250,
-  react: 46_200,
-  solid: 44_000,
-  vue: 44_750,
-  angular: 45_200,
-  thumbnails: 5_100,
-  sheet: 8_600,
-  kit: 5_250,
+  root: 47_350,
+  elements: 50_600,
+  react: 52_700,
+  solid: 50_500,
+  vue: 51_200,
+  angular: 51_550,
+  thumbnails: 4_900,
+  sheet: 8_350,
+  kit: 4_450,
   // It needs no stylesheet; the base one counts, as for the kit.
-  "hover-zoom": 5_100,
-  embeds: 6_350,
-  model: 4_950,
-  spin: 6_050,
+  "hover-zoom": 4_250,
+  embeds: 5_350,
+  model: 4_150,
+  spin: 5_250,
 };
 
 const jsonIndex = process.argv.indexOf("--json");

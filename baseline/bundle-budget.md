@@ -1,26 +1,26 @@
 # Bundle budget baseline
 
-Measured on 2026-10-23 with Bun 1.4.2 and tsdown 0.23.0 on Linux x86_64. Run `bun run test:bundle` from the workspace root to rebuild the package and check these limits. To save the per-chunk results as JSON after a build, run `bun run scripts/check-bundles.ts --json /tmp/fluidbox-bundles.json`. The limits themselves live in `scripts/check-bundles.ts`; this page records what they measure and why they moved.
+Measured on 2026-10-24 with Bun 1.4.3 and tsdown 0.23.0 on Linux x86_64. Run `bun run test:bundle` from the workspace root to rebuild the package and check these limits. To save the per-chunk results as JSON after a build, run `bun run scripts/check-bundles.ts --json /tmp/fluidbox-bundles.json`. The limits themselves live in `scripts/check-bundles.ts`; this page records what they measure and why they moved.
 
 The check builds one small consumer per public entry with tsdown as minified browser ESM targeting ES2022. It follows static and dynamic imports from each entry and counts each reachable emitted JS chunk once. Only the entry's own framework peer stays external: React, Solid, Vue, or Angular. An unresolved runtime external or an unrelated framework import fails the check. It gzips each emitted chunk separately, then sums those byte counts to estimate JS transfer. CSS is `packages/fluidbox/dist/styles.css`, measured as its own resource and added once to the activation total. Initial JS is what an entry loads before anyone touches a trigger; activation JS adds the lazy chunks the viewer loads on hover, press or idle.
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | -----------------------: |
-| Root           |         9,126 B |           37,231 B |                 40,796 B |
-| Elements       |        13,082 B |           40,620 B |                 44,185 B |
-| React          |        14,864 B |           42,551 B |                 46,116 B |
-| Solid          |        12,723 B |           40,379 B |                 43,944 B |
-| Vue            |        13,443 B |           41,138 B |                 44,703 B |
-| Angular        |        13,898 B |           41,578 B |                 45,143 B |
-| Thumbnails     |         3,644 B |            3,644 B |                  5,016 B |
-| Sheet          |         7,249 B |            7,249 B |                  8,559 B |
-| Kit            |         1,635 B |            1,635 B |                  5,200 B |
-| Hover zoom     |         1,456 B |            1,456 B |                  5,021 B |
-| Embeds         |         2,711 B |            2,711 B |                  6,276 B |
-| Model          |         1,300 B |            1,300 B |                  4,865 B |
-| Spin           |         2,426 B |            2,426 B |                  5,991 B |
+| Root           |        10,272 B |           44,540 B |                 47,277 B |
+| Elements       |        14,346 B |           47,785 B |                 50,522 B |
+| React          |        16,284 B |           49,875 B |                 52,612 B |
+| Solid          |        14,113 B |           47,696 B |                 50,433 B |
+| Vue            |        14,762 B |           48,389 B |                 51,126 B |
+| Angular        |        15,197 B |           48,734 B |                 51,471 B |
+| Thumbnails     |         3,763 B |            3,763 B |                  4,857 B |
+| Sheet          |         7,277 B |            7,277 B |                  8,283 B |
+| Kit            |         1,662 B |            1,662 B |                  4,399 B |
+| Hover zoom     |         1,453 B |            1,453 B |                  4,190 B |
+| Embeds         |         2,529 B |            2,529 B |                  5,266 B |
+| Model          |         1,333 B |            1,333 B |                  4,070 B |
+| Spin           |         2,463 B |            2,463 B |                  5,200 B |
 
-`styles.css` is 3,565 B gzip. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
+`styles.css` is 2,737 B gzip. The opt-in `baseline.css` is 3,218 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
 The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each core entry, record the hardening and product-media work merged together:
 
@@ -31,5 +31,12 @@ The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each cor
 - Media: slide activity for custom renderers and owned-input arbitration. The hover zoom, embeds, model and spin add-ons have budgets of their own and add nothing to a page that doesn't import them.
 
 On 2026-10-23 zoom steps taken before a zoom rests (Zoom in pressed twice, `+ +`, `zoomIn()` twice) started adding up instead of repeating the first step. That moved each core entry about 10 B initial and 90 B activation, in the viewer driver and the zoom engine. Fitting the image a zoom left once the viewer closes or moves to another item, so it doesn't open or come back still zoomed, added about 100 B activation more.
+
+On 2026-10-24 the API redesign moved every core entry by about 1.15 KB initial and 7.3 KB activation, against 9,126 B and 37,231 B on 2026-10-23:
+
+- Initial: the value model (`beforevaluechange`, `valuechange` and `valuechangecomplete` with `previousValue` and `action`) in place of the toggle and item events; `findTrigger` and `revealTrigger`; item checks for `fit: "fill"`, `data` and media kinds; full screen, Download, Share, `shareUrl`, the dismiss and wheel options; and the `bindControl` stub, which loads its wiring on first use.
+- Activation: slides for every media kind with their own error and retry states, item `data` on slides and thumbnails, full screen with its WebKit fallback, Download through `fetch` for cross-origin files, Share with its clipboard fallback, the wheel modes, the rubber band when drag-to-dismiss is off, the `mediaerror` event, and the control wiring that `bindControl` shares with the layer.
+- The control icons are gone: controls are text until an `icons` factory or `baseline.css` gives them a glyph. Each binding's initial chunk lost its icon builder and paths, about 370 B on React against the redesign before that.
+- `styles.css` lost 830 B to `baseline.css`, which holds the colours, shadows, radii, transitions and mask glyphs. The embeds add-on lost its Play SVG; model and spin lost their looks.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.
