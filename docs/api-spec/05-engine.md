@@ -250,7 +250,9 @@ readonly slide = injectFluidboxSlide();
 - A call once the flight is under way doesn't delay it. Development builds warn.
 - A rejected promise counts as settled. The open goes ahead and the slide shows its own error
   state.
-- Outside an open (moving between slides, or a neighbour mounting) the promise is ignored.
+- Outside an open (moving between slides, or a neighbour mounting) no open waits on the promise,
+  but the slide keeps it until it settles: the slideshow (§2.19) waits on the next slide with the
+  same `ready(index, cap)`, which therefore stays callable outside an open.
 
 The add-ons call it themselves, so app code never does it for them (§4):
 

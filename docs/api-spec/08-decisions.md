@@ -207,3 +207,69 @@ anywhere inside the gallery, not only as a direct child.
 **Recommendation: none.** The package is `0.0.0` and unpublished. Old names are removed in the same
 change that adds the new ones; the inventory (part 1) is the migration table for the examples and
 docs in this repo, and nothing outside it depends on the old names.
+
+## 8.14 The third amendment: ten additions
+
+**Decided (approved by the user):** fullscreen, download and share, a media error event, turning
+gestures off, styling by item, motion speed, hotspots, deep zoom (after 1.0, as an add-on), a
+slideshow and `reachend`. Items 1–5 are built in steps 1 and 2; items 6–10 in a new step 7, after
+React (§9.2). The decisions below are the refinements made while specifying them. Each is
+recommended, and can be overturned on its own.
+
+## 8.15 `wheel` names today's behaviour
+
+**Recommendation: `wheel: "dismiss" | "zoom" | "navigate" | "none"`, default `"dismiss"`.**
+
+The sketch had `"zoom" | "navigate" | "none"` with "today's behaviour" as the default. Today a
+vertical wheel on an unzoomed slide dismisses the viewer (`#onWheel`,
+`dom-viewer-driver.ts:2184`). An option whose default can't be written as one of its values is
+hard to document and to set back, so it gets a name.
+
+## 8.16 One `dismiss`
+
+**Recommendation: the Root's `dismiss: { drag, backdrop }` keeps the name; the sheet's
+`dismiss: "flight" | "scroll" | "none"` becomes `dismissMotion: "flight" | "scroll"`.**
+
+The two answered different questions: "what may close the viewer" and "how does the photo leave
+when it does". The sheet's `"none"` was the first question asked in the wrong place, and it equals
+`dismiss: { drag: false }`.
+
+## 8.17 Unavailable controls are hidden
+
+**Recommendation: Fullscreen, Download, Share and Slideshow get `hidden` when they can't work
+(iPhone, an item with no file, no Web Share and no clipboard, no `slideshow` option).**
+
+`disabled` suits a control that will work later in the same session, as Previous at the first
+slide does. A control that never works on this device or item would be a dead stop in the tab
+order. Apps that want a placeholder style `[data-fluidbox-download][hidden]`.
+
+## 8.18 Motion speed is a CSS property
+
+**Recommendation: `--fluidbox-motion-speed`, read when each motion is planned. No JS option.**
+
+That was the user's preference. It varies by breakpoint, theme or container like any custom
+property, and costs one `getComputedStyle` per flight, which the planner already pays for layout.
+A JS option would need `update()` plumbing and would only duplicate it. The strip's native smooth
+scroll can't be timed, so at a speed other than 1 the strip animates the scroll itself (§2.16).
+
+## 8.19 The slideshow never starts by itself
+
+**Recommendation: off until `play()` or `autoplay: true`; any interaction pauses it; the live
+region goes quiet while it plays.**
+
+WCAG 2.2.2 requires a way to pause motion that starts automatically and lasts over five seconds.
+Starting only on request, pausing on interaction and keeping the control reachable go past the
+minimum. Resuming after a tab comes back is limited to pauses the tab caused, so a user's pause
+always sticks.
+
+## 8.20 The new parts ship in the binding entries
+
+**Recommendation: as the overseer specified. Fullscreen, Download, Share, Slideshow and Hotspot are
+in `@ogdakke/fluidbox/react` (and each binding), with their logic in the lazy viewer chunk.**
+
+Each part is a button or anchor calling a command, 60–120 B gzip, so separate entries would cost
+more in import lines than they save. The behaviour (fullscreen dance, fetch-to-blob, share
+fallback, slideshow timer, hotspot layout) lives in the viewer chunk, which loads on intent
+anyway. The exception is deep zoom, whose tile code is its own add-on entry. If the React initial
+measurement comes in over the estimate (§9.3), Slideshow and Hotspot are the two to move to
+`@ogdakke/fluidbox/react/slideshow` and `/hotspot`, since step 7 hasn't shipped them yet.

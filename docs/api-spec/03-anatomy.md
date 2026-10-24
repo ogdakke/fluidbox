@@ -587,3 +587,111 @@ reads as a spin item. Without the import they read as they do today.
 
 Unchanged from today apart from `Toolbar`, `ZoomControls`' new home, `Counter`, `Caption` and the
 slide layer.
+
+## 3.18 Parts and props from the third amendment
+
+Fullscreen, Download, Share, the media error event, gesture options and item `data` come in steps 1
+and 2. Slideshow, Hotspot, motion speed and `reachend` come in step 7 (§9.2). The core behaviour
+of each is in §2.11–2.20; this section covers the binding surface.
+
+### Controls
+
+| Part                 | Element                  | Label                                | Hidden when                                     | Data attribute                                                  |
+| -------------------- | ------------------------ | ------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------- |
+| `Fullscreen`         | `<button type="button">` | `enterFullscreen` / `exitFullscreen` | fullscreen isn't available                      | `data-fluidbox-fullscreen`, plus `data-active` while fullscreen |
+| `Download`           | `<a download href>`      | `download`                           | the item has no file                            | `data-fluidbox-download`; `aria-busy` while fetching            |
+| `Share`              | `<button type="button">` | `share`                              | no link, or neither Web Share nor the clipboard | `data-fluidbox-share`; `data-copied` after a copy               |
+| `Slideshow` (step 7) | `<button type="button">` | `playSlideshow` / `pauseSlideshow`   | no `slideshow` option                           | `data-fluidbox-slideshow`, plus `data-active` while playing     |
+
+They follow the control rules of §3.8: HTML attributes pass through, children replace the icon,
+your `onClick` runs first and `preventDefault()` skips the command. `Download` is an anchor so
+its `href` works without the click handler. Unavailable controls get `hidden`, not `disabled`:
+a control that can never work on this device or item shouldn't sit in the tab order looking
+broken. An empty `Toolbar` still renders Previous, Next and Close only, so none of these appear
+unless placed.
+
+```tsx
+<Fluidbox.Viewer>
+  <Fluidbox.Toolbar>
+    <Fluidbox.Counter />
+    <Fluidbox.Share />
+    <Fluidbox.Download />
+    <Fluidbox.Fullscreen />
+    <Fluidbox.Close />
+  </Fluidbox.Toolbar>
+  <Fluidbox.Previous />
+  <Fluidbox.Next />
+</Fluidbox.Viewer>
+```
+
+### Hotspot (step 7)
+
+| Prop            | Type                                         | Default |                                                    |
+| --------------- | -------------------------------------------- | ------- | -------------------------------------------------- |
+| `x`, `y`        | `` `${number}%` `` or `number` (item pixels) | —       | Position on the painted media (§2.17).             |
+| `scaleWithZoom` | `boolean`                                    | `false` | Grow with the zoom instead of keeping screen size. |
+| `children`      | node                                         | —       | The pin's content; it needs an accessible name.    |
+| HTML attributes |                                              |         | On the `<button data-fluidbox-hotspot>`.           |
+
+Only inside `Media`; elsewhere it throws in development.
+
+```tsx
+<Fluidbox.Slides
+  product={({ item }) => (
+    <Fluidbox.Media>
+      <Fluidbox.Image item={item.image} />
+      {item.parts.map((part) => (
+        <Fluidbox.Hotspot key={part.id} x={part.x} y={part.y} aria-label={part.name}>
+          <PinIcon />
+        </Fluidbox.Hotspot>
+      ))}
+    </Fluidbox.Media>
+  )}
+/>
+```
+
+### Root props
+
+| Prop                                       | Type                                                         | §    |
+| ------------------------------------------ | ------------------------------------------------------------ | ---- |
+| `dismiss`                                  | `{ drag?: boolean; backdrop?: boolean }`                     | 2.14 |
+| `wheel`                                    | `"dismiss" \| "zoom" \| "navigate" \| "none"`                | 2.14 |
+| `shareUrl`                                 | `(item) => string \| undefined`; defaults to `href(item.id)` | 2.12 |
+| `onMediaError`                             | `(event: FluidboxMediaErrorEvent) => void`                   | 2.13 |
+| `slideshow` (step 7)                       | `FluidboxSlideshowOptions`                                   | 2.19 |
+| `reachEndThreshold`, `onReachEnd` (step 7) | `number`; `(event: FluidboxReachEndEvent) => void`           | 2.20 |
+
+`Sheet` takes `dismissMotion` instead of `dismiss` (§2.14).
+
+### Hooks
+
+`useFluidbox()` gains `fullscreen` and `playing` in its state, and `setFullscreen`, `download`,
+`share`, `play` and `pause` in its commands. `useFluidboxSlide()` gains `fail(error?)` and
+`onZoom(listener)`. The latter is for add-ons such as deep zoom; app code rarely needs it.
+
+### Per framework
+
+| React                                       | Vue            | Solid          | Angular                                     | Elements                                                      |
+| ------------------------------------------- | -------------- | -------------- | ------------------------------------------- | ------------------------------------------------------------- |
+| `Fluidbox.Fullscreen`                       | same           | same           | `button[fluidboxFullscreen]`                | `<fluidbox-fullscreen>`                                       |
+| `Fluidbox.Download`                         | same           | same           | `a[fluidboxDownload]`                       | `<fluidbox-download>`                                         |
+| `Fluidbox.Share`                            | same           | same           | `button[fluidboxShare]`                     | `<fluidbox-share>`                                            |
+| `Fluidbox.Slideshow`                        | same           | same           | `button[fluidboxSlideshow]`                 | `<fluidbox-slideshow>`                                        |
+| `Fluidbox.Hotspot`                          | same           | same           | `button[fluidboxHotspot]` with `[x]`, `[y]` | `<fluidbox-hotspot x y>`                                      |
+| `onMediaError`                              | `@media-error` | `onMediaError` | `(mediaError)`                              | `mediaerror` event                                            |
+| `onReachEnd`                                | `@reach-end`   | `onReachEnd`   | `(reachEnd)`                                | `reachend` event                                              |
+| `dismiss`, `wheel`, `shareUrl`, `slideshow` | `:dismiss` …   | props          | inputs                                      | properties; `wheel` and `reach-end-threshold` also attributes |
+
+Plain JS adds `"fullscreen"`, `"download"`, `"share"` and `"slideshow"` to
+`FluidboxControlName`, so `controls: ["share", "download", "fullscreen", "close"]` draws them in
+that order.
+
+### Accessibility
+
+| Part                  | Notes                                                                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fullscreen, Slideshow | The name changes with the state. No `aria-pressed` as well.                                                                                                      |
+| Download              | A link that downloads; while fetching it has `aria-busy="true"`.                                                                                                 |
+| Share                 | After a copy, `labels.linkCopied` is announced in the viewer's polite live region.                                                                               |
+| Hotspot               | A `<button>` in DOM order within the slide. Needs a name from its content or `aria-label`; development builds warn without one. Focus pans a zoomed image to it. |
+| Slideshow playing     | The live region goes `aria-live="off"`; it is polite again on pause (§2.19).                                                                                     |

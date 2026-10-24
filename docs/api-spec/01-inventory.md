@@ -434,16 +434,16 @@ becomes `--fluidbox-thumbnails-hide`.
 
 ### Other props
 
-| Current                                                                     | New                                            |
-| --------------------------------------------------------------------------- | ---------------------------------------------- |
-| Trigger `asChild`                                                           | → same                                         |
-| Trigger `item`, `returns`                                                   | `value`                                        |
-| Trigger `children(preview)`                                                 | → same: `({ item, index, status })`            |
-| `FluidboxControlsProps.zoom`                                                | removed (see `Controls`)                       |
-| Filmstrip `children({ item, index })`                                       | Thumbnails `children({ item, index, active })` |
-| Sheet `snapPoints`, `dismiss`, `children({ item, index })`, HTML attributes | → same; adds `onSnapChange`                    |
-| SheetStop `stop`                                                            | SheetSnap `to`                                 |
-| ThumbnailOverlay `travel`                                                   | Overlay `flight`                               |
+| Current                                                                     | New                                                              |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Trigger `asChild`                                                           | → same                                                           |
+| Trigger `item`, `returns`                                                   | `value`                                                          |
+| Trigger `children(preview)`                                                 | → same: `({ item, index, status })`                              |
+| `FluidboxControlsProps.zoom`                                                | removed (see `Controls`)                                         |
+| Filmstrip `children({ item, index })`                                       | Thumbnails `children({ item, index, active })`                   |
+| Sheet `snapPoints`, `dismiss`, `children({ item, index })`, HTML attributes | → same, `dismiss` → `dismissMotion` (§2.14); adds `onSnapChange` |
+| SheetStop `stop`                                                            | SheetSnap `to`                                                   |
+| ThumbnailOverlay `travel`                                                   | Overlay `flight`                                                 |
 
 ### Hooks and types
 
@@ -483,7 +483,7 @@ becomes `--fluidbox-thumbnails-hide`.
 | Trigger `as-child`, `item`, `returns`, slot `(preview)`                                                                                                                                                  | `as-child`, `value`, slot `(preview)`                            |                                             |
 | Controls `zoom`                                                                                                                                                                                          | removed                                                          |                                             |
 | Filmstrip slot                                                                                                                                                                                           | Thumbnails slot                                                  |                                             |
-| Sheet `snap-points`, `dismiss`, slot                                                                                                                                                                     | → same                                                           |                                             |
+| Sheet `snap-points`, `dismiss` (→ `dismiss-motion`, §2.14), slot                                                                                                                                         | → same                                                           |                                             |
 | SheetStop `stop`                                                                                                                                                                                         | SheetSnap `to`                                                   |                                             |
 | ThumbnailOverlay `travel`, FrameLayer                                                                                                                                                                    | Overlay `flight`                                                 |                                             |
 | `useFluidbox()`, `useFluidbox(selector)`, `useFluidboxSheet()`                                                                                                                                           | → same, plus `useFluidboxSlide()`                                |                                             |
@@ -555,7 +555,7 @@ becomes `--fluidbox-thumbnails-hide`.
 | `<fluidbox-item>` attr `placeholder`, `aria-label`; slots `trigger`, `content`, `sheet`; props `itemId`, `returns`, `trigger` | → same; `itemId` → `value`; `returns` removed                                                                               |                               |
 | `fluidbox-preview-change`                                                                                                     | → same                                                                                                                      |                               |
 | `<fluidbox-filmstrip>` / `FluidboxFilmstripElement` (`render`)                                                                | `<fluidbox-thumbnails>` / `FluidboxThumbnailsElement`                                                                       |                               |
-| `<fluidbox-sheet>` / `FluidboxSheetElement` (`snap-points`, `dismiss`, `render`)                                              | → same                                                                                                                      |                               |
+| `<fluidbox-sheet>` / `FluidboxSheetElement` (`snap-points`, `dismiss` → `dismiss-motion`, `render`)                           | → same                                                                                                                      |                               |
 | `FluidboxPreviewChangeEvent`                                                                                                  | → same                                                                                                                      |                               |
 | Content-template mapping (`img`/`picture`, `video` + `track`, `iframe[src]`, other markup → custom)                           | → same, other markup → the slide of the item's `type` attribute, else a markup slide                                        |                               |
 | —                                                                                                                             | `<img data-zoom-src data-zoom-srcset>`                                                                                      | New: sets `zoom` from markup. |
@@ -627,3 +627,38 @@ Fix these as part of the docs step (§9):
 - Solid's `Viewer` doc says the default Close stays; the code removes all defaults.
 - `docs/BINDINGS.md` describes the bindings as wrappers of `<fluidbox-gallery>` with a `source`
   prop. That is a previous design. Replace it with part 3.
+
+## 1.20 Additions from the third amendment
+
+All new; nothing old is renamed except the sheet's `dismiss`. "Step" is the plan step (§9.2).
+
+| Where                          | Name                                                                                     | Step                | §          |
+| ------------------------------ | ---------------------------------------------------------------------------------------- | ------------------- | ---------- |
+| Options / Root                 | `dismiss: { drag, backdrop }`, `wheel`                                                   | 1                   | 2.14       |
+| Options / Root                 | `shareUrl`                                                                               | 1                   | 2.12       |
+| Options / Root                 | `slideshow`, `reachEndThreshold`                                                         | 7                   | 2.19, 2.20 |
+| `FluidboxSheetOptions.dismiss` | → `dismissMotion: "flight" \| "scroll"`; `"none"` → Root `dismiss.drag: false`           | 1                   | 2.14       |
+| Item fields                    | `download`, `data`                                                                       | 1                   | 2.12, 2.15 |
+| Image item                     | `tiles` (read by the deep-zoom add-on)                                                   | 7                   | 2.18       |
+| State                          | `fullscreen`                                                                             | 1                   | 2.11       |
+| State                          | `playing`                                                                                | 7                   | 2.19       |
+| Commands                       | `setFullscreen`, `download`, `share`                                                     | 1                   | 2.11, 2.12 |
+| Commands                       | `play`, `pause`                                                                          | 7                   | 2.19       |
+| Events                         | `mediaerror` / `FluidboxMediaErrorEvent`, `FluidboxMediaErrorKind`                       | 1                   | 2.13       |
+| Events                         | `reachend` / `FluidboxReachEndEvent`                                                     | 7                   | 2.20       |
+| `FluidboxReason`               | `"slideshow"`                                                                            | 7                   | 2.19       |
+| `FluidboxSlide`                | `fail`, `onZoom`; `zoomable(on \| { max, sharpen })`                                     | 1 (`onZoom` in 1.4) | 2.13, 2.18 |
+| `FluidboxSlide`                | `hotspot`                                                                                | 7                   | 2.17       |
+| Types                          | `FluidboxZoomPose`, `FluidboxZoomableOptions`, `FluidboxSlideshowOptions`                | 1, 7                | 2.18, 2.19 |
+| `FluidboxControlName`          | `"fullscreen"`, `"download"`, `"share"`                                                  | 1                   | 3.18       |
+| `FluidboxControlName`          | `"slideshow"`                                                                            | 7                   | 3.18       |
+| Labels                         | `enterFullscreen`, `exitFullscreen`, `download`, `share`, `linkCopied`                   | 1                   | 2.9        |
+| Labels                         | `playSlideshow`, `pauseSlideshow`                                                        | 7                   | 2.9        |
+| Item lists                     | `withCount(count)` on `createItemList` lists                                             | 7                   | 2.20       |
+| CSS                            | `--fluidbox-motion-speed` (input), `--fluidbox-zoom-scale` (published, on the media box) | 7, 1.4              | 2.16, 2.17 |
+| Data attributes                | `data-fluidbox-fullscreen`, `-download`, `-share`, `data-copied`, item `data-*`          | 1                   | 3.18, 2.15 |
+| Data attributes                | `data-fluidbox-slideshow`, `-hotspot`                                                    | 7                   | 3.18       |
+| Parts (all bindings)           | `Fullscreen`, `Download`, `Share`; Root `onMediaError`                                   | 2, 4                | 3.18       |
+| Parts (all bindings)           | `Slideshow`, `Hotspot`; Root `onReachEnd`                                                | 7                   | 3.18       |
+| Hooks                          | `useFluidboxSlide().fail`, `.onZoom`                                                     | 2                   | 3.18       |
+| Entry                          | `@ogdakke/fluidbox/deep-zoom` (`deepZoomSlide`, `DeepZoom` parts)                        | after 1.0           | 2.18       |

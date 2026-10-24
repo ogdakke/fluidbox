@@ -76,6 +76,21 @@ The main changes:
   provider; YouTube and Vimeo are two built with it. Items store the provider's name.
 - **`fit: "fill"`** sizes a box to the whole stage. Models default to it, so `<model-viewer>`
   is no longer an 800 × 800 square.
+- **Ten approved additions.** These are built with the redesign (steps 1–2):
+  - `Fullscreen`, `Download` and `Share` controls;
+  - a `mediaerror` event with `slide.fail`;
+  - `dismiss: { drag, backdrop }` and `wheel`;
+  - item `data-*` for styling.
+
+  These come later (step 7):
+  - a `--fluidbox-motion-speed` property;
+  - `Hotspot`;
+  - a `Slideshow`;
+  - `reachend` for appending;
+  - deep zoom as an add-on after 1.0.
+
+  The sheet's `dismiss` becomes `dismissMotion` (§2.11–2.20, §3.18, §8.14).
+
 - **Every control is a part**, including the new `Counter`, `Caption` and `ZoomControls`.
   `Controls` and its `zoom` flag go away.
 - **Renames:** `Filmstrip` → `Thumbnails`, `ThumbnailOverlay` + `FrameLayer` + `travel` →

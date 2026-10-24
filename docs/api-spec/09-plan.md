@@ -15,6 +15,8 @@ Step 4  Vue │ Solid │ Angular │ Elements                                (p
 Step 5  Add-on parts per framework                                      (with each of step 4)
         ────────────────────────────────────────────────────────────────────────────────
 Step 6  Docs, examples, patterns, CONTRACT, stale docs, bundle budget
+        ────────────────────────────────────────────────────────────────────────────────
+Step 7  Motion speed, hotspots, slideshow, reachend, then deep zoom     (after React; a later session)
 ```
 
 React and plain JS go first, as the brief asks. React is the binding with the most tests
@@ -77,6 +79,22 @@ In sub-steps that can each be reviewed alone, in this order:
    `--fluidbox-media-aspect` on a fill box, optional `width`/`height` validation, and the flight's
    start crop at the poster's contained rectangle. Needs 4, because a fill box is a media box.
 
+10. **Third-amendment features 1–5** (§2.11–2.15): `setFullscreen` and `state.fullscreen` with
+    the popover hand-off over a modal dialog and the close that exits first; `download()` and
+    `share()` with their fallbacks; `mediaerror` from every `#fail` site, the last `<source>`,
+    the zoom image, and `slide.fail`; `dismiss: { drag, backdrop }` and `wheel` in `#onWheel` and
+    the drag and backdrop handlers; the sheet's `dismiss` → `dismissMotion`; item `data` with its
+    validation; the new control names, labels and icons. Needs 2 (events) and 4 (the box, for
+    `slide.fail`).
+11. **Hooks step 7 needs, built now so nothing rules it out.** In 1.4: `slide.onZoom` with
+    `FluidboxZoomPose` from both zoom modes, `zoomable({ max, sharpen })`,
+    `--fluidbox-zoom-scale` on the media box, media content kept inside the transformed element,
+    and every duration and spring `response` read through one `#duration(ms)` helper in the
+    driver and the zoom engine. In 1.5: `ready(index, cap)` callable outside an open, and
+    `waitUntil` promises kept per slide. In the driver: one `#userInteraction()` point that every
+    gesture, key and zoom passes through. None of these is public behaviour yet except `onZoom`
+    and `zoomable` options, so their cost is a few hundred bytes of activation JS.
+
 Sub-steps 1, 2 and 7 are renames and API reshaping; 3–6, 8 and 9 are the engine work and carry the risk
 (§5.1 risks table). 3 and 4 must land together for any non-image slide to fly.
 
@@ -89,7 +107,9 @@ core, replacing the `renderers` proxy at `index.ts:294`); `Media` with `render` 
 `opening`; reporting each slide's commit to the core from a layout effect in the slide host, after
 the children's effects (so `Media render` and add-ons have called `waitUntil`);
 `Toolbar`, `ZoomControls`, `Counter`, `Caption`; `Overlay` replacing `ThumbnailOverlay` and
-`FrameLayer`; `Thumbnails`, `SheetSnap`, `useFluidboxSheet` → `{ snap, setSnap }`. Delete
+`FrameLayer`; `Thumbnails`, `SheetSnap`, `useFluidboxSheet` → `{ snap, setSnap }`;
+`Fullscreen`, `Download`, `Share`; Root `dismiss`, `wheel`, `shareUrl`, `onMediaError` (with
+`shareUrl` defaulting to `href`); `useFluidboxSlide().fail` and `.onZoom`; Sheet `dismissMotion`. Delete
 `Controls`, `Filmstrip`, `SheetStop`.
 
 ### Step 3: plain-JS add-on slides
@@ -117,6 +137,10 @@ One agent or person each, from step 2's React code and the anatomy (§3.13–3.1
 | Angular  | ~1,200 lines over six files            | `model()` for `[(value)]`, `ng-template fluidboxSlide`, `fluidboxMedia`, `injectFluidboxSlide`, new parts; delete the renderer-map input. Keep the 17.3 floor.                                                    |
 | Elements | `gallery.ts`, `item.ts`, `elements.ts` | `value` attribute, `<template data-fluidbox-slide>`, `defineSlide`/`defineMarkup` registry, `<fluidbox-toolbar>`, `<fluidbox-zoom-controls>`, `<fluidbox-counter>`, `<fluidbox-caption>`, `<fluidbox-thumbnails>` |
 
+Each binding in step 4 also gets `Fullscreen`, `Download`, `Share`, the Root's `dismiss`, `wheel`,
+`shareUrl` and media-error output, and the icons-from-the-viewer change (§9.3), as React did in
+step 2.
+
 ### Step 5: add-on parts
 
 `{react,vue,solid,angular}/{embed,model,spin}` and `elements/{embed,model,spin}`: package exports,
@@ -133,6 +157,28 @@ dozen lines (§4.1). Done by whoever does that framework in step 4.
 - Fix the stale docs listed in §1.19 in the same pass.
 - `apps/examples/src/demos/photo-library.tsx` and `pages/fixtures.ts`: the browser specs read them.
 - Update `baseline/bundle-budget.md` with the measured numbers and a paragraph on what moved.
+
+### Step 7: motion speed, hotspots, slideshow, reachend, deep zoom
+
+A later session, after React (step 2) has landed, so it builds on the final binding code. It
+adds nothing to steps 1–3 beyond the hooks of sub-step 1.11. In order:
+
+1. **Motion speed** (§2.16): `--fluidbox-motion-speed` read in `#duration`, clamped; the strip's
+   own scroll animation at speeds other than 1; `css-api.ts` entry.
+2. **`reachend`** (§2.20): the event and the once-per-count rule in the controller; `withCount`
+   on `createItemList` lists; `onReachEnd` in each binding.
+3. **Slideshow** (§2.19): the timer in the viewer chunk on `#userInteraction`, `visibilitychange`
+   and video `play`/`pause`; `ready(index, interval)` before each advance; the live region off
+   while playing; `play`/`pause`/`state.playing`; the `"slideshow"` control and `Slideshow` part;
+   `reason: "slideshow"`.
+4. **Hotspots** (§2.17): the hotspot layer sized to the painted content rectangle, the
+   counter-scale, focus panning, hiding during flights; `slide.hotspot`; `Hotspot` in each binding
+   and `<fluidbox-hotspot>`.
+5. **Deep zoom** (§2.18), after 1.0: `@ogdakke/fluidbox/deep-zoom` with IIIF and DZI readers, the
+   tile layer on `onZoom`, and parts per framework. Its own bundle-check consumer.
+
+Each of 1–4 is a separate, reviewable change, and they can run in parallel. 5 needs only
+`onZoom` and `zoomable({ max, sharpen })`.
 
 ## 9.3 Bundle impact
 
@@ -151,17 +197,50 @@ Estimates, gzip, against `baseline/bundle-budget.md` (2026-10-23):
 | Kit                        |       1,635 B |            ±50 B |          1,635 B |               ±50 B | `takeOverFluidbox` takes a value.                                                                                                                                                                                                                                                             |
 | Add-ons                    |               |                  |                  |                     | §4.7                                                                                                                                                                                                                                                                                          |
 
-The React figure is the one to watch: 1.2 KB is about 8% on 14.9 KB. Two ways to keep it near the
-low end if the measurement comes in high:
+The table above is steps 1–6 before the third amendment. The ten additions add, per entry:
+
+| Entry               | Steps 1–2 (features 1–5) initial | Step 7 initial | Steps 1–2 activation |  Step 7 activation |
+| ------------------- | -------------------------------: | -------------: | -------------------: | -----------------: |
+| Root                |                   +150 to +250 B |  +60 to +120 B |   +1,250 to +1,600 B | +1,600 to +2,100 B |
+| React               |                   +600 to +850 B | +400 to +550 B |              as Root |            as Root |
+| Vue, Solid, Angular |                   +550 to +900 B | +350 to +550 B |              as Root |            as Root |
+| Elements            |                   +500 to +800 B | +350 to +500 B |              as Root |            as Root |
+
+**React initial, worked out.** Each new control is one line on the existing `action()` factory
+(`react/src/index.ts:685-715`), about 20 B gzip. The cost is elsewhere:
+
+| Piece                                                                                                                          | Lives in                          |          gzip |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- | ------------: |
+| Five label defaults                                                                                                            | core initial (`labels.ts`)        |      80–100 B |
+| Control descriptors for fullscreen, download, share (`hidden`, label switch)                                                   | core initial (`controls.ts`)      |     100–150 B |
+| Four icons (enter and exit fullscreen, download, share)                                                                        | core initial (`control-icons.ts`) |     200–320 B |
+| State fields, command stubs, option pass-through                                                                               | core initial                      |      60–100 B |
+| `Download` as an anchor variant, `Share`'s `data-copied`, `onMediaError` wiring, `shareUrl` from `href`                        | React                             |     150–200 B |
+| **Total, features 1–5**                                                                                                        |                                   | **600–850 B** |
+| Step 7: two slideshow icons, Slideshow line, `Hotspot` (props, portal into the hotspot layer), `onReachEnd`, two labels, state |                                   | **400–550 B** |
+
+Together with the redesign's +600 to +1,200 B, React initial grows by about 1,600–2,600 B, or
+11–17% on 14,864 B. That is more than the redesign alone, so the plan includes one mitigation
+up front:
+
+- **Icons from the viewer chunk.** A control only renders inside the open viewer, and the open
+  viewer means the lazy chunk has loaded. The parts can render their default icon from path data
+  the viewer exposes (`hostOf(fluidbox).icon(name)`) instead of importing `control-icons.ts`.
+  Applied to all controls, old and new, this takes about 400–650 B out of every binding's initial
+  chunk and lands React's total at +1,200 to +2,000 B. Do it in step 2 for React, and the same
+  in step 4.
+
+Then, if still high:
 
 - The controls (`Toolbar`, `ZoomControls`, `Counter`, `Caption`, the zoom buttons) share one
   `controlPart(kind)` factory, as Angular's parts already share a base directive.
 - `Image`, `Video` and `Iframe` are one component with a `kind` prop under three names.
+- Step 7's `Slideshow` and `Hotspot` move to their own entries (§8.20).
 
 New bundle-check consumers (`tests/bundle/*.ts` and the `entrypoints` list in
 `scripts/check-bundles.ts:4`): rename `filmstrip` → `thumbnails` and `embeds` → `embed`; add
 `react-embed`, `react-model`, `react-spin`, the same for Vue, Solid and Angular, and
-`elements-embed`, `elements-model`, `elements-spin` (15 new), and `hls` once that add-on exists. Each asserts it carries only its
+`elements-embed`, `elements-model`, `elements-spin` (15 new), and `hls` and `deep-zoom` once those add-ons exist. Each asserts it carries only its
 own add-on and its own framework (§4.7). The new limits are the measurements plus 40 B, rounded up
 to the next 50 B, as now.
 
@@ -242,21 +321,62 @@ New tests:
   dock and with a sheet's peek; the opening flight's first frame shows the poster at the trigger's
   rectangle; resizing the window resizes the box; a model item from `modelItem()` fills.
 
+Third amendment, steps 1–2:
+
+- Fullscreen, in Chromium, WebKit and Firefox: enter and leave from the control; the control is
+  hidden where `fullscreenEnabled` is false (stubbed); closing from fullscreen exits first and the
+  close flight lands on the trigger; Escape leaves fullscreen and a second Escape closes; **over a
+  modal `<dialog>`**: enter, leave and close all work and the viewer stays above the dialog (the
+  popover hand-off, §2.11).
+- Download: same-origin anchor with the right `download` filename; cross-origin with CORS saves a
+  blob (and revokes the URL); cross-origin without CORS opens a tab; hidden on an item with
+  `download: false` and on a model; a move aborts the fetch.
+- Share: `navigator.share` called with title and URL (stubbed); cancel does nothing; fallback copies
+  and announces `linkCopied`; hidden with no URL.
+- `mediaerror`: image, video (every `<source>` failing), URL check, a neighbour failing, Retry
+  failing again, `kind: "zoom"` with no error slide, `slide.fail` with Retry re-rendering; in
+  each binding through `onMediaError`.
+- Gestures: `dismiss.drag: false` springs back; `dismiss.backdrop: false`; Escape still closes;
+  each `wheel` mode, including one move per trackpad gesture for `"navigate"`; the sheet's
+  `dismissMotion`.
+- Item `data`: attributes on the slide, the thumbnail and the server copy; a bad name throws; a
+  reused slide drops stale keys.
+- `onZoom`: a listener sees the pose during a pinch and at rest, `visible` matches the scroller's
+  viewport, and `--fluidbox-zoom-scale` is set on the box.
+
+Step 7:
+
+- Motion speed: at `--fluidbox-motion-speed: 2` the open, close, release and move take half as
+  long (measured from animation timing); reduced motion still has no flights.
+- `reachend`: fires within the threshold, once per count, again after `setItems` grows the count,
+  never with `loop`; the open `value` doesn't change on `setItems`; `withCount` keeps made items.
+- Slideshow: doesn't start without `play()`/`autoplay`; advances after the interval and only once
+  the next slide is ready; pauses on a pointer, a key, a zoom, a hidden tab and a playing video,
+  and resumes only after the latter two; the live region is off while playing; instant moves under
+  reduced motion; axe passes with the control.
+- Hotspots: stay on their point at zoom 1, 2 and 4, with `object-fit: contain` and in a fill box;
+  keep screen size unless `scaleWithZoom`; tab order; focus pans a zoomed image; hidden during
+  flights.
+
 ## 9.5 What runs in parallel
 
-| Track                                     | Depends on                                            | Can run with                                                                    |
-| ----------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1.1 item types, 1.7 renames               | —                                                     | each other; they touch different names, but rebase often, as both edit fixtures |
-| 1.2 state and events                      | 1.1                                                   | 1.3                                                                             |
-| 1.3–1.5 slides, Media box, waiting        | 1.1                                                   | 1.2, 1.6                                                                        |
-| 1.6 triggers and overlays                 | 1.2                                                   | 1.3–1.5                                                                         |
-| 1.8 video sources and `attach`            | 1.3 (`drawVideo`)                                     | 1.4–1.6, 1.9                                                                    |
-| 1.9 fill boxes                            | 1.4                                                   | 1.5, 1.6, 1.8                                                                   |
-| 2 React                                   | 1's public types (write them first, implement behind) | 3                                                                               |
-| 3 plain-JS add-on slides, embed providers | 1.3's slide contract; `modelItem` fill needs 1.9      | 2                                                                               |
-| 4 Vue, Solid, Angular, elements           | 1 done, 2's `Media` portal proven                     | each other                                                                      |
-| 5 add-on parts                            | 3, and that framework's step 4                        | the other frameworks                                                            |
-| 6 docs and examples                       | each framework's step                                 | per page; patterns per framework                                                |
+| Track                                        | Depends on                                            | Can run with                                                                    |
+| -------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1.1 item types, 1.7 renames                  | —                                                     | each other; they touch different names, but rebase often, as both edit fixtures |
+| 1.2 state and events                         | 1.1                                                   | 1.3                                                                             |
+| 1.3–1.5 slides, Media box, waiting           | 1.1                                                   | 1.2, 1.6                                                                        |
+| 1.6 triggers and overlays                    | 1.2                                                   | 1.3–1.5                                                                         |
+| 1.8 video sources and `attach`               | 1.3 (`drawVideo`)                                     | 1.4–1.6, 1.9                                                                    |
+| 1.9 fill boxes                               | 1.4                                                   | 1.5, 1.6, 1.8                                                                   |
+| 2 React                                      | 1's public types (write them first, implement behind) | 3                                                                               |
+| 3 plain-JS add-on slides, embed providers    | 1.3's slide contract; `modelItem` fill needs 1.9      | 2                                                                               |
+| 4 Vue, Solid, Angular, elements              | 1 done, 2's `Media` portal proven                     | each other                                                                      |
+| 5 add-on parts                               | 3, and that framework's step 4                        | the other frameworks                                                            |
+| 6 docs and examples                          | each framework's step                                 | per page; patterns per framework                                                |
+| 1.10 features 1–5                            | 1.2 (events), 1.4 (the box)                           | 1.6, 1.8, 1.9                                                                   |
+| 1.11 hooks for step 7                        | inside 1.4 and 1.5                                    | —                                                                               |
+| 7.1–7.4 speed, reachend, slideshow, hotspots | 2 landed, 1.11                                        | each other, and step 4                                                          |
+| 7.5 deep zoom                                | `onZoom`, `zoomable({ max, sharpen })`; after 1.0     | anything                                                                        |
 
 With four people or agents: one on 1.3–1.5 (the engine), one on 1.1/1.2/1.6/1.7, one on 2 then
 Vue, one on 3 then Angular; Solid and elements follow. The critical path is 1.3 → 1.4 → React
@@ -270,3 +390,5 @@ Vue, one on 3 then Angular; Solid and elements follow. The critical path is 1.3 
 - All 13 patterns exist in React, Vue, Solid, Angular, elements and JS, and every docs snippet
   in §6.14 is rewritten.
 - `baseline/bundle-budget.md` records the measured sizes.
+- Step 7: the four features ship in every binding and the elements, each with its tests, and
+  deep zoom is tracked for after 1.0.
