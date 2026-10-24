@@ -2,10 +2,10 @@
 // #region example
 import { For, onCleanup, onMount } from "solid-js";
 import { itemLabel, type FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { renderEmbed } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer } from "@ogdakke/fluidbox/model";
+import { embedSlide } from "@ogdakke/fluidbox/embed";
+import { createModelSlide } from "@ogdakke/fluidbox/model";
 import { Fluidbox, type FluidboxSolidRenderer } from "@ogdakke/fluidbox/solid";
-import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
+import { createSpinSlide } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
 import { addonSlide } from "../../addon-slide";
 
@@ -14,7 +14,7 @@ import { addonSlide } from "../../addon-slide";
  * the add-on the slide's item, signal and activity.
  */
 const addon =
-  (render: FluidboxSlideRenderer): FluidboxSolidRenderer =>
+  (render: FluidboxSlideRenderer<any>): FluidboxSolidRenderer =>
   (context) => {
     const target = (<span style={{ display: "contents" }} />) as HTMLSpanElement;
     onMount(() => {
@@ -30,12 +30,12 @@ const addon =
     return target;
   };
 
-// The items' `render` names these: "embed", "spin" and "model".
+// The items' types name these slides: "embed", "spin" and "model".
 const renderers = {
-  embed: addon(renderEmbed),
-  spin: addon(createSpinRenderer()),
+  embed: addon(embedSlide),
+  spin: addon(createSpinSlide()),
   // <model-viewer> loads when a model first comes on show.
-  model: addon(createModelRenderer({ load: () => import(/* @vite-ignore */ modelViewerUrl) })),
+  model: addon(createModelSlide({ load: () => import(/* @vite-ignore */ modelViewerUrl) })),
 };
 
 export function Media() {

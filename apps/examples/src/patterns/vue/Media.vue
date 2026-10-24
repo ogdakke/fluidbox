@@ -2,14 +2,14 @@
 <script setup lang="ts">
 import { defineComponent, h, onBeforeUnmount, onMounted, ref, type PropType } from "vue";
 import { itemLabel, type FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { renderEmbed } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer } from "@ogdakke/fluidbox/model";
+import { embedSlide } from "@ogdakke/fluidbox/embed";
+import { createModelSlide } from "@ogdakke/fluidbox/model";
 import {
   Fluidbox,
   type FluidboxVueRenderContext,
   type FluidboxVueRenderer,
 } from "@ogdakke/fluidbox/vue";
-import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
+import { createSpinSlide } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
 import { addonSlide } from "../../addon-slide";
 
@@ -19,7 +19,7 @@ import { addonSlide } from "../../addon-slide";
  */
 const AddonSlide = defineComponent({
   props: {
-    render: { type: Function as PropType<FluidboxSlideRenderer>, required: true },
+    render: { type: Function as PropType<FluidboxSlideRenderer<any>>, required: true },
     context: { type: Object as PropType<FluidboxVueRenderContext>, required: true },
   },
   setup(props) {
@@ -41,16 +41,16 @@ const AddonSlide = defineComponent({
 });
 
 const addon =
-  (render: FluidboxSlideRenderer): FluidboxVueRenderer =>
+  (render: FluidboxSlideRenderer<any>): FluidboxVueRenderer =>
   (context) =>
     h(AddonSlide, { render, context });
 
-// The items' `render` names these: "embed", "spin" and "model".
+// The items' types name these slides: "embed", "spin" and "model".
 const renderers = {
-  embed: addon(renderEmbed),
-  spin: addon(createSpinRenderer()),
+  embed: addon(embedSlide),
+  spin: addon(createSpinSlide()),
   // <model-viewer> loads when a model first comes on show.
-  model: addon(createModelRenderer({ load: () => import(/* @vite-ignore */ modelViewerUrl) })),
+  model: addon(createModelSlide({ load: () => import(/* @vite-ignore */ modelViewerUrl) })),
 };
 </script>
 

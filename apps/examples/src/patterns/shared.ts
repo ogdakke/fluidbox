@@ -9,7 +9,7 @@ import type {
   FluidboxItem,
   FluidboxLabels,
 } from "@ogdakke/fluidbox";
-import { youtubeItem } from "@ogdakke/fluidbox/embeds";
+import { youtubeItem } from "@ogdakke/fluidbox/embed";
 import { modelItem } from "@ogdakke/fluidbox/model";
 import { spinItem } from "@ogdakke/fluidbox/spin";
 import { artItem, artSrc, sceneById, scenes } from "../art";

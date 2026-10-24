@@ -5,9 +5,9 @@ import {
   type FluidboxItem,
   type FluidboxSlideRenderer,
 } from "@ogdakke/fluidbox";
-import { renderEmbed, vimeoItem, youtubeItem } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer, modelItem } from "@ogdakke/fluidbox/model";
-import { createSpinRenderer, spinItem } from "@ogdakke/fluidbox/spin";
+import { embedSlide, vimeoItem, youtubeItem } from "@ogdakke/fluidbox/embed";
+import { createModelSlide, modelItem } from "@ogdakke/fluidbox/model";
+import { createSpinSlide, spinItem } from "@ogdakke/fluidbox/spin";
 import "./media.css";
 
 mountSite("fixtures", {
@@ -91,9 +91,9 @@ const fluidbox = createFluidbox({
   items,
   slides: {
     probe,
-    embed: renderEmbed,
-    spin: createSpinRenderer(),
-    model: createModelRenderer({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) }),
+    embed: embedSlide,
+    spin: createSpinSlide(),
+    model: createModelSlide({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) }),
   },
 });
 

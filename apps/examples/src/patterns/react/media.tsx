@@ -1,14 +1,14 @@
 // #region example
 import { useLayoutEffect, useRef } from "react";
 import { itemLabel, type FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { renderEmbed } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer } from "@ogdakke/fluidbox/model";
+import { embedSlide } from "@ogdakke/fluidbox/embed";
+import { createModelSlide } from "@ogdakke/fluidbox/model";
 import {
   Fluidbox,
   type FluidboxReactRenderContext,
   type FluidboxReactRenderer,
 } from "@ogdakke/fluidbox/react";
-import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
+import { createSpinSlide } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
 import { addonSlide } from "../../addon-slide";
 
@@ -20,7 +20,7 @@ function AddonSlide({
   render,
   context,
 }: {
-  render: FluidboxSlideRenderer;
+  render: FluidboxSlideRenderer<any>;
   context: FluidboxReactRenderContext;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -40,15 +40,15 @@ function AddonSlide({
 }
 
 const addon =
-  (render: FluidboxSlideRenderer): FluidboxReactRenderer =>
+  (render: FluidboxSlideRenderer<any>): FluidboxReactRenderer =>
   (context) => <AddonSlide render={render} context={context} />;
 
-// The items' `render` names these: "embed", "spin" and "model".
+// The items' types name these slides: "embed", "spin" and "model".
 const renderers = {
-  embed: addon(renderEmbed),
-  spin: addon(createSpinRenderer()),
+  embed: addon(embedSlide),
+  spin: addon(createSpinSlide()),
   // <model-viewer> loads when a model first comes on show.
-  model: addon(createModelRenderer({ load: () => import(/* @vite-ignore */ modelViewerUrl) })),
+  model: addon(createModelSlide({ load: () => import(/* @vite-ignore */ modelViewerUrl) })),
 };
 
 export function Media() {

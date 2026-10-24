@@ -1,19 +1,19 @@
 // #region example
 import { createFluidbox, itemLabel } from "@ogdakke/fluidbox";
-import { renderEmbed } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer } from "@ogdakke/fluidbox/model";
-import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
+import { embedSlide } from "@ogdakke/fluidbox/embed";
+import { createModelSlide } from "@ogdakke/fluidbox/model";
+import { createSpinSlide } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
 
 export function mountMedia(root: HTMLElement) {
   const fluidbox = createFluidbox({
     items: productMedia,
-    // The items' `render` names these: "embed", "spin" and "model".
+    // The items' types name these slides: "embed", "spin" and "model".
     slides: {
-      embed: renderEmbed,
-      spin: createSpinRenderer(),
+      embed: embedSlide,
+      spin: createSpinSlide(),
       // <model-viewer> loads when a model first comes on show.
-      model: createModelRenderer({ load: () => import(/* @vite-ignore */ modelViewerUrl) }),
+      model: createModelSlide({ load: () => import(/* @vite-ignore */ modelViewerUrl) }),
     },
   });
 

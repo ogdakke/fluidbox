@@ -86,7 +86,7 @@ createFluidbox({
 
 YouTube and Vimeo, 360° spins and 3D models. See [Product media](./product-media.md).
 
-<!-- api-summary: embeds -->
+<!-- api-summary: embed -->
 
 <!-- api-summary: spin -->
 

@@ -67,9 +67,9 @@
       "types": "./dist/hover-zoom.d.ts",
       "import": "./dist/hover-zoom.js"
     },
-    "./embeds": {
-      "types": "./dist/embeds.d.ts",
-      "import": "./dist/embeds.js"
+    "./embed": {
+      "types": "./dist/embed.d.ts",
+      "import": "./dist/embed.js"
     },
     "./model": {
       "types": "./dist/model.d.ts",

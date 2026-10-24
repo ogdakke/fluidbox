@@ -12,7 +12,7 @@ const entrypoints = [
   "sheet",
   "kit",
   "hover-zoom",
-  "embeds",
+  "embed",
   "model",
   "spin",
 ] as const;
@@ -28,7 +28,7 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   sheet: [],
   kit: [],
   "hover-zoom": [],
-  embeds: [],
+  embed: [],
   model: [],
   spin: [],
 };
@@ -49,9 +49,10 @@ const initialGzipLimits: Record<Entry, number> = {
   kit: 1_750,
   // The hover zoom add-on, loaded by pages that magnify their photos on hover.
   "hover-zoom": 1_500,
-  // The media add-ons carry their few rules in their JS.
-  embeds: 2_600,
-  model: 1_400,
+  // The media add-ons carry their few rules in their JS. Embed providers added
+  // about 430 B to the embed slide; a model that waits for its first frame, 60 B.
+  embed: 3_050,
+  model: 1_450,
   spin: 2_500,
 };
 const cssGzipLimit = 2_800;
@@ -73,8 +74,8 @@ const activationJsGzipLimits: Record<Entry, number> = {
   sheet: 7_350,
   kit: 1_750,
   "hover-zoom": 1_500,
-  embeds: 2_600,
-  model: 1_400,
+  embed: 3_050,
+  model: 1_450,
   spin: 2_500,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
@@ -89,8 +90,8 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   kit: 4_450,
   // It needs no stylesheet; the base one counts, as for the kit.
   "hover-zoom": 4_250,
-  embeds: 5_350,
-  model: 4_100,
+  embed: 5_800,
+  model: 4_200,
   spin: 5_250,
 };
 

@@ -1,16 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  embedUrl,
-  isEmbedItem,
-  parseVimeo,
-  parseYouTube,
+  createEmbedProvider,
+  createEmbedSlide,
+  embedItem,
+  vimeo,
   vimeoItem,
+  youtube,
   youtubeItem,
-} from "../src/embeds";
+  type FluidboxEmbedItem,
+} from "../src/embed";
 
 const id = "M7lc1UVf-VE";
 
-describe("parseYouTube", () => {
+describe("youtube.parse", () => {
   it.each([
     [id, { video: id }],
     [`https://www.youtube.com/watch?v=${id}`, { video: id }],
@@ -23,14 +25,14 @@ describe("parseYouTube", () => {
     [`https://youtu.be/${id}?si=abc&t=42`, { video: id, start: 42 }],
     [`youtu.be/${id}`, { video: id }],
     [`www.youtube.com/watch?v=${id}`, { video: id }],
-    [`https://www.youtube.com/shorts/${id}`, { video: id, short: true }],
+    [`https://www.youtube.com/shorts/${id}`, { video: id, aspect: 9 / 16 }],
     [`https://www.youtube.com/embed/${id}?start=30`, { video: id, start: 30 }],
     [`https://www.youtube-nocookie.com/embed/${id}`, { video: id }],
     [`https://www.youtube.com/live/${id}`, { video: id }],
     [`https://www.youtube.com/v/${id}`, { video: id }],
     [`  https://youtu.be/${id}  `, { video: id }],
   ])("finds the video in %s", (source, expected) => {
-    expect(parseYouTube(source)).toEqual(expected);
+    expect(youtube.parse(source)).toEqual(expected);
   });
 
   it.each([
@@ -45,11 +47,11 @@ describe("parseYouTube", () => {
     `https://youtube.com.example.com/watch?v=${id}`,
     `https://vimeo.com/${id}`,
   ])("rejects %j", (source) => {
-    expect(parseYouTube(source)).toBeNull();
+    expect(youtube.parse(source)).toBeNull();
   });
 });
 
-describe("parseVimeo", () => {
+describe("vimeo.parse", () => {
   it.each([
     ["76979871", { video: "76979871" }],
     ["https://vimeo.com/76979871", { video: "76979871" }],
@@ -66,7 +68,7 @@ describe("parseVimeo", () => {
     ["https://vimeo.com/showcase/11223/video/76979871", { video: "76979871" }],
     ["https://vimeo.com/album/11223/video/76979871", { video: "76979871" }],
   ])("finds the video in %s", (source, expected) => {
-    expect(parseVimeo(source)).toEqual(expected);
+    expect(vimeo.parse(source)).toEqual(expected);
   });
 
   it.each([
@@ -80,11 +82,11 @@ describe("parseVimeo", () => {
     "https://vimeo.com.example.com/76979871",
     `https://youtu.be/${id}`,
   ])("rejects %j", (source) => {
-    expect(parseVimeo(source)).toBeNull();
+    expect(vimeo.parse(source)).toBeNull();
   });
 
   it("drops a hash that isn't hexadecimal", () => {
-    expect(parseVimeo("https://player.vimeo.com/video/76979871?h=no%20way")).toEqual({
+    expect(vimeo.parse("https://player.vimeo.com/video/76979871?h=no%20way")).toEqual({
       video: "76979871",
     });
   });
@@ -104,7 +106,6 @@ describe("youtubeItem and vimeoItem", () => {
       start: 12,
       poster: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
     });
-    expect(isEmbedItem(item)).toBe(true);
   });
 
   it("stand a Short upright and take the caller's fields over the URL's", () => {
@@ -129,16 +130,12 @@ describe("youtubeItem and vimeoItem", () => {
     expect(() => youtubeItem("https://vimeo.com/1", { title: "" })).toThrow(TypeError);
     expect(() => vimeoItem(`https://youtu.be/${id}`, { title: "" })).toThrow(TypeError);
   });
-
-  it("are told apart from other items", () => {
-    expect(isEmbedItem({ type: "image", src: "/x.jpg", alt: "", width: 1, height: 1 })).toBe(false);
-  });
 });
 
-describe("embedUrl", () => {
+describe("the providers' url", () => {
   it("plays YouTube from youtube-nocookie.com with its script API on", () => {
     const item = youtubeItem(id, { title: "", start: 90.5 });
-    const url = new URL(embedUrl(item));
+    const url = new URL(youtube.url(item));
     expect(url.origin).toBe("https://www.youtube-nocookie.com");
     expect(url.pathname).toBe(`/embed/${id}`);
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -148,12 +145,14 @@ describe("embedUrl", () => {
       rel: "0",
       start: "90",
     });
-    expect(new URL(embedUrl(item, { autoplay: false })).searchParams.has("autoplay")).toBe(false);
+    expect(new URL(youtube.url(item, { autoplay: false })).searchParams.has("autoplay")).toBe(
+      false,
+    );
   });
 
   it("plays Vimeo from player.vimeo.com with Do Not Track and the private hash", () => {
     const item = vimeoItem("https://vimeo.com/76979871/8272103f6e#t=65", { title: "" });
-    const url = new URL(embedUrl(item));
+    const url = new URL(vimeo.url(item));
     expect(url.origin).toBe("https://player.vimeo.com");
     expect(url.pathname).toBe("/video/76979871");
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -166,8 +165,91 @@ describe("embedUrl", () => {
 
   it("refuses an id it didn't parse", () => {
     const item = { ...youtubeItem(id, { title: "" }), video: "../../evil" };
-    expect(() => embedUrl(item)).toThrow(TypeError);
-    const vimeo = { ...vimeoItem("1", { title: "" }), hash: "?x=1" };
-    expect(() => embedUrl(vimeo)).toThrow(TypeError);
+    expect(() => youtube.url(item)).toThrow(TypeError);
+    const film = { ...vimeoItem("1", { title: "" }), hash: "?x=1" };
+    expect(() => vimeo.url(film)).toThrow(TypeError);
+  });
+});
+
+describe("createEmbedProvider", () => {
+  const wistia = createEmbedProvider({
+    name: "wistia",
+    origin: "https://fast.wistia.net",
+    parse: (source) => {
+      const video =
+        /(?:medias|iframe)\/(\w+)/.exec(source)?.[1] ?? (/^\w{10}$/.test(source) ? source : null);
+      return video ? { video } : null;
+    },
+    url: (item, { autoplay }) =>
+      `https://fast.wistia.net/embed/iframe/${item.video}?autoPlay=${autoplay}`,
+  });
+
+  it("makes items of an app's own provider, by name", () => {
+    const item = embedItem(wistia, "https://fast.wistia.net/medias/abc123defg", { title: "Demo" });
+    expect(item).toEqual({
+      type: "embed",
+      id: "wistia:abc123defg",
+      title: "Demo",
+      width: 1280,
+      height: 720,
+      provider: "wistia",
+      video: "abc123defg",
+    });
+    expect(wistia.url(item, { autoplay: false })).toBe(
+      "https://fast.wistia.net/embed/iframe/abc123defg?autoPlay=false",
+    );
+    expect(() => embedItem(wistia, "nope", { title: "" })).toThrow(TypeError);
+  });
+
+  it("sizes an item from parse's aspect, then the provider's", () => {
+    const tall = createEmbedProvider({
+      name: "tall",
+      origin: "https://tall.example",
+      aspect: 3 / 4,
+      parse: (source) => ({ video: source }),
+      url: (item) => `https://tall.example/${item.video}`,
+    });
+    expect(embedItem(tall, "a", { title: "" })).toMatchObject({ width: 960, height: 1280 });
+    expect(embedItem(tall, "a", { title: "", width: 30, height: 40 })).toMatchObject({
+      width: 30,
+      height: 40,
+    });
+  });
+
+  it("refuses a player off its origin, and an origin that isn't https", () => {
+    const sneaky = createEmbedProvider({
+      name: "sneaky",
+      origin: "https://player.example",
+      parse: (source) => ({ video: source }),
+      url: (item) =>
+        item.video === "js" ? "javascript:alert(1)" : `https://evil.example/${item.video}`,
+    });
+    const item = embedItem(sneaky, "x", { title: "" });
+    expect(() => sneaky.url(item)).toThrow(TypeError);
+    expect(() => sneaky.url({ ...item, video: "js" })).toThrow(TypeError);
+    expect(() =>
+      createEmbedProvider({ ...sneaky, origin: "http://player.example", url: () => "" }),
+    ).toThrow(TypeError);
+    expect(() =>
+      createEmbedProvider({ ...sneaky, origin: "https://player.example/path", url: () => "" }),
+    ).toThrow(TypeError);
+    expect(() => createEmbedProvider({ ...sneaky, name: "Bad name", url: () => "" })).toThrow(
+      TypeError,
+    );
+  });
+
+  it("refuses two providers with one name in a slide", () => {
+    expect(() => createEmbedSlide({ providers: [youtube, youtube] })).toThrow(TypeError);
+  });
+
+  it("fails the slide of an item whose provider it doesn't have", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fail = vi.fn();
+    const item: FluidboxEmbedItem = { ...embedItem(wistia, "abc123defg", { title: "" }) };
+    const render = createEmbedSlide();
+    render({ item, fail } as unknown as Parameters<typeof render>[0]);
+    expect(fail).toHaveBeenCalledWith(expect.any(TypeError));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("wistia"));
+    warn.mockRestore();
   });
 });

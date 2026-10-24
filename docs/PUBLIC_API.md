@@ -24,9 +24,9 @@ documentation is in `apps/docs/content` ([API reference](../apps/docs/content/ap
 | `@ogdakke/fluidbox/sheet`       | Registers the sheet add-on on import. Exports its types only. SSR-safe. Styles in `sheet.css`.                               |
 | `@ogdakke/fluidbox/hover-zoom`  | `hoverZoom` and its options: magnifies a photo on the page under a resting mouse. No side effects. SSR-safe.                 |
 | `@ogdakke/fluidbox/kit`         | The binding kit for framework bindings. Not needed by app code.                                                              |
-| `@ogdakke/fluidbox/embeds`      | YouTube and Vimeo facades: `youtubeItem`, `vimeoItem`, `renderEmbed`. No side effects on import. SSR-safe.                   |
-| `@ogdakke/fluidbox/spin`        | 360° spins: `spinItem`, `createSpinRenderer`. No side effects on import. SSR-safe.                                           |
-| `@ogdakke/fluidbox/model`       | 3D models: `modelItem`, `createModelRenderer`. Never bundles `<model-viewer>`; loads it through `load`. SSR-safe.            |
+| `@ogdakke/fluidbox/embed`       | Video facades: `embedSlide`, `youtubeItem`, `vimeoItem`, `createEmbedProvider`. No side effects on import. SSR-safe.         |
+| `@ogdakke/fluidbox/spin`        | 360° spins: `spinItem`, `createSpinSlide`. No side effects on import. SSR-safe.                                              |
+| `@ogdakke/fluidbox/model`       | 3D models: `modelItem`, `createModelSlide`. Never bundles `<model-viewer>`; loads it through `load`. SSR-safe.               |
 | `@ogdakke/fluidbox/<framework>` | `react`, `solid`, `vue`, `angular`: built on the plain API and the kit only, never the custom elements.                      |
 
 Add-ons register into one registry per page (`Symbol.for`), however many copies a bundler makes.

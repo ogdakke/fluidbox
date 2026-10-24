@@ -8,7 +8,7 @@ export default defineConfig({
     sheet: "src/sheet-entry.ts",
     kit: "src/kit.ts",
     "hover-zoom": "src/hover-zoom.ts",
-    embeds: "src/embeds.ts",
+    embed: "src/embed.ts",
     model: "src/model.ts",
     spin: "src/spin.ts",
   },

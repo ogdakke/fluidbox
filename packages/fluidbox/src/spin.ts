@@ -5,7 +5,6 @@
 import { addStyles, paintPoster, posterStyles } from "./addon-styles";
 import type {
   FluidboxCustomItemBase,
-  FluidboxItem,
   FluidboxSlideRenderer,
   FluidboxThumbnail,
 } from "./public-api";
@@ -63,7 +62,7 @@ export function spinFrames(frames: readonly string[] | FluidboxSpinFrameTemplate
   );
 }
 
-/** A spin item for the spin renderer. */
+/** A spin item for the spin slide. */
 export function spinItem(options: FluidboxSpinItemOptions): FluidboxSpinItem {
   const frames = spinFrames(options.frames);
   if (!frames.length) throw new RangeError("A spin needs at least one frame.");
@@ -75,13 +74,8 @@ export function spinItem(options: FluidboxSpinItemOptions): FluidboxSpinItem {
   };
 }
 
-/** Whether an item is a spin made by `spinItem`. */
-export function isSpinItem(item: FluidboxItem): item is FluidboxSpinItem {
-  return item.type === "spin";
-}
-
-/** What `createSpinRenderer` takes. */
-export interface FluidboxSpinRendererOptions {
+/** What `createSpinSlide` takes. */
+export interface FluidboxSpinSlideOptions {
   /**
    * The spin's value as a slider reads it.
    * @default (frame, count) => `Frame ${frame} of ${count}`
@@ -116,23 +110,20 @@ const FRICTION = 0.995;
 const REST = 0.004;
 
 /**
- * Make a renderer for `spinItem` spins. Frame 0 shows at once and is what the
+ * Make the slide for spin items. Frame 0 shows at once and is what the
  * opening flight lands on; the other frames load at low priority once the slide
  * is first on show. A horizontal drag turns the spin and lets go with inertia
  * that settles on a frame. With the spin focused, the arrow keys step a frame,
  * Home and End go to the first and last. The spin owns its input, so neither
  * gesture nor keys move the viewer.
  */
-export function createSpinRenderer(
-  options: FluidboxSpinRendererOptions = {},
-): FluidboxSlideRenderer<FluidboxItem> {
+export function createSpinSlide(
+  options: FluidboxSpinSlideOptions = {},
+): FluidboxSlideRenderer<FluidboxSpinItem> {
   const label = options.label ?? ((frame, count) => `Frame ${frame} of ${count}`);
   const keep = Math.max(2, options.keep ?? 48);
   const turns = options.turns ?? 1;
   return ({ item, media: target, signal, active, onActiveChange }) => {
-    if (!isSpinItem(item)) {
-      throw new TypeError(`The spin renderer draws spinItem spins: ${item.id}`);
-    }
     const ownerDocument = target.ownerDocument;
     const view = ownerDocument.defaultView!;
     addStyles(ownerDocument, "spin", posterStyles + spinStyles);

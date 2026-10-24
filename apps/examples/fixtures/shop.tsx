@@ -1,10 +1,10 @@
 import { mountSite } from "../src/site";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { FluidboxImageItem, FluidboxItem, FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { renderEmbed, youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
-import { createSpinRenderer, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
+import type { FluidboxImageItem, FluidboxSlideRenderer } from "@ogdakke/fluidbox";
+import { embedSlide, youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embed";
+import { createModelSlide, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
+import { createSpinSlide, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
 import {
   Fluidbox,
   useFluidbox,
@@ -119,7 +119,7 @@ const badges: Record<string, string> = { embed: "Video", spin: "360°", model: "
  * The add-ons' renderers draw into an element. A React slide gets a span of
  * its own to draw them into, with the slide's signal and activity.
  */
-function addon(render: FluidboxSlideRenderer<FluidboxItem>): FluidboxReactRenderer<ShopItem> {
+function addon(render: FluidboxSlideRenderer<any>): FluidboxReactRenderer<ShopItem> {
   return (context) => <AddonSlide render={render} context={context} />;
 }
 
@@ -127,7 +127,7 @@ function AddonSlide({
   render,
   context,
 }: {
-  render: FluidboxSlideRenderer<FluidboxItem>;
+  render: FluidboxSlideRenderer<any>;
   context: FluidboxReactRenderContext<ShopItem>;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -150,9 +150,9 @@ function AddonSlide({
 const MODEL_VIEWER = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
 
 const renderers = {
-  embed: addon(renderEmbed),
-  spin: addon(createSpinRenderer()),
-  model: addon(createModelRenderer({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) })),
+  embed: addon(embedSlide),
+  spin: addon(createSpinSlide()),
+  model: addon(createModelSlide({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) })),
 };
 
 const sizes = [

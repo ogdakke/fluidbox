@@ -19,7 +19,7 @@
       "@ogdakke/fluidbox/sheet": ["./packages/fluidbox/src/sheet-entry.ts"],
       "@ogdakke/fluidbox/kit": ["./packages/fluidbox/src/kit.ts"],
       "@ogdakke/fluidbox/hover-zoom": ["./packages/fluidbox/src/hover-zoom.ts"],
-      "@ogdakke/fluidbox/embeds": ["./packages/fluidbox/src/embeds.ts"],
+      "@ogdakke/fluidbox/embed": ["./packages/fluidbox/src/embed.ts"],
       "@ogdakke/fluidbox/model": ["./packages/fluidbox/src/model.ts"],
       "@ogdakke/fluidbox/spin": ["./packages/fluidbox/src/spin.ts"],
       "@ogdakke/fluidbox/styles.css": ["./packages/fluidbox/src/styles.css.d.ts"],

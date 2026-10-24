@@ -16,9 +16,9 @@ The check builds one small consumer per public entry with tsdown as minified bro
 | Sheet          |         7,277 B |            7,277 B |                  8,272 B |
 | Kit            |         1,662 B |            1,662 B |                  4,403 B |
 | Hover zoom     |         1,453 B |            1,453 B |                  4,194 B |
-| Embeds         |         2,557 B |            2,557 B |                  5,298 B |
-| Model          |         1,312 B |            1,312 B |                  4,053 B |
-| Spin           |         2,439 B |            2,439 B |                  5,180 B |
+| Embed          |         2,991 B |            2,991 B |                  5,732 B |
+| Model          |         1,375 B |            1,375 B |                  4,116 B |
+| Spin           |         2,388 B |            2,388 B |                  5,129 B |
 
 `styles.css` is 2,741 B gzip. The opt-in `baseline.css` is 3,235 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
@@ -38,5 +38,7 @@ On 2026-10-24 the API redesign moved every core entry by about 1.2 KB initial an
 - Activation: slides for every media kind with their own error and retry states, item `data` on slides and thumbnails, full screen with its WebKit fallback, Download through `fetch` for cross-origin files, Share with its clipboard fallback, the wheel modes, the rubber band when drag-to-dismiss is off, the `mediaerror` event, and the control wiring that `bindControl` shares with the layer.
 - The control icons are gone: controls are text until an `icons` factory or `baseline.css` gives them a glyph. Each binding's initial chunk lost its icon builder and paths, about 370 B on React against the redesign before that.
 - `styles.css` lost 824 B to `baseline.css`, which holds the colours, shadows, radii, transitions and mask glyphs. The embeds add-on lost its Play SVG; model and spin lost their looks.
+
+Later on 2026-10-24 the media add-ons became slides. The `embeds` entry became `embed` and grew 434 B, to 2,991 B: `createEmbedProvider` with its URL and origin checks, the provider lookup, a preconnect to the player's origin, the `play` content option, and `fail` for an item whose provider the slide doesn't have. The spec estimated 2,800–2,950 B. YouTube and Vimeo stay in the default provider list, so neither shakes out of `embedSlide`. Model grew 63 B, to 1,375 B, because a model the viewer opens on holds the opening until its first frame has painted; spin lost 51 B with `isSpinItem`.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

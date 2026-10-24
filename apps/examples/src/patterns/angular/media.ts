@@ -10,9 +10,9 @@ import {
 } from "@angular/core";
 import { itemLabel, type FluidboxItem, type FluidboxSlideRenderer } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
-import { renderEmbed } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer } from "@ogdakke/fluidbox/model";
-import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
+import { embedSlide } from "@ogdakke/fluidbox/embed";
+import { createModelSlide } from "@ogdakke/fluidbox/model";
+import { createSpinSlide } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
 import { addonSlide } from "../../addon-slide";
 
@@ -23,7 +23,7 @@ import { addonSlide } from "../../addon-slide";
  */
 @Directive()
 abstract class AddonSlide implements OnInit, OnDestroy {
-  protected abstract readonly render: FluidboxSlideRenderer;
+  protected abstract readonly render: FluidboxSlideRenderer<any>;
   @Input({ required: true }) item!: FluidboxItem;
   @Input() index = 0;
   @Input() set active(active: boolean) {
@@ -71,18 +71,18 @@ const slide = { standalone: true, host: { style: "display: contents" }, template
 
 @Component({ ...slide, selector: "span[appEmbedSlide]" })
 export class EmbedSlide extends AddonSlide {
-  protected readonly render = renderEmbed;
+  protected readonly render = embedSlide;
 }
 
 @Component({ ...slide, selector: "span[appSpinSlide]" })
 export class SpinSlide extends AddonSlide {
-  protected readonly render = createSpinRenderer();
+  protected readonly render = createSpinSlide();
 }
 
 @Component({ ...slide, selector: "span[appModelSlide]" })
 export class ModelSlide extends AddonSlide {
   // <model-viewer> loads when a model first comes on show.
-  protected readonly render = createModelRenderer({
+  protected readonly render = createModelSlide({
     load: () => import(/* @vite-ignore */ modelViewerUrl),
   });
 }
@@ -103,7 +103,7 @@ export class ModelSlide extends AddonSlide {
 })
 export class Media {
   readonly media = productMedia;
-  // The items' `render` names these: "embed", "spin" and "model".
+  // The items' types name these slides: "embed", "spin" and "model".
   readonly renderers = { embed: EmbedSlide, spin: SpinSlide, model: ModelSlide };
   readonly label = itemLabel;
   readonly thumbnailSrc = thumbnailSrc;

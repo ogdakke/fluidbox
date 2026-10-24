@@ -38,13 +38,19 @@ import type * as ThumbnailsEntry from "@ogdakke/fluidbox/thumbnails";
 import type { FluidboxThumbnailsOptions } from "@ogdakke/fluidbox/thumbnails";
 import type { FluidboxSheetOptions, FluidboxSheetSnapPoint } from "@ogdakke/fluidbox/sheet";
 import {
-  renderEmbed,
+  createEmbedProvider,
+  createEmbedSlide,
+  embedItem,
+  embedSlide,
+  vimeo,
   vimeoItem,
+  youtube,
   youtubeItem,
   type FluidboxEmbedItem,
-} from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
-import { createSpinRenderer, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
+  type FluidboxEmbedProvider,
+} from "@ogdakke/fluidbox/embed";
+import { createModelSlide, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
+import { createSpinSlide, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
 import {
   createTrigger,
   bindTrigger,
@@ -292,11 +298,33 @@ createFluidbox<Shop>({
     }),
   ],
   slides: {
-    embed: renderEmbed,
-    spin: createSpinRenderer({ label: (frame, count) => `${frame}/${count}` }),
-    model: createModelRenderer({ load: () => Promise.resolve() }),
+    embed: embedSlide,
+    spin: createSpinSlide({ label: (frame, count) => `${frame}/${count}` }),
+    model: createModelSlide({ load: () => Promise.resolve() }),
   },
 });
+
+// An app's own provider, beside the built-in two.
+const wistia: FluidboxEmbedProvider = createEmbedProvider({
+  name: "wistia",
+  origin: "https://fast.wistia.net",
+  parse: (source) => (/^\w{10}$/.test(source) ? { video: source } : null),
+  url: (item, { autoplay }) =>
+    `https://fast.wistia.net/embed/iframe/${item.video}?autoPlay=${autoplay}`,
+});
+const wistiaItem: FluidboxEmbedItem = embedItem(wistia, "abc123defg", { title: "Demo" });
+createFluidbox({
+  items: [wistiaItem],
+  slides: {
+    embed: createEmbedSlide({
+      providers: [youtube, vimeo, wistia],
+      label: (item) => `Play ${item.title}`,
+      play: () => document.createElement("span"),
+    }),
+  },
+});
+// @ts-expect-error a provider's url takes the item
+createEmbedProvider({ name: "x", origin: "https://x.example", parse: () => null, url: () => 1 });
 
 // @ts-expect-error slides are functions, not objects with mount
 createFluidbox({ items: photos, slides: { note: { mount: note2 } } });

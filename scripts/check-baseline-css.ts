@@ -222,7 +222,7 @@ export function functionalSources(): [string, string][] {
     name,
     readFileSync(resolve(src, name), "utf8"),
   ]);
-  const injected = ["addon-styles.ts", "embeds.ts", "spin.ts", "model.ts"].flatMap((name) =>
+  const injected = ["addon-styles.ts", "embed.ts", "spin.ts", "model.ts"].flatMap((name) =>
     [...readFileSync(resolve(src, name), "utf8").matchAll(/const (\w+Styles) = `([^`]*)`/g)].map(
       ([, constant, css]): [string, string] => [`${name} ${constant}`, css!],
     ),

@@ -143,8 +143,8 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
     1", the layer is gone; Escape.
 13. **media** — a gallery of `productMedia` (a photo, a YouTube facade from `youtubeItem`, a spin
     from `spinItem`, a model from `modelItem`) with a trigger per item (`thumbnailSrc`). The
-    renderers are the add-ons' own: `renderEmbed`, `createSpinRenderer()` and
-    `createModelRenderer({ load })` loading `modelViewerUrl`. Elements and JS pass them as they
+    slides are the add-ons' own: `embedSlide`, `createSpinSlide()` and
+    `createModelSlide({ load })` loading `modelViewerUrl`. Elements and JS pass them as they
     are; React, Vue, Solid and Angular wrap each in the framework's renderer API (a component, or
     in Solid a returned element, that calls the add-on on an element of its own with the slide's
     item, index, signal and activity). The spec stubs YouTube, its stills and the CDN

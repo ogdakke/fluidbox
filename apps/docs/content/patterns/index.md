@@ -31,7 +31,7 @@ The examples import their items from `./data`. Each item is a plain object. Here
 
 ```ts
 import type { FluidboxImageItem, FluidboxItem, FluidboxLabels } from "@ogdakke/fluidbox";
-import { youtubeItem } from "@ogdakke/fluidbox/embeds";
+import { youtubeItem } from "@ogdakke/fluidbox/embed";
 import { modelItem } from "@ogdakke/fluidbox/model";
 import { spinItem } from "@ogdakke/fluidbox/spin";
 

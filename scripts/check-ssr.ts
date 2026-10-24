@@ -10,7 +10,7 @@ for (const subpath of [
   "/sheet",
   "/kit",
   "/hover-zoom",
-  "/embeds",
+  "/embed",
   "/model",
   "/spin",
 ]) {

@@ -6,7 +6,6 @@
 import { addStyles, paintPoster, posterStyles } from "./addon-styles";
 import type {
   FluidboxCustomItemBase,
-  FluidboxItem,
   FluidboxSlideRenderer,
   FluidboxThumbnail,
 } from "./public-api";
@@ -14,8 +13,6 @@ import type {
 /** A glTF or GLB model. Its fields are `<model-viewer>`'s, by property name. */
 export interface FluidboxModelItem extends FluidboxCustomItemBase<"model"> {
   readonly id: string;
-  /** The marker `modelItem` sets, so the renderer knows its items. */
-  readonly model: true;
   /** The `.glb` or `.gltf` file. */
   readonly src: string;
   /** An image of the model, shown over the thumbnail until the model is ready. */
@@ -39,7 +36,7 @@ declare module "@ogdakke/fluidbox" {
 /** What `modelItem` takes. */
 export interface FluidboxModelItemOptions extends Omit<
   FluidboxModelItem,
-  "type" | "id" | "model" | "thumbnail"
+  "type" | "id" | "thumbnail"
 > {
   /** Defaults to `src`. */
   readonly id?: string;
@@ -47,7 +44,7 @@ export interface FluidboxModelItemOptions extends Omit<
 }
 
 /**
- * A model item for the model renderer. Its box fills the stage unless you
+ * A model item for the model slide. Its box fills the stage unless you
  * pass `fit: "contain"`; `width` and `height` then only shape the poster.
  */
 export function modelItem(options: FluidboxModelItemOptions): FluidboxModelItem {
@@ -56,21 +53,15 @@ export function modelItem(options: FluidboxModelItemOptions): FluidboxModelItem 
     ...options,
     type: "model",
     id: options.id ?? options.src,
-    model: true,
   };
 }
 
-/** Whether an item is a model made by `modelItem`. */
-export function isModelItem(item: FluidboxItem): item is FluidboxModelItem {
-  return item.type === "model";
-}
-
-/** What `createModelRenderer` takes. */
-export interface FluidboxModelRendererOptions {
+/** What `createModelSlide` takes. */
+export interface FluidboxModelSlideOptions {
   /**
    * Load `<model-viewer>`, as `() => import("@google/model-viewer")`. The
-   * renderer calls it when a model slide first comes on show, then waits for
-   * the element to be defined. Without it, load the element yourself.
+   * slide calls it when a model is first opened or comes on show, then waits
+   * for the element to be defined. Without it, load the element yourself.
    */
   readonly load?: () => Promise<unknown>;
 }
@@ -104,20 +95,18 @@ const modelStyles = `
 `;
 
 /**
- * Make a renderer for `modelItem` models. The slide shows the thumbnail, then
- * the poster, through the opening flight. When the slide first comes on show
- * it loads `<model-viewer>` and the model, and shows the model once it has
- * loaded. The model owns its input: a drag on it turns it, a pinch zooms it,
- * and the arrow keys turn it while it has focus, rather than moving the viewer.
+ * Make the slide for model items. The slide shows the thumbnail, then the
+ * poster. A model being opened loads `<model-viewer>` and the model at once,
+ * and the opening waits for its first frame; a neighbour loads when it first
+ * comes on show. The model shows once it has loaded. It owns its input: a drag
+ * on it turns it, a pinch zooms it, and the arrow keys turn it while it has
+ * focus, rather than moving the viewer.
  */
-export function createModelRenderer(
-  options: FluidboxModelRendererOptions = {},
-): FluidboxSlideRenderer<FluidboxItem> {
+export function createModelSlide(
+  options: FluidboxModelSlideOptions = {},
+): FluidboxSlideRenderer<FluidboxModelItem> {
   let loading: Promise<unknown> | undefined;
-  return ({ item, media: target, signal, active, onActiveChange }) => {
-    if (!isModelItem(item)) {
-      throw new TypeError(`The model renderer draws modelItem models: ${item.id}`);
-    }
+  return ({ item, media: target, signal, active, opening, onActiveChange, waitUntil }) => {
     const ownerDocument = target.ownerDocument;
     addStyles(ownerDocument, "model", posterStyles + modelStyles);
     const box = ownerDocument.createElement("div");
@@ -126,8 +115,8 @@ export function createModelRenderer(
     paintPoster(box, item.thumbnail, item.poster, signal);
     target.append(box);
     let model: ModelViewerElement | undefined;
+    let shown: Promise<void> | undefined;
     const show = async () => {
-      if (model) return;
       const registry = ownerDocument.defaultView?.customElements;
       if (!registry) return;
       if (options.load && !registry.get("model-viewer")) {
@@ -153,19 +142,40 @@ export function createModelRenderer(
       for (const [name, value] of Object.entries(item.attributes ?? {})) {
         model.setAttribute(name, value);
       }
-      model.addEventListener("load", () => (box.dataset.fluidboxModelReady = ""), {
-        once: true,
-        signal,
+      // Its first frame: the load event, then a frame painted with it.
+      const loaded = new Promise<void>((resolve, reject) => {
+        model!.addEventListener(
+          "load",
+          () => {
+            box.dataset.fluidboxModelReady = "";
+            ownerDocument.defaultView!.requestAnimationFrame(() => resolve());
+          },
+          { once: true, signal },
+        );
+        model!.addEventListener("error", () => reject(new Error(`${item.src} didn't load`)), {
+          once: true,
+          signal,
+        });
       });
       model.addEventListener("error", () => (box.dataset.fluidboxModelError = ""), { signal });
       model.setAttribute("src", item.src);
       box.append(model);
+      await loaded;
     };
-    const start = () => void show().catch(() => (box.dataset.fluidboxModelError = ""));
-    // Neighbouring slides keep their posters: a model loads once its slide is on show.
-    if (active) start();
+    const start = () => {
+      shown ??= show().catch(() => {
+        // A failed load of the element tries again when the slide next comes on show.
+        if (!model) shown = undefined;
+        box.dataset.fluidboxModelError = "";
+      });
+      return shown;
+    };
+    // The model being opened starts now and holds the flight for its first
+    // frame; neighbouring slides keep their posters until they come on show.
+    if (opening) waitUntil(start());
+    else if (active) void start();
     return onActiveChange((now) => {
-      if (now) start();
+      if (now) void start();
       else model?.pause?.();
     });
   };
