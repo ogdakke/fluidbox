@@ -102,10 +102,13 @@ const modelStyles = `
 
 /**
  * Make a renderer for `modelItem` models. The slide shows the thumbnail, then
- * the poster, through the opening flight. When the slide first comes on show
- * it loads `<model-viewer>` and the model, and shows the model once it has
- * loaded. The model owns its input: a drag on it turns it, a pinch zooms it,
- * and the arrow keys turn it while it has focus, rather than moving the viewer.
+ * the poster, through the opening flight. Each time the slide comes on show
+ * it makes a `<model-viewer>`, loading the element the first time, and shows
+ * the model once it has loaded. When the slide leaves the show the element
+ * goes and the poster returns: `<model-viewer>` draws nothing, or a clipped
+ * frame, once it has left the page and come back, as a closed viewer's slides
+ * do. The model owns its input: a drag on it turns it, a pinch zooms it, and
+ * the arrow keys turn it while it has focus, rather than moving the viewer.
  */
 export function createModelRenderer(
   options: FluidboxModelRendererOptions = {},
@@ -123,6 +126,7 @@ export function createModelRenderer(
     paintPoster(box, item.thumbnail, item.poster, signal);
     target.append(box);
     let model: ModelViewerElement | undefined;
+    let onShow = active;
     const show = async () => {
       if (model) return;
       const registry = ownerDocument.defaultView?.customElements;
@@ -136,8 +140,9 @@ export function createModelRenderer(
         await loading;
       }
       await registry.whenDefined("model-viewer");
-      if (signal.aborted || model) return;
-      model = ownerDocument.createElement("model-viewer") as ModelViewerElement;
+      if (signal.aborted || model || !onShow) return;
+      const element = ownerDocument.createElement("model-viewer") as ModelViewerElement;
+      model = element;
       // Content that owns its input: the viewer neither swipes, dismisses,
       // zooms nor steps from a gesture or a key that starts on the model.
       model.dataset.fluidboxOwnsInput = "";
@@ -150,20 +155,37 @@ export function createModelRenderer(
       for (const [name, value] of Object.entries(item.attributes ?? {})) {
         model.setAttribute(name, value);
       }
-      model.addEventListener("load", () => (box.dataset.fluidboxModelReady = ""), {
-        once: true,
-        signal,
-      });
-      model.addEventListener("error", () => (box.dataset.fluidboxModelError = ""), { signal });
+      model.addEventListener(
+        "load",
+        () => {
+          if (model === element) box.dataset.fluidboxModelReady = "";
+        },
+        { once: true, signal },
+      );
+      model.addEventListener(
+        "error",
+        () => {
+          if (model === element) box.dataset.fluidboxModelError = "";
+        },
+        { signal },
+      );
       model.setAttribute("src", item.src);
       box.append(model);
     };
     const start = () => void show().catch(() => (box.dataset.fluidboxModelError = ""));
+    const hide = () => {
+      model?.pause?.();
+      model?.remove();
+      model = undefined;
+      delete box.dataset.fluidboxModelReady;
+      delete box.dataset.fluidboxModelError;
+    };
     // Neighbouring slides keep their posters: a model loads once its slide is on show.
     if (active) start();
     return onActiveChange((now) => {
+      onShow = now;
       if (now) start();
-      else model?.pause?.();
+      else hide();
     });
   };
 }

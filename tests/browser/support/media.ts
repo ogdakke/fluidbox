@@ -9,7 +9,9 @@ const still = readFileSync(
 /**
  * A stand-in for `<model-viewer>`: a focusable element that turns on a drag
  * and the arrow keys, zooms on a wheel, and fires `load` once it has a `src`.
- * It records what it got in data attributes.
+ * It records what it got in data attributes, and how often it has joined the
+ * page: the real element draws nothing, or a clipped frame, once it has left
+ * the page and come back.
  */
 const fakeModelViewer = `
 window.__modelViewerLoads = (window.__modelViewerLoads ?? 0) + 1;
@@ -49,6 +51,7 @@ class FakeModelViewer extends HTMLElement {
     );
   }
   connectedCallback() {
+    this.dataset.connections = String(Number(this.dataset.connections ?? 0) + 1);
     this.tabIndex = 0;
     this.style.display = "block";
     if (this.getAttribute("src") && !this.loaded) {
