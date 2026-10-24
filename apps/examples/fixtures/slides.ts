@@ -34,6 +34,9 @@ declare module "@ogdakke/fluidbox" {
     other: FluidboxCustomItemBase<"other">;
     card: FluidboxCustomItemBase<"card">;
     blank: FluidboxCustomItemBase<"blank">;
+    own: FluidboxCustomItemBase<"own">;
+    film: FluidboxCustomItemBase<"film">;
+    gated: FluidboxCustomItemBase<"gated">;
   }
 }
 
@@ -143,7 +146,13 @@ const hookItems: FluidboxItem[] = [
   { type: "card", id: "card", title: "Card", width: 800, height: 600 },
   { type: "blank", id: "blank", title: "Blank", width: 800, height: 600 },
   photo("after", "/photo-square.svg"),
+  { type: "own", id: "own", title: "Own image", width: 800, height: 800 },
+  { type: "film", id: "film", title: "Own video", width: 640, height: 360 },
+  { type: "gated", id: "gated", title: "Gated", width: 800, height: 600 },
 ];
+
+/** Opens the gated slide's waitUntil promise, and calls waitUntil on it again. */
+const gate: { open?: () => void; wait?: (promise: Promise<unknown>) => void } = {};
 
 const hooks: Fluidbox = createFluidbox({
   items: hookItems,
@@ -166,6 +175,33 @@ const hooks: Fluidbox = createFluidbox({
     },
     // Draws nothing: the open has no picture to fly.
     blank: () => {},
+    // Images and videos of its own, which the open waits for.
+    own: (slide) => {
+      log.push(`own opening ${slide.opening}`);
+      const image = document.createElement("img");
+      image.alt = "";
+      image.src = "/products/fjord-room.webp?own";
+      image.style.cssText = "width: 100%; height: 100%; object-fit: contain";
+      slide.media.append(image);
+    },
+    film: (slide) => {
+      log.push(`film opening ${slide.opening}`);
+      const video = document.createElement("video");
+      video.muted = true;
+      video.poster = "/video/drift-poster.jpg?own";
+      video.src = "/video/drift.webm?own";
+      video.style.cssText = "width: 100%; height: 100%";
+      slide.media.append(video);
+    },
+    gated: (slide) => {
+      log.push(`gated opening ${slide.opening}`);
+      const art = document.createElement("div");
+      art.className = "slides-card";
+      art.style.cssText = "width: 100%; height: 100%; background: #335";
+      slide.media.append(art);
+      slide.waitUntil(new Promise<void>((resolve) => (gate.open = resolve)));
+      gate.wait = slide.waitUntil;
+    },
   },
 });
 
@@ -189,4 +225,4 @@ grid("#slides", fluidbox, items);
 grid("#replaced", replaced, replacedItems);
 grid("#hooks", hooks, hookItems);
 
-Object.assign(window, { slidesFixture: { fluidbox, replaced, hooks, log, poses } });
+Object.assign(window, { slidesFixture: { fluidbox, replaced, hooks, log, poses, gate } });

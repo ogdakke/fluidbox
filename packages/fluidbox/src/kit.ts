@@ -7,7 +7,7 @@ import { hostOf } from "./host";
 import { idOf, indexIn, itemLabel, targetKey, targetKeys } from "./items";
 import { defaultLabels, resolveLabels } from "./labels";
 import { fluidboxEventTypes } from "./events";
-import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "./public-api";
+import type { Fluidbox, FluidboxItem, FluidboxRenderer, FluidboxSlide } from "./public-api";
 
 export { controlNames, fluidboxControls, zoomControlNames, type FluidboxControl } from "./controls";
 export { defaultLabels, resolveLabels };
@@ -39,6 +39,19 @@ export { latestOrigins } from "./origins";
  * binding's unmount does. The next press or open makes a new viewer, so a
  * StrictMode remount keeps working.
  */
+/**
+ * Hold a slide's commit while a framework renders it: call it in the slide's
+ * renderer, and call what it returns once the content is in the box. An open
+ * waits for the commit before it reads the box (at most its three seconds).
+ * Outside the renderer's body it holds nothing.
+ */
+export function holdSlideCommit(slide: FluidboxSlide<any>): () => void {
+  const hold = (slide as unknown as { [key: symbol]: (() => () => void) | undefined })[
+    Symbol.for("fluidbox.holdCommit")
+  ];
+  return hold ? hold() : () => {};
+}
+
 export function unloadFluidbox(fluidbox: Fluidbox<any>) {
   hostOf(fluidbox).unload();
 }

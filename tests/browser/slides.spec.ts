@@ -15,6 +15,7 @@ declare global {
         moving: boolean;
         visible: { x: number; y: number; width: number; height: number };
       }[];
+      gate: { open?: () => void; wait?: (promise: Promise<unknown>) => void };
     };
   }
 }
@@ -250,4 +251,130 @@ test("an empty box opens and closes with a fade, not a flight", async ({ page })
   // No copy of the box travels to the trigger.
   await expect(page.locator("[data-fluidbox-flight]")).toHaveCount(0);
   await expect(page.locator(dialog)).toHaveCount(0);
+});
+
+const overlay = "[data-fluidbox-overlay]";
+
+/** Hold a request until the returned function lets it through. */
+async function hold(page: Page, url: string) {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(url, async (route) => {
+    await held;
+    await route.continue();
+  });
+  return release;
+}
+
+/** Whether the open is still waiting for its slide: mounted but not yet shown. */
+const waiting = (page: Page) =>
+  page.locator(overlay).evaluate((element) => element.hasAttribute("data-fluidbox-prepared"));
+
+test.describe("an open waits for its slide", () => {
+  test("for an image of the slide's own to decode, with the card still painted", async ({
+    page,
+  }) => {
+    await load(page);
+    const release = await hold(page, "**/products/fjord-room.webp?own");
+    await page.locator('#hooks [data-item="own"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "opening");
+    await page.waitForTimeout(400);
+    expect(await waiting(page)).toBe(true);
+    await expect(page.locator('#hooks [data-item="own"] img')).toBeVisible();
+    // Only the slide being opened is opening; its neighbours mount without it.
+    const log = await page.evaluate(() => window.slidesFixture.log);
+    expect(log).toContain("own opening true");
+    expect(log).toContain("film opening false");
+    release();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    const image = page.locator(`${shown} [data-fluidbox-media] img`);
+    expect(await image.evaluate((element: HTMLImageElement) => element.complete)).toBe(true);
+  });
+
+  test("for a video of the slide's own to show its poster", async ({ page }) => {
+    await load(page);
+    await hold(page, "**/video/drift.webm?own");
+    const poster = await hold(page, "**/video/drift-poster.jpg?own");
+    await page.locator('#hooks [data-item="film"]').click();
+    await page.waitForTimeout(400);
+    expect(await waiting(page)).toBe(true);
+    poster();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  });
+
+  test("for waitUntil, while Escape calls it off and the arrows move it", async ({ page }) => {
+    await load(page);
+    await page.locator('#hooks [data-item="gated"]').click();
+    await page.waitForTimeout(300);
+    expect(await waiting(page)).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(page.locator(dialog)).toHaveCount(0);
+    expect(await page.evaluate(() => window.slidesFixture.hooks.state.status)).toBe("closed");
+
+    await page.locator('#hooks [data-item="gated"]').click();
+    await page.waitForTimeout(300);
+    expect(await waiting(page)).toBe(true);
+    // The arrows retarget the open to the item beside it, which waits for nothing.
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator(`${shown} [data-fluidbox-media] video`)).toHaveCount(1);
+  });
+
+  test("at most three seconds, then flies and warns what it waited for", async ({ page }) => {
+    const warnings = await load(page);
+    const start = Date.now();
+    await page.locator('#hooks [data-item="gated"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open", {
+      timeout: 6000,
+    });
+    expect(Date.now() - start).toBeGreaterThan(2900);
+    expect(warnings.find((text) => text.includes("without its slide ready"))).toMatch(
+      /Gated after 3000 ms .*a waitUntil promise/,
+    );
+  });
+
+  test("for a waitUntil before its flight, and warns of one after it starts", async ({ page }) => {
+    const warnings = await load(page);
+    await page.locator('#hooks [data-item="gated"]').click();
+    await page.waitForTimeout(200);
+    const late = await page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const { gate } = window.slidesFixture;
+          const overlay = document.querySelector("[data-fluidbox-overlay]")!;
+          // A second promise before the flight still holds it.
+          let second!: () => void;
+          gate.wait!(new Promise<void>((open) => (second = open)));
+          gate.open!();
+          setTimeout(() => {
+            const held = overlay.hasAttribute("data-fluidbox-prepared");
+            second();
+            const frame = () => {
+              if (overlay.hasAttribute("data-fluidbox-prepared")) {
+                requestAnimationFrame(frame);
+                return;
+              }
+              // The flight is under way: this one comes too late to hold it.
+              gate.wait!(new Promise(() => {}));
+              resolve(held ? "held" : "flew");
+            };
+            frame();
+          }, 300);
+        }),
+    );
+    expect(late).toBe("held");
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    expect(warnings.some((text) => text.includes("after the opening flight started"))).toBe(true);
+  });
+
+  test("with reduced motion too, then appears without a flight", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page);
+    await page.locator('#hooks [data-item="gated"]').click();
+    await page.waitForTimeout(300);
+    expect(await waiting(page)).toBe(true);
+    await page.evaluate(() => window.slidesFixture.gate.open!());
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator("[data-fluidbox-flight]")).toHaveCount(0);
+  });
 });

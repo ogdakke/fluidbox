@@ -217,6 +217,12 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   /** Whether the slide is the one on show in the viewer. */
   readonly active: boolean;
   /**
+   * True while an open waits for this slide: it mounted as the item being
+   * opened. Neighbours that mount with it are false. Start heavy work early
+   * only when an open waits for it.
+   */
+  readonly opening: boolean;
+  /**
    * Call `listener` with the new `active` each time it changes: true as the slide
    * comes to be the one on show, false as the viewer moves away from it. Use it to
    * play and pause. Returns a function that stops listening; `signal` stops it too.
@@ -232,6 +238,14 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    * once as it comes to rest. Returns a function that stops listening.
    */
   onZoom(this: void, listener: (pose: FluidboxZoomPose) => void): () => void;
+  /**
+   * Make the opening flight also wait for `promise`, as
+   * `ExtendableEvent.waitUntil` does: for what the runtime can't see in the
+   * box, such as a canvas having painted. Every open already waits for the
+   * box's images and videos, at most three seconds in all. A rejected promise
+   * counts as settled. Call it before the slide commits: in the renderer.
+   */
+  waitUntil(this: void, promise: Promise<unknown>): void;
   /**
    * Draw the built-in image into `media`: it loads, sharpens and fails as a
    * photo's does. Without an argument it draws `item`, which must be an image

@@ -58,6 +58,8 @@ import { originPose, originPicture } from "./origin-pose";
 import type { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 
+/** The longest an open waits for its slide to be ready, as the instant open waits for its image. */
+const SLIDE_READY_CAP = 3000;
 const OPEN_DURATION = 300;
 const TOUCH_DISMISS_DISTANCE = 60;
 const OPENING_SPRING_RESPONSE = 210;
@@ -603,6 +605,8 @@ export class DomViewerDriver<
       return () => {};
     }
     this.#stage(context.origin?.trigger ?? null);
+    // The slide mounts knowing an open may wait for it.
+    this.#strip?.setOpening(context.index);
     void this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
     this.#render(context.item, context.index, false);
@@ -664,6 +668,7 @@ export class DomViewerDriver<
         : undefined;
     if (!prepared) this.#discardPreparation();
     else this.#preparedOpen = undefined;
+    this.#strip?.setOpening(context.index);
     const focused = this.#portal.overlay.ownerDocument.activeElement;
     this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
@@ -699,7 +704,7 @@ export class DomViewerDriver<
     if (context.instant) {
       // Hidden until the image can paint, so it replaces the server's copy in one frame.
       this.#keepThumbnailVisible(undefined);
-      await this.#mediaReady();
+      await Promise.all([this.#mediaReady(), this.#slideReady(context)]);
       if (abandoned()) return;
       this.#clearMotionStyles();
       this.#thumbnailOverlays?.prepare(context.item, context.index, this.#frame, "open", 0);
@@ -712,6 +717,11 @@ export class DomViewerDriver<
     }
     if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (abandoned()) return;
+    // The card keeps its picture while the slide gets ready, so the flight
+    // doesn't land on an empty box.
+    await this.#slideReady(context);
+    if (abandoned()) return;
+    this.#strip?.setOpening(context.index, true);
     if (this.#prefersReducedMotion()) {
       this.#keepThumbnailVisible(undefined);
       for (const animation of prepared?.animations ?? []) animation.cancel();
@@ -1008,6 +1018,22 @@ export class DomViewerDriver<
     this.#strip?.destroy();
     this.#strip = undefined;
     this.#finishClose();
+  }
+
+  /**
+   * Wait until the opened slide is ready, for at most three seconds, with the
+   * keys of a wait. The open's signal ends it: a close, a newer open, new
+   * items or a destroy.
+   */
+  #slideReady(context: { readonly index: number; readonly signal: AbortSignal }) {
+    const ready = this.#strip?.ready(context.index, SLIDE_READY_CAP);
+    if (!ready) return Promise.resolve();
+    const { signal } = context;
+    const called = new Promise<void>((resolve) => {
+      if (signal.aborted) resolve();
+      signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    return this.#whileWaiting(Promise.race([ready, called]), signal);
   }
 
   /** Wait until the active image has decoded and the strip shows it, for at most three seconds. */
@@ -1326,6 +1352,7 @@ export class DomViewerDriver<
     const prepared = this.#preparedOpen;
     if (!prepared) return;
     this.#preparedOpen = undefined;
+    this.#strip?.setOpening(undefined);
     for (const animation of prepared.animations) animation.cancel();
     this.#strip?.unmount();
     this.#clearMotionStyles();
@@ -2021,6 +2048,7 @@ export class DomViewerDriver<
   }
 
   #setState(state: "closed" | "opening" | "open" | "closing") {
+    if (state !== "opening") this.#strip?.setOpening(undefined);
     for (const target of [this.#portal.overlay, this.#portal.dialog]) {
       target.dataset.fluidboxStatus = state;
       target.toggleAttribute("data-open", state !== "closed");

@@ -6,8 +6,8 @@ const none = (): never => {
 
 /**
  * The slide a plain-JS add-on draws into, from a framework slide's context:
- * an element of the component's own is its box. It doesn't zoom, and it has
- * no built-in media to draw.
+ * an element of the component's own is its box. It doesn't zoom, holds no
+ * open, and has no built-in media to draw.
  */
 export function addonSlide<TItem extends FluidboxItem>(
   context: {
@@ -28,12 +28,14 @@ export function addonSlide<TItem extends FluidboxItem>(
     get active() {
       return context.active;
     },
+    opening: false,
     onActiveChange: (listener) => {
       const stop = context.onActiveChange(listener);
       return () => void stop();
     },
     zoomable: () => {},
     onZoom: () => () => {},
+    waitUntil: () => {},
     drawImage: none,
     drawVideo: none,
     drawIframe: none,

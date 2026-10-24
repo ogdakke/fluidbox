@@ -109,6 +109,36 @@ interface ViewerSlide {
   dispose?: FluidboxDispose;
   /** Custom content's view of whether its slide is on show, and who follows it. */
   activity?: { active: boolean; readonly listeners: Set<(active: boolean) => void> };
+  /**
+   * Settles once the renderer's content has committed: as the renderer
+   * returns, or when the binding holding the commit reports it.
+   */
+  commit?: Promise<void>;
+  /** Settles the commit, for a slide that unloads before it commits. */
+  release?: () => void;
+  /** The renderer's `waitUntil` promises, each until it settles. */
+  waits?: Set<Promise<void>>;
+}
+
+/** Where a binding finds the hold on a slide's commit: shared across chunks by its key. */
+const holdCommit = Symbol.for("fluidbox.holdCommit");
+
+/** Settles once a video can show a frame, or its poster has decoded. */
+function videoFrame(video: HTMLVideoElement) {
+  return new Promise<void>((resolve) => {
+    const settled = new AbortController();
+    const done = () => {
+      settled.abort();
+      resolve();
+    };
+    video.addEventListener("loadeddata", done, { signal: settled.signal });
+    video.addEventListener("error", done, { signal: settled.signal });
+    if (video.poster) {
+      const poster = new Image();
+      poster.src = video.poster;
+      poster.decode().then(done, () => {});
+    }
+  });
 }
 
 /** Point an image at a thumbnail, its srcset and sizes included. */
@@ -175,6 +205,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
     | undefined;
   /** While new items are laid out: the old slides whose item is unchanged, by id. */
+  /** The item an open waits for, and whether its flight has started. */
+  #opening: { readonly index: number; readonly flying: boolean } | undefined;
   #recycled: Map<string, { item: TItem; slide: ViewerSlide }[]> | undefined;
 
   constructor(
@@ -719,6 +751,78 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return slide.custom ? slide.media : slide.frame;
   }
 
+  /**
+   * Mark the item an open waits for, so its slide mounts with `opening` set,
+   * then the start of its flight, after which `waitUntil` comes too late.
+   */
+  setOpening(index: number | undefined, flying = false) {
+    this.#opening = index === undefined ? undefined : { index, flying };
+  }
+
+  /**
+   * Settles once the slide for an item is ready to show, or after `cap` ms:
+   * its content has committed, the images and videos in its box can paint and
+   * its `waitUntil` promises have settled. The built-in media a slide draws
+   * adds no wait, and a built-in slide is ready at once. Callable outside an
+   * open, for whatever waits on the next slide.
+   */
+  async ready(index: number, cap: number) {
+    const slide = this.#slides.get(this.#near(index));
+    if (!slide?.custom || !slide.rendered) return;
+    const content = slide.content;
+    // What is still pending, for the warning at the cap.
+    const pending = new Map<Promise<void>, string>();
+    let committed = false;
+    const ready = (async () => {
+      await slide.commit;
+      committed = true;
+      if (slide.content !== content) return;
+      const track = (promise: Promise<void>, what: string) => {
+        pending.set(promise, what);
+        void promise.then(() => pending.delete(promise));
+      };
+      for (const [promise, what] of this.#boxWaits(slide)) track(promise, what);
+      // A waitUntil before the flight starts still counts, so read them until none is new.
+      const seen = new Set<Promise<void>>();
+      for (;;) {
+        const fresh = [...(slide.waits ?? [])].filter((promise) => !seen.has(promise));
+        for (const promise of fresh) {
+          seen.add(promise);
+          track(promise, "a waitUntil promise");
+        }
+        if (!pending.size && !fresh.length) return;
+        await Promise.all(pending.keys());
+        if (slide.content !== content) return;
+        if (![...(slide.waits ?? [])].some((promise) => !seen.has(promise))) return;
+      }
+    })();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capped = new Promise<false>((resolve) => (timer = setTimeout(resolve, cap, false)));
+    const done = await Promise.race([ready.then(() => true), capped]);
+    clearTimeout(timer);
+    if (!done && process.env.NODE_ENV !== "production" && slide.content === content) {
+      const waiting = committed ? [...pending.values()] : ["the slide's content to commit"];
+      console.warn(
+        `Fluidbox opened ${itemLabel(this.#source.getItem(index))} after ${cap} ms without its slide ready, still waiting for ${waiting.join(", ")}.`,
+      );
+    }
+  }
+
+  /** The images and videos in a slide's box that must paint, but not the built-in media it drew. */
+  *#boxWaits(slide: ViewerSlide): Generator<[Promise<void>, string]> {
+    const drawn = [slide.picture, slide.placeholder, slide.preview, slide.cover, slide.image];
+    const own = (element: Element) => !drawn.some((part) => part?.contains(element));
+    for (const image of slide.media.querySelectorAll("img")) {
+      if (!own(image)) continue;
+      const decoded = image.decode().catch(() => {});
+      yield [decoded, `<img src="${image.currentSrc || image.src}">`];
+    }
+    for (const video of slide.media.querySelectorAll("video")) {
+      if (!own(video) || video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) continue;
+      yield [videoFrame(video), `<video src="${video.currentSrc || video.src}">`];
+    }
+  }
+
   prepareOpening(index: number, origin?: HTMLImageElement) {
     const position = this.#near(index);
     const slide = this.#slides.get(position);
@@ -1202,9 +1306,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const { signal } = controller;
     const zoomListeners = (slide.zoomListeners = new Set<(pose: FluidboxZoomPose) => void>());
     const layer = () => this.#layer(slide);
-    const context: FluidboxSlide<any> = {
+    const itemIndex = this.#item(index);
+    const waits = (slide.waits = new Set<Promise<void>>());
+    let release!: () => void;
+    slide.commit = new Promise<void>((resolve) => (release = resolve));
+    slide.release = release;
+    let holds = 0;
+    let rendering = true;
+    const opening = () => (this.#opening?.index === itemIndex ? this.#opening : undefined);
+    const context: FluidboxSlide<any> & { [holdCommit]?: () => () => void } = {
       item,
-      index: this.#item(index),
+      index: itemIndex,
       media: slide.media,
       get layer() {
         return layer();
@@ -1212,6 +1324,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       signal,
       get active() {
         return activity.active;
+      },
+      get opening() {
+        return opening()?.flying === false;
       },
       onActiveChange(listener: (active: boolean) => void) {
         activity.listeners.add(listener);
@@ -1226,11 +1341,42 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         zoomListeners.add(listener);
         return () => zoomListeners.delete(listener);
       },
+      waitUntil: (promise: Promise<unknown>) => {
+        if (signal.aborted) return;
+        if (process.env.NODE_ENV !== "production" && opening()?.flying) {
+          console.warn(
+            "Fluidbox got slide.waitUntil() after the opening flight started, so it doesn't delay it. Call it before the slide commits.",
+          );
+        }
+        const settled = Promise.resolve(promise).then(
+          () => {},
+          () => {},
+        );
+        waits.add(settled);
+        void settled.then(() => waits.delete(settled));
+      },
+      // A binding holds the commit while its framework renders the slide, and
+      // reports it once the content is in the box.
+      [holdCommit]: () => {
+        if (!rendering || signal.aborted) return () => {};
+        holds += 1;
+        let reported = false;
+        return () => {
+          if (reported) return;
+          reported = true;
+          if (--holds === 0) release();
+        };
+      },
       drawImage: (image?: FluidboxItem) => this.#draw(slide, signal, "image", image ?? item),
       drawVideo: (video?: FluidboxItem) => this.#draw(slide, signal, "video", video ?? item),
       drawIframe: (iframe?: FluidboxItem) => this.#draw(slide, signal, "iframe", iframe ?? item),
     };
-    slide.dispose = renderer(context) ?? undefined;
+    try {
+      slide.dispose = renderer(context) ?? undefined;
+    } finally {
+      rendering = false;
+      if (!holds) release();
+    }
   }
 
   /**
@@ -1325,6 +1471,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.dispose = undefined;
       slide.activity = undefined;
       slide.zoomListeners = undefined;
+      // An open waiting for the slide goes on without it.
+      slide.release?.();
+      slide.release = undefined;
+      slide.commit = undefined;
+      slide.waits = undefined;
       slide.rendered = false;
       this.#undraw(slide);
       slide.error.hidden = true;
