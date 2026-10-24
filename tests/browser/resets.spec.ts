@@ -180,3 +180,16 @@ for (const { id, what, zoom } of cases) {
     });
   }
 }
+
+test("unlayered resets leave the selected thumbnail its bar", async ({ page }) => {
+  await page.goto("/resets.html?resets&thumbnails");
+  await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
+  await page.evaluate(() => window.resetsFixture.fluidbox.open(0));
+  const selected = page.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]');
+  await expect(selected).toBeVisible();
+  const bar = await selected.evaluate((element) => {
+    const style = getComputedStyle(element, "::after");
+    return { style: style.outlineStyle, width: style.outlineWidth };
+  });
+  expect(bar).toEqual({ style: "solid", width: "2px" });
+});

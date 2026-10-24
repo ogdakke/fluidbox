@@ -21,7 +21,9 @@ const derivedIds = new WeakMap<FluidboxItem, string>();
 export function idOf(item: FluidboxItem): string {
   const id = item.id ?? derivedIds.get(item) ?? ("src" in item ? item.src : undefined);
   if (typeof id !== "string" || !id.trim())
-    throw new TypeError("A fluidbox item needs an id or a src.");
+    throw new TypeError(
+      process.env.NODE_ENV === "production" ? "fluidbox" : "A fluidbox item needs an id or a src.",
+    );
   return id;
 }
 
@@ -78,19 +80,32 @@ export function targetKeys(value: FluidboxTarget | readonly FluidboxTarget[]): (
   const targets: readonly FluidboxTarget[] = Array.isArray(value)
     ? value
     : [value as FluidboxTarget];
-  if (!targets.length) throw new TypeError("A fluidbox trigger needs at least one item.");
+  if (!targets.length)
+    throw new TypeError(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : "A fluidbox trigger needs at least one item.",
+    );
   return [...new Set(targets.map(targetKey))];
 }
 
 function checkCount(count: number) {
   if (!Number.isInteger(count) || count < 0) {
-    throw new RangeError("A fluidbox item list's count must be a non-negative integer.");
+    throw new RangeError(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : "A fluidbox item list's count must be a non-negative integer.",
+    );
   }
 }
 
 function checkIndex(index: number, count: number) {
   if (!Number.isInteger(index) || index < 0 || index >= count) {
-    throw new RangeError(`Fluidbox item index is out of range: ${index}`);
+    throw new RangeError(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : `Fluidbox item index is out of range: ${index}`,
+    );
   }
 }
 
@@ -140,8 +155,17 @@ export function createItemList<TItem extends FluidboxItem>(
 /** What an item's `data` names may be: lower case, digits and single dashes. */
 const dataName = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-/** Throw when an item's `data` names an attribute the viewer can't set, or one it owns. */
+/**
+ * Throw when an item's `data` names an attribute the viewer can't set, or one
+ * it owns. In development only: a production build, and a page without a
+ * bundler, skip it.
+ */
 export function checkItemData(item: FluidboxItem, id: string) {
+  try {
+    if (process.env.NODE_ENV === "production") return;
+  } catch {
+    return;
+  }
   for (const [name, value] of Object.entries(item.data ?? {})) {
     if (!dataName.test(name) || name.startsWith("fluidbox-") || typeof value !== "string") {
       throw new TypeError(
@@ -167,7 +191,9 @@ function checkItem(item: FluidboxItem) {
   const { width, height } = item;
   if (!(width! > 0 && height! > 0)) {
     throw new TypeError(
-      `Fluidbox item ${idOf(item)} needs a positive width and height, or fit: "fill".`,
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : `Fluidbox item ${idOf(item)} needs a positive width and height, or fit: "fill".`,
     );
   }
 }
@@ -191,7 +217,10 @@ export function toList<TItem extends FluidboxItem>(
     checkItem(item);
     if (item.id === undefined) continue;
     const id = idOf(item);
-    if (indices.has(id)) throw new TypeError(`Duplicate fluidbox item id: ${id}`);
+    if (indices.has(id))
+      throw new TypeError(
+        process.env.NODE_ENV === "production" ? "fluidbox" : `Duplicate fluidbox item id: ${id}`,
+      );
     indices.set(id, index);
   }
   const seen = new Set<TItem>();

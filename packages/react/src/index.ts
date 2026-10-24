@@ -229,13 +229,23 @@ const TravelContext = createContext(false);
 
 function useFluidboxContext(): FluidboxContextValue {
   const value = useContext(FluidboxContext);
-  if (!value) throw new Error("Fluidbox parts must be rendered inside <Fluidbox.Root>.");
+  if (!value)
+    throw new Error(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : "Fluidbox parts must be rendered inside <Fluidbox.Root>.",
+    );
   return value;
 }
 
 function useSlideContext(part: string): SlideContextValue {
   const value = useContext(SlideContext);
-  if (!value) throw new Error(`<Fluidbox.${part}> must be inside a slide, in <Fluidbox.Slides>.`);
+  if (!value)
+    throw new Error(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : `<Fluidbox.${part}> must be inside a slide, in <Fluidbox.Slides>.`,
+    );
   return value;
 }
 
@@ -660,7 +670,11 @@ function Trigger<TItem extends FluidboxItem>({
 }: FluidboxTriggerProps<TItem>): ReactElement {
   const context = useFluidboxContext();
   if (value === null || value === undefined) {
-    throw new Error("<Fluidbox.Trigger> needs a value: an item, its id or its index, or a list.");
+    throw new Error(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : "<Fluidbox.Trigger> needs a value: an item, its id or its index, or a list.",
+    );
   }
   // Its first opens; every one closes back onto it. Compared by value.
   const keysKey = JSON.stringify(targetKeys(value));
@@ -694,7 +708,11 @@ function Trigger<TItem extends FluidboxItem>({
     : children;
   const only = asChild ? Children.only(rendered) : null;
   if (asChild && !isValidElement(only)) {
-    throw new Error("<Fluidbox.Trigger asChild> needs one element child.");
+    throw new Error(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : "<Fluidbox.Trigger asChild> needs one element child.",
+    );
   }
   const child = isValidElement(only) ? only : null;
   const childProps = isValidElement<Record<string, unknown>>(child) ? child.props : {};
@@ -925,20 +943,22 @@ function Iframe({ item }: FluidboxIframeProps): null {
 function useControl(name: FluidboxControlName) {
   const { fluidbox, labels } = useFluidboxContext();
   const control = fluidboxControls[name];
-  const disabled = useFluidbox((state) => control.disabled(state));
-  const hidden = useFluidbox((state) => !!control.hidden?.(fluidbox, state));
-  const label = useFluidbox((state) => control.label(labels, state));
-  const link = useFluidbox((state) =>
-    name === "download" ? JSON.stringify(downloadLink(state.item)) : "null",
+  // As one string, so a control renders again only when what it shows changes.
+  const shown = useFluidbox((state) =>
+    JSON.stringify([
+      control.disabled(state),
+      !!control.hidden?.(fluidbox, state),
+      control.label(labels, state),
+      name === "download" && downloadLink(state.item),
+    ]),
   );
-  return {
-    fluidbox,
-    control,
-    disabled,
-    hidden,
-    label,
-    link: JSON.parse(link) as ReturnType<typeof downloadLink>,
-  };
+  const [disabled, hidden, label, link] = JSON.parse(shown) as [
+    boolean,
+    boolean,
+    string,
+    ReturnType<typeof downloadLink> | false,
+  ];
+  return { fluidbox, control, disabled, hidden, label, link: link || null };
 }
 
 /**
@@ -1410,7 +1430,11 @@ const Overlay = forwardRef<HTMLSpanElement, FluidboxOverlayProps>(function Overl
   // In the live copy a flight renders, an overlay is a picture, not another overlay.
   const travelling = useContext(TravelContext);
   if (!keys && !travelling) {
-    throw new Error("<Fluidbox.Overlay> must be inside a <Fluidbox.Trigger>.");
+    throw new Error(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : "<Fluidbox.Overlay> must be inside a <Fluidbox.Trigger>.",
+    );
   }
   const latestChildren = useLatest(children);
   const [element, setElement] = useState<HTMLSpanElement | null>(null);

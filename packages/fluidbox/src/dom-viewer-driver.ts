@@ -1,5 +1,5 @@
 import { controlSelector, drawViewerLayer } from "./viewer-layer";
-import { idOf } from "./items";
+import { idOf, itemLabel } from "./items";
 import { FluidboxMediaErrorEvent, type FluidboxOptions } from "./public-api";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
@@ -54,14 +54,16 @@ import {
 } from "./viewer-portal";
 import type { FluidboxLabels } from "./labels";
 import { ViewerStrip } from "./viewer-strip";
-import { downloadItem, shareItem } from "./file-actions";
-import { canGoFullscreen } from "./item-file";
+import type * as ViewerActions from "./viewer-actions";
+import { canGoFullscreen, crossOrigin, downloadName, fileOf } from "./item-file";
 import { activeViewer } from "./viewer-ownership";
 import { mapRadii, mixInsets, type ImageClip } from "./transition-geometry";
 import { fillContent, originPose, originPicture } from "./origin-pose";
 import type { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 
+/** The controls whose actions load on demand. */
+const ACTION_CONTROLS = "[data-fluidbox-fullscreen],[data-fluidbox-download],[data-fluidbox-share]";
 /** The longest an open waits for its slide to be ready, as the instant open waits for its image. */
 const SLIDE_READY_CAP = 3000;
 const OPEN_DURATION = 300;
@@ -253,8 +255,8 @@ export class DomViewerDriver<
   };
   /** When the last wheel event of a `"navigate"` gesture came. */
   #lastNavigateWheel = -Infinity;
-  /** The viewer left the top layer as a popover to go fullscreen, and goes back on leaving. */
-  #fullscreenPopover = false;
+  /** Fullscreen, download and share, once a press or a control for one has loaded them. */
+  #actions: typeof ViewerActions | undefined;
   /** A cross-origin download's fetch, which a move or a close aborts. */
   #fileFetch: AbortController | undefined;
   #copiedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -374,83 +376,38 @@ export class DomViewerDriver<
     return this.#fullscreenElement() === this.#portal.overlay;
   }
 
+  #loadActions() {
+    return import("./viewer-actions").then((actions) => (this.#actions = actions));
+  }
+
+  /** Load the actions once the viewer holds a control for one, so its press finds them ready. */
+  #preloadActions() {
+    if (!this.#actions && this.#portal.dialog.querySelector(ACTION_CONTROLS)) {
+      void this.#loadActions();
+    }
+  }
+
   /**
-   * Make the viewer fill the screen, or stop. Over a modal dialog the viewer
-   * is a popover in the top layer, which browsers disagree about taking
-   * fullscreen, so it stops being one first; fullscreen keeps it above the
-   * dialog by itself. Resolves whether the viewer is as asked.
+   * Make the viewer fill the screen, or stop. Resolves whether the viewer is as
+   * asked. Loaded, the actions run in the press itself, as fullscreen needs.
    */
   async setFullscreen(on: boolean): Promise<boolean> {
     if (on === this.#isFullscreen()) return true;
+    const actions = this.#actions ?? (await this.#loadActions());
     if (!on) {
-      await this.#exitFullscreen();
+      await actions.exitFullscreen(this.#portal.overlay);
       return !this.#isFullscreen();
     }
-    const overlay = this.#portal.overlay as HTMLDivElement & {
-      webkitRequestFullscreen?: () => void;
-    };
-    if (!canGoFullscreen() || !overlay.isConnected || this.#controller?.state.status !== "open") {
-      return false;
-    }
-    const focused = overlay.ownerDocument.activeElement;
-    if (overlay.hasAttribute("popover")) {
-      overlay.hidePopover();
-      overlay.removeAttribute("popover");
-      this.#fullscreenPopover = true;
-    }
-    try {
-      if (overlay.requestFullscreen) await overlay.requestFullscreen();
-      else overlay.webkitRequestFullscreen?.();
-    } catch {
-      this.#raiseAgain();
-      return false;
-    } finally {
-      // Hiding the popover may have moved focus out of it.
-      if (focused instanceof HTMLElement && focused !== overlay.ownerDocument.activeElement) {
-        focused.focus({ preventScroll: true });
-      }
-    }
-    return true;
-  }
-
-  /** Leave fullscreen, waiting for it at most 500 ms. */
-  #exitFullscreen() {
-    if (!this.#isFullscreen()) return Promise.resolve();
-    const ownerDocument = this.#portal.overlay.ownerDocument as Document & {
-      webkitExitFullscreen?: () => void;
-    };
-    return new Promise<void>((resolve) => {
-      const done = new AbortController();
-      const finish = () => {
-        clearTimeout(timer);
-        done.abort();
-        resolve();
-      };
-      const timer = setTimeout(finish, 500);
-      for (const type of ["fullscreenchange", "webkitfullscreenchange"]) {
-        ownerDocument.addEventListener(type, finish, { signal: done.signal });
-      }
-      try {
-        if (ownerDocument.exitFullscreen) void ownerDocument.exitFullscreen().catch(finish);
-        else ownerDocument.webkitExitFullscreen?.();
-      } catch {
-        finish();
-      }
-    });
-  }
-
-  /** Back into the top layer as a popover, as the viewer was before it went fullscreen. */
-  #raiseAgain() {
-    if (!this.#fullscreenPopover) return;
-    this.#fullscreenPopover = false;
-    const overlay = this.#portal.overlay;
-    overlay.popover = "manual";
-    if (overlay.isConnected) overlay.showPopover();
+    return (
+      canGoFullscreen() &&
+      this.#controller?.state.status === "open" &&
+      actions.enterFullscreen(this.#portal.overlay)
+    );
   }
 
   #onFullscreenChange = () => {
     const on = this.#isFullscreen();
-    if (!on) this.#raiseAgain();
+    if (!on) this.#actions?.raiseAgain(this.#portal.overlay);
     this.#portal.overlay.toggleAttribute("data-fullscreen", on);
     this.#controller?.fullscreenChanged?.(on);
   };
@@ -466,10 +423,17 @@ export class DomViewerDriver<
   }
 
   /** Save the item's file; a move or a close stops a fetch under way. */
-  download(item: TItem) {
+  async download(item: TItem) {
     this.#fileFetch?.abort();
     const fetching = (this.#fileFetch = new AbortController());
-    return downloadItem(this.#portal.overlay.ownerDocument, item, fetching.signal, (busy) => {
+    const file = fileOf(item);
+    if (!file) return false;
+    const href = new URL(file.src, location.href).href;
+    const { saveFile } = this.#actions ?? (await this.#loadActions());
+    if (fetching.signal.aborted) return false;
+    const { ownerDocument } = this.#portal.overlay;
+    const name = downloadName(item, file);
+    return saveFile(ownerDocument, href, name, crossOrigin(href), fetching.signal, (busy) => {
       for (const control of this.#controlsNamed("download")) {
         if (busy) control.setAttribute("aria-busy", "true");
         else control.removeAttribute("aria-busy");
@@ -478,8 +442,9 @@ export class DomViewerDriver<
   }
 
   /** Share a link to the item, or copy it and say so. */
-  share(item: TItem, url: string) {
-    return shareItem(item, url, () => {
+  async share(item: TItem, url: string) {
+    const { shareLink } = this.#actions ?? (await this.#loadActions());
+    return shareLink(itemLabel(item), url, () => {
       this.#announce(this.#labels.linkCopied);
       const controls = this.#controlsNamed("share");
       for (const control of controls) control.toggleAttribute("data-copied", true);
@@ -819,6 +784,7 @@ export class DomViewerDriver<
 
   async open(context: ViewerSessionMotionContext<TItem>) {
     const operation = ++this.#operation;
+    this.#preloadActions();
     // Every wait below can end with the open called off: by a close, a destroy,
     // new items or the caller's signal. It then stops before touching the page.
     const abandoned = () => {
@@ -1022,7 +988,7 @@ export class DomViewerDriver<
     this.#fileFetch?.abort();
     // A close planned while the viewer covers the screen would fly to stale geometry.
     if (this.#isFullscreen()) {
-      await this.#exitFullscreen();
+      await this.setFullscreen(false);
       if (context.signal.aborted || this.#destroyed || operation !== this.#operation) return;
     }
     const settling = this.#extensions
@@ -1203,8 +1169,8 @@ export class DomViewerDriver<
     this.#endWheelHandoff();
     this.#fileFetch?.abort();
     clearTimeout(this.#copiedTimer);
-    if (this.#isFullscreen()) void this.#exitFullscreen();
-    this.#raiseAgain();
+    if (this.#isFullscreen()) void this.setFullscreen(false);
+    this.#actions?.raiseAgain(this.#portal.overlay);
     this.#zoom?.destroy();
     this.#mediaObserver?.disconnect();
     this.#mediaObserver = undefined;
@@ -2370,6 +2336,7 @@ export class DomViewerDriver<
 
   #onDialogChange = () => {
     this.#describe();
+    this.#preloadActions();
     const { dialog } = this.#portal;
     const last = this.#lastFocus;
     const active = dialog.ownerDocument.activeElement;

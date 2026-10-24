@@ -15,5 +15,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   report: false,
+  // Left for the app's bundler, so development-only checks drop out of its production build.
+  define: { "process.env.NODE_ENV": "process.env.NODE_ENV" },
   deps: { neverBundle: [/^@ogdakke\/fluidbox(?:\/.*)?$/] },
 });

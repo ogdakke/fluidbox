@@ -47,6 +47,7 @@ export interface ViewerZoomPose {
   };
 }
 import { sharperCandidate, srcsetCandidates } from "./srcset";
+import type * as ZoomPosing from "./zoom-pose";
 
 /** A `<video>` as a playback source: nothing until it knows its duration. */
 const videoPlayback = (video: HTMLVideoElement) => () =>
@@ -301,6 +302,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   onUnload: ((media: HTMLElement) => void) | undefined;
   /** Called when the slide on show may have started or stopped being zoomable. */
   onZoomableChange: (() => void) | undefined;
+  /** What turns a zoom pose into a slide's, loaded once a slide follows its zoom. */
+  #posing: typeof ZoomPosing | undefined;
+  /** The pose that came while it loaded. */
+  #lastPose: [HTMLElement, ViewerZoomPose] | undefined;
   /** Called as a slide shows its error, and when a sharper image for the zoom fails. */
   onMediaError: ((index: number, kind: FluidboxMediaErrorKind, cause: unknown) => void) | undefined;
 
@@ -364,38 +369,27 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return !!this.current?.zoomListeners?.size;
   }
 
-  /** Tell the slide whose box this is where its zoom is. */
+  /** Tell the slide whose box this is where its zoom is, once its pose code is in. */
   zoomPose(media: HTMLElement, pose: ViewerZoomPose) {
     const slide = this.current?.media === media ? this.current : undefined;
     const listeners = slide?.zoomListeners;
     if (!slide || !listeners?.size) return;
-    const item = this.#source.getItem(this.#item(this.#index));
-    // In the item's own pixels, as its width and height count them.
-    const width = item.width ?? pose.width;
-    const height = item.height ?? pose.height;
-    const { viewport } = pose;
-    const shownWidth = pose.width * pose.scale;
-    const shownHeight = pose.height * pose.scale;
-    const left = pose.left + pose.x;
-    const top = pose.top + pose.y;
-    const from = (start: number, extent: number, size: number, total: number) =>
-      shownWidth && shownHeight
-        ? Math.max(0, Math.min(total, ((start - extent) / size) * total))
-        : 0;
-    // What of the item shows through the zoom viewport, the stage.
-    const x = from(viewport.left, left, shownWidth, width);
-    const y = from(viewport.top, top, shownHeight, height);
-    const right = from(viewport.left + viewport.width, left, shownWidth, width);
-    const bottom = from(viewport.top + viewport.height, top, shownHeight, height);
-    const visible = new DOMRectReadOnly(x, y, right - x, bottom - y);
-    const shown: FluidboxZoomPose = {
-      scale: pose.scale,
-      x: pose.x,
-      y: pose.y,
-      visible,
-      moving: pose.moving,
-    };
+    if (!this.#posing) {
+      this.#lastPose = [media, pose];
+      return;
+    }
+    const shown = this.#posing.shownPose(this.#source.getItem(this.#item(this.#index)), pose);
     for (const listener of listeners) listener(shown);
+  }
+
+  /** Load what turns a zoom pose into a slide's, and tell it the pose it missed. */
+  #loadPosing() {
+    void import("./zoom-pose").then((posing) => {
+      this.#posing = posing;
+      const last = this.#lastPose;
+      this.#lastPose = undefined;
+      if (last) this.zoomPose(...last);
+    });
   }
 
   /** Whether the strip goes round: a single item has nowhere to go. */
@@ -1479,8 +1473,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         slide.zoom = on === true ? {} : on;
         this.#zoomableChanged(slide);
       },
-      onZoom(listener: (pose: FluidboxZoomPose) => void) {
+      onZoom: (listener: (pose: FluidboxZoomPose) => void) => {
         zoomListeners.add(listener);
+        if (!this.#posing) this.#loadPosing();
         return () => zoomListeners.delete(listener);
       },
       waitUntil: (promise: Promise<unknown>) => {

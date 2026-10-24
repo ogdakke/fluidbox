@@ -9,7 +9,7 @@
   background: var(--fb-surface-2);
   cursor: zoom-in;
 }
-.media-grid img {
+.media-grid :is(img, video) {
   display: block;
   width: 100%;
   aspect-ratio: 1;

@@ -32,7 +32,11 @@ export function registerAddon<K extends keyof Addons>(name: K, create: NonNullab
 export function addon<K extends keyof Addons>(name: K): NonNullable<Addons[K]> {
   const create = registry()[name];
   if (!create) {
-    throw new Error(`The ${name} needs its entry: import "@ogdakke/fluidbox/${name}" once.`);
+    throw new Error(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : `The ${name} needs its entry: import "@ogdakke/fluidbox/${name}" once.`,
+    );
   }
   return create;
 }

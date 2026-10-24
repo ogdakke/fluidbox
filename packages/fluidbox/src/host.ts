@@ -39,7 +39,12 @@ export const hostKey = Symbol.for("@ogdakke/fluidbox/host");
 
 export function hostOf(fluidbox: Fluidbox<any>): FluidboxHost {
   const host = (fluidbox as unknown as { [hostKey]?: FluidboxHost })[hostKey];
-  if (!host) throw new TypeError("Expected a fluidbox from createFluidbox.");
+  if (!host)
+    throw new TypeError(
+      process.env.NODE_ENV === "production"
+        ? "fluidbox"
+        : "Expected a fluidbox from createFluidbox.",
+    );
   return host;
 }
 

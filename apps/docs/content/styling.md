@@ -51,7 +51,7 @@ A rule in any of your layers beats `baseline.css` if your layer comes later, and
 @layer theme, base, fluidbox-baseline, components, utilities;
 ```
 
-Nothing else depends on it. A layer named later is stronger, and every layer loses to a rule outside any layer, so an unlayered reset of yours beats `baseline.css` too. A reset such as `button { padding: 0 }` or `*, ::after { border-width: 0 }` changes the look: put it in a layer before `fluidbox-baseline`, as Tailwind v4's `base` is above. The functional rules aren't in a layer, so they win over every layer of yours, and resets in them can't touch the mechanics.
+Nothing else depends on it. A layer named later is stronger, and every layer loses to a rule outside any layer, so an unlayered reset of yours beats `baseline.css` too. A reset such as `button { padding: 0; background-color: transparent }` changes the look: put it in a layer before `fluidbox-baseline`, as Tailwind v4's `base` is above. The functional rules aren't in a layer, so they win over every layer of yours, and resets in them can't touch the mechanics.
 
 The package's few `!important` declarations hide a thumbnail during a flight, keep the flight's source hidden and hand touches back to the page after a dismiss. `baseline.css` has none.
 
@@ -116,7 +116,7 @@ When the viewer opens, it reads the trigger's computed styles and copies every `
 
 `--fluidbox-backdrop-background` defaults to `--fluidbox-background`. `--fluidbox-backdrop-filter` is `none` by default. Pair a blur with a see-through background.
 
-With `baseline.css`, focus rings are 2px of `--fluidbox-focus-color`, which defaults to the text colour. On the controls a 2px edge of `--fluidbox-focus-contrast`, black by default, sits inside the ring, so a white ring still shows over a bright photo. In forced colours, as Windows' contrast themes, the controls get a border and focus rings take the system's `Highlight`; with `prefers-contrast: more`, a disabled Previous or Next fades only to 0.6.
+With `baseline.css`, focus rings are 2px of `--fluidbox-focus-color`, which defaults to the text colour. On the controls a 2px edge of `--fluidbox-focus-contrast`, black by default, sits inside the ring, so a white ring still shows over a bright photo. In forced colours, as Windows' contrast themes, the controls get an outline for an edge and focus rings take the system's `Highlight`; with `prefers-contrast: more`, a disabled Previous or Next fades only to 0.6.
 
 ## State attributes
 

@@ -44,27 +44,28 @@ const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fl
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 // baseline/bundle-budget.md records the measurements behind them and why they moved.
-// The React binding's redesigned parts added about 1,430 B to its initial chunk.
+// The React binding's redesigned parts added about 1,430 B to its initial chunk; the size
+// pass after step 3 took 634 B back, mostly development-only checks and messages.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 10_400,
-  elements: 14_550,
-  react: 17_850,
-  solid: 14_250,
-  vue: 14_900,
-  angular: 15_300,
+  root: 9_850,
+  elements: 14_000,
+  react: 17_200,
+  solid: 13_700,
+  vue: 14_350,
+  angular: 14_800,
   thumbnails: 3_850,
   sheet: 7_350,
-  kit: 1_750,
+  kit: 1_550,
   // The hover zoom add-on, loaded by pages that magnify their photos on hover.
   "hover-zoom": 1_500,
   // The media add-ons carry their few rules in their JS. Embed providers added
   // about 430 B to the embed slide; a model that waits for its first frame, 60 B.
   embed: 3_050,
   model: 1_450,
-  spin: 2_500,
-  "react-embed": 20_300,
-  "react-model": 18_900,
-  "react-spin": 19_750,
+  spin: 2_450,
+  "react-embed": 19_750,
+  "react-model": 18_300,
+  "react-spin": 19_150,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -74,42 +75,80 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 45_100,
+  root: 44_050,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 48_400,
-  react: 51_900,
-  solid: 48_250,
-  vue: 48_950,
-  angular: 49_300,
+  elements: 47_400,
+  react: 50_750,
+  solid: 47_250,
+  vue: 47_900,
+  angular: 48_250,
   thumbnails: 3_850,
   sheet: 7_350,
-  kit: 1_750,
+  kit: 1_550,
   "hover-zoom": 1_500,
   embed: 3_050,
   model: 1_450,
-  spin: 2_500,
-  "react-embed": 54_450,
-  "react-model": 52_950,
+  spin: 2_450,
+  "react-embed": 53_350,
+  "react-model": 51_850,
+  "react-spin": 52_650,
+};
+// Fullscreen, download and share, and a slide's zoom pose, load on first use.
+const onDemandJsGzipLimits: Record<Entry, number> = {
+  root: 45_200,
+  elements: 48_550,
+  react: 51_900,
+  solid: 48_400,
+  vue: 49_050,
+  angular: 49_400,
+  thumbnails: 3_850,
+  sheet: 7_350,
+  kit: 1_550,
+  "hover-zoom": 1_500,
+  embed: 3_050,
+  model: 1_450,
+  spin: 2_450,
+  "react-embed": 54_500,
+  "react-model": 53_000,
+  "react-spin": 53_800,
+};
+// Activation and on demand together: everything a viewer can load but its add-ons.
+const reachableJsGzipLimits: Record<Entry, number> = {
+  root: 45_200,
+  elements: 48_550,
+  react: 51_900,
+  solid: 48_400,
+  vue: 49_050,
+  angular: 49_400,
+  thumbnails: 3_850,
+  sheet: 7_350,
+  kit: 1_550,
+  "hover-zoom": 1_500,
+  embed: 3_050,
+  model: 1_450,
+  spin: 2_450,
+  "react-embed": 54_500,
+  "react-model": 53_000,
   "react-spin": 53_800,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 47_900,
-  elements: 51_200,
-  react: 54_700,
-  solid: 51_050,
-  vue: 51_750,
-  angular: 52_100,
+  root: 46_900,
+  elements: 50_200,
+  react: 53_600,
+  solid: 50_050,
+  vue: 50_750,
+  angular: 51_050,
   thumbnails: 4_900,
   sheet: 8_350,
-  kit: 4_550,
+  kit: 4_350,
   // It needs no stylesheet; the base one counts, as for the kit.
   "hover-zoom": 4_350,
   embed: 5_850,
   model: 4_250,
   spin: 5_250,
-  "react-embed": 57_250,
-  "react-model": 55_750,
-  "react-spin": 56_600,
+  "react-embed": 56_150,
+  "react-model": 54_650,
+  "react-spin": 55_450,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
@@ -142,6 +181,8 @@ const report = {
     cssGzipBytes: cssGzipLimit,
     baselineCssGzipBytes: baselineCssGzipLimit,
     activationJsGzipBytes: activationJsGzipLimits,
+    onDemandJsGzipBytes: onDemandJsGzipLimits,
+    reachableJsGzipBytes: reachableJsGzipLimits,
     activationWithCssGzipBytes: activationWithCssGzipLimits,
   },
   css,
@@ -151,8 +192,10 @@ const report = {
     {
       initialJs: Size;
       activationJs: Size;
+      onDemandJs: Size;
+      reachableJs: Size;
       activationWithCss: Size;
-      chunks: Array<Size & { fileName: string; phase: "initial" | "lazy" }>;
+      chunks: Array<Size & { fileName: string; phase: "initial" | "lazy" | "on demand" }>;
       frameworkExternals: string[];
       errors: string[];
     }
@@ -161,8 +204,17 @@ const report = {
 
 let failed = false;
 for (const name of entrypoints) {
-  const { initialJs, activationJs, chunks, externals, unresolved, initialCode, activationCode } =
-    await measureEntry(name);
+  const {
+    initialJs,
+    activationJs,
+    onDemandJs,
+    reachableJs,
+    chunks,
+    externals,
+    unresolved,
+    initialCode,
+    activationCode,
+  } = await measureEntry(name);
   const entryCss = name === "sheet" ? sheetCss : name === "thumbnails" ? thumbnailsCss : css;
   const activationWithCss = {
     rawBytes: activationJs.rawBytes + entryCss.rawBytes,
@@ -184,6 +236,10 @@ for (const name of entrypoints) {
       `initial JS gzip budget exceeded (${initialGzipLimits[name]} B)`,
     activationJs.gzipBytes > activationJsGzipLimits[name] &&
       `activation JS gzip budget exceeded (${activationJsGzipLimits[name]} B)`,
+    onDemandJs.gzipBytes > onDemandJsGzipLimits[name] &&
+      `on-demand JS gzip budget exceeded (${onDemandJsGzipLimits[name]} B)`,
+    reachableJs.gzipBytes > reachableJsGzipLimits[name] &&
+      `reachable JS gzip budget exceeded (${reachableJsGzipLimits[name]} B)`,
     activationWithCss.gzipBytes > activationWithCssGzipLimits[name] &&
       `activation with CSS gzip budget exceeded (${activationWithCssGzipLimits[name]} B)`,
     name !== "elements" && registersFluidbox && "custom elements loaded eagerly",
@@ -200,13 +256,16 @@ for (const name of entrypoints) {
   report.entries[name] = {
     initialJs,
     activationJs,
+    onDemandJs,
+    reachableJs,
     activationWithCss,
     chunks,
     frameworkExternals: [...externals].sort(),
     errors,
   };
+  const column = (size: Size) => `${String(size.gzipBytes).padStart(6)} B`;
   console.log(
-    `${name.padEnd(8)} initial ${String(initialJs.gzipBytes).padStart(6)} B gzip  activation JS ${String(activationJs.gzipBytes).padStart(6)} B gzip  + CSS ${String(activationWithCss.gzipBytes).padStart(6)} B gzip`,
+    `${name.padEnd(11)} initial ${column(initialJs)}  activation ${column(activationJs)}  on demand ${column(onDemandJs)}  reachable ${column(reachableJs)}  activation + CSS ${column(activationWithCss)}  (gzip)`,
   );
   if (errors.length) {
     console.error(`${name}: ${errors.join("; ")}`);

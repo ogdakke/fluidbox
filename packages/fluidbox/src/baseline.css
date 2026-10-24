@@ -463,7 +463,8 @@
   }
 
   /* Windows high contrast and other forced colours drop backgrounds and shadows,
-     so the controls get an edge, and focus and disabled states a system colour. */
+     so the controls get an edge, and focus and disabled states a system colour.
+     An outline, which a reset that zeroes borders leaves alone. */
   @media (forced-colors: active) {
     :where([data-fluidbox-viewer], [data-fluidbox-flight])
       :is(
@@ -476,11 +477,12 @@
         [data-fluidbox-slideshow],
         [data-fluidbox-counter]
       ) {
-      border: 1px solid ButtonText;
+      outline: 1px solid ButtonText;
+      outline-offset: -1px;
     }
     :where([data-fluidbox-viewer], [data-fluidbox-flight])
       :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
-      border-color: GrayText;
+      outline-color: GrayText;
       color: GrayText;
     }
   }
@@ -746,15 +748,20 @@
     [data-fluidbox-thumbnails-item][aria-selected="true"] {
     opacity: 1;
   }
-  /* Not by opacity alone: the current thumbnail has a bar along its foot. A
-     border, so it stays in forced colours. */
+  /* Not by opacity alone: the current thumbnail has a bar along its foot. An
+     outline, so it stays in forced colours and under a reset that zeroes
+     borders, as Tailwind's preflight does. */
   :where([data-fluidbox-viewer], [data-fluidbox-flight])
     [data-fluidbox-thumbnails-item][aria-selected="true"]::after {
     content: "";
     position: absolute;
     inset-inline: 25%;
     bottom: 3px;
-    border-top: 3px solid var(--fluidbox-color, white);
+    height: 3px;
+    /* Inset 2px on each side of a 3px box, so it fills it: whole pixels, as
+       browsers round an outline's width down to them. */
+    outline: 2px solid var(--fluidbox-color, white);
+    outline-offset: -2px;
     border-radius: 2px;
     box-shadow: 0 0 2px oklch(0% 0 0 / 0.6);
   }

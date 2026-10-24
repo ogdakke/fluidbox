@@ -2,28 +2,30 @@
 
 Measured on 2026-10-24 with Bun 1.4.3 and tsdown 0.23.0 on Linux x86_64. Run `bun run test:bundle` from the workspace root to rebuild the package and check these limits. To save the per-chunk results as JSON after a build, run `bun run scripts/check-bundles.ts --json /tmp/fluidbox-bundles.json`. The limits themselves live in `scripts/check-bundles.ts`; this page records what they measure and why they moved.
 
-The check builds one small consumer per public entry with tsdown as minified browser ESM targeting ES2022. It follows static and dynamic imports from each entry and counts each reachable emitted JS chunk once. Only the entry's own framework peer stays external: React, Solid, Vue, or Angular. An unresolved runtime external or an unrelated framework import fails the check. It gzips each emitted chunk separately, then sums those byte counts to estimate JS transfer. CSS is `packages/fluidbox/dist/styles.css`, measured as its own resource and added once to the activation total. Initial JS is what an entry loads before anyone touches a trigger; activation JS adds the lazy chunks the viewer loads on hover, press or idle.
+The check builds one small consumer per public entry with tsdown as minified browser ESM targeting ES2022. It follows static and dynamic imports from each entry and counts each reachable emitted JS chunk once. Only the entry's own framework peer stays external: React, Solid, Vue, or Angular. An unresolved runtime external or an unrelated framework import fails the check. It gzips each emitted chunk separately, then sums those byte counts to estimate JS transfer. CSS is `packages/fluidbox/dist/styles.css`, measured as its own resource and added once to the activation total. Initial JS is what an entry loads before anyone touches a trigger; activation JS adds the lazy chunks the viewer loads on hover, press or idle. On demand JS is what the viewer loads on a rarely used feature's first use, or once a control for one is in the viewer: fullscreen, download and share in one chunk, a slide's zoom pose in another. Reachable JS is activation and on demand together, the conservative total of everything a viewer can load but its add-ons, as activation counted it before the split. Each column has its own limit.
 
-| Consumer entry | Initial JS gzip | Activation JS gzip | Activation JS + CSS gzip |
-| -------------- | --------------: | -----------------: | -----------------------: |
-| Root           |        10,329 B |           45,025 B |                 47,835 B |
-| Elements       |        14,467 B |           48,325 B |                 51,135 B |
-| React          |        17,778 B |           51,823 B |                 54,633 B |
-| Solid          |        14,171 B |           48,199 B |                 51,009 B |
-| Vue            |        14,827 B |           48,896 B |                 51,706 B |
-| Angular        |        15,245 B |           49,229 B |                 52,039 B |
-| Thumbnails     |         3,763 B |            3,763 B |                  4,858 B |
-| Sheet          |         7,277 B |            7,277 B |                  8,272 B |
-| Kit            |         1,662 B |            1,662 B |                  4,472 B |
-| Hover zoom     |         1,453 B |            1,453 B |                  4,263 B |
-| Embed          |         2,991 B |            2,991 B |                  5,801 B |
-| Model          |         1,375 B |            1,375 B |                  4,185 B |
-| Spin           |         2,388 B |            2,388 B |                  5,198 B |
-| React embed    |        20,246 B |           54,368 B |                 57,178 B |
-| React model    |        18,859 B |           52,895 B |                 55,705 B |
-| React spin     |        19,704 B |           53,720 B |                 56,530 B |
+These are the package's own chunks, as a consumer's bundler first emits them. A bundling consumer merges and splits them again by its own rules, often folding a small on-demand chunk into the viewer's, so its numbers differ; the sum of what loads stays close to the reachable column, plus the cost of each extra request when the chunks stay apart.
 
-`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,235 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
+| Consumer entry | Initial JS gzip | Activation JS gzip | On demand JS gzip | Reachable JS gzip | Activation JS + CSS gzip |
+| -------------- | --------------: | -----------------: | ----------------: | ----------------: | -----------------------: |
+| Root           |         9,802 B |           44,004 B |           1,151 B |          45,155 B |                 46,814 B |
+| Elements       |        13,947 B |           47,342 B |           1,151 B |          48,493 B |                 50,152 B |
+| React          |        17,149 B |           50,705 B |           1,151 B |          51,856 B |                 53,515 B |
+| Solid          |        13,611 B |           47,165 B |           1,151 B |          48,316 B |                 49,975 B |
+| Vue            |        14,306 B |           47,858 B |           1,151 B |          49,009 B |                 50,668 B |
+| Angular        |        14,713 B |           48,192 B |           1,151 B |          49,343 B |                 51,002 B |
+| Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
+| Sheet          |         7,277 B |            7,277 B |               0 B |           7,277 B |                  8,272 B |
+| Kit            |         1,499 B |            1,499 B |               0 B |           1,499 B |                  4,309 B |
+| Hover zoom     |         1,453 B |            1,453 B |               0 B |           1,453 B |                  4,263 B |
+| Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
+| Model          |         1,375 B |            1,375 B |               0 B |           1,375 B |                  4,185 B |
+| Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
+| React embed    |        19,665 B |           53,268 B |           1,151 B |          54,419 B |                 56,078 B |
+| React model    |        18,229 B |           51,774 B |           1,151 B |          52,925 B |                 54,584 B |
+| React spin     |        19,072 B |           52,595 B |           1,151 B |          53,746 B |                 55,405 B |
+
+`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
 The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each core entry, record the hardening and product-media work merged together:
 
@@ -45,6 +47,14 @@ On 2026-10-24 the API redesign moved every core entry by about 1.2 KB initial an
 Later on 2026-10-24 the media add-ons became slides. The `embeds` entry became `embed` and grew 434 B, to 2,991 B: `createEmbedProvider` with its URL and origin checks, the provider lookup, a preconnect to the player's origin, the `play` content option, and `fail` for an item whose provider the slide doesn't have. The spec estimated 2,800–2,950 B. YouTube and Vimeo stay in the default provider list, so neither shakes out of `embedSlide`. Model grew 63 B, to 1,375 B, because a model the viewer opens on holds the opening until its first frame has painted; spin lost 51 B with `isSpinItem`.
 
 The React binding's new parts then moved React by 1,426 B initial, to 17,778 B, and about 1,460 B activation: `Slides` with a slide host that holds each slide's commit until its layout effect, `Media` with `render`, attributes and children, `Image`, `Video` and `Iframe`, `Toolbar`, `ZoomControls`, `Counter`, `Caption`, `Fullscreen`, `Download`, `Share`, `Loading`, `Error` and `Retry`, the label rule on every control, `Overlay` in place of `ThumbnailOverlay` and `FrameLayer`, `SheetSnap`, `useFluidboxSlide`, and `value` in place of the open and index sync. The spec estimated 600–1,200 B for the redesign's parts and 300–500 B for features 1–5. `styles.css` grew 69 B, to 2,810 B: the rules that let an error part or a Retry of yours stand in for the default error, and the toolbar's `display: contents`. Every entry's activation with CSS moved with it.
+
+The size pass after step 3 took back most of the React binding's growth:
+
+- **Development only.** The item-data name check, every error message and the trigger reach warning run only where the bundler builds for development; a production build drops them, and a page without a bundler skips the checks. This took 520–640 B off each binding's initial chunk, 641 B off React's. The URL check stays in production. The React package now leaves `process.env.NODE_ENV` for the app's bundler too; it had shipped its development check in production.
+- **On demand.** Fullscreen, download and share, and the zoom pose a slide follows with `onZoom`, load on first use, or as soon as one of their controls is in the viewer, so a press finds them ready. Activation fell about 430 B, and reachable grew about 720 B, the price of two small chunks that compress less well apart. The drag's rubber band stays: every drag uses it.
+- **React.** One store subscription per control in place of four.
+
+React's initial chunk ends at 17,149 B, 634 B under the step's peak, and still above the spec's estimate of 15,600–16,300 B. What is left is the parts themselves: `Root` with the slide host, the server viewer's take-over and the value sync is about 3.7 KB of the binding's 14 KB minified, `Trigger` 1.1 KB, and the attribute and status helpers that `Media`, `Loading` and `Error` need about 1.6 KB. `baseline.css` grew 24 B: the selected thumbnail's bar and the forced-colours edges are outlines now, which a reset that zeroes borders leaves alone.
 
 The trigger video's playback for custom players and the click and tap zoom modes added about 420 B to every viewer's activation, against the spec's estimate of 150–250 B: `origin` and its live view, `returnPlayback` and the built-in video's registration, the origin video found at open and close, the zoom option's two modes and the `data-fluidbox-zoom-click` mark. The custom elements' `zoom-click` and `zoom-tap` attributes added 80 B to their initial chunk.
 

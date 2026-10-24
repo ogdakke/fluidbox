@@ -475,7 +475,13 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   zoomTo(scale: number, options?: FluidboxZoomCommandOptions) {
     if (!Number.isFinite(scale)) {
-      return Promise.reject(new RangeError(`Fluidbox zoom scale must be finite: ${scale}`));
+      return Promise.reject(
+        new RangeError(
+          process.env.NODE_ENV === "production"
+            ? "fluidbox"
+            : `Fluidbox zoom scale must be finite: ${scale}`,
+        ),
+      );
     }
     return this.#zoomCommand(() => scale, "api", options);
   }
@@ -666,7 +672,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   ) {
     this.#assertAlive();
     if (!controlNameList.includes(name)) {
-      throw new TypeError(`Fluidbox has no control named "${name}".`);
+      throw new TypeError(
+        process.env.NODE_ENV === "production"
+          ? "fluidbox"
+          : `Fluidbox has no control named "${name}".`,
+      );
     }
     // The control code loads on first use, so a page that binds none skips it.
     let release: (() => void) | undefined;
@@ -706,7 +716,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const targets = targetKeys(value);
     for (const each of targets) {
       if (typeof each === "string" ? !each : !Number.isInteger(each) || each < 0) {
-        throw new RangeError(`Not a fluidbox item target: ${String(each)}`);
+        throw new RangeError(
+          process.env.NODE_ENV === "production"
+            ? "fluidbox"
+            : `Not a fluidbox item target: ${String(each)}`,
+        );
       }
     }
     // Ids may arrive with later items.
@@ -1384,7 +1398,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   #assertKnownId(id: string) {
-    if (this.#source.getIndex(id) === null) throw new RangeError(`Unknown fluidbox item id: ${id}`);
+    if (this.#source.getIndex(id) === null)
+      throw new RangeError(
+        process.env.NODE_ENV === "production" ? "fluidbox" : `Unknown fluidbox item id: ${id}`,
+      );
   }
 
   #stateFor(status: FluidboxStatus, index: number | null): FluidboxState<TItem> {

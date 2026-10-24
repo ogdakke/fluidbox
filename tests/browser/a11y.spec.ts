@@ -451,7 +451,7 @@ test.describe("semantics", () => {
     const bar = (index: number) =>
       thumbnails
         .nth(index)
-        .evaluate((element) => getComputedStyle(element, "::after").borderTopStyle);
+        .evaluate((element) => getComputedStyle(element, "::after").outlineStyle);
     expect(await bar(1)).toBe("solid");
     expect(await bar(0)).toBe("none");
   });
@@ -487,7 +487,7 @@ test.describe("semantics", () => {
     await load(page);
     await page.evaluate(() => (window as any).a11yFluidbox.open(1));
     const close = dialog(page).locator("[data-fluidbox-close]");
-    await expect(close).toHaveCSS("border-top-style", "solid");
+    await expect(close).toHaveCSS("outline-style", "solid");
   });
 
   test("the controls' focus ring has a dark edge", async ({ page, isMobile }) => {

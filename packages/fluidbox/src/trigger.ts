@@ -92,14 +92,23 @@ export interface FluidboxTrigger<TItem extends FluidboxItem = FluidboxItem> {
 /** Elements a keyboard and a screen reader can use as a trigger. */
 const INTERACTIVE = "a[href],button,input,select,textarea,summary,[role],[tabindex]";
 
-/** Whether a bundler built for development. Without one, it says no. */
-const development = () => {
+/**
+ * Warn in development about a trigger a keyboard can't reach. A production
+ * build drops it, and a page without a bundler skips it.
+ */
+function checkReach(element: HTMLElement) {
   try {
-    return process.env.NODE_ENV !== "production";
+    if (process.env.NODE_ENV === "production") return;
   } catch {
-    return false;
+    return;
   }
-};
+  if (!element.matches(INTERACTIVE)) {
+    console.warn(
+      "A fluidbox trigger needs to be a <button> or <a href>, or to have a role and tabindex:",
+      element,
+    );
+  }
+}
 
 /** How long a preload waits for a click after the pointer lifts. */
 const PRELOAD_GRACE = 250;
@@ -199,12 +208,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
         listenForIntent(next);
         next.dataset.fluidboxTrigger = "";
         if (!next.hasAttribute("aria-haspopup")) next.setAttribute("aria-haspopup", "dialog");
-        if (development() && !next.matches(INTERACTIVE)) {
-          console.warn(
-            "A fluidbox trigger needs to be a <button> or <a href>, or to have a role and tabindex:",
-            next,
-          );
-        }
+        checkReach(next);
       }
       register();
     },
