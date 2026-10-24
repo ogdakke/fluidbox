@@ -598,7 +598,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       items,
       // The origins property can change after the viewer is made.
       origins: latestOrigins(() => this.#origins),
-      renderers: this.#runtimeRenderers,
+      slides: this.#runtimeRenderers,
     });
     this.#fluidbox = fluidbox;
     this.#sync = createOpenIndexSync(fluidbox);

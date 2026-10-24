@@ -293,7 +293,7 @@ const embedStyles = `
 export function createEmbedRenderer(
   options: FluidboxEmbedRendererOptions = {},
 ): FluidboxSlideRenderer<FluidboxItem> {
-  return ({ item, target, signal, onActiveChange }) => {
+  return ({ item, media: target, signal, onActiveChange }) => {
     if (!isEmbedItem(item)) {
       throw new TypeError(`The embed renderer draws youtubeItem and vimeoItem videos: ${item.id}`);
     }

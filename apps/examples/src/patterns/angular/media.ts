@@ -15,6 +15,10 @@ import { createModelRenderer } from "@ogdakke/fluidbox/model";
 import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
 
+const noDrawing = (): never => {
+  throw new Error("This slide draws no built-in media.");
+};
+
 /**
  * The add-ons draw into an element. An Angular slide is a component that gets
  * `item`, `index` and `active` inputs, so it draws the add-on into its own
@@ -44,8 +48,12 @@ abstract class AddonSlide implements OnInit, OnDestroy {
     this.#dispose = this.render({
       item: this.item,
       index: this.index,
-      target: this.#host.nativeElement,
+      media: this.#host.nativeElement,
       signal: this.#controller.signal,
+      // A framework slide draws no built-in media for an add-on.
+      drawImage: noDrawing,
+      drawVideo: noDrawing,
+      drawIframe: noDrawing,
       get active() {
         return active();
       },

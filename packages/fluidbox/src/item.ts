@@ -3,7 +3,7 @@ import type {
   FluidboxCustomItemBase,
   FluidboxItem,
   FluidboxPictureSource,
-  FluidboxRenderer,
+  FluidboxSlideRenderer,
   FluidboxThumbnail,
   FluidboxVideoTrack,
 } from "./public-api";
@@ -13,7 +13,7 @@ export interface DeclarativeFluidboxDefinition {
   /** The trigger the item opens from, if it has one. */
   readonly trigger: HTMLElement | null;
   /** The renderer of markup content that is not an image, video or iframe. */
-  readonly renderer?: readonly [string, FluidboxRenderer];
+  readonly renderer?: readonly [string, FluidboxSlideRenderer];
   /** The item's own `<template slot="sheet">`. */
   readonly sheet?: HTMLTemplateElement;
 }
@@ -240,9 +240,9 @@ export class FluidboxItemElement extends HTMLElement {
       } satisfies FluidboxCustomItemBase<string> as unknown as FluidboxItem),
       renderer: [
         key,
-        ({ target }) => {
-          target.append(template.content.cloneNode(true));
-          return () => target.replaceChildren();
+        ({ media }) => {
+          media.append(template.content.cloneNode(true));
+          return () => media.replaceChildren();
         },
       ],
     };

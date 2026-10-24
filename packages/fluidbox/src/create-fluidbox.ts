@@ -150,7 +150,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #listening = false;
   #zoom: FluidboxOptions<TItem>["zoom"];
   #loop: boolean;
-  readonly #renderers: FluidboxOptions<TItem>["renderers"];
+  readonly #slides: FluidboxOptions<TItem>["slides"];
   readonly #controls: SessionController<TItem> = this.#controller();
   /** Changed in place by update, so every part of the viewer reads the new strings. */
   readonly #labels: FluidboxLabels;
@@ -200,7 +200,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#origins = new OriginRegistry(options.origins as FluidboxOriginAdapter | undefined);
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
-    this.#renderers = options.renderers;
+    this.#slides = options.slides;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
     this.#makeAddons();
@@ -238,9 +238,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#viewerLoad ??= import("./dom-viewer-driver").then(
       ({ DomViewerDriver }) => {
         if (this.#lifetime.signal.aborted || generation !== this.#generation) return undefined;
-        this.#attach(
-          new DomViewerDriver<TItem>(document, this.#zoom, this.#renderers, this.#labels),
-        );
+        this.#attach(new DomViewerDriver<TItem>(document, this.#zoom, this.#slides, this.#labels));
         return this.#viewer;
       },
       (error: unknown) => {

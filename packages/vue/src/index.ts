@@ -42,8 +42,9 @@ import {
   type FluidboxLoading,
   type FluidboxOriginAdapter,
   type FluidboxRenderer,
-  type FluidboxSlideRenderContext,
+  type FluidboxSlide,
   type FluidboxSlideRenderer,
+  type FluidboxSlides,
   type FluidboxSheetEvent,
   type FluidboxSheetOptions,
   type FluidboxSheetSnapPoint,
@@ -321,8 +322,8 @@ const Root = defineComponent(
       get(_, key) {
         const render = typeof key === "string" ? props.renderers?.[key] : undefined;
         if (!render) return undefined;
-        return (context: FluidboxSlideRenderContext<TItem>) =>
-          mounts.mount(context.target, () =>
+        return (context: FluidboxSlide<TItem>) =>
+          mounts.mount(context.media, () =>
             render({
               item: context.item,
               index: context.index,
@@ -366,7 +367,7 @@ const Root = defineComponent(
     const fluidbox = createFluidbox<TItem>({
       items: items.value,
       ...(applied as FluidboxUpdateOptions<TItem>),
-      renderers,
+      slides: renderers as FluidboxSlides<TItem>,
       origins: latestOrigins(() => props.origins as FluidboxOriginAdapter<TItem> | undefined),
     });
     const state = shallowRef(fluidbox.state);

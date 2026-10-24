@@ -185,7 +185,7 @@ export interface FluidboxRenderContext<TItem extends FluidboxItem = FluidboxItem
 }
 
 /**
- * Draws into `target`: a custom slide (`renderers`), a filmstrip thumbnail, the
+ * Draws into `target`: a filmstrip thumbnail, the
  * sheet, or a travelling thumbnail overlay. Return a function to release your own
  * resources, such as timers.
  */
@@ -193,10 +193,21 @@ export type FluidboxRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxRenderContext<TItem>,
 ) => void | (() => void);
 
-/** What a custom slide's renderer gets: a render context that also follows the slide on show. */
-export interface FluidboxSlideRenderContext<
-  TItem extends FluidboxItem = FluidboxItem,
-> extends FluidboxRenderContext<TItem> {
+/**
+ * A slide, as its renderer gets it: the item, the media box to draw it in,
+ * and whether it is on show.
+ */
+export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
+  readonly item: TItem;
+  readonly index: number;
+  /**
+   * The media box: the element that flies, follows a drag to dismiss and
+   * zooms. The runtime sizes it from the item's width and height. Draw your
+   * media here. The runtime empties it after your disposer runs.
+   */
+  readonly media: HTMLElement;
+  /** Aborted when the slide is disposed. */
+  readonly signal: AbortSignal;
   /** Whether the slide is the one on show in the viewer. */
   readonly active: boolean;
   /**
@@ -205,12 +216,35 @@ export interface FluidboxSlideRenderContext<
    * play and pause. Returns a function that stops listening; `signal` stops it too.
    */
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
+  /**
+   * Draw the built-in image into `media`: it loads, sharpens and fails as a
+   * photo's does. Without an argument it draws `item`, which must be an image
+   * item. A slide draws one built-in media at a time: drawing again replaces it.
+   * Returns a function that takes it out.
+   */
+  drawImage(this: void, item?: FluidboxImageItem): () => void;
+  /** Draw the built-in video into `media`, as `drawImage` does the image. */
+  drawVideo(this: void, item?: FluidboxVideoItem): () => void;
+  /** Draw the built-in iframe into `media`, as `drawImage` does the image. */
+  drawIframe(this: void, item?: FluidboxIframeItem): () => void;
 }
 
-/** Draws a custom slide (`renderers`). It can follow whether its slide is on show. */
+/** Draws a slide. Return a function to release your own resources, such as timers. */
 export type FluidboxSlideRenderer<TItem extends FluidboxItem = FluidboxItem> = (
-  context: FluidboxSlideRenderContext<TItem>,
+  slide: FluidboxSlide<TItem>,
 ) => void | (() => void);
+
+/**
+ * How each item type draws its slide, by `type`. A type looks up its own
+ * entry, then the built-in slide of images, videos and iframes, then
+ * `default`. A type with none shows the slide's error.
+ */
+export type FluidboxSlides<TItem extends FluidboxItem = FluidboxItem> = {
+  readonly [K in TItem["type"]]?: FluidboxSlideRenderer<Extract<TItem, { readonly type: K }>>;
+} & {
+  /** Any type without its own entry and without a built-in slide. */
+  readonly default?: FluidboxSlideRenderer<TItem>;
+};
 
 export interface FluidboxViewerContext<TItem extends FluidboxItem = FluidboxItem> {
   /** The viewer's layer for your controls and captions. */
@@ -485,7 +519,7 @@ export type FluidboxControlName =
  */
 export type FluidboxLoading = "hover" | "press" | "eager";
 
-/** Every option but `items`, `value`, `renderers` and `origins` can change later through `update`. */
+/** Every option but `items`, `value`, `slides` and `origins` can change later through `update`. */
 export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly items: FluidboxItems<TItem>;
   /**
@@ -503,8 +537,8 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    * @default { step: 2, max: 4 }
    */
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
-  /** Draw items of your own types, keyed by their `type`. Read when a slide mounts. */
-  readonly renderers?: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
+  /** Draw slides by item type: your own types, or the built-in ones. Read when a slide mounts. */
+  readonly slides?: FluidboxSlides<TItem>;
   /**
    * Go round: past the last item comes the first, and before the first the
    * last, by swipe, key, button and filmstrip alike. A single item never loops.

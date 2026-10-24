@@ -8,7 +8,7 @@ import {
   type Type,
   type ViewContainerRef,
 } from "@angular/core";
-import type { FluidboxItem, FluidboxSlideRenderContext } from "@ogdakke/fluidbox";
+import type { FluidboxItem, FluidboxSlide } from "@ogdakke/fluidbox";
 
 /**
  * What the sheet's and the filmstrip's templates get: `{ item, index }`, with
@@ -70,7 +70,7 @@ export function mountContent<TItem extends FluidboxItem>(
   item: TItem,
   index: number,
   target: Element,
-  slide?: FluidboxSlideRenderContext<TItem>,
+  slide?: FluidboxSlide<TItem>,
 ): () => void {
   if (typeof content !== "function") {
     if (!slide) {

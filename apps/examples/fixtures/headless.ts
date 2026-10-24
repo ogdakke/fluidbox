@@ -5,7 +5,7 @@ import type {
   Fluidbox,
   FluidboxCustomItemBase,
   FluidboxItem,
-  FluidboxRenderer,
+  FluidboxSlides,
 } from "@ogdakke/fluidbox";
 import "./headless.css";
 
@@ -61,8 +61,8 @@ const origins = {
 const increment = (name: string) => {
   document.body.dataset[name] = String(Number(document.body.dataset[name] ?? 0) + 1);
 };
-const renderers = {
-  demo({ target, item, signal }) {
+const slides = {
+  demo({ media: target, item, signal }) {
     increment("customMounts");
     const content = document.createElement("button");
     content.type = "button";
@@ -72,12 +72,12 @@ const renderers = {
     signal.addEventListener("abort", () => increment("customAborts"), { once: true });
     return () => increment("customDisposals");
   },
-} satisfies Record<string, FluidboxRenderer<DemoItem>>;
+} satisfies FluidboxSlides<DemoItem>;
 
 const viewer: Fluidbox<DemoItem> = createFluidbox({
   items,
   origins,
-  renderers,
+  slides,
   viewer({ target, fluidbox, signal }) {
     const controls = document.createElement("div");
     controls.dataset.demoControls = "";
@@ -116,19 +116,19 @@ const viewer: Fluidbox<DemoItem> = createFluidbox({
 const secondaryViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
   origins,
-  renderers,
+  slides,
 });
 // The filmstrip is an option: its code loads only with the side-effect import.
 const filmstripViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
   origins,
-  renderers,
+  slides,
   filmstrip: true,
 });
 const protectedViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
   origins,
-  renderers,
+  slides,
 });
 protectedViewer.addEventListener("beforevaluechange", (event) => {
   if (event.action === "close") event.preventDefault();

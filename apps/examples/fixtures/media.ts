@@ -24,7 +24,7 @@ declare module "@ogdakke/fluidbox" {
 const log: string[] = [];
 
 /** A slide that records when it mounts, comes on show, leaves it and unloads. */
-const probe: FluidboxSlideRenderer = ({ item, target, signal, active, onActiveChange }) => {
+const probe: FluidboxSlideRenderer = ({ item, media: target, signal, active, onActiveChange }) => {
   const id = item.id ?? "";
   log.push(`${id} mount ${active ? "active" : "inactive"}`);
   const text = document.createElement("p");
@@ -89,7 +89,7 @@ const MODEL_VIEWER = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/m
 
 const fluidbox = createFluidbox({
   items,
-  renderers: {
+  slides: {
     probe,
     embed: renderEmbed,
     spin: createSpinRenderer(),

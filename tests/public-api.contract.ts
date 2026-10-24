@@ -169,10 +169,10 @@ const made: FluidboxItemList<Photo> = createItemList({
 const madeCredit: string = made.get(0).credit;
 void [unindexed, madeCredit];
 
-const note2: FluidboxRenderer = ({ item, index, target, signal }) => {
-  target.textContent = `${item.type} ${index}`;
-  signal.addEventListener("abort", () => target.replaceChildren());
-  return () => target.replaceChildren();
+const note2: FluidboxSlideRenderer = ({ item, index, media, signal }) => {
+  media.textContent = `${item.type} ${index}`;
+  signal.addEventListener("abort", () => media.replaceChildren());
+  return () => media.replaceChildren();
 };
 const viewer: FluidboxViewerRenderer<Photo> = ({ target, fluidbox, signal }) => {
   const caption = document.createElement("p");
@@ -206,7 +206,7 @@ const fluidbox = createFluidbox({
   items: photos,
   labels,
   zoom: { step: 2, max: 6 },
-  renderers: { note: note2 },
+  slides: { default: note2 },
   viewer,
   controls: ["close"],
   filmstrip: { render: ({ item, target }) => void (target.title = item.credit) },
@@ -252,7 +252,30 @@ const clip: FluidboxSlideRenderer<Photo | ContractNoteItem> = ({
   const stop: () => void = onActiveChange((now: boolean) => void [playing, now]);
   signal.addEventListener("abort", stop);
 };
-createFluidbox<Photo | ContractNoteItem>({ items: photos, renderers: { "contract-note": clip } });
+createFluidbox<Photo | ContractNoteItem>({ items: photos, slides: { "contract-note": clip } });
+// Each type's slide gets its own items, and can draw the built-in media.
+createFluidbox<Photo | ContractNoteItem>({
+  items: photos,
+  slides: {
+    "contract-note": (slide) => {
+      assert<Equal<typeof slide.item, ContractNoteItem>>();
+      const media: HTMLElement = slide.media;
+      void media;
+      const undraw: () => void = slide.drawImage(photo);
+      return undraw;
+    },
+    // Listing a built-in type replaces its slide; it can still draw the built-in image.
+    image: (slide) => {
+      assert<Equal<typeof slide.item, Photo>>();
+      slide.drawImage();
+    },
+    default: (slide) => void slide.item.type,
+  },
+});
+// @ts-expect-error a slide for a type the items don't have
+createFluidbox<Photo>({ items: photos, slides: { video: note2 } });
+// @ts-expect-error drawImage draws image items
+createFluidbox({ items: photos, slides: { note: (slide) => void slide.drawImage(video) } });
 // Other renderers don't get it.
 // @ts-expect-error a filmstrip thumbnail is never on show as a slide
 const thumbnailActive: FluidboxRenderer = ({ active }) => void active;
@@ -271,16 +294,17 @@ createFluidbox<Shop>({
       height: 1,
     }),
   ],
-  renderers: {
-    note: note2,
+  slides: {
     embed: renderEmbed,
     spin: createSpinRenderer({ label: (frame, count) => `${frame}/${count}` }),
     model: createModelRenderer({ load: () => Promise.resolve() }),
   },
 });
 
-// @ts-expect-error renderers are functions, not objects with mount
-createFluidbox({ items: photos, renderers: { note: { mount: note2 } } });
+// @ts-expect-error slides are functions, not objects with mount
+createFluidbox({ items: photos, slides: { note: { mount: note2 } } });
+// @ts-expect-error the renderers option is now slides
+createFluidbox({ items: photos, renderers: { note: note2 } });
 // @ts-expect-error a sheet dismissal is one of flight, scroll or none
 createFluidbox({ items: photos, sheet: { dismiss: "swipe" } });
 

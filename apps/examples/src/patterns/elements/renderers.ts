@@ -6,11 +6,11 @@ export function renderers(root: HTMLElement) {
   // Items from JS; the buttons marked data-fluidbox-item-id open them.
   gallery.items = media;
   gallery.renderers = {
-    note({ target }) {
+    note({ media }) {
       const note = document.createElement("article");
       note.className = "pattern-note";
       note.textContent = `Theme: ${theme}`;
-      target.append(note);
+      media.append(note);
     },
   };
 }

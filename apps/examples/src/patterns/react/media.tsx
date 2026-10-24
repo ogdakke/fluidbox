@@ -15,6 +15,10 @@ import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
  * The add-ons draw into an element. A React renderer gets the slide's item,
  * signal and activity, so give the add-on an element of the component's own.
  */
+const noDrawing = (): never => {
+  throw new Error("This slide draws no built-in media.");
+};
+
 function AddonSlide({
   render,
   context,
@@ -29,8 +33,13 @@ function AddonSlide({
     const dispose = render({
       item: context.item,
       index: context.index,
-      target,
+      media: target,
       signal: AbortSignal.any([context.signal, controller.signal]),
+      // A framework slide draws no built-in media for an add-on.
+      drawImage: noDrawing,
+      drawVideo: noDrawing,
+      drawIframe: noDrawing,
+
       get active() {
         return context.active;
       },

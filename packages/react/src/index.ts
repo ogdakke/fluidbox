@@ -33,6 +33,7 @@ import {
   type FluidboxLabels,
   type FluidboxOriginAdapter,
   type FluidboxSlideRenderer,
+  type FluidboxSlides,
   type FluidboxState,
   type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
@@ -292,13 +293,13 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     loading,
     // Renderers are looked up by name when an item renders, so the newest
     // render function is used without telling the viewer.
-    renderers: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
+    slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get(_, key) {
         const render = typeof key === "string" ? latest.current.renderers?.[key] : undefined;
         if (!render) return undefined;
         const renderer: FluidboxSlideRenderer<TItem> = (context) =>
           mount(
-            context.target,
+            context.media,
             render({
               item: context.item,
               index: context.index,
@@ -312,7 +313,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         return renderer;
       },
       has: (_, key) => typeof key === "string" && !!latest.current.renderers?.[key],
-    }),
+    }) as FluidboxSlides<TItem>,
     // latestOrigins is not generic; the adapter only ever sees this Root's items.
     origins: latestOrigins(
       () => latest.current.origins as FluidboxOriginAdapter | undefined,

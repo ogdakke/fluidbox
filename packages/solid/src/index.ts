@@ -30,6 +30,7 @@ import {
   type FluidboxLabels,
   type FluidboxRenderer,
   type FluidboxSlideRenderer,
+  type FluidboxSlides,
   type FluidboxSheetEvent,
   type FluidboxSheetOptions,
   type FluidboxState,
@@ -267,12 +268,12 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     loading: untrack(() => props.loading),
     // Renderers resolve by key when an item renders, so the newest render
     // function is used without rebuilding the viewer.
-    renderers: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
+    slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
       get(_, key) {
         const renderer = typeof key === "string" ? props.renderers?.[key] : undefined;
         return renderer
           ? (((context) =>
-              mount(context.target, () =>
+              mount(context.media, () =>
                 renderer({
                   item: context.item,
                   index: context.index,
@@ -286,7 +287,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
           : undefined;
       },
       has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
-    }),
+    }) as FluidboxSlides<TItem>,
     origins: latestOrigins(() => props.origins),
     viewer: ({ target }) => {
       setViewerTarget(target);

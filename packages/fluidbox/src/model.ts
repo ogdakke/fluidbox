@@ -112,7 +112,7 @@ export function createModelRenderer(
   options: FluidboxModelRendererOptions = {},
 ): FluidboxSlideRenderer<FluidboxItem> {
   let loading: Promise<unknown> | undefined;
-  return ({ item, target, signal, active, onActiveChange }) => {
+  return ({ item, media: target, signal, active, onActiveChange }) => {
     if (!isModelItem(item)) {
       throw new TypeError(`The model renderer draws modelItem models: ${item.id}`);
     }

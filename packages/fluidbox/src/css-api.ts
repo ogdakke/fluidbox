@@ -290,6 +290,7 @@ export const internal: readonly string[] = [
   "data-fluidbox-content",
   "data-fluidbox-server-viewer",
   "data-fluidbox-controls-revealing",
+  "data-fluidbox-drawn",
   "data-fluidbox-filmstrip-thumbnail",
   "data-fluidbox-filmstrip-track",
   "data-fluidbox-flight-source-hidden",

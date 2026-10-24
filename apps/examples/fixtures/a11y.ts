@@ -6,7 +6,7 @@ import type {
   Fluidbox,
   FluidboxCustomItemBase,
   FluidboxItem,
-  FluidboxRenderer,
+  FluidboxSlides,
 } from "@ogdakke/fluidbox";
 import "./site.css";
 
@@ -57,8 +57,8 @@ class ShadowControl extends HTMLElement {
 if (!customElements.get("a11y-shadow-control"))
   customElements.define("a11y-shadow-control", ShadowControl);
 
-const renderers: Record<string, FluidboxRenderer> = {
-  shop({ target }) {
+const slides: FluidboxSlides = {
+  shop({ media: target }) {
     target.innerHTML = `
       <form class="a11y-shop" onsubmit="return false">
         <input type="hidden" name="id" value="1" />
@@ -117,7 +117,7 @@ const viewer = params.has("viewer")
 
 const fluidbox: Fluidbox = createFluidbox({
   items,
-  renderers,
+  slides,
   loading: "eager",
   filmstrip: params.has("filmstrip"),
   ...(params.has("zoom")

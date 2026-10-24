@@ -9,7 +9,7 @@ export function mountMedia(root: HTMLElement) {
   const fluidbox = createFluidbox({
     items: productMedia,
     // The items' `render` names these: "embed", "spin" and "model".
-    renderers: {
+    slides: {
       embed: renderEmbed,
       spin: createSpinRenderer(),
       // <model-viewer> loads when a model first comes on show.

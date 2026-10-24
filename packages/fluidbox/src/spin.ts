@@ -133,7 +133,7 @@ export function createSpinRenderer(
   const label = options.label ?? ((frame, count) => `Frame ${frame} of ${count}`);
   const keep = Math.max(2, options.keep ?? 48);
   const turns = options.turns ?? 1;
-  return ({ item, target, signal, active, onActiveChange }) => {
+  return ({ item, media: target, signal, active, onActiveChange }) => {
     if (!isSpinItem(item)) {
       throw new TypeError(`The spin renderer draws spinItem spins: ${item.id}`);
     }

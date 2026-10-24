@@ -32,6 +32,7 @@ import type {
   FluidboxOrigin,
   FluidboxViewerLayer,
   FluidboxSlideRenderer,
+  FluidboxSlides,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
   FluidboxZoomOptions,
@@ -149,7 +150,7 @@ export class DomViewerDriver<
   /** Loaded with the first overlay, so a viewer without overlays never loads it. */
   #thumbnailOverlays: ThumbnailOverlayRuntime<TItem> | undefined;
   #overlaysLoad: Promise<unknown> | undefined;
-  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
+  readonly #slides: FluidboxSlides<TItem>;
   readonly #viewerOwner = {
     closeImmediately: () => {
       const controller = this.#controller;
@@ -237,13 +238,13 @@ export class DomViewerDriver<
   constructor(
     ownerDocument: Document,
     zoomOptions: false | FluidboxZoomOptions | undefined,
-    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>> | undefined,
+    slides: FluidboxSlides<TItem> | undefined,
     labels: FluidboxLabels,
   ) {
     this.#labels = labels;
     this.#portal = createViewerPortal(ownerDocument, labels.viewer);
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
-    this.#renderers = renderers ?? {};
+    this.#slides = slides ?? {};
     this.#portal.dialog.dataset.fluidboxHeadless = "";
     this.#portal.container.addEventListener(
       "click",
@@ -496,7 +497,7 @@ export class DomViewerDriver<
         const controller = this.#controller;
         return controller?.state.status !== "open" || controller.allows({ index }, "pointer");
       },
-      this.#renderers,
+      this.#slides as Readonly<Record<string, FluidboxSlideRenderer<any> | undefined>>,
       this.#labels,
       this.#loop,
     );
@@ -1026,7 +1027,7 @@ export class DomViewerDriver<
   }
 
   get #media() {
-    return this.#strip?.current?.image ?? this.#portal.media;
+    return this.#strip?.current?.media ?? this.#portal.media;
   }
 
   /** Name the dialog for an item, and announce it: by `name`, by its own name, or not. */

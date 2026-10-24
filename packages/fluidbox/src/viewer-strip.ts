@@ -1,35 +1,79 @@
 import type {
   FluidboxDispose,
   FluidboxItem,
+  FluidboxSlide,
   FluidboxSlideRenderer,
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
 import { fitSize } from "./fit-size";
-import { idOf, sameItem } from "./items";
+import { idOf, itemLabel, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
 import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
 import { checkItemUrls } from "./media-url";
-import type { FluidboxThumbnail } from "./public-api";
+import type {
+  FluidboxIframeItem,
+  FluidboxImageItem,
+  FluidboxThumbnail,
+  FluidboxVideoItem,
+} from "./public-api";
 import { sharperCandidate, srcsetCandidates } from "./srcset";
 
 const WINDOW_SIZE = 31;
 const LOAD_RADIUS = 1;
+
+/** The media the runtime draws itself: by a built-in slide, or a slide's draw call. */
+type DrawnItem = FluidboxImageItem | FluidboxVideoItem | FluidboxIframeItem;
+
+/** Item types without a slide, warned about once. */
+const unknownTypes = new Set<string>();
+
+const builtIn = (type: string): type is DrawnItem["type"] =>
+  type === "image" || type === "video" || type === "iframe";
+
+/** The elements of drawn media. */
+interface DrawnParts {
+  readonly picture?: HTMLPictureElement;
+  readonly placeholder?: HTMLImageElement;
+  readonly preview?: HTMLImageElement;
+  readonly cover?: HTMLImageElement;
+  readonly image: HTMLElement;
+}
 
 interface ViewerSlide {
   /** Where the slide sits in the strip; new items can move it. */
   position: number;
   readonly element: HTMLDivElement;
   readonly frame: HTMLDivElement;
-  readonly picture?: HTMLPictureElement;
-  readonly placeholder?: HTMLImageElement;
-  readonly preview?: HTMLImageElement;
+  /**
+   * The media box: what flies, follows a drag and zooms. A built-in slide's
+   * box is its `<img>`, `<video>` or `<iframe>`; any other slide's is a div
+   * its renderer draws into.
+   */
+  readonly media: HTMLElement;
+  /** Whether a renderer draws the slide, rather than the built-in media alone. */
+  readonly custom: boolean;
+  /** The item of the built-in media drawn in the slide, if any. */
+  drawn?: DrawnItem;
+  /** The draw call that drew it, so a stale undraw does nothing. */
+  drawing?: AbortController;
+  picture?: HTMLPictureElement;
+  placeholder?: HTMLImageElement;
+  preview?: HTMLImageElement;
   /** Snapshot shown over embedded media until it has loaded, and while closing. */
-  readonly cover?: HTMLImageElement;
-  readonly image: HTMLElement;
+  cover?: HTMLImageElement;
+  /** The drawn `<img>`, `<video>` or `<iframe>`: the box itself in a built-in slide. */
+  image?: HTMLElement;
   readonly error: HTMLDivElement;
   readonly retry: HTMLButtonElement;
+  /** The drawn media has started loading. */
   loaded: boolean;
+  /** The renderer of a custom slide has run, and not been disposed. */
+  rendered: boolean;
+  /** Aborts the renderer's signal. */
+  content?: AbortController;
+  /** The origin an open prepared before the renderer drew, for the image it draws. */
+  origin?: HTMLImageElement | null;
   decoded: boolean;
   fullApplied: boolean;
   imageVersion: number;
@@ -73,7 +117,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   readonly #controller = new AbortController();
   readonly #onSelect: (index: number, settled: boolean) => void;
   readonly #allows: (index: number) => boolean;
-  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
+  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<any> | undefined>>;
   readonly #labels: FluidboxLabels;
   #source: FluidboxSource<TItem>;
   #loop: boolean;
@@ -117,7 +161,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     source: FluidboxSource<TItem>,
     onSelect: (index: number, settled: boolean) => void,
     allows: (index: number) => boolean,
-    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>,
+    renderers: Readonly<Record<string, FluidboxSlideRenderer<any> | undefined>>,
     labels: FluidboxLabels,
     loop = false,
   ) {
@@ -446,6 +490,51 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     retry.textContent = this.#labels.retry;
     retry.addEventListener("click", () => this.#retry(slide.position));
     error.append(`${this.#labels.error} `, retry);
+    // A slide of your own for the type comes first, then the built-in one.
+    const custom = !!this.#renderers[item.type] || !builtIn(item.type);
+    let drawn: DrawnParts | undefined;
+    let media: HTMLElement;
+    if (custom) {
+      const content = this.#ownerDocument.createElement("div");
+      content.dataset.fluidboxItemContent = "";
+      content.setAttribute("role", "group");
+      content.setAttribute("aria-label", itemLabel(item));
+      frame.append(content);
+      media = content;
+    } else {
+      drawn = this.#build(item as DrawnItem, frame, frame);
+      media = drawn.image;
+    }
+    media.dataset.fluidboxMedia = "";
+    media.style.setProperty("--fluidbox-media-aspect", `${item.width} / ${item.height}`);
+    frame.append(error);
+    element.append(frame);
+    const slide: ViewerSlide = {
+      position: index,
+      element,
+      frame,
+      media,
+      custom,
+      drawn: drawn && (item as DrawnItem),
+      ...drawn,
+      error,
+      retry,
+      loaded: false,
+      rendered: false,
+      decoded: false,
+      fullApplied: false,
+      imageVersion: 0,
+    };
+    this.#wire(slide, this.#controller.signal);
+    this.#present(slide, index === this.#index);
+    return slide;
+  }
+
+  /**
+   * Make the built-in media for an item into `host`: the frame of a built-in
+   * slide, where the media element is the box, or the box of a custom one.
+   */
+  #build(item: DrawnItem, frame: HTMLDivElement, host: HTMLElement): DrawnParts {
     let picture: HTMLPictureElement | undefined;
     let placeholder: HTMLImageElement | undefined;
     let preview: HTMLImageElement | undefined;
@@ -464,13 +553,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       if (item.placeholder) {
         placeholder = decorative("fluidboxSlidePlaceholder");
         placeholder.src = item.placeholder;
-        frame.append(placeholder);
+        host.append(placeholder);
       }
       if (item.thumbnail?.src) {
         // A preview is small and usually already decoded for the page; paint it
         // on the first frame it appears in.
         preview = decorative("fluidboxSlidePreview");
-        frame.append(preview);
+        host.append(preview);
       }
       picture = this.#ownerDocument.createElement("picture");
       picture.dataset.fluidboxPicture = "";
@@ -482,18 +571,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       image.decoding = "async";
       image.draggable = false;
       image.dataset.fluidboxImagePending = "";
-      image.addEventListener(
-        "load",
-        () => {
-          void this.#revealImage(slide, slide.imageVersion);
-        },
-        { signal: this.#controller.signal },
-      );
-      image.addEventListener("error", () => this.#fail(slide), {
-        signal: this.#controller.signal,
-      });
       picture.append(image);
-      frame.append(picture);
+      host.append(picture);
       media = image;
     } else if (item.type === "video") {
       const video = this.#ownerDocument.createElement("video");
@@ -512,65 +591,75 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         element.default = !!track.default;
         video.append(element);
       }
-      frame.append(video);
+      host.append(video);
       media = video;
-    } else if (item.type === "iframe") {
+    } else {
       const iframe = this.#ownerDocument.createElement("iframe");
       iframe.title = item.title;
       iframe.loading = "lazy";
       iframe.setAttribute("allowfullscreen", "");
-      frame.append(iframe);
+      host.append(iframe);
       media = iframe;
       cover = decorative("fluidboxMediaCover");
       if (item.thumbnail) paintThumbnail(cover, item.thumbnail);
-      frame.append(cover);
-    } else {
-      const content = this.#ownerDocument.createElement("div");
-      content.dataset.fluidboxItemContent = "";
-      content.setAttribute("role", "group");
-      content.setAttribute("aria-label", item.title);
-      frame.append(content);
-      media = content;
+      host.append(cover);
     }
-    media.dataset.fluidboxMedia = "";
-    media.style.setProperty("--fluidbox-media-aspect", `${item.width} / ${item.height}`);
-    frame.append(error);
-    element.append(frame);
-    const slide = {
-      position: index,
-      element,
-      frame,
-      picture,
-      placeholder,
-      preview,
-      cover,
-      image: media,
-      error,
-      retry,
-      loaded: false,
-      decoded: false,
-      fullApplied: false,
-      imageVersion: 0,
-    } satisfies ViewerSlide;
-    this.#present(slide, index === this.#index);
-    return slide;
+    // Inside a box, the box is the media; the drawn element fills it.
+    if (host !== frame) media.dataset.fluidboxDrawn = "";
+    return { picture, placeholder, preview, cover, image: media };
+  }
+
+  /** Follow the drawn image's loads and failures until `signal` aborts. */
+  #wire(slide: ViewerSlide, signal: AbortSignal) {
+    const image = slide.image;
+    if (slide.drawn?.type !== "image" || !(image instanceof HTMLImageElement)) return;
+    image.addEventListener(
+      "load",
+      () => {
+        void this.#revealImage(slide, slide.imageVersion);
+      },
+      { signal },
+    );
+    image.addEventListener("error", () => this.#fail(slide), { signal });
+  }
+
+  /** Where a slide's drawn media sits: its frame, or a custom slide's box. */
+  #host(slide: ViewerSlide) {
+    return slide.custom ? slide.media : slide.frame;
   }
 
   prepareOpening(index: number, origin?: HTMLImageElement) {
     const position = this.#near(index);
     const slide = this.#slides.get(position);
-    const item = this.#source.getItem(index);
-    if (slide?.cover) {
+    if (!slide) return;
+    // The renderer hasn't drawn yet: the image it draws paints the origin.
+    if (slide.custom && !slide.rendered) {
+      slide.origin = origin ?? null;
+      return;
+    }
+    if (!this.#paintOpening(slide, origin)) return;
+    this.#reset(slide);
+    slide.fullApplied = false;
+    this.#loadMedia(position, slide);
+  }
+
+  /**
+   * Paint the trigger's picture into a slide's drawn media, for the opening's
+   * first frame. Returns whether the image must load again behind it.
+   */
+  #paintOpening(slide: ViewerSlide, origin?: HTMLImageElement | null) {
+    const item = slide.drawn;
+    if (slide.cover) {
       // Embedded pages paint long after the opening motion starts. The origin's
       // snapshot covers the frame until the embed reports that it has loaded.
-      if (item.thumbnail) paintThumbnail(slide.cover, item.thumbnail);
+      if (item?.thumbnail) paintThumbnail(slide.cover, item.thumbnail);
       else {
         const src = origin?.currentSrc || origin?.src;
         if (src) slide.cover.src = src;
       }
-      return;
+      return false;
     }
-    if (!slide || item.type !== "image" || !(slide.image instanceof HTMLImageElement)) return;
+    if (item?.type !== "image" || !(slide.image instanceof HTMLImageElement)) return false;
     const decodedPreview = origin ? observeDecodedPreview(origin) : null;
     const preview = decodedPreview || item.thumbnail?.src || origin?.currentSrc || origin?.src;
     if (preview) {
@@ -587,9 +676,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.removeAttribute("srcset");
       slide.image.removeAttribute("sizes");
     }
-    this.#reset(slide);
-    slide.fullApplied = false;
-    this.#load(position, slide);
+    return true;
   }
 
   /**
@@ -599,9 +686,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    */
   continueVideo(index: number, origin: HTMLVideoElement) {
     const slide = this.#slides.get(this.#near(index));
-    const item = this.#source.getItem(index);
     const video = slide?.image;
-    if (!slide || item.type !== "video" || !(video instanceof HTMLVideoElement)) return;
+    if (!slide || slide.drawn?.type !== "video" || !(video instanceof HTMLVideoElement)) return;
     slide.videoHandoff?.abort();
     if (origin.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !origin.videoWidth) return;
     const handoff = new AbortController();
@@ -802,10 +888,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // An error a hidden slide raised was not heard; say it as the slide arrives.
     if (!this.active.error.hidden) this.#alert(this.active);
     this.#loadWindow();
-    const media = this.#source.getItem(this.#item(index));
+    const media = this.active.drawn;
     const player = this.active.image;
     if (
-      media.type === "video" &&
+      media?.type === "video" &&
       media.autoplay &&
       player instanceof HTMLVideoElement &&
       player.paused
@@ -839,11 +925,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // An image still loading sharpens once it shows; see #revealImage.
     this.#zoomed = { index, scale };
     const slide = this.#slides.get(index);
-    const item = this.#source.getItem(this.#item(index));
+    const item = slide?.drawn;
     const image = slide?.image;
     if (
       !slide ||
-      item.type !== "image" ||
+      item?.type !== "image" ||
       !(image instanceof HTMLImageElement) ||
       !slide.fullApplied ||
       !this.#painted(image)
@@ -905,7 +991,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #load(index: number, slide: ViewerSlide) {
-    const item = this.#source.getItem(this.#item(index));
+    if (slide.custom && !slide.rendered) this.#render(index, slide);
+    else this.#loadMedia(index, slide);
+  }
+
+  /** Start loading the slide's drawn media, or only reprioritise it once it is loading. */
+  #loadMedia(index: number, slide: ViewerSlide) {
+    const item = slide.drawn;
+    if (!item) return;
     this.#loadPreview(item, slide);
     if (slide.loaded) {
       if (slide.image instanceof HTMLImageElement)
@@ -964,7 +1057,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       // Autoplay only on the slide in view: its neighbours load too.
       if (item.autoplay && index === this.#index) void slide.image.play().catch(() => {});
     } else if (item.type === "iframe" && slide.image instanceof HTMLIFrameElement) {
-      const frame = slide.frame;
+      const frame = this.#host(slide);
       const controller = new AbortController();
       slide.controller = controller;
       delete frame.dataset.fluidboxMediaReady;
@@ -983,47 +1076,138 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       if (item.referrerPolicy) slide.image.referrerPolicy = item.referrerPolicy;
       slide.image.setAttribute("sandbox", item.sandbox ?? IFRAME_SANDBOX_DEFAULT);
       slide.image.src = item.src;
-    } else if (item.type !== "image" && item.type !== "video" && item.type !== "iframe") {
-      const renderer = this.#renderers[item.type];
-      if (!renderer) throw new TypeError(`Unknown fluidbox renderer: ${item.type}`);
-      const controller = new AbortController();
-      // Unloading drops the activity, so its listeners are never called again.
-      const activity = (slide.activity = {
-        active: this.#mounted && !this.#hidden && index === this.#index,
-        listeners: new Set<(active: boolean) => void>(),
-      });
-      slide.controller = controller;
-      slide.dispose =
-        renderer({
-          item,
-          index: this.#item(index),
-          target: slide.image,
-          signal: controller.signal,
-          get active() {
-            return activity.active;
-          },
-          onActiveChange(listener) {
-            activity.listeners.add(listener);
-            return () => activity.listeners.delete(listener);
-          },
-        }) ?? undefined;
     }
     slide.loaded = true;
   }
 
-  #unload(slide: ViewerSlide) {
+  /**
+   * Run a custom slide's renderer: the slide of its type, else the default.
+   * A type with neither shows the slide's error.
+   */
+  #render(index: number, slide: ViewerSlide) {
+    const item = this.#source.getItem(this.#item(index));
+    const renderer =
+      this.#renderers[item.type] ?? (builtIn(item.type) ? undefined : this.#renderers.default);
+    slide.rendered = true;
+    if (!renderer) {
+      if (process.env.NODE_ENV !== "production" && !unknownTypes.has(item.type)) {
+        unknownTypes.add(item.type);
+        console.warn(
+          `Fluidbox has no slide for items of type "${item.type}". Add one to the slides option.`,
+        );
+      }
+      this.#fail(slide);
+      return;
+    }
+    const controller = new AbortController();
+    // Unloading drops the activity, so its listeners are never called again.
+    const activity = (slide.activity = {
+      active: this.#mounted && !this.#hidden && index === this.#index,
+      listeners: new Set<(active: boolean) => void>(),
+    });
+    slide.content = controller;
+    const { signal } = controller;
+    const context: FluidboxSlide<any> = {
+      item,
+      index: this.#item(index),
+      media: slide.media,
+      signal,
+      get active() {
+        return activity.active;
+      },
+      onActiveChange(listener: (active: boolean) => void) {
+        activity.listeners.add(listener);
+        return () => activity.listeners.delete(listener);
+      },
+      drawImage: (image?: FluidboxItem) => this.#draw(slide, signal, "image", image ?? item),
+      drawVideo: (video?: FluidboxItem) => this.#draw(slide, signal, "video", video ?? item),
+      drawIframe: (iframe?: FluidboxItem) => this.#draw(slide, signal, "iframe", iframe ?? item),
+    };
+    slide.dispose = renderer(context) ?? undefined;
+  }
+
+  /**
+   * Draw built-in media into a custom slide's box, in place of what it drew
+   * before. Returns a function that takes it out again.
+   */
+  #draw(slide: ViewerSlide, signal: AbortSignal, type: DrawnItem["type"], item: FluidboxItem) {
+    if (item.type !== type) {
+      throw new TypeError(`Fluidbox draws ${type} items here, not "${item.type}" ones.`);
+    }
+    if (signal.aborted) return () => {};
+    this.#undraw(slide);
+    const drawing = new AbortController();
+    Object.assign(slide, this.#build(item, slide.frame, slide.media), { drawn: item, drawing });
+    this.#wire(slide, drawing.signal);
+    const origin = slide.origin;
+    slide.origin = undefined;
+    if (origin !== undefined) this.#paintOpening(slide, origin);
+    this.#loadMedia(slide.position, slide);
+    return () => {
+      if (slide.drawing === drawing) this.#undraw(slide);
+    };
+  }
+
+  /** Take a custom slide's drawn media out of its box. */
+  #undraw(slide: ViewerSlide) {
+    const drawing = slide.drawing;
+    if (!drawing) return;
+    this.#stopMedia(slide);
+    this.#unloadMedia(slide);
+    drawing.abort();
+    for (const node of [
+      slide.placeholder,
+      slide.preview,
+      slide.picture ?? slide.image,
+      slide.cover,
+    ])
+      node?.remove();
+    if (slide.drawn?.type === "image") delete slide.frame.dataset.fluidboxImageFrame;
+    delete slide.media.dataset.fluidboxMediaReady;
+    Object.assign(slide, {
+      drawn: undefined,
+      drawing: undefined,
+      picture: undefined,
+      placeholder: undefined,
+      preview: undefined,
+      cover: undefined,
+      image: undefined,
+    });
+  }
+
+  /** Stop the drawn media's work that outlives a load: a hand-off, a sharper image, a preview. */
+  #stopMedia(slide: ViewerSlide) {
     slide.videoHandoff?.abort();
     slide.sharpening?.abort();
     slide.sharpening = undefined;
     slide.sharpened = undefined;
     slide.previewController?.abort();
     slide.previewController = undefined;
+  }
+
+  #unload(slide: ViewerSlide) {
+    this.#stopMedia(slide);
+    slide.origin = undefined;
+    if (slide.rendered) {
+      slide.content?.abort();
+      slide.content = undefined;
+      slide.dispose?.();
+      slide.dispose = undefined;
+      slide.activity = undefined;
+      slide.rendered = false;
+      this.#undraw(slide);
+      slide.error.hidden = true;
+      slide.element.removeAttribute("aria-busy");
+      slide.media.replaceChildren();
+      return;
+    }
+    this.#unloadMedia(slide);
+  }
+
+  #unloadMedia(slide: ViewerSlide) {
     if (!slide.loaded) return;
     slide.controller?.abort();
     slide.controller = undefined;
-    slide.dispose?.();
-    slide.dispose = undefined;
-    slide.activity = undefined;
     slide.decoded = false;
     slide.fullApplied = false;
     slide.error.hidden = true;
@@ -1034,7 +1218,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.removeAttribute("src");
       slide.image.load();
     } else if (slide.image instanceof HTMLIFrameElement) {
-      delete slide.frame.dataset.fluidboxMediaReady;
+      delete this.#host(slide).dataset.fluidboxMediaReady;
       slide.image.removeAttribute("src");
     } else if (slide.image instanceof HTMLImageElement) {
       slide.imageVersion += 1;
@@ -1042,8 +1226,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.removeAttribute("src");
       slide.image.removeAttribute("srcset");
       slide.image.removeAttribute("sizes");
-    } else {
-      slide.image.replaceChildren();
     }
     slide.loaded = false;
   }
@@ -1065,8 +1247,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #applyImage(index: number, slide: ViewerSlide) {
-    const item = this.#source.getItem(this.#item(index));
-    if (item.type !== "image" || !(slide.image instanceof HTMLImageElement) || !slide.picture)
+    const item = slide.drawn;
+    if (item?.type !== "image" || !(slide.image instanceof HTMLImageElement) || !slide.picture)
       return;
     slide.imageVersion += 1;
     const version = slide.imageVersion;
@@ -1096,7 +1278,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /** Whether the image already shows the one candidate the full media resolves to. */
-  #showsFull(image: HTMLImageElement, item: TItem) {
+  #showsFull(image: HTMLImageElement, item: DrawnItem) {
     if (item.type !== "image") return false;
     if (item.sources?.length || item.srcset) return false;
     const base = this.#ownerDocument.baseURI;
@@ -1122,7 +1304,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /** The item's `<source>` elements; a staged copy goes through #writeSet. */
-  #sources(item: TItem, staged?: ViewerSlide) {
+  #sources(item: DrawnItem, staged?: ViewerSlide) {
     return (item.type === "image" ? (item.sources ?? []) : []).map((resource) => {
       const source = this.#ownerDocument.createElement("source");
       if (staged) this.#writeSet(source, resource, staged);
@@ -1137,7 +1319,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /** A detached copy of the slide's picture that loads the same candidate. */
-  #stage(item: TItem, slide: ViewerSlide) {
+  #stage(item: DrawnItem, slide: ViewerSlide) {
     const picture = this.#ownerDocument.createElement("picture");
     const image = this.#ownerDocument.createElement("img");
     if (item.type === "image") {
@@ -1149,7 +1331,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return image;
   }
 
-  #loadPreview(item: TItem, slide: ViewerSlide) {
+  #loadPreview(item: DrawnItem, slide: ViewerSlide) {
     const image = slide.preview;
     const src = item.thumbnail?.src;
     if (!image || !src || image.hasAttribute("data-fluidbox-image-ready")) return;
@@ -1197,6 +1379,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #retry(index: number) {
     const slide = this.#slides.get(index);
     if (!slide) return;
+    // A custom slide with nothing drawn draws again from the start.
+    if (slide.custom && !slide.drawn) this.#unload(slide);
     this.#reset(slide);
     this.#load(index, slide);
   }
