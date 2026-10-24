@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 test.use({ video: "on", trace: "on" });
+// Chromium, desktop WebKit and Pixel 7.
+test.skip(
+  ({ browserName, isMobile }) =>
+    browserName === "firefox" || (browserName === "webkit" && isMobile),
+  "One engine per input family keeps the committed visual baselines small.",
+);
 
-test("collapsed gallery visual checkpoints", async ({ page }, testInfo) => {
-  test.skip(
-    !["chromium", "webkit", "pixel-7"].includes(testInfo.project.name),
-    "One engine per input family keeps the committed visual baselines small.",
-  );
+test("collapsed gallery visual checkpoints", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
 
   const load = async () => {

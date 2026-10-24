@@ -5,11 +5,14 @@ function median(values: number[]) {
   return sorted[Math.floor(sorted.length / 2)]!;
 }
 
+test.skip(
+  ({ browserName }) => browserName !== "chromium",
+  "The relative performance gate runs once on Chromium.",
+);
+
 test("indexed source open cost stays near constant with gallery size", async ({
   page,
-  browserName,
 }, testInfo) => {
-  test.skip(browserName !== "chromium", "The relative performance gate runs once on Chromium.");
   test.setTimeout(60_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
   const measurements: Record<
