@@ -2,12 +2,7 @@
 export { createFluidbox } from "./create-fluidbox";
 export { createItemList, idOf, itemLabel } from "./items";
 export { imageItem, type FluidboxImageProps } from "./image-item";
-export {
-  FluidboxItemChangeEvent,
-  FluidboxSheetEvent,
-  FluidboxToggleEvent,
-  FluidboxZoomEvent,
-} from "./public-api";
+export { FluidboxSheetEvent, FluidboxValueChangeEvent, FluidboxZoomEvent } from "./public-api";
 
 export type {
   Fluidbox,
@@ -45,8 +40,10 @@ export type {
   FluidboxStatus,
   FluidboxTarget,
   FluidboxThumbnail,
-  FluidboxToggleState,
   FluidboxUpdateOptions,
+  FluidboxValue,
+  FluidboxValueChangeAction,
+  FluidboxValueChangeDetails,
   FluidboxVideoItem,
   FluidboxVideoTrack,
   FluidboxViewerContext,

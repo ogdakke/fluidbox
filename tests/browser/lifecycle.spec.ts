@@ -332,7 +332,10 @@ test("new items keep the slides of the items they share, and equal items change 
   });
   expect(swapped).toBe(true);
   expect(await marked()).toEqual(["Study one:Study one", "Study two:Study two", "Study four:new"]);
-  expect(await page.evaluate(() => window.fb.state)).toMatchObject({ status: "open", id: "two" });
+  expect(await page.evaluate(() => window.fb.state)).toMatchObject({
+    status: "open",
+    value: "two",
+  });
   expect(
     await page.evaluate(() => {
       const image = document.querySelector<HTMLImageElement>(

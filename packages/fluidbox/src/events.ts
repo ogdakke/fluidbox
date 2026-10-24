@@ -1,25 +1,21 @@
 import {
-  FluidboxItemChangeEvent,
   FluidboxSheetEvent,
-  FluidboxToggleEvent,
+  FluidboxValueChangeEvent,
   FluidboxZoomEvent,
   type FluidboxEventMap,
 } from "./public-api";
 
-/** The seven event names, for bindings that forward them as props, emits or outputs. */
+/** The five event names, for bindings that forward them as props, emits or outputs. */
 export const fluidboxEventTypes = [
-  "beforetoggle",
-  "toggle",
-  "beforeitemchange",
-  "itemchange",
-  "settle",
+  "beforevaluechange",
+  "valuechange",
+  "valuechangecomplete",
   "sheetchange",
   "zoomchange",
 ] as const satisfies readonly (keyof FluidboxEventMap)[];
 
 const eventClasses: (new (type: any, init: any) => Event)[] = [
-  FluidboxToggleEvent,
-  FluidboxItemChangeEvent,
+  FluidboxValueChangeEvent,
   FluidboxSheetEvent,
   FluidboxZoomEvent,
 ];

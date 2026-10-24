@@ -3,9 +3,8 @@
 import {
   createFluidbox,
   createItemList,
-  FluidboxItemChangeEvent,
   FluidboxSheetEvent,
-  FluidboxToggleEvent,
+  FluidboxValueChangeEvent,
   FluidboxZoomEvent,
   idOf,
   itemLabel as rootItemLabel,
@@ -348,34 +347,38 @@ fluidbox.bindOverlay(document.createElement("span"), 0, {
 // @ts-expect-error a frame layer is an element
 fluidbox.bindOverlay(button, 0, { travel: true, frameLayer: "badge" });
 
-fluidbox.addEventListener("beforetoggle", (event) => {
-  assert<Equal<typeof event, FluidboxToggleEvent>>();
-  if (event.newState === "closed" && event.reason === "keyboard") event.preventDefault();
+fluidbox.addEventListener("beforevaluechange", (event) => {
+  assert<Equal<typeof event, FluidboxValueChangeEvent<Photo>>>();
+  assert<Equal<typeof event.value, string | null>>();
+  assert<Equal<typeof event.action, "open" | "move" | "close">>();
+  if (event.action === "close" && event.reason === "keyboard") event.preventDefault();
 });
-fluidbox.addEventListener("itemchange", (event) => {
-  assert<Equal<typeof event, FluidboxItemChangeEvent<Photo>>>();
-  assert<Equal<typeof event.item, Photo>>();
-  void [event.id, event.index];
+fluidbox.addEventListener("valuechange", (event) => {
+  assert<Equal<typeof event, FluidboxValueChangeEvent<Photo>>>();
+  assert<Equal<typeof event.item, Photo | null>>();
+  void [event.value, event.previousValue, event.index];
 });
-fluidbox.addEventListener("settle", (event) => void event.item.credit);
+fluidbox.addEventListener("valuechangecomplete", (event) => void event.item?.credit);
+// @ts-expect-error toggle events are gone: the value events report opens and closes
+fluidbox.addEventListener("toggle", (event: FluidboxValueChangeEvent<Photo>) => void event);
 fluidbox.addEventListener("sheetchange", (event) => {
   assert<Equal<typeof event, FluidboxSheetEvent>>();
   void [event.stop, event.reason];
 });
-const toggle = new FluidboxToggleEvent("toggle", {
-  oldState: "closed",
-  newState: "open",
-  reason: "api",
-});
-const change = new FluidboxItemChangeEvent("itemchange", {
-  id: "one",
+const change = new FluidboxValueChangeEvent("valuechange", {
+  value: "one",
+  previousValue: null,
   index: 0,
   item: photo,
+  action: "open",
   reason: "api",
 });
-const sheetChange = new FluidboxSheetEvent("sheetchange", { stop: 1, reason: "pointer" });
+const sheetChange = new FluidboxSheetEvent("sheetchange", {
+  stop: 1,
+  reason: "pointer",
+});
 const zoomChange = new FluidboxZoomEvent("zoomchange", { scale: 2, reason: "wheel" });
-void [toggle, change, sheetChange, zoomChange];
+void [change, sheetChange, zoomChange];
 
 const update: FluidboxUpdateOptions<Photo> = { labels: { close: "Sulje" }, zoom: undefined };
 fluidbox.update(update);
@@ -407,9 +410,8 @@ assert<
     | "idOf"
     | "itemLabel"
     | "imageItem"
-    | "FluidboxItemChangeEvent"
     | "FluidboxSheetEvent"
-    | "FluidboxToggleEvent"
+    | "FluidboxValueChangeEvent"
     | "FluidboxZoomEvent"
   >
 >();
@@ -479,11 +481,11 @@ void gallery.load().then((loaded: boolean) => loaded);
 gallery.loading = "press";
 void gallery.setItems(photos).then((applied: boolean) => applied);
 gallery.addEventListener("sheetchange", (event) => void event.stop);
-gallery.addEventListener("itemchange", (event) => {
+gallery.addEventListener("valuechange", (event) => {
   const reason: FluidboxReason = event.reason;
   void [reason, event.item];
 });
-gallery.addEventListener("toggle", (event) => void event.newState.startsWith("o"));
+gallery.addEventListener("beforevaluechange", (event) => void event.value?.startsWith("o"));
 gallery.addEventListener("click", (event) => void event.clientX);
 void gallery.open(2);
 void gallery.open("one");

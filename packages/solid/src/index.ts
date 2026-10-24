@@ -40,14 +40,14 @@ import {
   createTrigger,
   fluidboxControlIcon,
   fluidboxControls,
-  fluidboxEventTypes,
   frameLayerOf,
   latestOrigins,
   resolveLabels,
-  createFluidboxSync,
+  createOpenIndexSync,
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
+  watchOpenIndex,
   zoomControlNames,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
@@ -91,7 +91,6 @@ export type {
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
-  FluidboxItemChangeEvent,
   FluidboxItemList,
   FluidboxItemListOptions,
   FluidboxItems,
@@ -105,7 +104,10 @@ export type {
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
-  FluidboxToggleEvent,
+  FluidboxValue,
+  FluidboxValueChangeAction,
+  FluidboxValueChangeDetails,
+  FluidboxValueChangeEvent,
   FluidboxVideoItem,
   FluidboxZoomCommandOptions,
   FluidboxZoomEvent,
@@ -214,15 +216,11 @@ function registry<T>(): [Accessor<T | null>, (value: T) => () => void] {
   ];
 }
 
+/** The events the Root forwards as they are; the value changes reach onValueChange instead. */
 const eventProps = {
-  beforetoggle: "onBeforeToggle",
-  toggle: "onToggle",
-  beforeitemchange: "onBeforeItemChange",
-  itemchange: "onItemChange",
-  settle: "onSettle",
   sheetchange: "onSheetChange",
   zoomchange: "onZoomChange",
-} as const satisfies Record<keyof FluidboxEventMap, keyof FluidboxRootProps>;
+} as const satisfies Partial<Record<keyof FluidboxEventMap, keyof FluidboxRootProps>>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.Element {
   const [viewerTarget, setViewerTarget] = createSignal<HTMLElement | null>(null);
@@ -307,7 +305,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   );
   const events = new AbortController();
   onCleanup(() => events.abort());
-  for (const type of fluidboxEventTypes) {
+  for (const type of ["sheetchange", "zoomchange"] as const) {
     fluidbox.addEventListener(
       type,
       (event) => (props[eventProps[type]] as ((event: Event) => void) | undefined)?.(event),
@@ -317,6 +315,14 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   watchFluidbox(
     fluidbox,
     {
+      value: (value, details) => props.onValueChange?.(value, details),
+      complete: (value, details) => props.onValueChangeComplete?.(value, details),
+    },
+    events.signal,
+  );
+  watchOpenIndex(
+    fluidbox,
+    {
       open: (open, details) => props.onOpenChange?.(open, details),
       index: (index, details) => props.onIndexChange?.(index, details),
     },
@@ -324,7 +330,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   );
   // Your open and index win whenever they change. Effects run once Root's
   // children mount, so the triggers are there and an open flies from its own.
-  const sync = createFluidboxSync(fluidbox);
+  const sync = createOpenIndexSync(fluidbox);
   createEffect(() => sync(props.open, props.index));
 
   createEffect(
@@ -762,8 +768,8 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
     get status() {
       return state().status;
     },
-    get id() {
-      return state().id;
+    get value() {
+      return state().value;
     },
     get index() {
       return state().index;

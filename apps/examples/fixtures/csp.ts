@@ -14,7 +14,7 @@ for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo]")) {
 const params = new URLSearchParams(location.search);
 const copy = document.querySelector<HTMLElement>("[data-fluidbox-static]");
 const takeOver = copy
-  ? takeOverFluidbox(viewer, copy, Number(params.get("ssr") || 0))
+  ? takeOverFluidbox(viewer, copy, cspItems[Number(params.get("ssr") || 0)]!.id!)
   : Promise.resolve(false);
 
 // A Root that renders open draws its server copy on the client too.

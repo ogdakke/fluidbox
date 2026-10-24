@@ -5,10 +5,9 @@ import {
   useFluidbox,
   useFluidboxSheet,
   type FluidboxApi,
-  type FluidboxItemChangeEvent,
   type FluidboxSheetApi,
   type FluidboxSheetEvent,
-  type FluidboxToggleEvent,
+  type FluidboxValueChangeDetails,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/react";
 
@@ -47,12 +46,14 @@ function ContractExample(): ReactElement {
       items={items}
       labels={{ close: "Sulje" }}
       zoom={{ step: 3, max: 6 }}
-      renderers={{ note: ({ item, index }) => <p>{`${item.credit} ${index}`}</p> }}
-      onBeforeToggle={(event: FluidboxToggleEvent) => event.preventDefault()}
-      onToggle={(event) => void event.newState}
-      onBeforeItemChange={(event: FluidboxItemChangeEvent<Photo>) => void event.item.credit}
-      onItemChange={(event) => void event.item.credit}
-      onSettle={(event) => void event.index}
+      renderers={{
+        note: ({ item, index }) => <p>{`${item.credit} ${index}`}</p>,
+      }}
+      onValueChange={(value: string | null, details: FluidboxValueChangeDetails<Photo>) => {
+        if (value === null && details.reason === "keyboard") details.cancel();
+        void details.item?.credit;
+      }}
+      onValueChangeComplete={(value, details) => void [value?.length, details.action]}
       onSheetChange={(event: FluidboxSheetEvent) => void event.stop}
     >
       <Fluidbox.Trigger item={items[0]!} asChild>

@@ -19,7 +19,6 @@ import {
   type Fluidbox,
   type FluidboxCommandOptions,
   type FluidboxItem,
-  type FluidboxItemChangeEvent,
   type FluidboxItemList,
   type FluidboxItems,
   type FluidboxLabels,
@@ -32,18 +31,17 @@ import {
   type FluidboxSheetSnapPoint,
   type FluidboxState,
   type FluidboxTarget,
-  type FluidboxToggleEvent,
+  type FluidboxValueChangeEvent,
   type FluidboxUpdateOptions,
   type FluidboxViewerRenderer,
   type FluidboxZoomCommandOptions,
   type FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import {
-  fluidboxEventTypes,
   latestOrigins,
   resolveLabels,
-  createFluidboxSync,
-  watchFluidbox,
+  createOpenIndexSync,
+  watchOpenIndex,
   unloadFluidbox,
 } from "@ogdakke/fluidbox/kit";
 import { injectIsBrowser, mountContent, type FluidboxContent } from "./mount.js";
@@ -145,16 +143,13 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
   @Input() loading?: FluidboxOptions["loading"];
 
-  /** Before the viewer opens or closes. `$event.preventDefault()` cancels a command. */
-  @Output() readonly beforeToggle = new EventEmitter<FluidboxToggleEvent>();
-  /** As the viewer starts to open or close. */
-  @Output() readonly toggle = new EventEmitter<FluidboxToggleEvent>();
-  /** Before the viewer moves to another item. `$event.preventDefault()` keeps it still. */
-  @Output() readonly beforeItemChange = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
-  /** When the active item changes, opening included. */
-  @Output() readonly itemChange = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
-  /** When the active item comes to rest. */
-  @Output() readonly settle = new EventEmitter<FluidboxItemChangeEvent<TItem>>();
+  /**
+   * Before every open, move and close, from any input. `$event.preventDefault()`
+   * cancels it where it can be canceled.
+   */
+  @Output() readonly beforeValueChange = new EventEmitter<FluidboxValueChangeEvent<TItem>>();
+  /** Once the motion of a value change settled: the flight landed, a move came to rest, or a close finished. */
+  @Output() readonly valueChangeComplete = new EventEmitter<FluidboxValueChangeEvent<TItem>>();
   /** When the sheet comes to rest at another stop. */
   @Output() readonly sheetChange = new EventEmitter<FluidboxSheetEvent>();
   /** When the image on show comes to rest at another zoom. */
@@ -211,7 +206,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly #parts: Parts<TItem> = { viewer: null, filmstrip: null, sheet: null };
   #scheduled = false;
   #destroyed = false;
-  readonly #sync = createFluidboxSync(this.fluidbox);
+  readonly #sync = createOpenIndexSync(this.fluidbox);
 
   constructor() {
     const fluidbox = this.fluidbox;
@@ -240,21 +235,18 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       this.#zone.run(() => this.#stop.set(event.stop)),
     );
     const outputs = {
-      beforetoggle: this.beforeToggle,
-      toggle: this.toggle,
-      beforeitemchange: this.beforeItemChange,
-      itemchange: this.itemChange,
-      settle: this.settle,
+      beforevaluechange: this.beforeValueChange,
+      valuechangecomplete: this.valueChangeComplete,
       sheetchange: this.sheetChange,
       zoomchange: this.zoomChange,
     } as const;
-    for (const type of fluidboxEventTypes) {
+    for (const type of Object.keys(outputs) as (keyof typeof outputs)[]) {
       const output = outputs[type] as unknown as EventEmitter<Event>;
       fluidbox.addEventListener(type, (event) => {
         if (output.observed) this.#zone.run(() => output.emit(event));
       });
     }
-    watchFluidbox(fluidbox, {
+    watchOpenIndex(fluidbox, {
       open: (open) => this.openChange.observed && this.#zone.run(() => this.openChange.emit(open)),
       index: (index) =>
         this.indexChange.observed && this.#zone.run(() => this.indexChange.emit(index)),

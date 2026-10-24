@@ -30,12 +30,7 @@ export function url(root: HTMLElement) {
     if (photo !== null) gallery.setAttribute("index", String(photo));
     gallery.toggleAttribute("open", photo !== null);
   };
-  gallery.addEventListener("toggle", ({ newState }) => {
-    if (newState !== "closed") return;
-    followInUrl(null);
-    show(null);
-  });
-  gallery.addEventListener("itemchange", ({ index }) => {
+  gallery.addEventListener("valuechange", ({ index }) => {
     followInUrl(index);
     show(index);
   });

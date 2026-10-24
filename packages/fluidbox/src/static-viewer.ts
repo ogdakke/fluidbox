@@ -1,12 +1,14 @@
 import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS } from "./control-icons";
 import { defaultLabels, type FluidboxLabels } from "./labels";
-import type { FluidboxItem } from "./public-api";
+import { idOf, indexIn, toList } from "./items";
+import type { FluidboxItem, FluidboxItems } from "./public-api";
 
 /** What the server needs to draw the open viewer. */
 export interface FluidboxStaticViewerOptions<TItem extends FluidboxItem = FluidboxItem> {
-  readonly items: readonly TItem[];
-  /** The item on show. */
-  readonly index: number;
+  /** An array, or a lazy list that finds an id with `indexOf`. */
+  readonly items: FluidboxItems<TItem>;
+  /** The item on show, by id. */
+  readonly value: string;
   readonly labels?: FluidboxLabels;
   readonly loop?: boolean;
   /** Leave room for the filmstrip, which appears once the viewer takes over. */
@@ -19,10 +21,10 @@ export interface FluidboxStaticViewerOptions<TItem extends FluidboxItem = Fluidb
   readonly dir?: "ltr" | "rtl";
   /**
    * The address each control leads to before JavaScript runs: `null` for
-   * Close, an index for Previous and Next. A control without one is drawn but
-   * inert until the viewer takes over.
+   * Close, the previous or next item's id for Previous and Next. A control
+   * without one is drawn but inert until the viewer takes over.
    */
-  readonly href?: (index: number | null) => string | undefined;
+  readonly href?: (value: string | null) => string | undefined;
 }
 
 /**
@@ -77,8 +79,8 @@ const staticSize = (width: number, height: number) => {
  * items have one; for any other item this returns `null`.
  */
 export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
-  items,
-  index,
+  items: given,
+  value,
   labels = defaultLabels,
   loop = false,
   filmstrip = false,
@@ -87,9 +89,11 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   dir,
   href,
 }: FluidboxStaticViewerOptions<TItem>): FluidboxStaticNode | null {
-  const item = items[index];
-  if (!item || item.type !== "image") return null;
-  const count = items.length;
+  const items = toList(given);
+  const index = indexIn(items, value);
+  const item = index === null ? undefined : items.get(index);
+  if (index === null || !item || item.type !== "image") return null;
+  const count = items.count;
   const position = labels.position(index, count);
 
   const placeholder = item.placeholder
@@ -131,7 +135,12 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   // to go to, and otherwise drawn but inert, so it never offers what it can't do.
   const control = (name: "previous" | "next" | "close", target: number | null) => {
     const label = labels[name];
-    const link = target === null && name !== "close" ? undefined : href?.(target);
+    const link =
+      target === null
+        ? name === "close"
+          ? href?.(null)
+          : undefined
+        : href?.(idOf(items.get(target)));
     const common = { [`data-fluidbox-${name}`]: "", "aria-label": label };
     return link
       ? node("a", { ...common, href: link }, icon(name))

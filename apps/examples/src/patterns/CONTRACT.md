@@ -69,11 +69,11 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    (the video); ArrowRight → a YouTube `iframe` with `referrerpolicy` set.
 5. **programmatic** — a gallery of `photos` with a `.pattern-toolbar` holding:
    `button[data-test="open-third"]` (calls `open(2)`), a checkbox
-   `input[data-test="lock"]` (while checked, a `beforeitemchange` listener calls `preventDefault()`, so `next`, `previous` and swipes do nothing),
+   `input[data-test="lock"]` (while checked, a value-change handler cancels moves, so `next`, `previous` and swipes do nothing),
    `output[data-test="status"]` (current state: `status index`, e.g. `open 2`, `closed -`),
-   and `ol.pattern-log[data-test="log"]` (one `<li>` per fluidbox event, text = event type, newest last,
+   and `ol.pattern-log[data-test="log"]` (one `<li>` per value change (`valuechange`) and completion (`valuechangecomplete`), newest last,
    keep 20). Thumbnails as in basic. Test: click open-third → "Item 3 of 4", status `open 2`, log
-   contains `itemchange`; Escape → status `closed -`; check lock; click open-third;
+   contains `valuechange`; Escape → status `closed -`; check lock; click open-third;
    ArrowRight, then a horizontal wheel swipe → still "Item 3 of 4".
 6. **zoom** — two galleries, each with one trigger per item, in this order: the first of
    `zoomPhotos` (raster photos with a `srcset` of 640w and 1280w and the full-size file as

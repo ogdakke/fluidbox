@@ -3,7 +3,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import {
   createItemList,
-  type FluidboxItemChangeEvent,
+  type FluidboxValue,
+  type FluidboxValueChangeDetails,
   type FluidboxImageItem,
   type FluidboxOriginAdapter,
   type FluidboxRevealContext,
@@ -35,7 +36,10 @@ function photoId(index: number): string {
   return `synthetic-photo-${index}`;
 }
 
-type PhotoItem = FluidboxImageItem & { readonly id: string; readonly thumbnail: { src: string } };
+type PhotoItem = FluidboxImageItem & {
+  readonly id: string;
+  readonly thumbnail: { src: string };
+};
 
 function photoAt(index: number, images: readonly LibraryImage[] = fixtureImages): PhotoItem {
   const fixture = images[(index * 17 + Math.floor(index / sectionSize)) % images.length]!;
@@ -197,8 +201,8 @@ export function PhotoLibrary({
   };
 
   const onSettle = useCallback(
-    (event: FluidboxItemChangeEvent<PhotoItem>) => {
-      if (event.index >= 0 && event.index < count) setLastViewed(event.index);
+    (_: FluidboxValue, { index }: FluidboxValueChangeDetails<PhotoItem>) => {
+      if (index !== null && index >= 0 && index < count) setLastViewed(index);
     },
     [count],
   );
@@ -246,7 +250,7 @@ export function PhotoLibrary({
   const visibleEnd = lastRow?.kind === "photos" ? lastRow.firstPhoto + lastRow.count : visibleStart;
 
   return (
-    <Fluidbox.Root items={items} origins={originAdapter} onSettle={onSettle}>
+    <Fluidbox.Root items={items} origins={originAdapter} onValueChangeComplete={onSettle}>
       <OpenBridge openRef={openRef} />
       {showFilmstrip && <Fluidbox.Filmstrip />}
       <main

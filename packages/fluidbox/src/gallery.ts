@@ -1,4 +1,4 @@
-import { createFluidboxSync } from "./controlled";
+import { createOpenIndexSync } from "./controlled";
 import { createFluidbox } from "./create-fluidbox";
 import { forwardEvents } from "./events";
 import { FluidboxFilmstripElement, FluidboxSheetElement } from "./filmstrip";
@@ -28,7 +28,7 @@ import type {
   FluidboxViewerRenderer,
   FluidboxZoomCommandOptions,
 } from "./public-api";
-import { FluidboxToggleEvent } from "./public-api";
+import { FluidboxValueChangeEvent } from "./public-api";
 import { latestOrigins } from "./origins";
 import { bindTrigger, frameLayerOf, type FluidboxTrigger } from "./trigger";
 
@@ -81,7 +81,7 @@ const isOverlay = (node: Node) =>
 
 const closedState: FluidboxState = Object.freeze({
   status: "closed",
-  id: null,
+  value: null,
   index: null,
   item: null,
   count: 0,
@@ -174,7 +174,10 @@ export class FluidboxGalleryElement extends HTMLElement {
   #events: AbortController | undefined;
   #lastStatus: FluidboxState["status"] = "closed";
   #listeners = new Set<(state: FluidboxState) => void>();
-  #readyWaiters: Array<{ resolve(fluidbox: Fluidbox): void; reject(error: unknown): void }> = [];
+  #readyWaiters: Array<{
+    resolve(fluidbox: Fluidbox): void;
+    reject(error: unknown): void;
+  }> = [];
   #lifetime: AbortController | undefined;
   #updateQueued = false;
   #sync: ((open?: boolean, index?: number) => void) | undefined;
@@ -489,7 +492,14 @@ export class FluidboxGalleryElement extends HTMLElement {
       this.#lastStatus = "closed";
       for (const listener of this.#listeners) listener(closed);
       this.dispatchEvent(
-        new FluidboxToggleEvent("toggle", { oldState: "open", newState: "closed", reason: "api" }),
+        new FluidboxValueChangeEvent("valuechange", {
+          value: null,
+          previousValue: dropped.value,
+          index: null,
+          item: null,
+          action: "close",
+          reason: "api",
+        }),
       );
     }
     for (const { trigger } of this.#triggers.values()) trigger.destroy();
@@ -591,7 +601,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       renderers: this.#runtimeRenderers,
     });
     this.#fluidbox = fluidbox;
-    this.#sync = createFluidboxSync(fluidbox);
+    this.#sync = createOpenIndexSync(fluidbox);
     this.#events = new AbortController();
     forwardEvents(fluidbox, this, this.#events.signal);
     this.#unsubscribe = fluidbox.subscribe((state) => {

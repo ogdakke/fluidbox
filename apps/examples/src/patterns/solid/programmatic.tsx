@@ -32,19 +32,16 @@ function Toolbar(props: { locked: boolean; onLockedChange: (locked: boolean) => 
 export function Programmatic() {
   const [locked, setLocked] = createSignal(false);
   const [log, setLog] = createSignal<string[]>([]);
-  const record = (event: Event) => setLog((types) => [...types, event.type].slice(-20));
+  const record = (type: string) => setLog((types) => [...types, type].slice(-20));
   return (
     <Fluidbox.Root
       items={photos}
-      // beforeitemchange comes before every move between items; canceling it keeps the viewer still.
-      onBeforeItemChange={(event) => {
-        record(event);
-        if (locked()) event.preventDefault();
+      // Called before every open, move and close; canceling a move keeps the viewer still.
+      onValueChange={(_, details) => {
+        if (locked() && details.action === "move") details.cancel();
+        record("valuechange");
       }}
-      onBeforeToggle={record}
-      onToggle={record}
-      onItemChange={record}
-      onSettle={record}
+      onValueChangeComplete={() => record("valuechangecomplete")}
     >
       <Toolbar locked={locked()} onLockedChange={setLocked} />
       <div class="pattern-grid">

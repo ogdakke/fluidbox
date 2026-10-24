@@ -48,7 +48,12 @@ type Post = {
   readonly text: string;
   readonly ago: string;
   readonly date: string;
-  readonly stats: { replies: number; reposts: number; likes: number; views: number };
+  readonly stats: {
+    replies: number;
+    reposts: number;
+    likes: number;
+    views: number;
+  };
   readonly replies: readonly Reply[];
   readonly items: readonly FluidboxImageItem[];
 };
@@ -149,7 +154,7 @@ const postOf = (posts: readonly Post[], id: string | null) =>
 function useActivePost(posts: readonly Post[]) {
   return postOf(
     posts,
-    useFluidbox(({ id }) => id),
+    useFluidbox(({ value }) => value),
   );
 }
 

@@ -21,17 +21,11 @@ export function mountProgrammatic(root: HTMLElement) {
 
   const fluidbox = createFluidbox({ items: photos });
 
-  // beforeitemchange comes before every move between items; canceling it keeps the viewer still.
-  fluidbox.addEventListener("beforeitemchange", (event) => {
-    if (lock.checked) event.preventDefault();
+  // beforevaluechange comes before every open, move and close; canceling a move keeps the viewer still.
+  fluidbox.addEventListener("beforevaluechange", (event) => {
+    if (lock.checked && event.action === "move") event.preventDefault();
   });
-  for (const type of [
-    "beforetoggle",
-    "toggle",
-    "beforeitemchange",
-    "itemchange",
-    "settle",
-  ] as const) {
+  for (const type of ["valuechange", "valuechangecomplete"] as const) {
     fluidbox.addEventListener(type, (event) => {
       const entry = document.createElement("li");
       entry.textContent = event.type;

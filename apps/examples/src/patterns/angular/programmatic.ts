@@ -1,7 +1,7 @@
 // #region example
 import { Component, signal } from "@angular/core";
 import { itemLabel } from "@ogdakke/fluidbox";
-import { FluidboxModule, type FluidboxItemChangeEvent } from "@ogdakke/fluidbox/angular";
+import { FluidboxModule, type FluidboxValueChangeEvent } from "@ogdakke/fluidbox/angular";
 import { photos } from "../shared";
 
 @Component({
@@ -30,11 +30,8 @@ import { photos } from "../shared";
       #fb="fluidbox"
       [items]="photos"
       class="pattern-grid"
-      (beforeToggle)="log($event)"
-      (toggle)="log($event)"
-      (beforeItemChange)="guard($event)"
-      (itemChange)="log($event)"
-      (settle)="log($event)"
+      (beforeValueChange)="guard($event)"
+      (valueChangeComplete)="log('valuechangecomplete')"
     >
       @for (photo of photos; track photo.id) {
         <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
@@ -55,14 +52,14 @@ export class Programmatic {
   readonly locked = signal(false);
   readonly events = signal<string[]>([]);
 
-  log(event: Event): void {
-    this.events.update((events) => [...events, event.type].slice(-20));
+  log(type: string): void {
+    this.events.update((events) => [...events, type].slice(-20));
   }
 
-  // beforeItemChange comes before every move between items; canceling it keeps the viewer still.
-  guard(event: FluidboxItemChangeEvent): void {
-    this.log(event);
-    if (this.locked()) event.preventDefault();
+  // Comes before every open, move and close; canceling a move keeps the viewer still.
+  guard(event: FluidboxValueChangeEvent): void {
+    this.log("valuechange");
+    if (this.locked() && event.action === "move") event.preventDefault();
   }
 }
 // #endregion example

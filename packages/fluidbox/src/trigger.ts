@@ -171,7 +171,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   };
   const preview = (state: FluidboxState<TItem>): FluidboxTriggerPreview<TItem> => {
     const known = ids();
-    const activeId = state.id && known.includes(state.id) ? state.id : null;
+    const activeId = state.value && known.includes(state.value) ? state.value : null;
     const list = fluidbox.items;
     const first = known[0];
     const shown = activeId ?? lastPreviewId ?? first;

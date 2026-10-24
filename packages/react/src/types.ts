@@ -2,7 +2,6 @@ import type { ButtonHTMLAttributes, DOMAttributes, HTMLAttributes, ReactNode } f
 import type {
   FluidboxCommandOptions,
   FluidboxItem,
-  FluidboxItemChangeEvent,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOptions,
@@ -11,7 +10,8 @@ import type {
   FluidboxSheetOptions,
   FluidboxState,
   FluidboxTarget,
-  FluidboxToggleEvent,
+  FluidboxValue,
+  FluidboxValueChangeDetails,
   FluidboxZoomCommandOptions,
   FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
@@ -60,9 +60,10 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly loop?: boolean;
   /**
    * Where the viewer's controls lead before JavaScript runs, when the server
-   * renders it open: `null` for Close, an index for Previous and Next.
+   * renders it open: `null` for Close, the previous or next item's id for
+   * Previous and Next.
    */
-  readonly href?: (index: number | null) => string | undefined;
+  readonly href?: (value: string | null) => string | undefined;
   /** Your strings for the viewer. They change the open viewer in place. */
   readonly labels?: Partial<FluidboxLabels>;
   /** Zoom steps, or `false` to turn zoom off. Compared by value. */
@@ -73,16 +74,19 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly origins?: FluidboxOriginAdapter<TItem>;
   /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
   readonly loading?: FluidboxOptions<TItem>["loading"];
-  /** Before the viewer opens or closes. `event.preventDefault()` stops it. */
-  readonly onBeforeToggle?: (event: FluidboxToggleEvent) => void;
-  /** As the viewer starts to open or close. */
-  readonly onToggle?: (event: FluidboxToggleEvent) => void;
-  /** Before the viewer moves to another item. `event.preventDefault()` stops it. */
-  readonly onBeforeItemChange?: (event: FluidboxItemChangeEvent<TItem>) => void;
-  /** When the active item changes, opening included. */
-  readonly onItemChange?: (event: FluidboxItemChangeEvent<TItem>) => void;
-  /** When the active item comes to rest. */
-  readonly onSettle?: (event: FluidboxItemChangeEvent<TItem>) => void;
+  /**
+   * Before every open, move and close, from any input, with the value the
+   * viewer goes to: an id, or null for a close. `details.cancel()` stops it.
+   */
+  readonly onValueChange?: (
+    value: FluidboxValue,
+    details: FluidboxValueChangeDetails<TItem>,
+  ) => void;
+  /** Once the motion of a value change settled: the flight landed, a move came to rest, or a close finished. */
+  readonly onValueChangeComplete?: (
+    value: FluidboxValue,
+    details: FluidboxValueChangeDetails<TItem>,
+  ) => void;
   /** When the sheet comes to rest at another stop. */
   readonly onSheetChange?: (event: FluidboxSheetEvent) => void;
   /** When the image on show comes to rest at another zoom. */

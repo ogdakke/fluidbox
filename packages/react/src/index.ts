@@ -43,16 +43,17 @@ import {
   defaultLabels,
   fluidboxControlIcon,
   fluidboxControls,
-  fluidboxEventTypes,
+  idOf,
   frameLayerOf,
   latestOrigins,
   resolveLabels,
-  createFluidboxSync,
+  createOpenIndexSync,
   fluidboxStaticViewerNodes,
   takeOverFluidbox,
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
+  watchOpenIndex,
   zoomControlNames,
   type FluidboxSlot,
   type FluidboxSlots,
@@ -101,7 +102,6 @@ export type {
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
-  FluidboxItemChangeEvent,
   FluidboxItemList,
   FluidboxItemListOptions,
   FluidboxItems,
@@ -115,7 +115,10 @@ export type {
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
-  FluidboxToggleEvent,
+  FluidboxValue,
+  FluidboxValueChangeAction,
+  FluidboxValueChangeDetails,
+  FluidboxValueChangeEvent,
   FluidboxVideoItem,
   FluidboxZoomCommandOptions,
   FluidboxZoomEvent,
@@ -210,21 +213,18 @@ function useLatest<T>(value: T) {
   return ref;
 }
 
+/** The events the Root forwards as they are; the value changes reach onValueChange instead. */
 const eventProps = {
-  beforetoggle: "onBeforeToggle",
-  toggle: "onToggle",
-  beforeitemchange: "onBeforeItemChange",
-  itemchange: "onItemChange",
-  settle: "onSettle",
   sheetchange: "onSheetChange",
   zoomchange: "onZoomChange",
-} as const satisfies Record<(typeof fluidboxEventTypes)[number], keyof FluidboxRootProps>;
+} as const satisfies Record<"sheetchange" | "zoomchange", keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
   const { items, open, index, labels, zoom, loop, loading, href, children } = props;
-  const slotsRef = useRef<{ filmstrip: FluidboxSlots<TItem>; sheet: FluidboxSlots<TItem> } | null>(
-    null,
-  );
+  const slotsRef = useRef<{
+    filmstrip: FluidboxSlots<TItem>;
+    sheet: FluidboxSlots<TItem>;
+  } | null>(null);
   slotsRef.current ??= { filmstrip: createSlots(), sheet: createSlots() };
   const slots = slotsRef.current;
   const serverHints = useRef<ServerHints>({
@@ -373,7 +373,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
-    for (const type of fluidboxEventTypes) {
+    for (const type of ["sheetchange", "zoomchange"] as const) {
       fluidbox.addEventListener(
         type,
         (event) => {
@@ -384,6 +384,14 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       );
     }
     watchFluidbox(
+      fluidbox,
+      {
+        value: (value, details) => latest.current.onValueChange?.(value, details),
+        complete: (value, details) => latest.current.onValueChangeComplete?.(value, details),
+      },
+      events.signal,
+    );
+    watchOpenIndex(
       fluidbox,
       {
         open: (open, details) => latest.current.onOpenChange?.(open, details),
@@ -414,7 +422,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   const [takenOver, setTakenOver] = useState(false);
   const serverViewer = useRef<HTMLDivElement>(null);
   const attempt = useRef(0);
-  const sync = useRef<ReturnType<typeof createFluidboxSync>>(null);
+  const sync = useRef<ReturnType<typeof createOpenIndexSync>>(null);
   useIsomorphicLayoutEffect(() => () => void (sync.current = null), [fluidbox]);
   useIsomorphicLayoutEffect(() => {
     const copy = serverViewer.current;
@@ -424,9 +432,12 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       const done = () => {
         if (attempt.current === current) setTakenOver(true);
       };
-      void takeOverFluidbox(fluidbox, copy, taken).then(done, done);
+      void takeOverFluidbox(fluidbox, copy, idOf((items as readonly TItem[])[taken]!)).then(
+        done,
+        done,
+      );
     }
-    sync.current ??= createFluidboxSync(fluidbox);
+    sync.current ??= createOpenIndexSync(fluidbox);
     sync.current(open, index);
   }, [fluidbox, open, index]);
 
@@ -551,7 +562,7 @@ function ServerViewer({
 }): ReactElement | null {
   const copy = fluidboxStaticViewerNodes({
     items,
-    index,
+    value: idOf(items[index]!),
     labels,
     loop,
     href,

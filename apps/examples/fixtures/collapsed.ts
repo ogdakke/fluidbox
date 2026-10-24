@@ -98,7 +98,7 @@ void gallery.whenReady().then((fluidbox) => {
   let closingId: string | null = null;
   let lastClosedId = teaser.itemId;
   fluidbox.subscribe((state) => {
-    const id = state.id;
+    const id = state.value;
     if (state.status === "closing" && id && hiddenIds.has(id)) closingId = id;
     if (state.status === "closed") {
       if (closingId) {

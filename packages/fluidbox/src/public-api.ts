@@ -275,8 +275,8 @@ export interface FluidboxZoomState {
 /** A frozen snapshot. */
 export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly status: FluidboxStatus;
-  /** The item the viewer shows or is going to, or null while closed. */
-  readonly id: string | null;
+  /** The item the viewer shows or is going to, by id; null while closed. */
+  readonly value: FluidboxValue;
   readonly index: number | null;
   readonly item: TItem | null;
   readonly count: number;
@@ -299,53 +299,65 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
  */
 export type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items";
 
-export type FluidboxToggleState = "open" | "closed";
+/** The open item's id, or null while the viewer is closed. */
+export type FluidboxValue = string | null;
+
+/** What a value change does: open the viewer, move it to another item, or close it. */
+export type FluidboxValueChangeAction = "open" | "move" | "close";
 
 /**
- * Fired as the viewer opens or closes, like a popover's events: `beforetoggle`
- * first, cancelable, then `toggle` as the motion starts.
+ * Fired as the viewer opens, moves between items and closes:
+ * `beforevaluechange` first, cancelable, then `valuechange` as the motion
+ * starts, and `valuechangecomplete` once it settles.
  */
-export class FluidboxToggleEvent extends Event {
-  readonly oldState: FluidboxToggleState;
-  readonly newState: FluidboxToggleState;
+export class FluidboxValueChangeEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
+  /** The id the viewer goes to, or null for a close. */
+  readonly value: FluidboxValue;
+  /** The id the viewer comes from, or null for an open. */
+  readonly previousValue: FluidboxValue;
+  /** The index the viewer goes to, or null for a close. */
+  readonly index: number | null;
+  /** The item the viewer goes to, or null for a close. */
+  readonly item: TItem | null;
+  readonly action: FluidboxValueChangeAction;
   readonly reason: FluidboxReason;
 
   constructor(
-    type: "beforetoggle" | "toggle",
+    type: "beforevaluechange" | "valuechange" | "valuechangecomplete",
     init: EventInit & {
-      oldState: FluidboxToggleState;
-      newState: FluidboxToggleState;
+      value: FluidboxValue;
+      previousValue: FluidboxValue;
+      index: number | null;
+      item: TItem | null;
+      action: FluidboxValueChangeAction;
       reason: FluidboxReason;
     },
   ) {
     super(type, init);
-    this.oldState = init.oldState;
-    this.newState = init.newState;
+    this.value = init.value;
+    this.previousValue = init.previousValue;
+    this.index = init.index;
+    this.item = init.item;
+    this.action = init.action;
     this.reason = init.reason;
   }
 }
 
 /**
- * Fired as the viewer moves between items: `beforeitemchange` first, cancelable,
- * then `itemchange` when the item changes (opening included), and `settle` once it
- * comes to rest.
+ * What a binding's value-change callback gets with the new value, from the
+ * `beforevaluechange` event behind it.
  */
-export class FluidboxItemChangeEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
-  readonly id: string;
-  readonly index: number;
-  readonly item: TItem;
+export interface FluidboxValueChangeDetails<TItem extends FluidboxItem = FluidboxItem> {
   readonly reason: FluidboxReason;
-
-  constructor(
-    type: "beforeitemchange" | "itemchange" | "settle",
-    init: EventInit & { id: string; index: number; item: TItem; reason: FluidboxReason },
-  ) {
-    super(type, init);
-    this.id = init.id;
-    this.index = init.index;
-    this.item = init.item;
-    this.reason = init.reason;
-  }
+  readonly action: FluidboxValueChangeAction;
+  readonly index: number | null;
+  readonly item: TItem | null;
+  readonly previousValue: FluidboxValue;
+  /** The DOM event behind it, when there was one. */
+  readonly event: Event | undefined;
+  /** Stop the change. Only works synchronously inside the callback, and only where it can be stopped. */
+  cancel(): void;
+  readonly isCanceled: boolean;
 }
 
 /**
@@ -384,23 +396,20 @@ export class FluidboxZoomEvent extends Event {
 }
 
 /**
- * The events a fluidbox and `<fluidbox-gallery>` fire. The before-events fire
- * synchronously for every command that would do something, from a key, a gesture
- * or your code. `preventDefault()` cancels the command, and its promise resolves
- * false. An open fires `beforetoggle`, `toggle`, `itemchange`, and `settle` after
- * the flight.
+ * The events a fluidbox and `<fluidbox-gallery>` fire. `beforevaluechange`
+ * fires synchronously for every open, move and close that would do something,
+ * from a key, a gesture or your code; `preventDefault()` cancels it, and the
+ * command's promise resolves false. A change the items force, as a close when
+ * they run out, fires it too, not cancelable. An open fires
+ * `beforevaluechange`, `valuechange`, and `valuechangecomplete` after the flight.
  */
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
-  /** Before the viewer opens or closes. Cancelable. */
-  beforetoggle: FluidboxToggleEvent;
-  /** The opening or closing motion starts. */
-  toggle: FluidboxToggleEvent;
-  /** Before the open viewer moves to another item. Cancelable. */
-  beforeitemchange: FluidboxItemChangeEvent<TItem>;
-  /** The viewer moves to an item, the one it opens on included. */
-  itemchange: FluidboxItemChangeEvent<TItem>;
-  /** The viewer comes to rest on an item. */
-  settle: FluidboxItemChangeEvent<TItem>;
+  /** Before an open, a move or a close. Cancelable: the command resolves false. */
+  beforevaluechange: FluidboxValueChangeEvent<TItem>;
+  /** The change happens: the motion starts. */
+  valuechange: FluidboxValueChangeEvent<TItem>;
+  /** The motion settled: the opening flight landed, a move came to rest, or a close finished. */
+  valuechangecomplete: FluidboxValueChangeEvent<TItem>;
   /** The sheet comes to rest at another stop. */
   sheetchange: FluidboxSheetEvent;
   /** The image on show comes to rest at another zoom. */
@@ -476,9 +485,14 @@ export type FluidboxControlName =
  */
 export type FluidboxLoading = "hover" | "press" | "eager";
 
-/** Every option but `items`, `renderers` and `origins` can change later through `update`. */
+/** Every option but `items`, `value`, `renderers` and `origins` can change later through `update`. */
 export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly items: FluidboxItems<TItem>;
+  /**
+   * The item to open with, by id, as a deep link does: the viewer opens on it
+   * without motion once its media is ready. An id the items don't hold opens nothing.
+   */
+  readonly value?: FluidboxValue;
   /** Your strings for the viewer, over the defaults. */
   readonly labels?: Partial<FluidboxLabels>;
   /**

@@ -84,7 +84,9 @@ function cspFixture(): Plugin {
         if (context.path !== "/csp.html") return html;
         const ssr = new URL(context.originalUrl ?? "/", "http://host").searchParams.get("ssr");
         const copy =
-          ssr === null ? "" : fluidboxStaticViewer({ items: cspItems, index: Number(ssr) || 0 });
+          ssr === null
+            ? ""
+            : fluidboxStaticViewer({ items: cspItems, value: cspItems[Number(ssr) || 0]!.id! });
         return html
           .replace("<!--fluidbox-static-viewer-->", copy ?? "")
           .replace(/<script type="module">[\s\S]*?<\/script>/g, "");

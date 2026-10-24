@@ -75,7 +75,9 @@ test("a veto holds across the seam", async ({ page }) => {
   await openFirst(page, "");
   await page.evaluate(() => {
     const gallery = document.querySelector<FluidboxGalleryElement>("fluidbox-gallery")!;
-    gallery.addEventListener("beforeitemchange", (event) => event.preventDefault());
+    gallery.addEventListener("beforevaluechange", (event) => {
+      if (event.action === "move") event.preventDefault();
+    });
   });
   await page.keyboard.press("ArrowLeft");
   await dialog(page).locator("[data-fluidbox-previous]").click();

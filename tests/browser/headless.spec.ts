@@ -1096,7 +1096,7 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
         layer.closest("[data-fluidbox-slide]")!,
       ),
       mounts: layer.dataset.mounts,
-      selected: window.headlessViewer.state.id,
+      selected: window.headlessViewer.state.value,
     };
   });
   expect(parked).toEqual({ slide: 0, mounts: "1", selected: "two" });
@@ -1230,12 +1230,12 @@ test("bindings follow setItems, by index and by an id that arrives later", async
   expect(errors).toEqual({ thrown: [], count: 3, items: 3 });
 });
 
-test("an aborted open toggles back to closed", async ({ page }) => {
+test("an aborted open changes the value back to null", async ({ page }) => {
   await page.goto("/headless.html");
   const events = await page.evaluate(async () => {
     const viewer = window.headlessViewer;
     const seen: string[] = [];
-    viewer.addEventListener("toggle", (event) => seen.push(event.newState));
+    viewer.addEventListener("valuechange", (event) => seen.push(event.action));
     const controller = new AbortController();
     const opening = viewer.open(0, { signal: controller.signal });
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -1243,7 +1243,7 @@ test("an aborted open toggles back to closed", async ({ page }) => {
     const result = await opening;
     return { seen, result, status: viewer.state.status };
   });
-  expect(events).toEqual({ seen: ["open", "closed"], result: false, status: "closed" });
+  expect(events).toEqual({ seen: ["open", "close"], result: false, status: "closed" });
 });
 
 test("update changes labels, controls, zoom and the filmstrip while the viewer stays open", async ({

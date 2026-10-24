@@ -45,7 +45,14 @@ export function unloadFluidbox(fluidbox: Fluidbox<any>) {
 
 export { indexIn };
 
-export { createFluidboxSync, watchFluidbox, type FluidboxChangeDetails } from "./controlled";
+export {
+  createFluidboxSync,
+  createOpenIndexSync,
+  valueChangeDetails,
+  watchFluidbox,
+  watchOpenIndex,
+  type FluidboxChangeDetails,
+} from "./controlled";
 export {
   fluidboxStaticViewer,
   fluidboxStaticViewerNodes,
@@ -57,8 +64,8 @@ export {
 const takeovers = new WeakMap<Fluidbox<any>, object>();
 
 /**
- * Take over the open viewer the server rendered inside `element`: open at
- * `index` with no motion, and hide the server's copy in the frame the viewer
+ * Take over the open viewer the server rendered inside `element`: open on
+ * `value`, an id, with no motion, and hide the server's copy in the frame the viewer
  * first paints. Resolves whether the viewer opened. A takeover that fails
  * hides the copy too, unless a newer one is under way, as after StrictMode's
  * remount.
@@ -66,7 +73,7 @@ const takeovers = new WeakMap<Fluidbox<any>, object>();
 export function takeOverFluidbox(
   fluidbox: Fluidbox<any>,
   element: HTMLElement,
-  index: number,
+  value: string,
 ): Promise<boolean> {
   const copy = element.matches("[data-fluidbox-static]")
     ? element
@@ -81,7 +88,7 @@ export function takeOverFluidbox(
     if (copy && takeovers.get(fluidbox) === token) copy.hidden = true;
   };
   return hostOf(fluidbox)
-    .takeOver(index)
+    .takeOver(value)
     .then(
       (opened) => {
         hide();

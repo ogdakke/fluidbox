@@ -6,8 +6,7 @@ import type { DomViewerDriver } from "./dom-viewer-driver";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 import { OriginRegistry } from "./origin-registry";
 import {
-  FluidboxItemChangeEvent,
-  FluidboxToggleEvent,
+  FluidboxValueChangeEvent,
   type Fluidbox,
   type FluidboxBindOptions,
   type FluidboxCommandOptions,
@@ -25,6 +24,8 @@ import {
   type FluidboxStatus,
   type FluidboxTarget,
   type FluidboxUpdateOptions,
+  type FluidboxValue,
+  type FluidboxValueChangeAction,
   type FluidboxZoomCommandOptions,
   type FluidboxZoomState,
   FluidboxSheetEvent,
@@ -51,7 +52,7 @@ const defaultControls = ["previous", "next", "close"] as const;
 /** The factor of zoomIn, zoomOut and the zoom controls, as of the + and - keys. */
 const ZOOM_FACTOR = 1.5;
 
-const reasonOf = (reason: SessionChangeReason): FluidboxReason =>
+const reasonOf = (reason: SessionChangeReason | FluidboxReason): FluidboxReason =>
   reason === "source-update" || reason === "source-empty" ? "items" : reason;
 
 /**
@@ -176,8 +177,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** The item whose origin the user last saw: the one opened or last revealed. */
   #revealedId: string | undefined;
   #sourceRefreshPending = false;
-  /** The side of the last toggle event, so a rolled-back command toggles back. */
-  #announced: "open" | "closed" = "closed";
+  /** The value the last valuechange announced, so a rolled-back command announces its way back. */
+  #announced: FluidboxValue = null;
   /** The reason of the request whose status change comes next. */
   #reason: FluidboxReason = "api";
   /** The scale the zoom last rested at, and the item it belongs to. */
@@ -205,6 +206,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#makeAddons();
     if (driver) this.#attach(driver);
     this.#setLoading(options.loading);
+    // A deep link opens as a viewer the server rendered does: without motion.
+    const value = options.value;
+    if (value != null && this.#source.getIndex(value) !== null && typeof document !== "undefined") {
+      queueMicrotask(() => void this.#command("open", value, "api", { instant: true }));
+    }
   }
 
   #setLoading(loading: FluidboxLoading | undefined) {
@@ -467,7 +473,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   /** The zoom came to rest at another scale on the item on show. */
   #zoomed(scale: number, reason: FluidboxReason | undefined) {
-    this.#zoomId = this.#state.id;
+    this.#zoomId = this.#state.value;
     if (scale === this.#zoomScale) return;
     this.#zoomScale = scale;
     if (this.#state.zoom && this.#state.zoom.scale !== scale) {
@@ -697,7 +703,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       },
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
-      takeOver: (index) => this.#command("open", index, "api", { instant: true }),
+      takeOver: (value) => this.#command("open", value, "api", { instant: true }),
       zoom: (name, reason) =>
         this.#zoomCommand(
           (from) =>
@@ -762,9 +768,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       this.#finish(this.#pending, aborted());
     }
     if (this.#state.status === "closed") return;
+    const from = this.#announced;
+    this.#before(null, null, this.#reason, false);
     this.#origins.restoreThumbnail();
     this.#publish("closed", null);
-    this.#toggle("closed");
+    this.#announce(null, this.#reason);
+    if (from !== null) this.#complete("close", null, from, this.#reason);
   }
 
   #close(options: SessionCommandOptions): Promise<SessionCommandResult> {
@@ -784,8 +793,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     );
     this.#abortReveal();
     const index = this.#state.index;
+    const from = this.#announced;
     this.#publish("closing", index);
-    this.#toggle("closing");
+    this.#announce(null, reason);
     const active = index === null ? null : this.#source.getItem(index);
     // A swipe reveals its slide's origin only once the strip settles. A close
     // that starts sooner still has to land on that origin, not the last one.
@@ -801,7 +811,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       }
     }
     if (active) this.#origins.hideThumbnail(idOf(active));
-    return this.#closeMotion(operation, active ? this.#origins.get(idOf(active)) : null, reason);
+    return this.#closeMotion(
+      operation,
+      active ? this.#origins.get(idOf(active)) : null,
+      reason,
+      from,
+    );
   }
 
   #goTo(target: SessionTarget, options: SessionCommandOptions) {
@@ -828,8 +843,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     // A thumbnail can change its media while the close flight targets it.
     // Keep that flight running when the selected item still exists. Reopening
     // here would turn a normal preview update into an interrupted close.
-    if (this.#state.status === "closing" && this.#state.id !== null) {
-      const index = source.getIndex(this.#state.id);
+    if (this.#state.status === "closing" && this.#state.value !== null) {
+      const index = source.getIndex(this.#state.value);
       if (index !== null) {
         const changed = index !== this.#state.index;
         this.#source = source;
@@ -841,7 +856,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#supersede();
     this.#abortReveal();
 
-    const { id: previousId, index: previousIndex, status } = this.#state;
+    const { value: previousId, index: previousIndex, status } = this.#state;
     this.#source = source;
     this.#viewer?.setSource(source);
     this.#sourceRefreshPending = false;
@@ -862,11 +877,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const matchingIndex = previousId === null ? null : source.getIndex(previousId);
     const index = matchingIndex ?? Math.min(previousIndex, source.count - 1);
     const changed = idOf(source.getItem(index)) !== previousId || index !== previousIndex;
+    const value = idOf(source.getItem(index));
+    // The items force it: announced, but not cancelable.
+    if (value !== this.#announced && status !== "closed") {
+      this.#before(value, index, "source-update", false);
+    }
     this.#publish(status, index);
-    if (changed) this.#itemEvent("itemchange", index, "source-update");
+    if (status !== "closed") this.#announce(value, "source-update");
 
     if (status === "closed") return Promise.resolve(completed(changed));
-    return this.#reconcileSelection(index, changed);
+    return this.#reconcileSelection(index, changed, previousId);
   }
 
   #select(
@@ -885,7 +905,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       // A plain move that repeats a pending scrub ends it, so it brings the trigger into view.
       if (!options.scrub && this.#pending?.scrub) {
         return repeated.then((result) => {
-          if (result.status === "completed" && this.#state.id === id) {
+          if (result.status === "completed" && this.#state.value === id) {
             this.#requestReveal(id, index, "selection");
           }
           return result;
@@ -914,15 +934,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     );
     operation.scrub = options.scrub;
     this.#abortReveal();
+    const from = this.#announced;
     this.#publish(opening ? "opening" : status, index);
-    if (opening) this.#toggle("opening");
-    this.#itemEvent("itemchange", index, reason);
+    this.#announce(id, reason);
     if (opening) this.#revealedId = id;
     return this.#move(operation, index, opening, reason, {
       scrub: options.scrub,
       step: options.step,
       instant: opening && options.instant,
       phase: opening ? "open" : "selection",
+      from,
     });
   }
 
@@ -932,14 +953,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#viewer?.setSource(this.#source);
   }
 
-  #reconcileSelection(index: number, changed: boolean) {
+  #reconcileSelection(index: number, changed: boolean, from: FluidboxValue) {
     const operation = this.#begin(`source:${idOf(this.#source.getItem(index))}`);
     const opening = this.#state.status !== "open";
-    if (opening && this.#state.status !== "opening") {
-      this.#publish("opening", index);
-      this.#toggle("opening");
-    }
-    return this.#move(operation, index, opening, "source-update", { changed });
+    if (opening && this.#state.status !== "opening") this.#publish("opening", index);
+    return this.#move(operation, index, opening, "source-update", { changed, from });
   }
 
   /** Run the open or select motion to an item, then settle on it. */
@@ -954,12 +972,15 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       instant,
       phase = "selection",
       changed = true,
+      from,
     }: {
       scrub?: boolean;
       step?: 1 | -1;
       instant?: boolean;
       phase?: "open" | "selection";
       changed?: boolean;
+      /** The value the motion leaves. */
+      from: FluidboxValue;
     },
   ) {
     const item = this.#source.getItem(index);
@@ -983,22 +1004,23 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
           })),
     ).then((settled) => {
       if (!settled || !this.#owns(operation)) return;
-      if (opening) {
-        this.#publish("open", index);
-        this.#toggle("open");
-      }
+      if (opening) this.#publish("open", index);
       if (!scrub) this.#requestReveal(idOf(item), index, phase);
-      if (changed) this.#itemEvent("settle", index, reason);
+      if (changed) {
+        this.#complete(opening ? "open" : "move", idOf(item), opening ? null : from, reason);
+      }
       this.#finish(operation, completed(changed));
     });
     return operation.promise;
   }
 
   #reconcileClose(reason: "source-empty") {
+    const from = this.#announced;
+    this.#before(null, null, reason, false);
     const operation = this.#begin(reason);
     this.#publish("closing", null);
-    this.#toggle("closing");
-    return this.#closeMotion(operation, null, reason);
+    this.#announce(null, reason);
+    return this.#closeMotion(operation, null, reason, from);
   }
 
   /** Run the close motion, then settle closed. */
@@ -1006,6 +1028,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     operation: PendingCommand,
     origin: FluidboxOrigin | null,
     reason: SessionChangeReason,
+    from: FluidboxValue,
   ) {
     void this.#run(operation, () =>
       // A viewer that never loaded has painted nothing to close.
@@ -1016,7 +1039,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       // A close that the items emptied has nothing left to refresh.
       this.#flushSourceRefresh();
       this.#publish("closed", null);
-      this.#toggle("closed");
+      if (from !== null) this.#complete("close", null, from, reason);
       this.#finish(operation, completed(true));
     });
     return operation.promise;
@@ -1110,36 +1133,75 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #allowed(
     command: "open" | "close" | "goTo" | "next" | "previous",
     target: SessionTarget | undefined,
-    sessionReason: SessionReason,
+    reason: SessionReason,
   ) {
-    const reason = reasonOf(sessionReason);
     const { status, index } = this.#state;
     const shown = status === "open" || status === "opening";
-    const opening = command === "open" && !shown;
     // A command that would do nothing announces nothing.
-    if (command === "close" && !shown) return true;
-    if (opening || command === "close") {
-      return this.dispatchEvent(
-        new FluidboxToggleEvent("beforetoggle", {
-          cancelable: true,
-          oldState: opening ? "closed" : "open",
-          newState: opening ? "open" : "closed",
-          reason,
-        }),
-      );
-    }
-    if (!shown) return true;
+    if (command === "close") return !shown || this.#before(null, null, reason);
+    if (command !== "open" && !shown) return true;
     const goal = target ? this.#resolve(target) : null;
-    if (typeof goal !== "number" || goal === index) return true;
-    const item = this.#source.getItem(goal);
+    if (typeof goal !== "number" || (shown && goal === index)) return true;
+    return this.#before(idOf(this.#source.getItem(goal)), goal, reason);
+  }
+
+  /** Fire `beforevaluechange` for a change to `value`. False when a listener prevented it. */
+  #before(
+    value: FluidboxValue,
+    index: number | null,
+    reason: SessionChangeReason | FluidboxReason,
+    cancelable = true,
+  ) {
+    const previousValue = this.#announced;
     return this.dispatchEvent(
-      new FluidboxItemChangeEvent<TItem>("beforeitemchange", {
-        cancelable: true,
-        id: idOf(item),
-        index: goal,
-        item,
-        reason,
-      }),
+      this.#valueEvent("beforevaluechange", value, previousValue, index, reason, cancelable),
+    );
+  }
+
+  #valueEvent(
+    type: "beforevaluechange" | "valuechange" | "valuechangecomplete",
+    value: FluidboxValue,
+    previousValue: FluidboxValue,
+    index: number | null,
+    reason: SessionChangeReason | FluidboxReason,
+    cancelable = false,
+    action: FluidboxValueChangeAction = previousValue === null
+      ? "open"
+      : value === null
+        ? "close"
+        : "move",
+  ) {
+    const item = index === null || index >= this.#list.count ? null : this.#list.get(index);
+    return new FluidboxValueChangeEvent<TItem>(type, {
+      cancelable,
+      value,
+      previousValue,
+      index: item ? index : null,
+      item,
+      action,
+      reason: reasonOf(reason),
+    });
+  }
+
+  /** Fire `valuechange` as the viewer heads for `value`, unless it already announced it. */
+  #announce(value: FluidboxValue, reason: SessionChangeReason | FluidboxReason) {
+    const previousValue = this.#announced;
+    if (value === previousValue) return;
+    this.#announced = value;
+    const index = value === null ? null : this.#state.index;
+    this.dispatchEvent(this.#valueEvent("valuechange", value, previousValue, index, reason));
+  }
+
+  /** Fire `valuechangecomplete` once the motion to `value` settled. */
+  #complete(
+    action: FluidboxValueChangeAction,
+    value: FluidboxValue,
+    previousValue: FluidboxValue,
+    reason: SessionChangeReason | FluidboxReason,
+  ) {
+    const index = value === null ? null : this.#state.index;
+    this.dispatchEvent(
+      this.#valueEvent("valuechangecomplete", value, previousValue, index, reason, false, action),
     );
   }
 
@@ -1164,7 +1226,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       void Promise.resolve(reveal)
         .then(() => {
           this.#viewer?.revealed();
-          if (!controller.signal.aborted && this.#state.id === id) {
+          if (!controller.signal.aborted && this.#state.value === id) {
             this.#origins.hideThumbnail(id);
           }
         })
@@ -1180,12 +1242,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   #restoreState(state: FluidboxState<TItem>, reason: SessionChangeReason) {
-    const current = this.#state;
     this.#publish(state.status, state.index);
-    if (current.status !== state.status) this.#toggle(state.status);
-    if (state.index !== null && current.id !== state.id) {
-      this.#itemEvent("itemchange", state.index, reason);
-    }
+    this.#announce(state.status === "closed" ? null : state.value, reason);
   }
 
   /** The index of a target, or the error for an unknown one, which commands reject with. */
@@ -1209,7 +1267,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const item = index === null ? null : this.#source.getItem(index);
     return Object.freeze({
       status,
-      id: item ? idOf(item) : null,
+      value: item ? idOf(item) : null,
       index,
       item,
       count: this.#source.count,
@@ -1236,29 +1294,5 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         report(error);
       }
     }
-  }
-
-  /** Opening and closing toggle; an aborted command lands back where it was. */
-  #toggle(status: FluidboxStatus) {
-    const side = status === "opening" || status === "open" ? "open" : "closed";
-    if (side === this.#announced) return;
-    const oldState = this.#announced;
-    this.#announced = side;
-    this.dispatchEvent(
-      new FluidboxToggleEvent("toggle", { oldState, newState: side, reason: this.#reason }),
-    );
-  }
-
-  #itemEvent(type: "itemchange" | "settle", index: number, reason: SessionChangeReason) {
-    if (index < 0 || index >= this.#list.count) return;
-    const item = this.#list.get(index);
-    this.dispatchEvent(
-      new FluidboxItemChangeEvent<TItem>(type, {
-        id: idOf(item),
-        index,
-        item,
-        reason: reasonOf(reason),
-      }),
-    );
   }
 }

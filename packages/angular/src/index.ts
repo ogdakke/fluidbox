@@ -44,12 +44,7 @@ export {
 } from "./root.js";
 export { FluidboxSheetDirective } from "./sheet.js";
 
-export {
-  FluidboxItemChangeEvent,
-  FluidboxSheetEvent,
-  FluidboxToggleEvent,
-  FluidboxZoomEvent,
-} from "@ogdakke/fluidbox";
+export { FluidboxSheetEvent, FluidboxValueChangeEvent, FluidboxZoomEvent } from "@ogdakke/fluidbox";
 export type {
   Fluidbox,
   FluidboxCommandOptions,
@@ -70,6 +65,9 @@ export type {
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
+  FluidboxValue,
+  FluidboxValueChangeAction,
+  FluidboxValueChangeDetails,
   FluidboxVideoItem,
   FluidboxZoomCommandOptions,
   FluidboxZoomState,

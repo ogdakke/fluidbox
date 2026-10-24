@@ -36,7 +36,6 @@ import {
   type FluidboxControlName,
   type FluidboxFilmstripOptions,
   type FluidboxItem,
-  type FluidboxItemChangeEvent,
   type FluidboxItemList,
   type FluidboxItems,
   type FluidboxLabels,
@@ -50,7 +49,7 @@ import {
   type FluidboxSheetSnapPoint,
   type FluidboxState,
   type FluidboxTarget,
-  type FluidboxToggleEvent,
+  type FluidboxValueChangeEvent,
   type FluidboxUpdateOptions,
   type FluidboxViewerRenderer,
   type FluidboxZoomEvent,
@@ -64,9 +63,9 @@ import {
   frameLayerOf,
   latestOrigins,
   resolveLabels,
-  createFluidboxSync,
+  createOpenIndexSync,
   unloadFluidbox,
-  watchFluidbox,
+  watchOpenIndex,
   zoomControlNames,
   type FluidboxChangeDetails,
   type FluidboxSlot,
@@ -94,7 +93,6 @@ export type {
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
-  FluidboxItemChangeEvent,
   FluidboxItemList,
   FluidboxItemListOptions,
   FluidboxItems,
@@ -108,7 +106,10 @@ export type {
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
-  FluidboxToggleEvent,
+  FluidboxValue,
+  FluidboxValueChangeAction,
+  FluidboxValueChangeDetails,
+  FluidboxValueChangeEvent,
   FluidboxVideoItem,
   FluidboxZoomCommandOptions,
   FluidboxZoomEvent,
@@ -282,11 +283,9 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
 }
 
 type RootEmits<TItem extends FluidboxItem> = {
-  beforetoggle: (event: FluidboxToggleEvent) => true;
-  toggle: (event: FluidboxToggleEvent) => true;
-  beforeitemchange: (event: FluidboxItemChangeEvent<TItem>) => true;
-  itemchange: (event: FluidboxItemChangeEvent<TItem>) => true;
-  settle: (event: FluidboxItemChangeEvent<TItem>) => true;
+  beforevaluechange: (event: FluidboxValueChangeEvent<TItem>) => true;
+  valuechange: (event: FluidboxValueChangeEvent<TItem>) => true;
+  valuechangecomplete: (event: FluidboxValueChangeEvent<TItem>) => true;
   sheetchange: (event: FluidboxSheetEvent) => true;
   zoomchange: (event: FluidboxZoomEvent) => true;
   "update:open": (open: boolean, details: FluidboxChangeDetails) => true;
@@ -394,7 +393,7 @@ const Root = defineComponent(
     fluidbox.addEventListener("sheetchange", (event) => (sheetStop.value = event.stop), {
       signal: events.signal,
     });
-    watchFluidbox(
+    watchOpenIndex(
       fluidbox,
       {
         open: (open, details) => emit("update:open", open, details),
@@ -420,7 +419,7 @@ const Root = defineComponent(
       );
       // Your open and index win whenever they change. The triggers have
       // registered by now, so an open flies from the item's own.
-      const sync = createFluidboxSync(fluidbox);
+      const sync = createOpenIndexSync(fluidbox);
       watch(
         [() => props.open, () => props.index],
         ([open, index]) => sync(open === undefined ? undefined : open !== false, index),
@@ -439,8 +438,8 @@ const Root = defineComponent(
       get status() {
         return state.value.status;
       },
-      get id() {
-        return state.value.id;
+      get value() {
+        return state.value.value;
       },
       get index() {
         return state.value.index;
@@ -776,7 +775,9 @@ const Controls = defineComponent({
  */
 const Filmstrip = defineComponent({
   name: "FluidboxFilmstrip",
-  slots: Object as SlotsType<{ default?: (thumbnail: FluidboxItemContext) => VNode[] }>,
+  slots: Object as SlotsType<{
+    default?: (thumbnail: FluidboxItemContext) => VNode[];
+  }>,
   setup(_, { slots }) {
     const { features } = useRootContext("Filmstrip");
     const strip = useRuntimeSlots();
@@ -818,7 +819,9 @@ const Sheet = defineComponent({
     snapPoints: Array as PropType<readonly FluidboxSheetSnapPoint[]>,
     dismiss: String as PropType<FluidboxSheetProps["dismiss"]>,
   },
-  slots: Object as SlotsType<{ default?: (sheet: FluidboxItemContext) => VNode[] }>,
+  slots: Object as SlotsType<{
+    default?: (sheet: FluidboxItemContext) => VNode[];
+  }>,
   setup(props, { attrs, slots }) {
     const { features } = useRootContext("Sheet");
     const applied = new WeakMap<HTMLElement, Applied>();

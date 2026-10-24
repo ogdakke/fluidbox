@@ -113,9 +113,9 @@ for (const framework of frameworks) {
       await openThird.click();
       await expectSlide(page, "Item 3 of 4");
       await expect(status).toHaveText("open 2");
-      await expect(root.locator('[data-test="log"] li', { hasText: "itemchange" })).not.toHaveCount(
-        0,
-      );
+      await expect(
+        root.locator('[data-test="log"] li', { hasText: "valuechange" }),
+      ).not.toHaveCount(0);
       await close(page);
       await expect(status).toHaveText("closed -");
       await root.locator('[data-test="lock"]').check();

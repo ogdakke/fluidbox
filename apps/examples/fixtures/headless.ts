@@ -90,7 +90,7 @@ const viewer: Fluidbox<DemoItem> = createFluidbox({
     const caption = controls.querySelector<HTMLElement>("[data-demo-caption]")!;
     const sync = () => {
       const state = fluidbox.state;
-      caption.textContent = state.id ?? "";
+      caption.textContent = state.value ?? "";
       controls.querySelector<HTMLButtonElement>("[data-demo-previous]")!.disabled =
         !state.hasPrevious;
       controls.querySelector<HTMLButtonElement>("[data-demo-next]")!.disabled = !state.hasNext;
@@ -130,8 +130,8 @@ const protectedViewer: Fluidbox<DemoItem> = createFluidbox({
   origins,
   renderers,
 });
-protectedViewer.addEventListener("beforetoggle", (event) => {
-  if (event.newState === "closed") event.preventDefault();
+protectedViewer.addEventListener("beforevaluechange", (event) => {
+  if (event.action === "close") event.preventDefault();
 });
 
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {

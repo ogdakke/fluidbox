@@ -3,10 +3,9 @@ import { FluidboxRuntime, type FluidboxRuntimeDriver } from "../src/create-fluid
 import { hostOf } from "../src/host";
 import type {
   FluidboxItem,
-  FluidboxItemChangeEvent,
+  FluidboxValueChangeEvent,
   FluidboxZoomEvent,
   FluidboxOptions,
-  FluidboxToggleEvent,
 } from "../src/public-api";
 import type { ViewerSessionCloseContext, ViewerSessionMotionContext } from "../src/runtime-types";
 
@@ -115,15 +114,14 @@ function make(driver: TestDriver, options: Partial<FluidboxOptions<Item>> = {}) 
   );
 }
 
-const eventTypes = ["beforetoggle", "toggle", "beforeitemchange", "itemchange", "settle"];
+const eventTypes = ["beforevaluechange", "valuechange", "valuechangecomplete"];
 
-/** Each event the fluidbox dispatches, as `type` or `type:detail`. */
+/** Each value event the fluidbox dispatches, as `type:action:value`. */
 function record(fluidbox: EventTarget, into: string[]) {
   for (const type of eventTypes) {
     fluidbox.addEventListener(type, (event) => {
-      if (event.type.endsWith("toggle")) {
-        into.push(`${event.type}:${(event as FluidboxToggleEvent).newState}`);
-      } else into.push(`${event.type}:${(event as FluidboxItemChangeEvent<Item>).id}`);
+      const { action, value } = event as FluidboxValueChangeEvent<Item>;
+      into.push(`${event.type}:${action}:${value}`);
     });
   }
 }
@@ -136,7 +134,7 @@ describe("the fluidbox runtime", () => {
     const dispose = fluidbox.preload("two");
 
     expect(driver.preparations).toEqual([{ item: items[1], index: 1, origin: null }]);
-    expect(fluidbox.state).toMatchObject({ status: "closed", id: null });
+    expect(fluidbox.state).toMatchObject({ status: "closed", value: null });
     dispose();
     expect(driver.preparationDisposed).toBe(true);
     expect(() => fluidbox.preload("missing")).toThrow(RangeError);
@@ -148,30 +146,108 @@ describe("the fluidbox runtime", () => {
     const revealOrigin = vi.fn();
     const fluidbox = make(driver, { origins: { getOrigin: () => null, revealOrigin } });
     record(fluidbox, order);
-    fluidbox.subscribe((state) => order.push(`state:${state.status}:${state.id}`));
+    fluidbox.subscribe((state) => order.push(`state:${state.status}:${state.value}`));
 
     const result = fluidbox.open("two");
 
     expect(Object.isFrozen(fluidbox.state)).toBe(true);
     expect(fluidbox.state).toMatchObject({
       status: "opening",
-      id: "two",
+      value: "two",
       index: 1,
       item: items[1],
       hasPrevious: true,
       hasNext: true,
     });
     expect(order).toEqual([
-      "beforetoggle:open",
+      "beforevaluechange:open:two",
       "state:opening:two",
-      "toggle:open",
-      "itemchange:two",
+      "valuechange:open:two",
     ]);
 
     driver.steps[0]!.resolve();
     await expect(result).resolves.toBe(true);
-    expect(order.slice(4)).toEqual(["state:open:two", "settle:two"]);
+    expect(order.slice(3)).toEqual(["state:open:two", "valuechangecomplete:open:two"]);
     expect(revealOrigin).toHaveBeenCalledWith("two", 1, expect.objectContaining({ phase: "open" }));
+  });
+
+  it("reports moves and closes with the value they go to and the one they leave", async () => {
+    const driver = new TestDriver();
+    const order: string[] = [];
+    const fluidbox = make(driver);
+    record(fluidbox, order);
+    const previous: unknown[] = [];
+    fluidbox.addEventListener("valuechangecomplete", (event) =>
+      previous.push((event as FluidboxValueChangeEvent<Item>).previousValue),
+    );
+
+    const opening = fluidbox.open("one");
+    driver.steps[0]!.resolve();
+    await opening;
+    const moving = fluidbox.next();
+    driver.steps[1]!.resolve();
+    await expect(moving).resolves.toBe(true);
+    const closing = fluidbox.close();
+    driver.steps[2]!.resolve();
+    await expect(closing).resolves.toBe(true);
+
+    expect(order).toEqual([
+      "beforevaluechange:open:one",
+      "valuechange:open:one",
+      "valuechangecomplete:open:one",
+      "beforevaluechange:move:two",
+      "valuechange:move:two",
+      "valuechangecomplete:move:two",
+      "beforevaluechange:close:null",
+      "valuechange:close:null",
+      "valuechangecomplete:close:null",
+    ]);
+    expect(previous).toEqual([null, "one", "two"]);
+  });
+
+  it("lets a beforevaluechange listener cancel a move or a close", async () => {
+    const driver = new TestDriver();
+    const fluidbox = make(driver);
+    const opening = fluidbox.open("one");
+    driver.steps[0]!.resolve();
+    await opening;
+    const changes: string[] = [];
+    fluidbox.addEventListener("valuechange", (event) => changes.push(event.type));
+    fluidbox.addEventListener("beforevaluechange", (event) => event.preventDefault());
+
+    await expect(fluidbox.next()).resolves.toBe(false);
+    await expect(fluidbox.close()).resolves.toBe(false);
+
+    expect(changes).toEqual([]);
+    expect(driver.selections).toEqual([]);
+    expect(driver.closes).toEqual([]);
+    expect(fluidbox.state).toMatchObject({ status: "open", value: "one" });
+  });
+
+  it("can't cancel a close the items force", async () => {
+    const driver = new TestDriver();
+    const fluidbox = make(driver);
+    const opening = fluidbox.open("one");
+    driver.steps[0]!.resolve();
+    await opening;
+    const seen: Array<[string, boolean, string]> = [];
+    fluidbox.addEventListener("beforevaluechange", (event) => {
+      seen.push([event.type, event.cancelable, (event as FluidboxValueChangeEvent<Item>).reason]);
+      event.preventDefault();
+    });
+    fluidbox.addEventListener("valuechange", (event) =>
+      seen.push([event.type, false, (event as FluidboxValueChangeEvent<Item>).action]),
+    );
+
+    const emptying = fluidbox.setItems([]);
+    driver.steps.at(-1)?.resolve();
+    await emptying;
+
+    expect(seen).toEqual([
+      ["beforevaluechange", false, "items"],
+      ["valuechange", false, "close"],
+    ]);
+    expect(fluidbox.state).toMatchObject({ value: null });
   });
 
   it("shares repeated pending commands and supersedes incompatible work", async () => {
@@ -189,7 +265,7 @@ describe("the fluidbox runtime", () => {
 
     driver.steps[1]!.resolve();
     await expect(replacement).resolves.toBe(true);
-    expect(fluidbox.state).toMatchObject({ status: "open", id: "three" });
+    expect(fluidbox.state).toMatchObject({ status: "open", value: "three" });
   });
 
   it("restores the state when a caller aborts a command", async () => {
@@ -202,15 +278,15 @@ describe("the fluidbox runtime", () => {
 
     await expect(opening).resolves.toBe(false);
     expect(driver.opens[0]!.signal.aborted).toBe(true);
-    expect(fluidbox.state).toMatchObject({ status: "closed", id: null });
+    expect(fluidbox.state).toMatchObject({ status: "closed", value: null });
   });
 
   it("rejects unknown targets and stops prevented commands before events or motion", async () => {
     const driver = new TestDriver();
     const events: string[] = [];
     const fluidbox = make(driver);
-    fluidbox.addEventListener("beforetoggle", (event) => event.preventDefault());
-    for (const type of ["toggle", "itemchange"]) {
+    fluidbox.addEventListener("beforevaluechange", (event) => event.preventDefault());
+    for (const type of ["valuechange", "valuechangecomplete"]) {
       fluidbox.addEventListener(type, () => events.push(type));
     }
 
@@ -323,18 +399,18 @@ describe("the fluidbox runtime", () => {
     const preserving = fluidbox.setItems([items[1], items[0], items[2]]);
     driver.steps[1]!.resolve();
     await expect(preserving).resolves.toBe(true);
-    expect(fluidbox.state).toMatchObject({ id: "two", index: 0 });
+    expect(fluidbox.state).toMatchObject({ value: "two", index: 0 });
 
     const clamping = fluidbox.setItems([items[0], items[2]]);
     driver.steps[2]!.resolve();
     await expect(clamping).resolves.toBe(true);
-    expect(fluidbox.state).toMatchObject({ id: "one", index: 0 });
+    expect(fluidbox.state).toMatchObject({ value: "one", index: 0 });
 
     const closing = fluidbox.setItems([]);
     expect(driver.closes).toHaveLength(1);
     driver.steps[3]!.resolve();
     await expect(closing).resolves.toBe(true);
-    expect(fluidbox.state).toMatchObject({ status: "closed", count: 0, id: null });
+    expect(fluidbox.state).toMatchObject({ status: "closed", count: 0, value: null });
   });
 
   it("restarts an unfinished open when its items are replaced", async () => {
@@ -349,7 +425,7 @@ describe("the fluidbox runtime", () => {
     expect(driver.opens[0]!.signal.aborted).toBe(true);
     driver.steps[1]!.resolve();
     await expect(replacement).resolves.toBe(true);
-    expect(fluidbox.state).toMatchObject({ status: "open", id: "two", index: 0 });
+    expect(fluidbox.state).toMatchObject({ status: "open", value: "two", index: 0 });
   });
 
   it("keeps a close in progress when its items refresh", async () => {
@@ -413,11 +489,11 @@ describe("the fluidbox runtime", () => {
     const fluidbox = make(driver);
 
     await expect(fluidbox.open("one")).rejects.toBe(failure);
-    expect(fluidbox.state).toMatchObject({ status: "closed", id: null });
+    expect(fluidbox.state).toMatchObject({ status: "closed", value: null });
     await expect(fluidbox.close()).resolves.toBe(true);
   });
 
-  it("settles commands, toggles and later subscribers when a subscriber throws", async () => {
+  it("settles commands, value events and later subscribers when a subscriber throws", async () => {
     const reported: unknown[] = [];
     vi.stubGlobal("reportError", (error: unknown) => reported.push(error));
     try {
@@ -430,8 +506,8 @@ describe("the fluidbox runtime", () => {
       });
       fluidbox.subscribe((state) => seen.push(state.status));
       const toggles: string[] = [];
-      fluidbox.addEventListener("toggle", (event) =>
-        toggles.push((event as FluidboxToggleEvent).newState),
+      fluidbox.addEventListener("valuechange", (event) =>
+        toggles.push((event as FluidboxValueChangeEvent<Item>).action),
       );
 
       const opening = fluidbox.open("one");
@@ -442,7 +518,7 @@ describe("the fluidbox runtime", () => {
       await expect(closing).resolves.toBe(true);
 
       expect(seen).toEqual(["opening", "open", "closing", "closed"]);
-      expect(toggles).toEqual(["open", "closed"]);
+      expect(toggles).toEqual(["open", "close"]);
       expect(reported).toEqual([failure, failure, failure, failure]);
     } finally {
       vi.unstubAllGlobals();
@@ -466,11 +542,11 @@ describe("the fluidbox runtime", () => {
       // The close that finished first does not settle over the open that took over.
       expect(fluidbox.state, `after ${ticks} microtasks`).toMatchObject({
         status: "opening",
-        id: "two",
+        value: "two",
       });
       driver.steps.at(-1)!.resolve();
       await expect(reopening).resolves.toBe(true);
-      expect(fluidbox.state).toMatchObject({ status: "open", id: "two" });
+      expect(fluidbox.state).toMatchObject({ status: "open", value: "two" });
     }
   });
 
@@ -569,7 +645,7 @@ describe("zoom", () => {
     await fluidbox.zoomTo(2);
     expect(fluidbox.state.zoom?.scale).toBe(2);
     void fluidbox.next();
-    expect(fluidbox.state).toMatchObject({ id: "two", zoom: { scale: 1 } });
+    expect(fluidbox.state).toMatchObject({ value: "two", zoom: { scale: 1 } });
     fluidbox.update({ zoom: false });
     expect(fluidbox.state.zoom).toBeNull();
     await expect(fluidbox.zoomIn()).resolves.toBe(false);
