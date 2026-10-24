@@ -112,3 +112,57 @@ test("a photo's open flies as soon as before: waiting for slides adds no frame",
   // The open waits one frame to stage the viewer, as it did before slides could hold it.
   expect(frames).toBeLessThanOrEqual(2);
 });
+
+test("a React slide that draws the image opens as soon as the built-in image", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "The latency gate runs once on Chromium.");
+  await page.goto("/react-slides.html");
+  const dialog = page.locator("[data-fluidbox-dialog]");
+  /** The frames from a press to the start of the opening flight, as the photo test counts them. */
+  const time = async (selector: string) => {
+    const trigger = page.locator(selector);
+    // The first open loads the viewer's code; time the ones after it.
+    await trigger.click();
+    await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    const runs: { frames: number; ms: number }[] = [];
+    for (let run = 0; run < 7; run++) {
+      runs.push(
+        await trigger.evaluate(
+          (button: HTMLElement) =>
+            new Promise<{ frames: number; ms: number }>((resolve) => {
+              const start = performance.now();
+              let frames = 0;
+              const count = () => {
+                const overlay = document.querySelector("[data-fluidbox-viewer]");
+                if (overlay && !overlay.hasAttribute("data-fluidbox-prepared")) {
+                  resolve({ frames, ms: performance.now() - start });
+                  return;
+                }
+                frames += 1;
+                requestAnimationFrame(count);
+              };
+              button.click();
+              requestAnimationFrame(count);
+            }),
+        ),
+      );
+      await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0);
+    }
+    return {
+      frames: median(runs.map((run) => run.frames)),
+      ms: median(runs.map((run) => run.ms)),
+    };
+  };
+  const builtin = await time('#builtin [data-item="one"]');
+  const custom = await time('#custom [data-item="one"]');
+  console.log(
+    `React image open: built in ${builtin.frames} frames, ${builtin.ms.toFixed(1)} ms; through a slide ${custom.frames} frames, ${custom.ms.toFixed(1)} ms`,
+  );
+  expect(custom.frames).toBeLessThanOrEqual(builtin.frames);
+});

@@ -111,3 +111,51 @@ test("a slide reads its index and its origin live", async ({ page }) => {
   await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   expect(await origin()).toBeGreaterThan(0);
 });
+
+test("the open waits for a slide's commit and its waitUntil, then flies onto what it rendered", async ({
+  page,
+}) => {
+  await load(page);
+  await page.locator('#held [data-item="held-a"]').click();
+  await expect(page.locator(overlay)).toHaveCount(1);
+  // The content has committed, but its waitUntil holds the open.
+  await expect(page.locator(`${overlay} [data-test="held-card"]`).first()).toBeAttached();
+  await page.waitForTimeout(400);
+  expect(await waiting(page)).toBe(true);
+  const landed = inSlideAtFlight(page, '[data-test="held-card"]');
+  await page.evaluate(() => window.reactSlides.openGate!());
+  expect(await landed).toBe(true);
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+});
+
+test("closing hands the trigger's video the time a slide registered with returnPlayback", async ({
+  page,
+}) => {
+  await load(page);
+  const card = '#reels [data-item="reel-a"] video';
+  await page.locator(card).scrollIntoViewIfNeeded();
+  await page.waitForFunction((selector) => {
+    const video = document.querySelector<HTMLVideoElement>(selector);
+    return !!video && !video.paused && video.currentTime > 0.2;
+  }, card);
+  await page.locator('#reels [data-item="reel-a"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  // The trigger rests at a known frame, so a seek and a play show.
+  await page.locator(card).evaluate(async (video: HTMLVideoElement) => {
+    video.pause();
+    const seeked = new Promise((resolve) =>
+      video.addEventListener("seeked", resolve, { once: true }),
+    );
+    video.currentTime = 0.5;
+    await seeked;
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  const back = await page.locator(card).evaluate((video: HTMLVideoElement) => ({
+    time: video.currentTime,
+    paused: video.paused,
+  }));
+  expect(back.paused).toBe(false);
+  expect(back.time).toBeGreaterThanOrEqual(2.49);
+  expect(back.time).toBeLessThan(3.5);
+});
