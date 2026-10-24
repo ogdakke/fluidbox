@@ -86,7 +86,8 @@ export type {
   FluidboxViewerProps,
 } from "./types";
 export type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
+  FluidboxItemTypes,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,

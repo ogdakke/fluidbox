@@ -42,7 +42,7 @@ const delayed = (src: string, ms: number) => (ms ? `${src}?delay=${Math.round(ms
 
 const shot = (name: keyof typeof hashes, alt: string, frame?: FrameId): Shot => ({
   id: `fjord-${name}`,
-  type: "img",
+  type: "image",
   src: delayed(`/products/fjord-${name}.webp`, delay),
   alt,
   width: 1600,
@@ -106,11 +106,11 @@ type ShopItem = Shot | FluidboxEmbedItem | FluidboxSpinItem | FluidboxModelItem;
 const media: readonly ShopItem[] = [...shots, video, spin, model];
 
 /** The item's name for a card's label. */
-const named = (item: ShopItem) => (item.type === "img" ? item.alt : item.title);
+const named = (item: ShopItem) => (item.type === "image" ? item.alt : item.title);
 
 /** The picture a card shows: the photo, the video's poster, the spin's first frame or the model's poster. */
 const cover = (item: ShopItem) =>
-  item.type === "img"
+  item.type === "image"
     ? item.src
     : "frames" in item
       ? item.frames[0]!
@@ -302,7 +302,7 @@ function Photo({
   }, []);
   const box = useRef<HTMLSpanElement>(null);
   useEffect(
-    () => (zoom && item.type === "img" && box.current ? hoverZoom(box.current, item) : undefined),
+    () => (zoom && item.type === "image" && box.current ? hoverZoom(box.current, item) : undefined),
     [zoom, item],
   );
   return (
@@ -361,11 +361,11 @@ function Gallery({ carousel }: { carousel: Carousel }) {
                   size={item.width}
                   origin
                   eager={at < 2}
-                  zoom={item.type === "img"}
+                  zoom={item.type === "image"}
                 />
-                {item.type === "custom" && (
+                {item.type !== "image" && (
                   <span className="shop-kind" aria-hidden="true">
-                    {badges[item.render]}
+                    {badges[item.type]}
                   </span>
                 )}
               </button>

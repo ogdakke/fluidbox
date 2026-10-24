@@ -88,7 +88,7 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   href,
 }: FluidboxStaticViewerOptions<TItem>): FluidboxStaticNode | null {
   const item = items[index];
-  if (!item || item.type !== "img") return null;
+  if (!item || item.type !== "image") return null;
   const count = items.length;
   const position = labels.position(index, count);
 

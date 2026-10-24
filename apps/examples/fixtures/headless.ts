@@ -1,8 +1,19 @@
 import { mountSite } from "../src/site";
 import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/filmstrip";
-import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "@ogdakke/fluidbox";
+import type {
+  Fluidbox,
+  FluidboxCustomItemBase,
+  FluidboxItem,
+  FluidboxRenderer,
+} from "@ogdakke/fluidbox";
 import "./headless.css";
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    demo: FluidboxCustomItemBase<"demo">;
+  }
+}
 
 mountSite("fixtures", {
   fixture: "Headless runtime · custom renderers, a protected viewer, and a secondary viewer",
@@ -13,7 +24,7 @@ type DemoItem = FluidboxItem;
 const items: readonly DemoItem[] = [
   {
     id: "one",
-    type: "img",
+    type: "image",
     src: "/photo-square.svg",
     alt: "Blue square study",
     width: 800,
@@ -32,7 +43,7 @@ const items: readonly DemoItem[] = [
   },
   {
     id: "two",
-    type: "img",
+    type: "image",
     src: "/photo-portrait.svg",
     alt: "Orange portrait study",
     width: 600,

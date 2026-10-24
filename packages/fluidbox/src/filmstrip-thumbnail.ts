@@ -17,7 +17,7 @@ function appendResource(
 export function filmstripThumbnailSources(item: FluidboxItem): readonly string[] {
   const sources: string[] = [];
   appendResource(sources, item.thumbnail);
-  if (item.type === "img") appendResource(sources, item);
+  if (item.type === "image") appendResource(sources, item);
   else if (item.type === "video" && item.poster) appendResource(sources, { src: item.poster });
   return sources;
 }

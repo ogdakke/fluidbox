@@ -121,7 +121,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     // An item without a name, as a decorative photo, is named by its place.
     button.setAttribute(
       "aria-label",
-      (item.type === "img" ? item.alt : item.title) ||
+      (item.type === "image" ? item.alt : item.title) ||
         this.#labels.position(index, this.#source.count),
     );
     button.setAttribute("aria-posinset", String(index + 1));

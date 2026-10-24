@@ -15,7 +15,7 @@ function Note() {
 export function Renderers() {
   return (
     <ThemeContext.Provider value={theme}>
-      {/* Items of type "custom" whose render is "note" render <Note />. */}
+      {/* Items of type "note" render <Note />. */}
       <Fluidbox.Root items={media} renderers={{ note: () => <Note /> }}>
         <div className="pattern-grid">
           {media.map((item) => (

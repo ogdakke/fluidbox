@@ -17,6 +17,8 @@ export interface FluidboxItemBase {
   readonly thumbnail?: FluidboxThumbnail;
   /** An image URL, such as a data URI, painted at once behind an image slide. */
   readonly placeholder?: string;
+  /** Text shown by a caption part, which becomes the dialog's description. */
+  readonly caption?: string;
 }
 
 /** An `<img>`'s source attributes. */
@@ -38,7 +40,7 @@ export interface FluidboxPictureSource {
 
 /** An `<img>`, or a `<picture>` when it has `sources`. */
 export interface FluidboxImageItem extends FluidboxItemBase {
-  readonly type: "img";
+  readonly type: "image";
   readonly src: string;
   readonly srcset?: string;
   readonly sizes?: string;
@@ -47,16 +49,12 @@ export interface FluidboxImageItem extends FluidboxItemBase {
   readonly height: number;
   readonly sources?: readonly FluidboxPictureSource[];
   /**
-   * A larger image for zoom, as a master kept apart from the `srcset`. The
-   * viewer loads it once a zoom shows more pixels than the slide's own source
-   * has, and the hover zoom add-on magnifies it.
+   * The larger image zoom and hover zoom load. `src` is a master kept apart
+   * from the `srcset`, loaded once a zoom shows more pixels than the slide's
+   * own source has. `srcset` lists larger candidates with width descriptors,
+   * of which the viewer loads the smallest that is sharp at the zoom it rests at.
    */
-  readonly zoomSrc?: string;
-  /**
-   * Larger candidates for zoom, with width descriptors. The viewer loads the
-   * smallest one that is sharp at the zoom it rests at.
-   */
-  readonly zoomSrcset?: string;
+  readonly zoom?: { readonly src?: string; readonly srcset?: string };
 }
 
 /** A `<track>` of a video: captions, subtitles, descriptions or chapters. */
@@ -105,30 +103,41 @@ export interface FluidboxIframeItem extends FluidboxItemBase {
   readonly sandbox?: string;
 }
 
-/** Your own content, drawn by the renderer named `render`. */
-export interface FluidboxCustomItem extends FluidboxItemBase {
-  readonly type: "custom";
-  readonly id: string;
-  /** The key of a renderer in the `renderers` option. */
-  readonly render: string;
-  /** The content's accessible name. */
+/** What every item type of your own needs: a name and a size for its media box. */
+export interface FluidboxCustomItemBase<TType extends string> extends FluidboxItemBase {
+  readonly type: TType;
+  /** The accessible name of the slide and the dialog. */
   readonly title: string;
   readonly width: number;
   readonly height: number;
 }
 
 /**
- * One piece of media. Every field is the HTML attribute of the element the viewer
- * draws, by its DOM property name, so `srcset`, `sizes`, `poster` and
- * `referrerPolicy` mean what they mean on `<img>`, `<video>` and `<iframe>`.
- * Extend a type to add fields of your own. They come back in every callback,
- * event and state.
+ * Every item type, by its `type`. The add-on entries and your own code add to
+ * it by declaration merging:
+ *
+ * ```ts
+ * declare module "@ogdakke/fluidbox" {
+ *   interface FluidboxItemTypes {
+ *     product: ProductItem;
+ *   }
+ * }
+ * ```
  */
-export type FluidboxItem =
-  | FluidboxImageItem
-  | FluidboxVideoItem
-  | FluidboxIframeItem
-  | FluidboxCustomItem;
+export interface FluidboxItemTypes {
+  image: FluidboxImageItem;
+  video: FluidboxVideoItem;
+  iframe: FluidboxIframeItem;
+}
+
+/**
+ * One piece of media, of any type in `FluidboxItemTypes`. Every field of the
+ * built-in types is the HTML attribute of the element the viewer draws, by its
+ * DOM property name, so `srcset`, `sizes`, `poster` and `referrerPolicy` mean
+ * what they mean on `<img>`, `<video>` and `<iframe>`. Extend a type to add
+ * fields of your own. They come back in every callback, event and state.
+ */
+export type FluidboxItem = FluidboxItemTypes[keyof FluidboxItemTypes];
 
 /** A list read on demand, for long or generated galleries. */
 export interface FluidboxItemList<TItem extends FluidboxItem = FluidboxItem> {
@@ -480,7 +489,7 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    * @default { step: 2, max: 4 }
    */
   readonly zoom?: false | { readonly step?: number; readonly max?: number };
-  /** Draw `custom` items, by the name in their `render`. Read when a slide mounts. */
+  /** Draw items of your own types, keyed by their `type`. Read when a slide mounts. */
   readonly renderers?: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
   /**
    * Go round: past the last item comes the first, and before the first the

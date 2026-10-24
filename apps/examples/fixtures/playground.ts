@@ -17,7 +17,7 @@ const items: FluidboxItemList = {
     const src = index % 2 ? "/second.svg" : "/first.svg";
     return {
       id: String(index),
-      type: "img",
+      type: "image",
       src,
       alt: `Gallery item ${index + 1}`,
       width: 600,

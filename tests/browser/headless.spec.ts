@@ -200,8 +200,7 @@ test("plain runtime owns video and iframe media while custom renderers own desce
     await window.headlessViewer.setItems([
       {
         id: "custom",
-        type: "custom",
-        render: "demo",
+        type: "demo",
         title: "Custom study",
         width: 800,
         height: 600,
@@ -250,7 +249,7 @@ test("destroy unloads mounted custom media before removing the viewer", async ({
   await page.goto("/headless.html");
   await page.evaluate(async () => {
     await window.headlessViewer.setItems([
-      { id: "one", type: "custom", render: "demo", title: "Custom study", width: 800, height: 600 },
+      { id: "one", type: "demo", title: "Custom study", width: 800, height: 600 },
     ]);
     await window.headlessViewer.open("one");
     window.headlessViewer.destroy();
@@ -268,7 +267,7 @@ test("custom media uses the document close flight and returns to its retained sl
   await page.goto("/headless.html");
   await page.evaluate(async () => {
     await window.headlessViewer.setItems([
-      { id: "one", type: "custom", render: "demo", title: "Custom study", width: 800, height: 600 },
+      { id: "one", type: "demo", title: "Custom study", width: 800, height: 600 },
     ]);
     await window.headlessViewer.open("one");
     void window.headlessViewer.close();
@@ -363,7 +362,7 @@ test("plain runtime keeps the preview painted until the full image can replace i
     await window.headlessViewer.setItems([
       {
         id: "preview-test",
-        type: "img",
+        type: "image",
         src: "/photo-square.svg?full",
         alt: "Preview handoff",
         width: 800,
@@ -402,7 +401,7 @@ test("adjacent slides paint their placeholder while responsive images are pendin
     await window.headlessViewer.setItems(
       [0, 1].map((index) => ({
         id: `pending-${index}`,
-        type: "img" as const,
+        type: "image" as const,
         src: `/pending-slide-full-${index}.svg`,
         alt: `Pending image ${index}`,
         width: 800,
@@ -457,7 +456,7 @@ test("plain runtime retains the last decoded origin when its next source is pend
     await window.headlessViewer.setItems([
       {
         id: "one",
-        type: "img",
+        type: "image",
         src: "/deferred-full.svg",
         alt: "Deferred full image",
         width: 800,
@@ -501,7 +500,7 @@ test("plain runtime keeps the preview available while a failed full image is ret
     await window.headlessViewer.setItems([
       {
         id: "retry-test",
-        type: "img",
+        type: "image",
         src: "/retry-full.svg",
         alt: "Retry handoff",
         width: 800,
@@ -536,7 +535,7 @@ test("plain runtime keeps focus that moved into the dialog during the opening", 
     await window.headlessViewer.setItems([
       {
         id: "focus-test",
-        type: "img",
+        type: "image",
         src: "/focus-full.svg",
         alt: "Focus",
         width: 800,
@@ -1111,7 +1110,7 @@ test("native gallery scrolling is never corrected by the runtime", async ({ page
     await window.headlessViewer.setItems(
       Array.from({ length: 6 }, (_, index) => ({
         id: `slide-${index}`,
-        type: "img" as const,
+        type: "image" as const,
         src: "/photo-square.svg",
         alt: `Slide ${index}`,
         width: 800,
@@ -1147,7 +1146,7 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
       count,
       get: (index) => ({
         id: `large-${index}`,
-        type: "img",
+        type: "image",
         src: "/photo-square.svg",
         alt: `Large item ${index + 1}`,
         width: 800,
@@ -1206,7 +1205,7 @@ test("bindings follow setItems, by index and by an id that arrives later", async
   await page.goto("/headless.html");
   const errors = await page.evaluate(async () => {
     const item = (name: string) => ({
-      type: "img" as const,
+      type: "image" as const,
       src: `/art/${name}.svg`,
       alt: name,
       width: 1200,

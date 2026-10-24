@@ -10,7 +10,7 @@ export function artItem(scene: Scene, id = scene.id): FluidboxImageItem {
   const src = artSrc(scene);
   return {
     id,
-    type: "img",
+    type: "image",
     src,
     alt: scene.title,
     width: scene.width,

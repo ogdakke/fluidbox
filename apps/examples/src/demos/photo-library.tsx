@@ -40,7 +40,7 @@ type PhotoItem = FluidboxImageItem & { readonly id: string; readonly thumbnail: 
 function photoAt(index: number, images: readonly LibraryImage[] = fixtureImages): PhotoItem {
   const fixture = images[(index * 17 + Math.floor(index / sectionSize)) % images.length]!;
   return {
-    type: "img",
+    type: "image",
     id: photoId(index),
     src: fixture.src,
     alt: `Synthetic ${fixture.shape} illustration, photo ${index + 1}`,

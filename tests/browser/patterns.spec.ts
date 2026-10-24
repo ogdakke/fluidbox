@@ -193,7 +193,7 @@ for (const framework of frameworks) {
           );
         // At fit the photo is under 1280 px across, so the 1280w candidate has the pixels.
         await expect.poll(source).toBe("/photos/1015-1280.webp");
-        // Zoomed by 1.5 it needs more than the srcset has: zoomSrc, the full-size file.
+        // Zoomed by 1.5 it needs more than the srcset has: zoom.src, the full-size file.
         await dialog(page).locator("[data-fluidbox-zoom-in]").click();
         await expect.poll(source).toBe("/photos/1015.webp");
         await close(page);

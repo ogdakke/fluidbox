@@ -480,7 +480,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   /** The zoom of the item on show: open on an image, with zoom on. */
   #zoomFor(status: FluidboxStatus, item: TItem | null): FluidboxZoomState | null {
-    if (status !== "open" || item?.type !== "img" || this.#zoom === false) return null;
+    if (status !== "open" || item?.type !== "image" || this.#zoom === false) return null;
     // The scale belongs to the item it rested on; another item starts fitted.
     const scale = this.#zoomId === idOf(item) ? this.#zoomScale : 1;
     return Object.freeze({ scale, min: 1, max: this.#zoom?.max ?? 4 });

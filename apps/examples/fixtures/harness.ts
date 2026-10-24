@@ -35,7 +35,7 @@ if (params.has("virtual")) {
       const src = index % 2 ? "/second.svg" : "/first.svg";
       return {
         id: String(index),
-        type: "img",
+        type: "image",
         src,
         alt: `Virtual item ${index + 1}`,
         width: 600,

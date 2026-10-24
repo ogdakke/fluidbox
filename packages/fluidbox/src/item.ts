@@ -1,5 +1,6 @@
 import { checkItemUrls } from "./media-url";
 import type {
+  FluidboxCustomItemBase,
   FluidboxItem,
   FluidboxPictureSource,
   FluidboxRenderer,
@@ -171,7 +172,7 @@ export class FluidboxItemElement extends HTMLElement {
       const sizes = image.getAttribute("sizes");
       return done({
         ...base,
-        type: "img",
+        type: "image",
         src: source(image, "img"),
         alt: image.alt,
         ...sized(image, "img"),
@@ -227,16 +228,16 @@ export class FluidboxItemElement extends HTMLElement {
       });
     }
 
+    // Markup has a slide of its own, which the gallery registers under the item's type.
     const key = `fluidbox-item:${id}`;
     return {
       ...done({
         ...base,
-        type: "custom",
-        render: key,
+        type: key,
         title: named(this.getAttribute("aria-label") || content.getAttribute("aria-label")),
         width: dimension(content, "width") || thumbnail?.width || 1,
         height: dimension(content, "height") || thumbnail?.height || 1,
-      }),
+      } satisfies FluidboxCustomItemBase<string> as unknown as FluidboxItem),
       renderer: [
         key,
         ({ target }) => {

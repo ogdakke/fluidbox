@@ -96,7 +96,8 @@ export type {
 } from "./types";
 export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 export type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
+  FluidboxItemTypes,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
@@ -406,7 +407,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   const serverIndex = useRef<number | null | undefined>(undefined);
   if (serverIndex.current === undefined) {
     serverIndex.current =
-      open && Array.isArray(items) && Number.isInteger(index) && items[index!]?.type === "img"
+      open && Array.isArray(items) && Number.isInteger(index) && items[index!]?.type === "image"
         ? index!
         : null;
   }

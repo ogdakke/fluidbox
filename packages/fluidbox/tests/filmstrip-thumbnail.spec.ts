@@ -5,7 +5,7 @@ describe("filmstrip thumbnail sources", () => {
   it("tries the smallest thumbnail candidates before progressively larger fallbacks", () => {
     expect(
       filmstripThumbnailSources({
-        type: "img",
+        type: "image",
         thumbnail: { src: "/thumb.jpg", srcset: "/thumb-320.jpg 320w, /thumb-160.jpg 160w" },
         src: "/full.jpg",
         srcset: "/full-800.jpg 800w",

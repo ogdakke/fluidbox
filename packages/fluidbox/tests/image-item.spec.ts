@@ -17,7 +17,7 @@ describe("imageItem", () => {
     };
     const thumb = { ...full, srcSet: "/_next/image?w=640 640w", sizes: "25vw" };
     expect(imageItem(full, thumb)).toEqual({
-      type: "img",
+      type: "image",
       src: "/_next/image?w=3840",
       srcset: "/_next/image?w=640 640w, /_next/image?w=3840 3840w",
       sizes: "100vw",
@@ -39,7 +39,7 @@ describe("imageItem", () => {
     expect(
       imageItem({ src: "/a.jpg", srcset: "/a.jpg 800w", width: "800", height: "600" }),
     ).toEqual({
-      type: "img",
+      type: "image",
       src: "/a.jpg",
       srcset: "/a.jpg 800w",
       alt: "",

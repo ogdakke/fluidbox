@@ -360,7 +360,7 @@ test.describe("semantics", () => {
       return (window as any).a11yFluidbox.setItems([
         {
           id: "green",
-          type: "img",
+          type: "image",
           src: "/first.svg",
           alt: "Green study",
           width: 600,

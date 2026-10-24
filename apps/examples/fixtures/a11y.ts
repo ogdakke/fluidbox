@@ -2,8 +2,19 @@ import { mountSite } from "../src/site";
 import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/filmstrip";
 import "@ogdakke/fluidbox/filmstrip.css";
-import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "@ogdakke/fluidbox";
+import type {
+  Fluidbox,
+  FluidboxCustomItemBase,
+  FluidboxItem,
+  FluidboxRenderer,
+} from "@ogdakke/fluidbox";
 import "./site.css";
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    shop: FluidboxCustomItemBase<"shop">;
+  }
+}
 
 mountSite("fixtures", {
   fixture: "Accessibility · query flags: filmstrip, unnamed, viewer, broken",
@@ -12,10 +23,10 @@ mountSite("fixtures", {
 const params = new URLSearchParams(location.search);
 
 const items: FluidboxItem[] = [
-  { id: "first", type: "img", src: "/first.svg", alt: "Red study", width: 600, height: 400 },
+  { id: "first", type: "image", src: "/first.svg", alt: "Red study", width: 600, height: 400 },
   {
     id: "second",
-    type: "img",
+    type: "image",
     src: params.has("broken") ? "/missing.svg?delay=300" : "/second.svg",
     alt: params.has("unnamed") ? "" : "Blue study",
     width: 600,
@@ -33,7 +44,7 @@ const items: FluidboxItem[] = [
       { src: "/captions.vtt", kind: "captions", srclang: "en", label: "English", default: true },
     ],
   },
-  { id: "shop", type: "custom", render: "shop", title: "Product form", width: 600, height: 400 },
+  { id: "shop", type: "shop", title: "Product form", width: 600, height: 400 },
 ];
 
 /** A web component with its own focusable control, as a 3D viewer has. */

@@ -89,7 +89,8 @@ export type {
 } from "./types";
 export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 export type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
+  FluidboxItemTypes,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,

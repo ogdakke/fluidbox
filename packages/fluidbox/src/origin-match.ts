@@ -38,7 +38,7 @@ export function originShowsItem(image: HTMLImageElement | undefined, item: Fluid
     }
   };
   collect(item.thumbnail, add);
-  if (item.type === "img") collect(item, add);
+  if (item.type === "image") collect(item, add);
   else if (item.type === "video" && item.poster) add(item.poster);
   // A framework may have just written `src`; `currentSrc` updates once loading starts.
   return [image.currentSrc, image.src].some((src) => !!src && declared.has(src));

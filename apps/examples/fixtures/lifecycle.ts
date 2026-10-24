@@ -9,7 +9,7 @@ mountSite("fixtures", {
 
 const item = (id: string, src: string, width: number, height: number): FluidboxImageItem => ({
   id,
-  type: "img",
+  type: "image",
   src,
   alt: `Study ${id}`,
   width,

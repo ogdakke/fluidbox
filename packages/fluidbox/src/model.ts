@@ -5,14 +5,15 @@
  */
 import { addStyles, paintPoster, posterStyles } from "./addon-styles";
 import type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
   FluidboxItem,
   FluidboxSlideRenderer,
   FluidboxThumbnail,
 } from "./public-api";
 
 /** A glTF or GLB model. Its fields are `<model-viewer>`'s, by property name. */
-export interface FluidboxModelItem extends FluidboxCustomItem {
+export interface FluidboxModelItem extends FluidboxCustomItemBase<"model"> {
+  readonly id: string;
   /** The marker `modelItem` sets, so the renderer knows its items. */
   readonly model: true;
   /** The `.glb` or `.gltf` file. */
@@ -29,35 +30,35 @@ export interface FluidboxModelItem extends FluidboxCustomItem {
   readonly attributes?: Readonly<Record<string, string>>;
 }
 
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    model: FluidboxModelItem;
+  }
+}
+
 /** What `modelItem` takes. */
 export interface FluidboxModelItemOptions extends Omit<
   FluidboxModelItem,
-  "type" | "id" | "render" | "model" | "thumbnail"
+  "type" | "id" | "model" | "thumbnail"
 > {
   /** Defaults to `src`. */
   readonly id?: string;
   readonly thumbnail?: FluidboxThumbnail;
-  /**
-   * The key of the renderer in `renderers`.
-   * @default "model"
-   */
-  readonly render?: string;
 }
 
 /** A model item for the model renderer. */
 export function modelItem(options: FluidboxModelItemOptions): FluidboxModelItem {
   return {
     ...options,
-    type: "custom",
+    type: "model",
     id: options.id ?? options.src,
-    render: options.render ?? "model",
     model: true,
   };
 }
 
 /** Whether an item is a model made by `modelItem`. */
 export function isModelItem(item: FluidboxItem): item is FluidboxModelItem {
-  return item.type === "custom" && (item as Partial<FluidboxModelItem>).model === true;
+  return item.type === "model";
 }
 
 /** What `createModelRenderer` takes. */

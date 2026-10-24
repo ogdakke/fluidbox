@@ -11,9 +11,9 @@ import type {
 import type { ViewerSessionCloseContext, ViewerSessionMotionContext } from "../src/runtime-types";
 
 const items = [
-  { id: "one", type: "img", src: "/one.jpg", alt: "One", width: 1200, height: 800 },
-  { id: "two", type: "img", src: "/two.jpg", alt: "Two", width: 1200, height: 800 },
-  { id: "three", type: "img", src: "/three.jpg", alt: "Three", width: 1200, height: 800 },
+  { id: "one", type: "image", src: "/one.jpg", alt: "One", width: 1200, height: 800 },
+  { id: "two", type: "image", src: "/two.jpg", alt: "Two", width: 1200, height: 800 },
+  { id: "three", type: "image", src: "/three.jpg", alt: "Three", width: 1200, height: 800 },
 ] as const satisfies readonly FluidboxItem[];
 
 type Item = (typeof items)[number];
@@ -257,7 +257,7 @@ describe("the fluidbox runtime", () => {
     const secondVisual = { isConnected: true } as HTMLElement;
     let dispose = () => {};
     const onPreviewChange = vi.fn((item: FluidboxItem) => {
-      thumbnail.src = item.type === "img" ? item.src : "";
+      thumbnail.src = item.type === "image" ? item.src : "";
       dispose();
       host.registerOrigin(["one", "two"], { trigger, visual: secondVisual, thumbnail });
     });

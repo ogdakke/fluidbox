@@ -459,7 +459,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       image.decoding = "sync";
       return image;
     };
-    if (item.type === "img") {
+    if (item.type === "image") {
       frame.dataset.fluidboxImageFrame = "";
       if (item.placeholder) {
         placeholder = decorative("fluidboxSlidePlaceholder");
@@ -570,7 +570,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       }
       return;
     }
-    if (!slide || item.type !== "img" || !(slide.image instanceof HTMLImageElement)) return;
+    if (!slide || item.type !== "image" || !(slide.image instanceof HTMLImageElement)) return;
     const decodedPreview = origin ? observeDecodedPreview(origin) : null;
     const preview = decodedPreview || item.thumbnail?.src || origin?.currentSrc || origin?.src;
     if (preview) {
@@ -831,7 +831,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Show the image on show sharper for a zoom resting at `scale`: once its
    * pixels on screen outnumber its candidate's, decode the smallest larger
-   * candidate of the same source, or of `zoomSrcset` and `zoomSrc`, off screen,
+   * candidate of the same source, or of the item's `zoom`, off screen,
    * then swap it in at the same size. The largest one caps it.
    */
   sharpen(scale: number) {
@@ -843,7 +843,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const image = slide?.image;
     if (
       !slide ||
-      item.type !== "img" ||
+      item.type !== "image" ||
       !(image instanceof HTMLImageElement) ||
       !slide.fullApplied ||
       !this.#painted(image)
@@ -864,8 +864,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const next = sharperCandidate(
       [
         ...chosen,
-        ...srcsetCandidates(item.zoomSrcset),
-        ...(item.zoomSrc ? [{ src: item.zoomSrc, width: Infinity }] : []),
+        ...srcsetCandidates(item.zoom?.srcset),
+        ...(item.zoom?.src ? [{ src: item.zoom.src, width: Infinity }] : []),
       ],
       current,
       needed,
@@ -913,7 +913,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       return;
     }
     slide.error.hidden = true;
-    if (item.type === "img" && slide.image instanceof HTMLImageElement && slide.picture) {
+    if (item.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
       // Busy until the full image shows, or fails.
       slide.element.setAttribute("aria-busy", "true");
       const current = slide.image.getAttribute("src");
@@ -983,9 +983,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       if (item.referrerPolicy) slide.image.referrerPolicy = item.referrerPolicy;
       slide.image.setAttribute("sandbox", item.sandbox ?? IFRAME_SANDBOX_DEFAULT);
       slide.image.src = item.src;
-    } else if (item.type === "custom") {
-      const renderer = this.#renderers[item.render];
-      if (!renderer) throw new TypeError(`Unknown fluidbox renderer: ${item.render}`);
+    } else if (item.type !== "image" && item.type !== "video" && item.type !== "iframe") {
+      const renderer = this.#renderers[item.type];
+      if (!renderer) throw new TypeError(`Unknown fluidbox renderer: ${item.type}`);
       const controller = new AbortController();
       // Unloading drops the activity, so its listeners are never called again.
       const activity = (slide.activity = {
@@ -1066,7 +1066,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   #applyImage(index: number, slide: ViewerSlide) {
     const item = this.#source.getItem(this.#item(index));
-    if (item.type !== "img" || !(slide.image instanceof HTMLImageElement) || !slide.picture) return;
+    if (item.type !== "image" || !(slide.image instanceof HTMLImageElement) || !slide.picture)
+      return;
     slide.imageVersion += 1;
     const version = slide.imageVersion;
     slide.fullApplied = true;
@@ -1096,7 +1097,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   /** Whether the image already shows the one candidate the full media resolves to. */
   #showsFull(image: HTMLImageElement, item: TItem) {
-    if (item.type !== "img") return false;
+    if (item.type !== "image") return false;
     if (item.sources?.length || item.srcset) return false;
     const base = this.#ownerDocument.baseURI;
     return new URL(image.currentSrc || image.src, base).href === new URL(item.src, base).href;
@@ -1122,7 +1123,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   /** The item's `<source>` elements; a staged copy goes through #writeSet. */
   #sources(item: TItem, staged?: ViewerSlide) {
-    return (item.type === "img" ? (item.sources ?? []) : []).map((resource) => {
+    return (item.type === "image" ? (item.sources ?? []) : []).map((resource) => {
       const source = this.#ownerDocument.createElement("source");
       if (staged) this.#writeSet(source, resource, staged);
       else {
@@ -1139,7 +1140,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #stage(item: TItem, slide: ViewerSlide) {
     const picture = this.#ownerDocument.createElement("picture");
     const image = this.#ownerDocument.createElement("img");
-    if (item.type === "img") {
+    if (item.type === "image") {
       picture.append(...this.#sources(item, slide));
       this.#writeSet(image, item, slide);
       image.src = item.src;

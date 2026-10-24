@@ -23,7 +23,7 @@ export class Note {
   imports: [FluidboxModule],
   providers: [{ provide: THEME, useValue: theme }],
   template: `
-    <!-- Items of type "custom" whose render is "note" render <article appNote>. -->
+    <!-- Items of type "note" render <article appNote>. -->
     <div fluidboxRoot [items]="media" [renderers]="renderers" class="pattern-grid">
       @for (item of media; track item.id) {
         <button [fluidboxTrigger]="item" class="pattern-thumb" data-test="trigger">

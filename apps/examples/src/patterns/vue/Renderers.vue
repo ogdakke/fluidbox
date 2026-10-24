@@ -14,7 +14,7 @@ const Note = defineComponent(() => {
   return () => h("article", { class: "pattern-note" }, `Theme: ${current}`);
 });
 
-// Draws items of type "custom" whose render is "note".
+// Draws items of type "note".
 const renderers: Record<string, FluidboxVueRenderer> = { note: () => h(Note) };
 </script>
 

@@ -443,7 +443,7 @@ test.describe("a sharper image as it zooms", () => {
       .toContain("?w=4320");
   });
 
-  test("zoomSrc loads once the image's own pixels run out", async ({ page }) => {
+  test("zoom.src loads once the image's own pixels run out", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     const requests = requestsOf(page, "/photos/1016.webp");
     await openOn(page, "master");

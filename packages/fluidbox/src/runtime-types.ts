@@ -4,7 +4,7 @@ import type { FluidboxLabels } from "./labels";
 export type FluidboxItemId = string;
 
 export type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,

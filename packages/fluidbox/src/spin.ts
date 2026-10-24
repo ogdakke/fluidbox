@@ -4,14 +4,15 @@
  */
 import { addStyles, paintPoster, posterStyles } from "./addon-styles";
 import type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
   FluidboxItem,
   FluidboxSlideRenderer,
   FluidboxThumbnail,
 } from "./public-api";
 
 /** A spin's frames, one full turn in order. Make one with `spinItem`. */
-export interface FluidboxSpinItem extends FluidboxCustomItem {
+export interface FluidboxSpinItem extends FluidboxCustomItemBase<"spin"> {
+  readonly id: string;
   /** The frames' URLs, a full turn in order. The first is the spin's poster. */
   readonly frames: readonly string[];
   /**
@@ -20,6 +21,12 @@ export interface FluidboxSpinItem extends FluidboxCustomItem {
    * @default false
    */
   readonly autoplay?: boolean | number;
+}
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    spin: FluidboxSpinItem;
+  }
 }
 
 /** Frames numbered in their URLs, as `{ src: "/mug/{index}.webp", count: 36 }`. */
@@ -36,17 +43,12 @@ export interface FluidboxSpinFrameTemplate {
 /** What `spinItem` takes. */
 export interface FluidboxSpinItemOptions extends Omit<
   FluidboxSpinItem,
-  "type" | "id" | "render" | "frames" | "thumbnail"
+  "type" | "id" | "frames" | "thumbnail"
 > {
   readonly frames: readonly string[] | FluidboxSpinFrameTemplate;
   /** Defaults to the first frame's URL. */
   readonly id?: string;
   readonly thumbnail?: FluidboxThumbnail;
-  /**
-   * The key of the renderer in `renderers`.
-   * @default "spin"
-   */
-  readonly render?: string;
 }
 
 /** The frames' URLs from a list or a template. */
@@ -67,16 +69,15 @@ export function spinItem(options: FluidboxSpinItemOptions): FluidboxSpinItem {
   if (!frames.length) throw new RangeError("A spin needs at least one frame.");
   return {
     ...options,
-    type: "custom",
+    type: "spin",
     id: options.id ?? frames[0]!,
-    render: options.render ?? "spin",
     frames,
   };
 }
 
 /** Whether an item is a spin made by `spinItem`. */
 export function isSpinItem(item: FluidboxItem): item is FluidboxSpinItem {
-  return item.type === "custom" && Array.isArray((item as Partial<FluidboxSpinItem>).frames);
+  return item.type === "spin";
 }
 
 /** What `createSpinRenderer` takes. */

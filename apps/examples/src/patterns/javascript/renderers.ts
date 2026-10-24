@@ -2,7 +2,7 @@
 import { createFluidbox, itemLabel, type FluidboxRenderer } from "@ogdakke/fluidbox";
 import { media, theme, thumbnailSrc } from "../shared";
 
-// Draws items of type "custom" whose render is "note".
+// Draws items of type "note".
 const note: FluidboxRenderer = ({ target }) => {
   const article = document.createElement("article");
   article.className = "pattern-note";

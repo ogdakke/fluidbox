@@ -10,7 +10,8 @@ import {
   idOf,
   itemLabel as rootItemLabel,
   type Fluidbox,
-  type FluidboxCustomItem,
+  type FluidboxCustomItemBase,
+  type FluidboxItemTypes,
   type FluidboxIframeItem,
   type FluidboxImageItem,
   type FluidboxItem,
@@ -77,7 +78,7 @@ const assert = <T extends true>(): T => true as T;
 // Items: flat, with the HTML attribute names of the element the viewer draws.
 
 const photo = {
-  type: "img",
+  type: "image",
   src: "/full.jpg",
   srcset: "/full-1200.jpg 1200w, /full.jpg 2400w",
   sizes: "100vw",
@@ -112,34 +113,44 @@ const embed = {
   referrerPolicy: "no-referrer",
   sandbox: "allow-scripts",
 } satisfies FluidboxIframeItem;
+// Types of your own join the union by declaration merging, keyed by their `type`.
+interface ContractNoteItem extends FluidboxCustomItemBase<"contract-note"> {
+  readonly id: string;
+}
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    "contract-note": ContractNoteItem;
+  }
+}
 const note = {
-  type: "custom",
+  type: "contract-note",
   id: "note",
-  render: "note",
   title: "Note",
   width: 400,
   height: 300,
-} satisfies FluidboxCustomItem;
+} satisfies FluidboxItem;
+assert<Equal<FluidboxItemTypes["contract-note"], ContractNoteItem>>();
+assert<Equal<Extract<FluidboxItem, { type: "contract-note" }>, ContractNoteItem>>();
+assert<Equal<Extract<FluidboxItem, { type: "image" }>, FluidboxImageItem>>();
 
 // @ts-expect-error images need intrinsic dimensions
-const missingDimensions: FluidboxImageItem = { type: "img", src: "/bad.jpg", alt: "Bad" };
-// @ts-expect-error a custom item needs an id: there is no src to default it to
-const anonymousCustom: FluidboxCustomItem = {
-  type: "custom",
-  render: "note",
-  title: "N",
-  width: 1,
-  height: 1,
-};
+const missingDimensions: FluidboxImageItem = { type: "image", src: "/bad.jpg", alt: "Bad" };
+// @ts-expect-error a type of your own needs its title and size
+const anonymousCustom: FluidboxItem = { type: "contract-note", id: "n" };
+// @ts-expect-error a type nobody declared is not an item
+const undeclared: FluidboxItem = { type: "undeclared", id: "x", title: "", width: 1, height: 1 };
+// @ts-expect-error "custom" items are gone: the type names the slide
+const customType: FluidboxItem = { type: "custom", id: "x", title: "", width: 1, height: 1 };
 // @ts-expect-error a video poster is a URL, not an image object
 const posterObject: FluidboxVideoItem = { ...video, poster: { src: "/poster.jpg" } };
 // @ts-expect-error there is no media wrapper
 const nested: FluidboxItem = { id: "nested", media: photo };
 // @ts-expect-error srcset strings replace candidate lists
 const candidates: FluidboxImageItem = { ...photo, candidates: [{ src: "/a.jpg", width: 1 }] };
-// @ts-expect-error the old "image" type name is gone
-const oldType: FluidboxItem = { ...photo, type: "image" };
-void [missingDimensions, anonymousCustom, posterObject, nested, candidates, oldType];
+// @ts-expect-error the old "img" type name is gone
+const oldType: FluidboxItem = { ...photo, type: "img" };
+void [missingDimensions, anonymousCustom, undeclared, customType, posterObject, nested];
+void [candidates, oldType];
 
 // Your own fields flow through every callback and the state.
 type Photo = FluidboxImageItem & { readonly credit: string };
@@ -233,7 +244,7 @@ createFluidbox({ items: photos, portal: viewer });
 // @ts-expect-error events replace callbacks
 createFluidbox({ items: photos, onEvent() {} });
 // A custom slide's renderer follows whether its slide is on show.
-const clip: FluidboxSlideRenderer<Photo | FluidboxCustomItem> = ({
+const clip: FluidboxSlideRenderer<Photo | ContractNoteItem> = ({
   active,
   onActiveChange,
   signal,
@@ -242,6 +253,7 @@ const clip: FluidboxSlideRenderer<Photo | FluidboxCustomItem> = ({
   const stop: () => void = onActiveChange((now: boolean) => void [playing, now]);
   signal.addEventListener("abort", stop);
 };
+createFluidbox<Photo | ContractNoteItem>({ items: photos, renderers: { "contract-note": clip } });
 // Other renderers don't get it.
 // @ts-expect-error a filmstrip thumbnail is never on show as a slide
 const thumbnailActive: FluidboxRenderer = ({ active }) => void active;
@@ -261,7 +273,6 @@ createFluidbox<Shop>({
     }),
   ],
   renderers: {
-    clip,
     note: note2,
     embed: renderEmbed,
     spin: createSpinRenderer({ label: (frame, count) => `${frame}/${count}` }),
@@ -305,15 +316,16 @@ createFluidbox({ items: photos, controls: ["close", "zoomIn", "zoomOut", "zoomRe
 // @ts-expect-error the zoom controls are named in camel case
 createFluidbox({ items: photos, controls: ["zoom-in"] });
 const masterPhoto: FluidboxImageItem = {
-  type: "img",
+  type: "image",
   src: "/one.jpg",
   alt: "",
   width: 1,
   height: 1,
-  zoomSrc: "/one-master.jpg",
-  zoomSrcset: "/one-3200.jpg 3200w, /one-6400.jpg 6400w",
+  zoom: { src: "/one-master.jpg", srcset: "/one-3200.jpg 3200w, /one-6400.jpg 6400w" },
 };
-void masterPhoto;
+// @ts-expect-error the zoom image is `zoom.src`
+const flatZoom: FluidboxImageItem = { ...masterPhoto, zoomSrc: "/one-master.jpg" };
+void [masterPhoto, flatZoom];
 
 const button = document.createElement("button");
 const unbind: () => void = fluidbox.bind(button, photos[0]!, {

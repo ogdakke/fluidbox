@@ -3,7 +3,7 @@ import { createItemList, idOf, toList, toSource } from "../src/items";
 import type { FluidboxImageItem } from "../src/public-api";
 
 const photo = (index: number): FluidboxImageItem => ({
-  type: "img",
+  type: "image",
   id: `photo-${index}`,
   src: `/photos/${index}.jpg`,
   alt: `Photo ${index + 1}`,
@@ -68,7 +68,7 @@ describe("createItemList", () => {
 
 describe("an array of items", () => {
   const media = (src: string, id?: string): FluidboxImageItem => ({
-    type: "img",
+    type: "image",
     ...(id === undefined ? {} : { id }),
     src,
     alt: src,

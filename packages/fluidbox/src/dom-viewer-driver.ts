@@ -1031,7 +1031,7 @@ export class DomViewerDriver<
 
   /** Name the dialog for an item, and announce it: by `name`, by its own name, or not. */
   #render(item: TItem, index: number, announce: string | boolean) {
-    const label = item.type === "img" ? item.alt : item.title;
+    const label = item.type === "image" ? item.alt : item.title;
     this.#portal.dialog.setAttribute("aria-label", label || this.#labels.viewer);
     const count = this.#controller?.state.count ?? 1;
     if (announce !== false && count > 1) {

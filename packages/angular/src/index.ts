@@ -53,7 +53,8 @@ export {
 export type {
   Fluidbox,
   FluidboxCommandOptions,
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
+  FluidboxItemTypes,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,

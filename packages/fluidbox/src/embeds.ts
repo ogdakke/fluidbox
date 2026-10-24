@@ -6,7 +6,7 @@
 import { addStyles, paintPoster, posterStyles } from "./addon-styles";
 import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
 import type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
   FluidboxItem,
   FluidboxSlideRenderer,
   FluidboxThumbnail,
@@ -16,7 +16,8 @@ import type {
 export type FluidboxEmbedProvider = "youtube" | "vimeo";
 
 /** A YouTube or Vimeo video, drawn by an embed renderer. Make one with `youtubeItem` or `vimeoItem`. */
-export interface FluidboxEmbedItem extends FluidboxCustomItem {
+export interface FluidboxEmbedItem extends FluidboxCustomItemBase<"embed"> {
+  readonly id: string;
   readonly provider: FluidboxEmbedProvider;
   /** The provider's id of the video. */
   readonly video: string;
@@ -30,6 +31,12 @@ export interface FluidboxEmbedItem extends FluidboxCustomItem {
    * so give a Vimeo video a `poster` or a `thumbnail`.
    */
   readonly poster?: string;
+}
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    embed: FluidboxEmbedItem;
+  }
 }
 
 /** What `youtubeItem` and `vimeoItem` take besides the video. */
@@ -46,11 +53,6 @@ export interface FluidboxEmbedItemOptions {
   readonly poster?: string;
   /** Where playback starts, in seconds. Overrides a time in the URL. */
   readonly start?: number;
-  /**
-   * The key of the renderer in `renderers`.
-   * @default "embed"
-   */
-  readonly render?: string;
 }
 
 const YOUTUBE_ID = /^[\w-]{11}$/;
@@ -148,9 +150,8 @@ function embedItem(
     options.poster ??
     (provider === "youtube" ? `https://i.ytimg.com/vi/${found.video}/hqdefault.jpg` : undefined);
   return {
-    type: "custom",
+    type: "embed",
     id: options.id ?? `${provider}:${found.video}`,
-    render: options.render ?? "embed",
     title: options.title,
     width: options.width ?? (found.short ? 720 : 1280),
     height: options.height ?? (found.short ? 1280 : 720),
@@ -219,7 +220,7 @@ export function embedUrl(item: FluidboxEmbedItem, { autoplay = true } = {}): str
 export function isEmbedItem(item: FluidboxItem): item is FluidboxEmbedItem {
   const provider = (item as Partial<FluidboxEmbedItem>).provider;
   return (
-    item.type === "custom" &&
+    item.type === "embed" &&
     (provider === "youtube" || provider === "vimeo") &&
     typeof (item as Partial<FluidboxEmbedItem>).video === "string"
   );

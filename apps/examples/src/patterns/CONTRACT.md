@@ -77,7 +77,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    ArrowRight, then a horizontal wheel swipe → still "Item 3 of 4".
 6. **zoom** — two galleries, each with one trigger per item, in this order: the first of
    `zoomPhotos` (raster photos with a `srcset` of 640w and 1280w and the full-size file as
-   `zoomSrc`; the triggers show `thumbnailSrc`) with zoom `{ step: 3, max: 6 }`, the second of
+   `zoom.src`; the triggers show `thumbnailSrc`) with zoom `{ step: 3, max: 6 }`, the second of
    `photos` with zoom off. The first gallery's viewer has the default controls and the zoom
    controls (`controls` with `zoomIn`, `zoomOut`, `zoomReset`; the framework Controls part with
    `zoom`; `<fluidbox-controls zoom>` for elements), and an

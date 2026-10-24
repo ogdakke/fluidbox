@@ -62,7 +62,7 @@ export function sameItems(a: readonly FluidboxItem[], b: readonly FluidboxItem[]
 
 /** The text an item is named by: its alt text or title. */
 export function itemLabel(item: FluidboxItem): string {
-  return item.type === "img" ? item.alt : item.title;
+  return item.type === "image" ? item.alt : item.title;
 }
 
 /** A target as an index or an id. An item names itself by its id. */

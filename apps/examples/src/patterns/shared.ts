@@ -3,7 +3,12 @@
  * implements the same thirteen patterns in `src/patterns/<framework>/`, against the
  * hooks listed in CONTRACT.md, so one browser spec checks them all.
  */
-import type { FluidboxImageItem, FluidboxItem, FluidboxLabels } from "@ogdakke/fluidbox";
+import type {
+  FluidboxCustomItemBase,
+  FluidboxImageItem,
+  FluidboxItem,
+  FluidboxLabels,
+} from "@ogdakke/fluidbox";
 import { youtubeItem } from "@ogdakke/fluidbox/embeds";
 import { modelItem } from "@ogdakke/fluidbox/model";
 import { spinItem } from "@ogdakke/fluidbox/spin";
@@ -30,7 +35,7 @@ export const album: FluidboxImageItem[] = art("album", [
 
 /** 3 origins: a product card and a horizontal scroller. */
 export const product: FluidboxImageItem = {
-  type: "img",
+  type: "image",
   src: "/runner.svg",
   alt: "Illustrated coral running shoe",
   width: 1000,
@@ -47,12 +52,22 @@ export const strip: FluidboxImageItem[] = art("strip", [
   "canyon",
 ]);
 
+/** 4 renderers: a note, an item type of the examples' own. */
+export interface NoteItem extends FluidboxCustomItemBase<"note"> {
+  readonly id: string;
+}
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    note: NoteItem;
+  }
+}
+
 /** 4 renderers: one custom note, one live map, one video, one YouTube embed. */
 export const media: FluidboxItem[] = [
   {
-    type: "custom",
+    type: "note",
     id: "media-note",
-    render: "note",
     title: "A note",
     width: 800,
     height: 600,
@@ -95,15 +110,15 @@ export const media: FluidboxItem[] = [
 ];
 
 /**
- * 6 zoom: photos at two widths in `srcset`, and the full-size file as `zoomSrc`,
+ * 6 zoom: photos at two widths in `srcset`, and the full-size file as `zoom.src`,
  * which the viewer loads once a zoom shows more pixels than the 1280w has.
  */
 const ladder = (id: string, alt: string, width: number, height: number): FluidboxImageItem => ({
   id: `zoom-${id}`,
-  type: "img",
+  type: "image",
   src: `/photos/${id}-1280.webp`,
   srcset: `/photos/${id}-640.webp 640w, /photos/${id}-1280.webp 1280w`,
-  zoomSrc: `/photos/${id}.webp`,
+  zoom: { src: `/photos/${id}.webp` },
   alt,
   width,
   height,
@@ -119,7 +134,7 @@ export const zoomPhotos: FluidboxImageItem[] = [
 /** 12 hover: a product photo, shown on the page at 640w, magnified from the 1600w. */
 export const productPhoto: FluidboxImageItem = {
   id: "fjord-wood",
-  type: "img",
+  type: "image",
   src: "/products/fjord-wood.webp",
   srcset: "/products/fjord-wood-640.webp 640w, /products/fjord-wood.webp 1600w",
   alt: "The print in a wood frame",
@@ -173,7 +188,7 @@ export const theme = "dusk";
 /** The picture a trigger shows for an item: its thumbnail, a video's poster, or the image. */
 export const thumbnailSrc = (item: FluidboxItem) =>
   item.thumbnail?.src ??
-  (item.type === "video" ? item.poster : item.type === "img" ? item.src : "");
+  (item.type === "video" ? item.poster : item.type === "image" ? item.src : "");
 
 /** 10 rtl: the viewer's words in Arabic, with Arabic-Indic digits in the position. */
 // Plain "ar" now formats with Western digits; nu-arab asks for Arabic-Indic ones.

@@ -5,8 +5,8 @@ import { createTrigger } from "../src/trigger";
 import type { Fluidbox, FluidboxImageItem, FluidboxState } from "../src/public-api";
 
 const items: FluidboxImageItem[] = [
-  { id: "one", type: "img", src: "/one.jpg", alt: "One", width: 4, height: 3 },
-  { id: "two", type: "img", src: "/two.jpg", alt: "Two", width: 4, height: 3 },
+  { id: "one", type: "image", src: "/one.jpg", alt: "One", width: 4, height: 3 },
+  { id: "two", type: "image", src: "/two.jpg", alt: "Two", width: 4, height: 3 },
 ];
 
 // There is no document here, as in a render on the server: a fluidbox that

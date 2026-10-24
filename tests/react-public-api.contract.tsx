@@ -17,8 +17,8 @@ interface Photo extends FluidboxImageItem {
 }
 
 const items: readonly Photo[] = [
-  { type: "img", src: "/one.jpg", alt: "One", width: 1200, height: 800, credit: "A" },
-  { type: "img", src: "/two.jpg", alt: "Two", width: 1200, height: 800, credit: "B" },
+  { type: "image", src: "/one.jpg", alt: "One", width: 1200, height: 800, credit: "A" },
+  { type: "image", src: "/two.jpg", alt: "Two", width: 1200, height: 800, credit: "B" },
 ];
 
 function Caption(): ReactElement {

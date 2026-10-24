@@ -15,7 +15,7 @@ import type { FluidboxItem } from "./public-api";
 export function fitSize(item: FluidboxItem) {
   const height = "var(--fluidbox-content-height, var(--fluidbox-height, 100svh))";
   const capped = (pixels: number) =>
-    item.type === "img" ? `, calc(${pixels}px * var(--fluidbox-max-upscale, 1e6))` : "";
+    item.type === "image" ? `, calc(${pixels}px * var(--fluidbox-max-upscale, 1e6))` : "";
   return {
     width: `min(100cqw, calc(${height} * ${item.width / item.height})${capped(item.width)})`,
     height: `min(${(item.height / item.width) * 100}cqw, ${height}${capped(item.height)})`,

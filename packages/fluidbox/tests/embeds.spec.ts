@@ -91,12 +91,11 @@ describe("parseVimeo", () => {
 });
 
 describe("youtubeItem and vimeoItem", () => {
-  it("make custom items for the embed renderer", () => {
+  it("make embed items", () => {
     const item = youtubeItem(`https://youtu.be/${id}?t=12`, { title: "A talk" });
     expect(item).toEqual({
-      type: "custom",
+      type: "embed",
       id: `youtube:${id}`,
-      render: "embed",
       title: "A talk",
       width: 1280,
       height: 720,
@@ -114,11 +113,9 @@ describe("youtubeItem and vimeoItem", () => {
       title: "A Short",
       id: "short",
       start: 7,
-      render: "video",
       thumbnail,
     });
-    expect(item).toMatchObject({ id: "short", width: 720, height: 1280, start: 7 });
-    expect(item.render).toBe("video");
+    expect(item).toMatchObject({ id: "short", type: "embed", width: 720, height: 1280, start: 7 });
     expect(item.thumbnail).toBe(thumbnail);
   });
 
@@ -133,10 +130,8 @@ describe("youtubeItem and vimeoItem", () => {
     expect(() => vimeoItem(`https://youtu.be/${id}`, { title: "" })).toThrow(TypeError);
   });
 
-  it("are told apart from other custom items", () => {
-    expect(
-      isEmbedItem({ type: "custom", id: "x", render: "x", title: "", width: 1, height: 1 }),
-    ).toBe(false);
+  it("are told apart from other items", () => {
+    expect(isEmbedItem({ type: "image", src: "/x.jpg", alt: "", width: 1, height: 1 })).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@ import type { FluidboxImageItem } from "../src/public-api";
 import { fluidboxStaticViewer, fluidboxStaticViewerNodes } from "../src/static-viewer";
 
 const photo = (index: number): FluidboxImageItem => ({
-  type: "img",
+  type: "image",
   id: `photo-${index}`,
   src: `/photos/${index}.jpg`,
   alt: `Photo ${index + 1}`,

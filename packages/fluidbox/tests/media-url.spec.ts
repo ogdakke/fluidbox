@@ -71,7 +71,7 @@ describe("checkItemUrls", () => {
 
   it("leaves images and custom content alone", () => {
     expect(() =>
-      checkItemUrls({ type: "img", src: "data:image/png;base64,", alt: "", width: 1, height: 1 }),
+      checkItemUrls({ type: "image", src: "data:image/png;base64,", alt: "", width: 1, height: 1 }),
     ).not.toThrow();
   });
 
