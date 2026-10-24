@@ -95,22 +95,22 @@ const activationJsGzipLimits: Record<Entry, number> = {
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
-  root: 45_200,
-  elements: 48_550,
-  react: 51_900,
-  solid: 48_400,
-  vue: 49_050,
-  angular: 49_400,
-  thumbnails: 3_850,
-  sheet: 7_350,
-  kit: 1_550,
-  "hover-zoom": 1_500,
-  embed: 3_050,
-  model: 1_450,
-  spin: 2_450,
-  "react-embed": 54_500,
-  "react-model": 53_000,
-  "react-spin": 53_800,
+  root: 1_200,
+  elements: 1_200,
+  react: 1_200,
+  solid: 1_200,
+  vue: 1_200,
+  angular: 1_200,
+  thumbnails: 50,
+  sheet: 50,
+  kit: 50,
+  "hover-zoom": 50,
+  embed: 50,
+  model: 50,
+  spin: 50,
+  "react-embed": 1_200,
+  "react-model": 1_200,
+  "react-spin": 1_200,
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
