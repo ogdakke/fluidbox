@@ -960,3 +960,105 @@ viewer.addEventListener("reachend", async () => {
 `withCount(count)` is new on the lists `createItemList` returns: a new list over the same
 `item`/`index` functions that shares the made-items map, so the ids already known resolve at
 once. Hook now: none beyond what `setItems` does today.
+
+## 2.21 Headless controls: no icons, `bindControl`, `icons`
+
+**Decided (the user, fourth amendment):** "Consumers should bring their own icons … lean more
+into headless, with just the default styles we need to make things function, and everything else
+on the consumer." The package's JavaScript ships no icon. The opt-in baseline stylesheet (§10.4)
+can draw today's glyphs in CSS.
+
+### What a control renders
+
+Every control, in plain JS, the elements and every binding, follows one rule:
+
+| The control has                   | It renders                                                                | Its accessible name                                                                                                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| no content                        | its label as text (`labels.close`, "Close"), with `data-fluidbox-default` | the text                                                                                                                                                                                              |
+| content (an icon, text, anything) | the content                                                               | `aria-label` from `labels`, unless the control has its own `aria-label`/`aria-labelledby`, or `label={false}` in a binding (`data-fluidbox-label="content"` in markup), which names it by its content |
+
+A text-only fallback still works and is still accessible with no stylesheet beyond the
+functional one. `data-fluidbox-default` lets a theme restyle fallbacks (the baseline turns them
+into glyphs, §10.4) without touching controls that carry the app's own icons. The same rule
+covers the state-switching controls: Fullscreen and Slideshow swap their text, or their
+`aria-label`, between their two labels.
+
+`control-icons.ts`, `controlIcon`, `CONTROL_ICON_PATHS`, `CONTROL_ICON_ATTRIBUTES`, the React
+`defaultIcon` and its Vue, Solid and Angular equivalents, and the static viewer's icon nodes
+(`static-viewer.ts:54-58`) are deleted. The server copy's controls render their label text, as
+the live ones do, so the copy and the takeover still match. The add-ons' glyphs go the same way
+(§4.9).
+
+### Plain JS
+
+```ts
+export interface FluidboxOptions<TItem> {
+  // …
+  /** The default controls to draw: plain <button>s with text, or `icons`. */
+  readonly controls?: boolean | readonly FluidboxControlName[];
+  /** Your icons for the default controls. Each call returns a new Node. */
+  readonly icons?: Partial<Record<FluidboxControlName, () => Node>>;
+}
+
+export interface Fluidbox<TItem> {
+  // …
+  /**
+   * Make your own element a control: it runs the command on click, gets the
+   * control's data attribute, its `aria-label` (unless it has its own),
+   * `disabled` and `hidden` from state, and for Fullscreen and Slideshow the
+   * label that matches the state. Returns its cleanup.
+   */
+  bindControl(
+    element: HTMLElement,
+    name: FluidboxControlName,
+    options?: { signal?: AbortSignal },
+  ): () => void;
+}
+```
+
+- `controls` draws unstyled `<button type="button" data-fluidbox-close>Close</button>`
+  elements. With `icons.close`, the button holds the returned node and gets `aria-label`.
+- `icons` factories return Nodes, never HTML strings, so the package needs no `innerHTML` and
+  stays clean under Trusted Types (`require-trusted-types-for 'script'`). The factory is called
+  once per drawn button. A `<template>` clone or `document.createElementNS` both work:
+
+  ```ts
+  const closeIcon = document.querySelector<HTMLTemplateElement>("#icon-close")!;
+  createFluidbox({ items, icons: { close: () => closeIcon.content.cloneNode(true) } });
+  ```
+
+- `bindControl` works anywhere: in the viewer's layer, or on the page (a Slideshow button in a
+  page toolbar). Inside the viewer's layer, any `[data-fluidbox-close]` and the rest are wired as
+  now (`wireControls`, `viewer-layer.ts:101`) without calling it. `bindControl` is for elements the
+  layer doesn't own, and it adds the label and `hidden` handling the attribute wiring lacked.
+- `retry` joins `FluidboxControlName` (§3.19), so `bindControl(button, "retry")` wires a custom
+  error UI.
+
+### Custom elements
+
+`<fluidbox-gallery>` with no `<template slot="viewer">` draws what plain JS draws: Previous, Next
+and Close as plain text buttons. Markup supplies icons three ways, from narrow to broad:
+
+```html
+<!-- 1. Your own button, anywhere in the viewer template: its content is the icon. -->
+<template slot="viewer">
+  <button data-fluidbox-close><svg aria-hidden="true">…</svg></button>
+  <fluidbox-toolbar></fluidbox-toolbar>
+</template>
+
+<!-- 2. An icon for every default button of that control, in this gallery. -->
+<fluidbox-gallery>
+  <template data-fluidbox-icon="close"><svg aria-hidden="true">…</svg></template>
+  <template data-fluidbox-icon="next"><svg aria-hidden="true">…</svg></template>
+</fluidbox-gallery>
+
+<!-- 3. The `icons` property, as in plain JS. -->
+<script type="module">
+  gallery.icons = { close: () => closeIcon.content.cloneNode(true) };
+</script>
+```
+
+A `data-fluidbox-icon` template is cloned into each default button the gallery draws: the
+defaults, and placeholders such as `<fluidbox-toolbar>` and `<fluidbox-zoom-controls>` when
+expanded. Templates are inert, so their SVG costs nothing until cloned, and cloning is
+Trusted-Types clean. The `icons` property wins over a template for the same name.
