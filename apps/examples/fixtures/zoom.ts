@@ -31,9 +31,9 @@ const items: readonly FluidboxItem[] = [
     id: "master",
     type: "img",
     src: "/photos/1016.webp?w=1080",
-    alt: "A mountain lake",
-    width: 1800,
-    height: 1200,
+    alt: "A red rock canyon",
+    width: 1920,
+    height: 1080,
     zoomSrc: "/photos/1016.webp?master",
   },
   {
