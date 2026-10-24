@@ -7,6 +7,7 @@
 import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { transform } from "lightningcss";
+import { checkBaselineCss } from "./check-baseline-css";
 
 const root = resolve(import.meta.dirname, "..");
 const core = resolve(root, "packages/fluidbox");
@@ -19,6 +20,10 @@ async function run(command: string[], cwd: string) {
   }
 }
 
+// baseline.css is layered and the rest unlayered: a baseline rule on a property
+// the functional CSS sets on the same element would be dead.
+const deadRules = checkBaselineCss();
+if (deadRules.length) throw new Error(deadRules.join("\n"));
 await run(["bun", "run", "build:core"], core);
 // The stylesheets' comments document them for the CSS reference; consumers get
 // the rules alone, minified for the browsers in apps/docs/content/browser-support.md.
@@ -31,14 +36,10 @@ const targets = {
   edge: major(140),
   firefox: major(142),
 };
-// Each stylesheet opens by naming both layers, so whichever loads first fixes
-// their order. The minifier drops a statement no rule in the file needs, so it
-// goes back on.
-const layers = "@layer fluidbox,fluidbox-baseline;";
 for (const name of ["styles.css", "thumbnails.css", "sheet.css", "baseline.css"]) {
   const path = resolve(core, "dist", name);
   const { code } = transform({ filename: name, code: await readFile(path), minify: true, targets });
-  await writeFile(path, layers + code.toString().replace(/^@layer fluidbox;/, ""));
+  await writeFile(path, code);
 }
 await Promise.all(
   bindings.map((name) => run(["bun", "run", "build"], resolve(root, "packages", name))),

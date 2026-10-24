@@ -249,12 +249,12 @@ export interface FluidboxEmbedRendererOptions {
 
 // Over the poster, which is absolute too, and centred. Its look is in baseline.css.
 const embedStyles = `
+/* Centred over the poster at whatever size baseline.css or you give it. */
 :where([data-fluidbox-embed] > [data-fluidbox-embed-play]) {
   position: absolute;
-  inset: 0;
-  margin: auto;
-  width: fit-content;
-  height: fit-content;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
 }
 :where([data-fluidbox-embed] > iframe) {
   position: absolute;

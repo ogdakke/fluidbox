@@ -280,6 +280,12 @@ export const states: readonly CssName[] = [
 
 /** Names the runtime and the stylesheets use among themselves. They can change without notice. */
 export const internal: readonly string[] = [
+  "--fluidbox-baseline-backdrop",
+  "--fluidbox-baseline-download",
+  "--fluidbox-baseline-fullscreen",
+  "--fluidbox-baseline-share",
+  "--fluidbox-baseline-slideshow",
+  "--fluidbox-baseline-slot",
   "--fluidbox-chrome-reach",
   "--fluidbox-controls-reveal-delay",
   "--fluidbox-thumbnails-hide",

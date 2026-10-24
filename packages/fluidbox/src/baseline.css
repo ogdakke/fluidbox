@@ -1,10 +1,12 @@
 /* The default look: controls, glyphs, focus rings, fades, the thumbnails' and the sheet's look. */
-@layer fluidbox, fluidbox-baseline;
+@layer fluidbox-baseline;
 
-/* Import it after styles.css, thumbnails.css and sheet.css. Every rule is in
-   the fluidbox-baseline layer and behind :where(), so a plain rule of yours
-   beats it, and every transition waits for prefers-reduced-motion:
-   no-preference. */
+/* Every rule is in the fluidbox-baseline layer and behind :where(), so any
+   rule of yours outside a layer, or in a layer after this one, beats it.
+   styles.css, thumbnails.css and sheet.css are in no layer, so this file never
+   sets a property they set on the same element: where both have a say, they
+   read a token this file sets. Every transition waits for
+   prefers-reduced-motion: no-preference. */
 
 @layer fluidbox-baseline {
   :where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger])) {
@@ -49,7 +51,8 @@
   /** The backdrop's `backdrop-filter`, such as `blur(24px)`. @input --fluidbox-backdrop-filter @on Backdrop */
   /** The backdrop's resting opacity. @input --fluidbox-backdrop-opacity @on Backdrop */
   :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-backdrop] {
-    background: var(--fluidbox-backdrop-background, var(--fluidbox-background, #111));
+    /* styles.css paints it, after --fluidbox-backdrop-background. */
+    --fluidbox-baseline-backdrop: var(--fluidbox-background, #111);
     opacity: var(--fluidbox-backdrop-opacity, 1);
     -webkit-backdrop-filter: var(--fluidbox-backdrop-filter, none);
     backdrop-filter: var(--fluidbox-backdrop-filter, none);
@@ -203,8 +206,8 @@
   }
 
   /* Full screen, Download, Share, Slideshow and the counter: a row from the
-     top-left corner, the top-right right to left. A control that can't work
-     here hides and leaves its place. */
+     top-left corner, the top-right right to left, in that order. A control
+     that can't work here hides, and the ones after it close up. */
   :where([data-fluidbox-viewer], [data-fluidbox-flight])
     :is(
       [data-fluidbox-fullscreen],
@@ -216,6 +219,7 @@
     position: absolute;
     z-index: 6;
     top: calc(var(--fluidbox-stage-top) + 16px);
+    left: calc(var(--fluidbox-stage-left) + 16px + var(--fluidbox-baseline-slot, 0) * 40px);
     display: grid;
     place-items: center;
     box-sizing: border-box;
@@ -251,81 +255,82 @@
     ):hover {
     background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
   }
+  /* Which of them show beside each other, read by the ones after. */
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(
+        > :is(
+          [data-fluidbox-fullscreen],
+          [data-fluidbox-download],
+          [data-fluidbox-share],
+          [data-fluidbox-slideshow],
+          [data-fluidbox-counter]
+        )
+      )
+  ) {
+    --fluidbox-baseline-fullscreen: 0;
+    --fluidbox-baseline-download: 0;
+    --fluidbox-baseline-share: 0;
+    --fluidbox-baseline-slideshow: 0;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(> [data-fluidbox-fullscreen]:not([hidden]))
+  ) {
+    --fluidbox-baseline-fullscreen: 1;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(> [data-fluidbox-download]:not([hidden]))
+  ) {
+    --fluidbox-baseline-download: 1;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight]) :has(> [data-fluidbox-share]:not([hidden]))
+  ) {
+    --fluidbox-baseline-share: 1;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(> [data-fluidbox-slideshow]:not([hidden]))
+  ) {
+    --fluidbox-baseline-slideshow: 1;
+  }
   :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-fullscreen] {
-    left: calc(var(--fluidbox-stage-left) + 16px);
+    --fluidbox-baseline-slot: 0;
   }
   :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-download] {
-    left: calc(var(--fluidbox-stage-left) + 56px);
+    --fluidbox-baseline-slot: var(--fluidbox-baseline-fullscreen, 0);
   }
   :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-share] {
-    left: calc(var(--fluidbox-stage-left) + 96px);
+    --fluidbox-baseline-slot: calc(
+      var(--fluidbox-baseline-fullscreen, 0) + var(--fluidbox-baseline-download, 0)
+    );
   }
   :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slideshow] {
-    left: calc(var(--fluidbox-stage-left) + 136px);
+    --fluidbox-baseline-slot: calc(
+      var(--fluidbox-baseline-fullscreen, 0) + var(--fluidbox-baseline-download, 0) +
+        var(--fluidbox-baseline-share, 0)
+    );
   }
   :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-counter] {
-    left: calc(var(--fluidbox-stage-left) + 176px);
+    --fluidbox-baseline-slot: calc(
+      var(--fluidbox-baseline-fullscreen, 0) + var(--fluidbox-baseline-download, 0) +
+        var(--fluidbox-baseline-share, 0) + var(--fluidbox-baseline-slideshow, 0)
+    );
   }
-  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-fullscreen] {
+  :where([data-fluidbox-viewer][dir="rtl"])
+    :is(
+      [data-fluidbox-fullscreen],
+      [data-fluidbox-download],
+      [data-fluidbox-share],
+      [data-fluidbox-slideshow],
+      [data-fluidbox-counter]
+    ) {
     left: auto;
-    right: calc(var(--fluidbox-stage-right) + 16px);
-  }
-  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-download] {
-    left: auto;
-    right: calc(var(--fluidbox-stage-right) + 56px);
-  }
-  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-share] {
-    left: auto;
-    right: calc(var(--fluidbox-stage-right) + 96px);
-  }
-  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-slideshow] {
-    left: auto;
-    right: calc(var(--fluidbox-stage-right) + 136px);
-  }
-  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-counter] {
-    left: auto;
-    right: calc(var(--fluidbox-stage-right) + 176px);
+    right: calc(var(--fluidbox-stage-right) + 16px + var(--fluidbox-baseline-slot, 0) * 40px);
   }
 
-  /* The package hides the controls through the opening and the dismiss. This
-     layer comes later, so it says so again over its own opacity and fades. */
-  :where([data-fluidbox-viewer], [data-fluidbox-flight])
-    [data-fluidbox-dialog][data-gallery][data-opening]
-    :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
-  :where([data-fluidbox-viewer], [data-fluidbox-flight])
-    [data-fluidbox-dialog][data-opening]
-    :is(
-      [data-fluidbox-chrome],
-      [data-fluidbox-portal]
-        > :not(
-          [data-fluidbox-previous],
-          [data-fluidbox-next],
-          [data-fluidbox-close],
-          [data-fluidbox-mount]
-        ),
-      [data-fluidbox-portal] > [data-fluidbox-mount] > *
-    ) {
-    opacity: 0;
-    transition: none;
-  }
-  :where([data-fluidbox-viewer], [data-fluidbox-flight])
-    [data-fluidbox-dialog][data-dismissing]
-    :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
-  :where([data-fluidbox-viewer], [data-fluidbox-flight])
-    [data-fluidbox-dialog][data-dismissing]
-    :is(
-      [data-fluidbox-chrome],
-      [data-fluidbox-portal]
-        > :not(
-          [data-fluidbox-previous],
-          [data-fluidbox-next],
-          [data-fluidbox-close],
-          [data-fluidbox-mount]
-        ),
-      [data-fluidbox-portal] > [data-fluidbox-mount] > *
-    ) {
-    opacity: 0;
-  }
   /* Your portal content, and other layers marked data-fluidbox-chrome, fade
      with the controls. */
   @media (prefers-reduced-motion: no-preference) {
@@ -476,9 +481,6 @@
       :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
       border-color: GrayText;
       color: GrayText;
-    }
-    :where([data-fluidbox-viewer], [data-fluidbox-flight]) :focus-visible {
-      outline-color: Highlight;
     }
   }
 
@@ -760,12 +762,6 @@
     outline: 2px solid var(--fluidbox-focus-color, currentColor);
     outline-offset: 2px;
   }
-  @media (forced-colors: active) {
-    :where([data-fluidbox-viewer], [data-fluidbox-flight])
-      [data-fluidbox-thumbnails-item][aria-selected="true"] {
-      outline: 2px solid SelectedItem;
-    }
-  }
   @media (prefers-contrast: more) {
     :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] {
       opacity: 0.8;
@@ -796,8 +792,6 @@
   }
   :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet] {
     border-radius: var(--fluidbox-sheet-radius) var(--fluidbox-sheet-radius) 0 0;
-    background: var(--fluidbox-sheet-background);
-    color: var(--fluidbox-sheet-color);
     box-shadow:
       0 -1px 0 rgb(0 0 0 / 0.06),
       0 -12px 40px rgb(0 0 0 / 0.18);
@@ -857,12 +851,6 @@
     [data-fluidbox-dialog][data-fluidbox-sheet-host]
     [data-fluidbox-close] {
     opacity: calc(1 - var(--fluidbox-sheet-dismiss) * 3);
-  }
-  /* A dismiss fades the controls at once, as without a sheet. */
-  :where([data-fluidbox-viewer], [data-fluidbox-flight])
-    [data-fluidbox-dialog][data-fluidbox-sheet-host][data-dismissing]
-    :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
-    opacity: 0;
   }
 
   /* The media add-ons. */

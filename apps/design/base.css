@@ -1,11 +1,9 @@
 /* Base elements and shared components. Class names use the `fb-` prefix. */
 
-@layer fb-base {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html {
@@ -70,6 +68,7 @@ samp {
   border: 1px solid var(--fb-line);
 }
 
+/* Under baseline.css's layer (layers.css), so the viewer's controls keep its ring. */
 @layer fb-base {
   :focus-visible {
     outline: 1px solid var(--fb-fg);

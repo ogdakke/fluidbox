@@ -22,7 +22,7 @@ import "./gallery-theme.css";
 
 `styles.css`, `thumbnails.css` and `sheet.css` hold what makes the viewer work: layout, the strip, flights, zoom, hidden states and reduced motion. On its own, the viewer has a `Canvas` backdrop and plain text buttons. [`baseline.css`](#baselinecss) adds the default look.
 
-The rules sit in two cascade layers, `fluidbox` and then `fluidbox-baseline`, and each file starts by naming both. A rule of yours outside any layer beats both, whatever its selector. The package also wraps the viewer's rules in `:where([data-fluidbox-viewer], [data-fluidbox-flight])`, which adds nothing to their specificity. Either way, a rule on the same part overrides the default:
+The functional rules are in no cascade layer, so a site's resets can't break them. They select parts by data attribute inside `:where([data-fluidbox-viewer], [data-fluidbox-flight])`, which adds nothing, so most weigh one attribute. That beats an element reset such as Tailwind v3's `img, video { max-width: 100%; height: auto }`, and it is as light as a single class of yours. `baseline.css` is in the `fluidbox-baseline` layer and wholly in `:where()`, so any rule of yours outside a layer beats it, whatever its selector. A rule on the same part overrides the default look:
 
 ```css
 [data-fluidbox-close] {
@@ -41,15 +41,19 @@ The package declares the thumbnails' and the sheet's variables on the dialog wit
 }
 ```
 
+To change how the viewer works rather than how it looks, such as the media's size, match the package's selector or use its custom properties. A reset can't do it by accident.
+
 ### Your own layers
 
-The first `@layer` statement a page loads fixes the order of the layers it names. If your CSS has layers, as Tailwind's does, name them all once, before any stylesheet loads. Put resets before the package's layers, or a reset such as `* { padding: 0 }` overrides the viewer's layout. Put your components and utilities after them:
+A rule in any of your layers beats `baseline.css` if your layer comes later, and the first `@layer` statement a page loads fixes the order. If your CSS has layers, as Tailwind v4's does, name `fluidbox-baseline` with them, once, before any stylesheet loads. Put it before your components and utilities, so they win:
 
 ```css
-@layer theme, base, fluidbox, fluidbox-baseline, components, utilities;
+@layer theme, base, fluidbox-baseline, components, utilities;
 ```
 
-The package's few `!important` declarations, which hide a thumbnail during a flight and keep `[hidden]` controls hidden, win over yours in any layer.
+Nothing else depends on it. A layer named later is stronger, and every layer loses to a rule outside any layer, so an unlayered reset of yours beats `baseline.css` too. A reset such as `button { padding: 0 }` or `*, ::after { border-width: 0 }` changes the look: put it in a layer before `fluidbox-baseline`, as Tailwind v4's `base` is above. The functional rules aren't in a layer, so they win over every layer of yours, and resets in them can't touch the mechanics.
+
+The package's few `!important` declarations hide a thumbnail during a flight, keep the flight's source hidden and hand touches back to the page after a dismiss. `baseline.css` has none.
 
 ## The viewer layer
 
@@ -69,9 +73,9 @@ The container is `position: absolute` at the page's scroll position. Don't make 
 
 ## baseline.css
 
-`@ogdakke/fluidbox/baseline.css` is the default look: the round controls and where they sit, the focus rings, cursors, fades, the placeholder colour, the error message, the thumbnails' corners and current bar, the sheet's corners, shadow and handle, and the media add-ons' Play button and cursors. One file covers the viewer, the thumbnails and the sheet. Its rules are in the `fluidbox-baseline` layer and in `:where()`, so any rule of yours wins. To own the look, leave it out, or copy it and change it.
+`@ogdakke/fluidbox/baseline.css` is the default look: the round controls and where they sit, the focus rings, cursors, fades, the placeholder colour, the error message, the thumbnails' corners and current bar, the sheet's corners, shadow and handle, and the media add-ons' Play button and cursors. One file covers the viewer, the thumbnails and the sheet. Its rules are in the `fluidbox-baseline` layer and in `:where()`, so any rule of yours outside a layer, or in a later layer, wins. It never sets a property the functional CSS sets on the same element. Where both have a say, as on the backdrop's colour, the functional CSS reads a variable such as `--fluidbox-backdrop-background`, with a `Canvas` fallback, and the baseline gives it its own. To own the look, leave it out, or copy it and change it.
 
-Every transition in it sits inside `@media (prefers-reduced-motion: no-preference)`. Do the same with yours. A transition in a later layer, or outside any, overrides the package's own reduced-motion rule.
+Every transition in it sits inside `@media (prefers-reduced-motion: no-preference)`. Do the same with yours: a transition of yours that outweighs the package's own reduced-motion rule would run anyway.
 
 Don't put a `transition` or `!important` on the backdrop's `opacity`. The runtime reads and animates it.
 

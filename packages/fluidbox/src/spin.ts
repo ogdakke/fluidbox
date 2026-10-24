@@ -105,7 +105,7 @@ const spinStyles = `
   touch-action: none;
   outline-offset: -2px;
 }
-:where([data-fluidbox-spin] > [data-fluidbox-media-poster]) {
+:where([data-fluidbox-spin]) > [data-fluidbox-media-poster] {
   object-fit: contain;
 }
 `;
