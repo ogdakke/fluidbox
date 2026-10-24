@@ -24,8 +24,17 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** The item to open with, by id: a server-rendered open viewer, or a deep link. */
   readonly value?: string | null;
   readonly labels?: Partial<FluidboxLabels>;
-  /** @default { step: 2, max: 4 } */
-  readonly zoom?: false | { readonly step?: number; readonly max?: number };
+  /** @default { step: 2, max: 4, click: "single", tap: "double" } (§2.23) */
+  readonly zoom?:
+    | false
+    | {
+        readonly step?: number;
+        readonly max?: number;
+        /** What a mouse click on the media does. */
+        readonly click?: "single" | "double" | false;
+        /** What a touch or pen tap on the media does. */
+        readonly tap?: "double" | false;
+      };
   /**
    * How each item type draws its slide. Built-in types (image, video, iframe)
    * have a slide already; list one to replace it. Read when a slide mounts.
@@ -432,6 +441,19 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    */
   readonly opening: boolean;
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
+  /**
+   * What the trigger showed, when this slide is the one an open started from
+   * a trigger. `video` is set when the trigger's visual is a playing or paused
+   * `<video>`. Null on neighbours, on slides reached by moving, and for opens
+   * without a trigger. (§2.22)
+   */
+  readonly origin: FluidboxSlideOrigin | null;
+  /**
+   * Hand the playback position back to the trigger's video on close. Read
+   * once, when a close starts from this slide, before the closing flight.
+   * Returns a function that unregisters it. (§2.22)
+   */
+  returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
   /**
    * Let the media box zoom (pinch, double-tap, wheel, the zoom controls).
    * Off by default for your own media; on for drawImage.
@@ -1083,3 +1105,168 @@ A `data-fluidbox-icon` template is cloned into each default button the gallery d
 defaults, and placeholders such as `<fluidbox-toolbar>` and `<fluidbox-zoom-controls>` when
 expanded. Templates are inert, so their SVG costs nothing until cloned, and cloning is
 Trusted-Types clean. The `icons` property wins over a template for the same name.
+
+## 2.22 The trigger video's playback, for custom players
+
+The built-in video already continues a playing trigger video. On open it seeks to the trigger's
+time, twice if the trigger kept playing, and plays if the trigger was playing
+(`continueVideo`, `viewer-strip.ts:600-667`, called at `dom-viewer-driver.ts:1146`). On close it
+seeks the trigger's video to the player's time and plays it if the player was playing
+(`#handBackVideo`, `dom-viewer-driver.ts:1109-1117`, called at `:803`). A custom player
+(Mux, Video.js, Vidstack) gets the same through two members of the slide.
+
+```ts
+export interface FluidboxSlideOrigin {
+  /** The trigger's `<video>`, when that is what the trigger showed. */
+  readonly video?: FluidboxPlayback;
+}
+
+export interface FluidboxPlayback {
+  /** Live: each read returns the trigger video's time now. */
+  readonly currentTime: number;
+  readonly paused: boolean;
+  readonly muted: boolean;
+}
+
+/**
+ * Anything with `currentTime` and `paused`, read when the close starts: a
+ * `<video>`, `<mux-player>`, Vidstack's player. Or a function, for players
+ * whose state is behind methods (Video.js). Return null to leave the
+ * trigger alone.
+ */
+export type FluidboxPlaybackSource =
+  | { readonly currentTime: number; readonly paused: boolean }
+  | (() => { readonly currentTime: number; readonly paused: boolean } | null);
+```
+
+Rules:
+
+- **`origin` is set on one slide:** the one being opened, when the open came from a trigger and
+  the trigger's picture (what `#originPicture` finds, `dom-viewer-driver.ts:1121`) is a
+  `<video>`. It is null on neighbours, on
+  slides reached by moving, and for opens from `open(value)` with no trigger. It stays set for
+  that slide's lifetime, so a player that mounts late still reads it.
+- **`origin.video` is live**, not a snapshot. The trigger's video keeps playing during the
+  flight, as it does for the built-in video, so a player that seeks once its metadata has loaded
+  reads the time then and lands on the right frame.
+- **`returnPlayback(source)`** registers what the runtime reads when a close starts from this
+  slide. The close reads `currentTime` and `paused` once, before the closing flight, then does
+  what `#handBackVideo` does today: if the item's trigger has a `<video>`, it seeks it when the
+  times differ by more than 10 ms, and plays it unless `paused`. This applies to whichever slide
+  closes, so it also works after moving to another video item whose trigger is a video. With
+  nothing registered, or a function returning null, the trigger's video is left alone, as for
+  custom slides today.
+- **The built-in video uses the same path.** `drawVideo` registers its `<video>` with
+  `returnPlayback`, so `#handBackVideo` reads from the slide instead of from `#media`. The
+  open-side seek stays in `drawVideo`, since it also paints the hand-off canvas.
+- **Waiting.** An open doesn't wait for a custom player's seek. A player that wants the flight to
+  land on the trigger's frame wraps its seek in `slide.waitUntil` (§5.3), under the same 3 s cap.
+
+### In the bindings
+
+`useFluidboxSlide()` (React, Vue, Solid) and `injectFluidboxSlide()` (Angular) add `origin` and
+`returnPlayback`. `origin` doesn't change for a slide, so it is a plain value in every binding,
+not a signal or a getter. Call `returnPlayback` from an effect, and return its result as the
+cleanup. Custom elements' slide templates get the plain-JS slide.
+
+Mux Player (React):
+
+```tsx
+function MuxSlide() {
+  const slide = useFluidboxSlide<MuxItem>();
+  const player = useRef<MuxPlayerRefAttributes>(null);
+  useEffect(() => slide.returnPlayback(player.current!), []);
+  const from = slide.origin?.video;
+  return (
+    <Fluidbox.Media>
+      <MuxPlayer
+        ref={player}
+        playbackId={slide.item.playbackId}
+        startTime={from?.currentTime}
+        autoPlay={from ? !from.paused : false}
+        muted={from?.muted}
+      />
+    </Fluidbox.Media>
+  );
+}
+```
+
+Vidstack (React):
+
+```tsx
+const player = useRef<MediaPlayerInstance>(null);
+useEffect(() => slide.returnPlayback(player.current!), []);
+const from = slide.origin?.video;
+<MediaPlayer
+  ref={player}
+  src={slide.item.src}
+  muted={from?.muted}
+  autoPlay={from ? !from.paused : false}
+  onLoadedMetadata={() => from && (player.current!.currentTime = from.currentTime)}
+/>;
+```
+
+Video.js (plain JS), where state is behind methods:
+
+```ts
+const player = videojs(videoElement);
+const from = slide.origin?.video;
+if (from) {
+  player.ready(() => {
+    player.muted(from.muted);
+    player.currentTime(from.currentTime);
+    if (!from.paused) void player.play();
+  });
+}
+slide.returnPlayback(() => ({ currentTime: player.currentTime(), paused: player.paused() }));
+```
+
+In each, the fluidbox part is three statements: register the player, read `origin`, and pass its
+time and play state to the player. The library prop names (`startTime`, `onLoadedMetadata`,
+`player.ready`) are the libraries' own, and the docs examples are checked against each library's
+current release when they are written (step 6).
+
+## 2.23 Click and tap zoom
+
+Today (`fluidbox-zoom.ts:705-750`):
+
+- A mouse click on the media zooms in at the pointer, or out if zoomed. The second click of a
+  double-click is ignored (`event.detail === 1`).
+- A touch or pen tap does nothing alone. Two taps within 350 ms and 40 px (`DOUBLE_TAP`) toggle
+  the zoom at the tap.
+- A click or tap beside a zoomed image, on the zoom canvas, zooms out instead of closing.
+
+`zoom.click` and `zoom.tap` make the first two configurable:
+
+| Option                      | A click or tap on the media                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `click: "single"` (default) | Toggles the zoom at the pointer. The second click of a double-click is ignored, as now.    |
+| `click: "double"`           | A double-click (`event.detail === 2`) toggles at the pointer. A single click does nothing. |
+| `click: false`              | Nothing.                                                                                   |
+| `tap: "double"` (default)   | Two taps within 350 ms and 40 px toggle at the tap, as now.                                |
+| `tap: false`                | Nothing.                                                                                   |
+
+- **A single click does nothing under `"double"`.** It doesn't close the viewer, because the
+  close happens on the slide outside the frame (`dom-viewer-driver.ts:261-269`), and the media is
+  inside the frame, so a click on the photo has never closed it. It doesn't wait for a possible
+  second click either, so there is no delay to tune. The runtime uses the browser's click count,
+  which follows the OS double-click setting.
+- **`false` turns off only that pointer's click or tap.** Buttons, keys, pinch, the wheel
+  (`wheel: "zoom"`) and `zoomTo` still zoom. The click is still consumed, so nothing behind the
+  media reacts to it.
+- **Clicking beside a zoomed image zooms out in every mode,** `false` included. It is the way back
+  from a zoom for a mouse user who never sees the controls.
+- **Keyboard activation** (`event.detail === 0`) is unchanged: it never zooms.
+- **The double-tap window stays a constant** (350 ms, 40 px). It sits near the platforms' own
+  timing, and an option would rarely be set (§8.25).
+- **Cursor.** The viewer root gets `data-fluidbox-zoom-click="single" | "double" | "off"`. The
+  baseline shows `zoom-in` and `zoom-out` cursors only under `"single"`, since under `"double"` a
+  zoom cursor would promise a single click that does nothing. Apps style the other modes as they
+  like (§10.6).
+- **Live.** `update({ zoom })` changes both options, and the next click uses them. The bindings'
+  Root `zoom` prop takes the same object, compared by value. Custom elements get the attributes
+  `zoom-click` (`single`, `double`, `off`) and `zoom-tap` (`double`, `off`), beside `zoom-step`
+  and `zoom-max`.
+- **Per slide.** `slide.zoomable({ max, sharpen })` doesn't take `click` or `tap`. They are the
+  viewer's gesture settings, not the media's. A slide that wants no click zoom (a custom player
+  whose clicks play and pause) isn't zoomable in the first place.

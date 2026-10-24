@@ -342,3 +342,31 @@ removal already did.
 
 The fallback is unchanged: if step 7's measurement exceeds the upper estimate in §9.3, those two
 move to their own entries before they ship.
+
+## 8.25 Trigger video playback and click zoom: the open choices
+
+**`returnPlayback` takes a source the runtime reads, not a setter the player calls.** The
+overseer offered both, `slide.setReturnTime(seconds)` or a getter read before the closing
+flight. With a setter, a player has to push its time on every `timeupdate`, and the value is up
+to 250 ms stale when the close reads it. With a source, the runtime reads the time once, at the
+moment it needs it. Most players already expose `currentTime` and `paused` as properties
+(`<video>`, `<mux-player>`, Vidstack's player), so passing the player itself is the whole call. A
+function covers players with methods (Video.js). The play state goes back with the time, because
+the hand-back plays the trigger only if the player was playing, as today.
+
+**`origin.video` is live, not a snapshot.** The trigger keeps playing during the flight. A
+snapshot taken when the open starts would be behind by the time a player has loaded its
+metadata. The built-in video works around this with a second seek, and a live value saves custom
+players that step.
+
+**`click: "double"`: a single click does nothing.** The overseer's suggestion. Closing is ruled
+out, since a click on the media has never closed the viewer (§2.23), and making it start to
+would surprise people who meant the first half of a double-click. Waiting to see whether a
+second click follows would delay nothing useful.
+
+**No `doubleTapDelay` option.** The overseer leaned the same way. 350 ms and 40 px sit near the
+platforms' own double-tap timing, and a mouse's double-click already follows the OS setting
+through `event.detail`. If a real need appears, it can be added without a break.
+
+**No `tap: "single"` for now.** On touch, pinch is the main way to zoom, and a single tap that
+zooms would fire on taps meant for something else. It can be added later without a break.

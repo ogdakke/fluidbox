@@ -83,6 +83,11 @@ The main changes:
   - `dismiss: { drag, backdrop }` and `wheel`;
   - item `data-*` for styling.
 
+  Two more, also built in step 1:
+  - `slide.origin` and `slide.returnPlayback`, so a custom player (Mux, Video.js, Vidstack)
+    continues the trigger's video and hands its time back on close (§2.22);
+  - `zoom.click` (`"single"`, `"double"`, `false`) and `zoom.tap` (`"double"`, `false`) (§2.23).
+
   These come later (step 7):
   - a `--fluidbox-motion-speed` property;
   - `Hotspot`;

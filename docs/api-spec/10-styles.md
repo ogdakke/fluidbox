@@ -446,6 +446,9 @@ They are the styling contract: renaming one is a breaking change, so they are co
 `data-fluidbox-icon`, on the SVGs the package drew, is removed. It is reused only as the attribute
 of `<template data-fluidbox-icon="close">` in markup (§2.21).
 
+Added by the fifth amendment: `data-fluidbox-zoom-click="single" | "double" | "off"` on the viewer
+root. The baseline shows the zoom cursors only under `"single"` (§2.23).
+
 ## 10.7 What the consumer owns: an accessibility checklist
 
 Printed on the styling page, and checked against `baseline.css`:
