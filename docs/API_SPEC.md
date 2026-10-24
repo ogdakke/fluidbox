@@ -97,8 +97,9 @@ The main changes:
 - **Headless.** The package ships no icons. A control with no children shows its label as
   text; give it an icon and the label becomes its `aria-label`. Plain JS takes an `icons` option
   and `bindControl(element, name)`. `styles.css`, `thumbnails.css` and `sheet.css` keep only the
-  rules that make the viewer work. Today's look moves to an opt-in `baseline.css` in its own
-  cascade layer, so any app rule overrides it (part 10, §2.21, §3.19, §8.21–8.24).
+  rules that make the viewer work, unlayered with today's specificity so site resets can't
+  break them. Today's look moves to an opt-in `baseline.css` in its own cascade layer, so any
+  app rule overrides it (part 10, §2.21, §3.19, §8.21–8.24).
 - **Renames:** `Filmstrip` → `Thumbnails`, `ThumbnailOverlay` + `FrameLayer` + `travel` →
   `Overlay flight`, `origins` → `findTrigger`, `loading` → `preload`, `returns` → a list in
   the trigger's `value`.
@@ -131,7 +132,7 @@ These are argued in [part 8](api-spec/08-decisions.md). In short:
    gallery already reserves the slots `trigger`, `content`, `sheet` and `viewer`.
 7. **`<Fluidbox.Overlay>` clashes with the viewer root's `data-fluidbox-overlay`.** That
    attribute becomes `data-fluidbox-viewer`.
-8. **The functional layer keeps one look rule: an opaque backdrop and sheet.** They use the
+8. **The functional CSS keeps one look rule: an opaque backdrop and sheet.** They use the
    system colours `Canvas` and `CanvasText`. Without them an unstyled viewer would be
    see-through, with the page showing behind the photo, and a headless page would fail contrast
    before it styled anything (§10.2). This needs the user's confirmation.

@@ -419,7 +419,7 @@ over the hidden text. The functional `position: absolute; inset: 0; margin: auto
 keeps it above the poster in every case.
 
 **Injected styles.** The add-ons keep injecting their functional rules through `addStyles`, now
-inside `@layer fluidbox` like the stylesheets. Their look rules move to `baseline.css`: the Play
+unlayered with today's specificity, like the stylesheets (§10.1). Their look rules move to `baseline.css`: the Play
 button's size, shape, colours and hover; spin's `grab` cursors; the model's transparent backdrop
 and `--poster-color`. `posterStyles` and hover zoom's inline styles are all functional and
 unchanged.
