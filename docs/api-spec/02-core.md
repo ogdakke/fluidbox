@@ -520,14 +520,8 @@ export interface FluidboxVideoOptions {
   ) => void;
 }
 
-export interface FluidboxVideoAttachSlide {
-  /** This slide is the shown one. */
-  readonly active: boolean;
-  /** This slide is the one an open is flying to. */
-  readonly opening: boolean;
-  /** Called when `active` changes; returns a function that removes the listener. */
-  onActiveChange(listener: (active: boolean) => void): () => void;
-}
+/** The part of the slide an `attach` needs: whether it is shown, and when that changes. */
+export type FluidboxVideoAttachSlide = Pick<FluidboxSlide, "active" | "opening" | "onActiveChange">;
 
 /** A slide for video items that draws the built-in video with these options. */
 export function videoSlide(options: FluidboxVideoOptions): FluidboxSlideRenderer<FluidboxVideoItem>;
