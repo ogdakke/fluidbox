@@ -412,6 +412,20 @@ for (const framework of frameworks) {
       expect(media.modelViewer).toEqual([
         "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js",
       ]);
+      // A double render, as StrictMode makes, leaves one box and an element
+      // that joined the page once, and so does a reopen.
+      for (let round = 0; round < 2; round++) {
+        await expect(activeSlide(page).locator("[data-fluidbox-model]")).toHaveCount(1);
+        await expect(activeSlide(page).locator("model-viewer")).toHaveCount(1);
+        await expect(activeSlide(page).locator("model-viewer")).toHaveAttribute(
+          "data-connections",
+          "1",
+        );
+        await close(page);
+        if (round === 0) await open(page, triggers.nth(3), "Item 4 of 4");
+      }
+      await open(page, triggers.nth(1), "Item 2 of 4");
+      await expect(activeSlide(page).locator("[data-fluidbox-embed]")).toHaveCount(1);
       await close(page);
     });
   });

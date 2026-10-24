@@ -39,6 +39,7 @@ declare module "@ogdakke/fluidbox" {
     other: FluidboxCustomItemBase<"other">;
     card: FluidboxCustomItemBase<"card">;
     blank: FluidboxCustomItemBase<"blank">;
+    widget: FluidboxCustomItemBase<"widget">;
     own: FluidboxCustomItemBase<"own">;
     film: FluidboxCustomItemBase<"film">;
     gated: FluidboxCustomItemBase<"gated">;
@@ -156,7 +157,18 @@ const hookItems: FluidboxItem[] = [
   { type: "own", id: "own", title: "Own image", width: 800, height: 800 },
   { type: "film", id: "film", title: "Own video", width: 640, height: 360 },
   { type: "gated", id: "gated", title: "Gated", width: 800, height: 600 },
+  { type: "widget", id: "widget", title: "Widget", width: 800, height: 600 },
 ];
+
+/** A custom element that counts how often it joins the page, as <model-viewer> would mind. */
+customElements.define(
+  "fixture-widget",
+  class extends HTMLElement {
+    connectedCallback() {
+      this.dataset.connections = String(Number(this.dataset.connections ?? 0) + 1);
+    }
+  },
+);
 
 /** Opens the gated slide's waitUntil promise, and calls waitUntil on it again. */
 const gate: { open?: () => void; wait?: (promise: Promise<unknown>) => void } = {};
@@ -208,6 +220,11 @@ const hooks: Fluidbox = createFluidbox({
       slide.media.append(art);
       slide.waitUntil(new Promise<void>((resolve) => (gate.open = resolve)));
       gate.wait = slide.waitUntil;
+    },
+    widget: (slide) => {
+      const widget = document.createElement("fixture-widget");
+      widget.style.cssText = "display: block; width: 100%; height: 100%; background: #c96";
+      slide.media.append(widget);
     },
   },
 });

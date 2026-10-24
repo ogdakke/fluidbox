@@ -270,6 +270,24 @@ test("an empty box opens and closes with a fade, not a flight", async ({ page })
   await expect(page.locator(dialog)).toHaveCount(0);
 });
 
+test("a box holding a custom element closes in its own frame, so the element never leaves the page", async ({
+  page,
+}) => {
+  await load(page);
+  await page.locator('#hooks [data-item="widget"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const widget = page.locator(`${shown} fixture-widget`);
+  await expect(widget).toHaveAttribute("data-connections", "1");
+  const element = await widget.elementHandle();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "closing");
+  await expect(page.locator("[data-fluidbox-flight]")).toHaveCount(0);
+  expect(await element!.evaluate((node) => !!node.closest("[data-fluidbox-dialog]"))).toBe(true);
+  await expect(page.locator(dialog)).toHaveCount(0);
+  // It left with the viewer, and never joined a flight on the way.
+  expect(await element!.getAttribute("data-connections")).toBe("1");
+});
+
 const overlay = "[data-fluidbox-viewer]";
 
 /** Hold a request until the returned function lets it through. */
