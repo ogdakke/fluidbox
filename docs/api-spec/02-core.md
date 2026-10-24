@@ -508,11 +508,20 @@ unaffected. The hand-off from a playing trigger video works the same, because it
 export interface FluidboxVideoOptions {
   /**
    * Load the media yourself: the runtime sets no src and no <source>. Called
-   * when the slide loads; clean up when `signal` aborts, which happens before
-   * the runtime empties the video.
+   * when the slide loads, which includes mounted neighbours; clean up when
+   * `signal` aborts, which happens before the runtime empties the video.
+   * Fetch segments only once `slide.active` or `slide.opening` is true.
    */
-  readonly attach?: (video: HTMLVideoElement, signal: AbortSignal, item: FluidboxVideoItem) => void;
+  readonly attach?: (
+    video: HTMLVideoElement,
+    signal: AbortSignal,
+    item: FluidboxVideoItem,
+    slide: FluidboxVideoAttachSlide,
+  ) => void;
 }
+
+/** The part of the slide an `attach` needs: whether it is shown, and when that changes. */
+export type FluidboxVideoAttachSlide = Pick<FluidboxSlide, "active" | "opening" | "onActiveChange">;
 
 /** A slide for video items that draws the built-in video with these options. */
 export function videoSlide(options: FluidboxVideoOptions): FluidboxSlideRenderer<FluidboxVideoItem>;
@@ -522,23 +531,35 @@ export function videoSlide(options: FluidboxVideoOptions): FluidboxSlideRenderer
 // plain JS: every video item through hls.js, or natively where the browser plays HLS
 import Hls from "hls.js";
 
-const attachHls = (video, signal, item) => {
+const attachHls = (video, signal, item, slide) => {
   if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = item.src;
+    video.src = item.src; // native HLS honours preload="metadata"
     return;
   }
-  const hls = new Hls();
-  hls.loadSource(item.src);
+  const hls = new Hls({ autoStartLoad: false });
+  hls.loadSource(item.src); // the manifest only
   hls.attachMedia(video);
-  signal.addEventListener("abort", () => hls.destroy(), { once: true });
+  let started = false;
+  const start = () => {
+    if (started) return;
+    started = true;
+    hls.startLoad(); // segments
+  };
+  if (slide.active || slide.opening) start();
+  const off = slide.onActiveChange((active) => active && start());
+  signal.addEventListener("abort", () => (off(), hls.destroy()), { once: true });
 };
 
 createFluidbox({ items, slides: { video: videoSlide({ attach: attachHls }) } });
 ```
 
-`attach` runs where the runtime would set `src` (`#load`, `:961`), so it runs for neighbours
-too, as `preload="metadata"` does now. An engine that should not fetch segments for a neighbour
-starts loading on `play` or when `slide.active` turns true (the HLS add-on does, §4.8). The
+`attach` runs where the runtime would set `src` (`#load`, `:961`), so it runs for mounted
+neighbours too. The fourth argument says whether this slide is showing. The rule for an
+`attach`: it may load the manifest and the poster at once, as `preload="metadata"` would, but it
+fetches media segments only once `slide.active` or `slide.opening` is true. With hls.js that is
+`autoStartLoad: false`, then `startLoad()`, as above. An engine attached eagerly (hls.js with
+`autoStartLoad` on) would download segments for every idle neighbour. A neighbour therefore
+attaches without loading until it is shown. The HLS add-on follows the rule (§4.8). The
 runtime still sets `poster`, the attributes and the tracks. `item.src` must still pass the URL
 check (the manifest URL); what `attach` loads is the app's responsibility. A built-in video with
 `attach` is still exempt from the generic readiness rule (§5.3). An open doesn't wait for the

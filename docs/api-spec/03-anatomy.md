@@ -190,7 +190,10 @@ renders its own. Outside a slide, they throw.
 
 `Video` also takes `attach`, the `FluidboxVideoOptions.attach` of §2.8: a function that loads the
 media into the runtime's `<video>` (hls.js, dash.js, or native HLS) and cleans up when its signal
-aborts. With it the runtime sets no `src` or `<source>`. To stream every video item:
+aborts. With it the runtime sets no `src` or `<source>`. Its fourth argument,
+`{ active, opening, onActiveChange }`, tells it when the slide is shown. It runs for mounted
+neighbours too, so it loads at most the manifest and poster until the slide is active or opening,
+and only then fetches segments (§2.8). To stream every video item:
 
 ```tsx
 <Fluidbox.Slides video={() => <Fluidbox.Video attach={attachHls} />} />

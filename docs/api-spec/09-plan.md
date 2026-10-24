@@ -103,8 +103,9 @@ In sub-steps that can each be reviewed alone, in this order:
       static viewer, and the embed's Play SVG. Controls without content render their label text
       and `data-fluidbox-default`.
     - Add `bindControl`, the `icons` option, `"retry"`, `data-busy` and `data-error`.
-    - Split the three stylesheets by the tables of §10.3 into `@layer fluidbox`, with the
-      `Canvas` surfaces of §10.2. The look goes into a new `baseline.css` in
+    - Split the three stylesheets by the tables of §10.3. The functional rules stay unlayered,
+      with today's selectors and specificity, and the `Canvas` surfaces of §10.2 as token
+      fallbacks. The look goes into a new `baseline.css` in
       `@layer fluidbox-baseline`, with the glyph tokens and its forced-colours and CSP rules.
       Move the add-ons' injected look rules there too.
     - Add `./baseline.css` to the package exports.
@@ -349,6 +350,8 @@ New tests:
 - Video `attach`: called once per load with the runtime's `<video>`, no `src` set by the runtime,
   the signal aborts on unload, and autoplay, pause on leave and tracks still work (a stub engine
   that sets a blob URL).
+- Video `attach` on a neighbour: a mounted neighbour attaches with `active` and `opening` false
+  and fetches no segments; moving to it fires `onActiveChange(true)` and loading starts.
 - Embed providers: a provider made in the test plays, pauses and preconnects; a `url()` off its
   `origin` shows the error slide; an item naming an unregistered provider shows the error slide
   and warns.
@@ -404,6 +407,13 @@ Fourth amendment (sub-step 1.12):
   default UI; `Retry` reloads; the error is announced once.
 - **Layers.** An unlayered app rule overrides a baseline token and a baseline rule. A late
   baseline transition stays off under reduced motion.
+- **Resets don't break the mechanics**, new: a fixture page loads typical unlayered resets
+  before the package CSS (Tailwind v3 preflight, modern-normalize, and
+  `img, video { max-width: 100%; height: auto; display: block }`). The open, fit, fill, zoom and
+  close geometry (the flight's start and end rects, the media box, the zoomed box, the strip
+  offset) must be identical to the same page without resets.
+- **No dead baseline rules**, a build check: no property is set by both `baseline.css` and the
+  functional CSS for the same selector, and `baseline.css` has no `!important`.
 - **Moved assertions.** `a11y.spec.ts`, `headless.spec.ts`, `frameworks.spec.ts`, `patterns.spec.ts`
   and `tests/public-api.contract.ts` stop expecting icon SVGs and `fluidboxControlIcon`, and
   expect text or `aria-label` names.

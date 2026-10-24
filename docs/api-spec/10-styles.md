@@ -7,30 +7,43 @@ The look moves to an opt-in `@ogdakke/fluidbox/baseline.css`, and the JavaScript
 File and line references are to `packages/fluidbox/src` at `59cb944`. The stylesheets keep
 their current names in the tables. `filmstrip.css` becomes `thumbnails.css` in step 1.7.
 
-## 10.1 The layers
+## 10.1 Unlayered functional CSS, layered baseline
 
 ```css
-/* first line of styles.css, thumbnails.css, sheet.css and baseline.css */
-@layer fluidbox, fluidbox-baseline;
+/* first line of baseline.css; the other stylesheets declare no layer */
+@layer fluidbox-baseline;
 ```
 
-- The functional rules of `styles.css`, `thumbnails.css` and `sheet.css` go in `@layer fluidbox`.
-  The opt-in look goes in `@layer fluidbox-baseline`. App CSS that isn't layered beats both, so any
-  override is one plain rule. Every selector stays wrapped in `:where()` (zero specificity), as
-  today, so a layered app (Tailwind v4's `@layer base, components, utilities`) also wins without
-  `!important` once its layers are declared after these.
-- **Layer order is fixed by the first declaration a page loads.** If an app's CSS declares its own
-  layers before the fluidbox files load, the fluidbox layers come later and win. The docs tell
-  apps with their own layers to declare all of them in one line up front:
-  `@layer fluidbox, fluidbox-baseline, base, components, utilities;`.
-- **`!important` inverts in layers.** A layered `!important` beats an unlayered one. The package's
-  five `!important` declarations (`styles.css:173`, `:184`, `:260-261`; `sheet.css:50`, `:297`)
-  hide the page thumbnail during a flight, keep the flight's source hidden, and stop pointer
-  events after a dismiss. They should win, and in the first layer they win more reliably than
-  today.
-- **Reduced motion.** A transition in a later layer beats the package's reduced-motion rule
-  (risk R6 below). So every transition and animation in `baseline.css` sits inside
-  `@media (prefers-reduced-motion: no-preference)`, and the docs give apps the same rule.
+- **The functional rules stay unlayered,** in `styles.css`, `thumbnails.css` and `sheet.css`,
+  with today's selectors and specificity. Most are `:where(scope) [data-fluidbox-…]` (0,1,0), and
+  some double an attribute to reach (0,2,0) (`styles.css:207`, `:231`). That beats element
+  resets, which is the point. A site reset or Tailwind v3's unlayered preflight
+  (`img, video { max-width: 100%; height: auto }`) is (0,0,1) and loses, as it does today. If
+  these rules sat in a layer, any unlayered rule would beat them whatever its specificity, and
+  sizing, fit and fill, positioning, the flight's transforms and the strip would break on most
+  sites.
+- **Only `baseline.css` is layered,** in `@layer fluidbox-baseline`, with every selector inside
+  `:where()` (zero specificity). Any unlayered app rule beats it, and so does a rule in any app
+  layer declared after it. An app with its own layers can put the baseline first in one line,
+  `@layer fluidbox-baseline, base, components, utilities;`, but nothing depends on that: a layer
+  declared first is weakest, and one declared later still loses to every unlayered rule.
+- **The baseline never sets a property the functional CSS sets on the same element.** Unlayered
+  beats layered, so such a baseline declaration would be dead. Where a surface needs a default
+  and a themed value, the functional rule reads a token with a fallback, and the baseline sets
+  only the token. The `Canvas` surfaces of §10.2 work this way. A build check enforces it (§9.4).
+- **Overriding.** A look override is any plain app rule, since it competes only with the
+  baseline. A mechanics override needs today's specificity, as now, or a mechanics custom
+  property (§10.5).
+- **`!important`.** The package's five `!important` declarations (`styles.css:173`, `:184`,
+  `:260-261`; `sheet.css:50`, `:297`) hide the page thumbnail during a flight, keep the flight's
+  source hidden, and stop pointer events after a dismiss. They stay unlayered, so they behave
+  exactly as today. `baseline.css` has no `!important`: a layered `!important` beats an
+  unlayered one, so it would beat the app's.
+- **Reduced motion.** The package's reduced-motion rules are unlayered and beat a baseline
+  transition on the same element. The baseline still puts every transition and animation inside
+  `@media (prefers-reduced-motion: no-preference)` (risk R6 below), because some of its
+  transitions are on elements the functional rules don't touch, and the docs give apps the same
+  rule.
 
 ## 10.2 What "functional" covers
 
@@ -60,18 +73,20 @@ functional. The baseline only sets the variable they end at
 **One deviation from the brief, recommended: keep a readable surface.** The brief moves the
 backdrop's colour out. With only functional CSS the backdrop would be transparent, and so would
 the sheet (risk R4): the page, or the photo, would show through the viewer's text. A see-through
-dialog fails 1.4.3 contrast before any theming. So the functional layer keeps system colours on
-those two surfaces:
+dialog fails 1.4.3 contrast before any theming. So the functional CSS keeps system colours on
+those two surfaces, as token fallbacks so the baseline and apps can theme them (§10.1):
 
 ```css
 :where([data-fluidbox-viewer]) [data-fluidbox-backdrop] {
-  background: Canvas;
+  background: var(--fluidbox-backdrop-background, Canvas);
 }
 :where([data-fluidbox-viewer]) [data-fluidbox-sheet] {
-  background: Canvas;
-  color: CanvasText;
+  background: var(--fluidbox-background, Canvas);
+  color: var(--fluidbox-color, CanvasText);
 }
 ```
+
+`baseline.css` sets those three tokens on `[data-fluidbox-viewer]` and never the properties.
 
 These are colour keywords, not a design. They follow light and dark mode and forced colours, and
 any theme replaces them. Without them, "headless" would mean "broken until styled". The
@@ -155,7 +170,8 @@ moves the rest.
 | 1021-1025 | static viewer anchor controls colour/underline                                                                                                       | look       | link colour and decoration                                                                                  |                                                                                                                                                                                                                    |
 
 The backdrop row is _split_ above, with only its geometry staying. Per §10.2 the functional
-layer also keeps `background: Canvas` on it, as a readable surface rather than a design.
+CSS also keeps `background: var(--fluidbox-backdrop-background, Canvas)` on it, as a readable
+surface rather than a design.
 
 ### Thumbnails, sheet and add-on styles
 
@@ -265,7 +281,7 @@ All functional. The lens is `position: fixed` at the measured box, with overflow
 | R3  | A visible scrollbar changes the measured extent of the strip and of the thumbnails.                                                                                                               | Scrollbar hiding stays functional in both.                                                                                                                                                                   |
 | R4  | The sheet's `max-height` and `offsetHeight` are measured (`sheet.ts:543-547`). A sheet without a background is see-through.                                                                       | `max-height` and `padding-bottom` stay. A `Canvas`/`CanvasText` surface stays (§10.2).                                                                                                                       |
 | R5  | The arrows' anchor positioning over the sheet (`sheet.css:259-267`) is a control position, but without it the arrows stay put while the photo is pushed.                                          | It moves to the baseline with the arrow placement. `anchor-scope` and `anchor-name` stay. The docs show the formula for themes that place their own arrows.                                                  |
-| R6  | Zero-specificity reduced-motion rules lose to later transitions.                                                                                                                                  | Baseline transitions sit inside `prefers-reduced-motion: no-preference` (§10.1).                                                                                                                             |
+| R6  | A baseline transition could run under reduced motion where no functional rule covers its element.                                                                                                 | Baseline transitions sit inside `prefers-reduced-motion: no-preference` (§10.1).                                                                                                                             |
 | R7  | The selected thumbnail's only cue, apart from opacity, is the `::after` bar, which is look.                                                                                                       | The baseline ships the bar. The consumer checklist (§10.7) asks for a cue that isn't opacity alone. Forced colours keep the functional outline.                                                              |
 | R8  | The embed Play button must be `position: absolute`, or it paints under the poster.                                                                                                                | `position: absolute; inset: 0; margin: auto; width: fit-content; height: fit-content` stays functional.                                                                                                      |
 | R9  | The embed Play SVG renders at 300 × 150 without a size.                                                                                                                                           | Moot: the SVG is removed (§4.9).                                                                                                                                                                             |
@@ -294,7 +310,8 @@ import "@ogdakke/fluidbox/baseline.css"; // optional: today's look
   thumbnails' radius, opacity and selected bar, the sheet's radius, shadow and handle, the arrows'
   sheet anchoring, the embed Play button's look and the spin cursor. One file covers the core, the
   thumbnails and the sheet (§8.22). Rules for parts a page doesn't use match nothing.
-- **Layer and specificity.** All of it is in `@layer fluidbox-baseline`, behind `:where()`.
+- **Layer and specificity.** All of it is in `@layer fluidbox-baseline`, behind `:where()`. It
+  sets no property the functional CSS sets on the same element (§10.1).
 - **Tokens.** The look custom properties stay as the baseline's tokens (§10.5), so the common
   overrides are one variable: `--fluidbox-background`, `--fluidbox-color`,
   `--fluidbox-control-background`, `--fluidbox-focus-color`, `--fluidbox-backdrop-background`,
@@ -443,7 +460,7 @@ Printed on the styling page, and checked against `baseline.css`:
    visually instead.
 6. Every transition inside `prefers-reduced-motion: no-preference`.
 7. Icons inside controls marked `aria-hidden="true"`. The control's label names it.
-8. Check forced colours. The functional layer keeps content and focus visible there, and a theme
+8. Check forced colours. The functional CSS keeps content and focus visible there, and a theme
    should not use `forced-color-adjust: none` on controls.
 
 ## 10.8 Sizes
