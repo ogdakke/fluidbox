@@ -15,26 +15,27 @@ Conventions in this part:
 
 ## 1.1 Entry points
 
-| Current entry                     | New entry                                                        | Notes                                              |
-| --------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------- |
-| `@ogdakke/fluidbox`               | → same                                                           | No side effects, no browser globals.               |
-| `@ogdakke/fluidbox/elements`      | → same                                                           | Defines the elements. Browser only.                |
-| `@ogdakke/fluidbox/react`         | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/vue`           | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/solid`         | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/angular`       | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/filmstrip`     | `@ogdakke/fluidbox/thumbnails`                                   | Registers the thumbnails add-on.                   |
-| `@ogdakke/fluidbox/filmstrip.css` | `@ogdakke/fluidbox/thumbnails.css`                               |                                                    |
-| `@ogdakke/fluidbox/sheet`         | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/sheet.css`     | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/styles.css`    | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/kit`           | → same                                                           | Contents change (§1.8).                            |
-| `@ogdakke/fluidbox/hover-zoom`    | → same                                                           |                                                    |
-| `@ogdakke/fluidbox/embeds`        | `@ogdakke/fluidbox/embed`                                        | One name: the item type is `"embed"`.              |
-| `@ogdakke/fluidbox/model`         | → same                                                           | Now exports `createModelSlide`.                    |
-| `@ogdakke/fluidbox/spin`          | → same                                                           | Now exports `createSpinSlide`.                     |
-| —                                 | `@ogdakke/fluidbox/{react,vue,solid,angular}/{embed,model,spin}` | New. The add-on parts, twelve entries.             |
-| —                                 | `@ogdakke/fluidbox/elements/{embed,model,spin}`                  | New. Registers the add-on for the custom elements. |
+| Current entry                     | New entry                                                        | Notes                                                  |
+| --------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| `@ogdakke/fluidbox`               | → same                                                           | No side effects, no browser globals.                   |
+| `@ogdakke/fluidbox/elements`      | → same                                                           | Defines the elements. Browser only.                    |
+| `@ogdakke/fluidbox/react`         | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/vue`           | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/solid`         | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/angular`       | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/filmstrip`     | `@ogdakke/fluidbox/thumbnails`                                   | Registers the thumbnails add-on.                       |
+| `@ogdakke/fluidbox/filmstrip.css` | `@ogdakke/fluidbox/thumbnails.css`                               |                                                        |
+| `@ogdakke/fluidbox/sheet`         | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/sheet.css`     | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/styles.css`    | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/kit`           | → same                                                           | Contents change (§1.8).                                |
+| `@ogdakke/fluidbox/hover-zoom`    | → same                                                           |                                                        |
+| `@ogdakke/fluidbox/embeds`        | `@ogdakke/fluidbox/embed`                                        | One name: the item type is `"embed"`.                  |
+| `@ogdakke/fluidbox/model`         | → same                                                           | Now exports `createModelSlide`.                        |
+| `@ogdakke/fluidbox/spin`          | → same                                                           | Now exports `createSpinSlide`.                         |
+| —                                 | `@ogdakke/fluidbox/{react,vue,solid,angular}/{embed,model,spin}` | New. The add-on parts, twelve entries.                 |
+| —                                 | `@ogdakke/fluidbox/elements/{embed,model,spin}`                  | New. Registers the add-on for the custom elements.     |
+| —                                 | `@ogdakke/fluidbox/hls`                                          | New, later (§4.8). `hlsAttach` for the built-in video. |
 
 ## 1.2 Root exports (`@ogdakke/fluidbox`)
 
@@ -54,56 +55,57 @@ Conventions in this part:
 
 ### Types
 
-| Current                      | New                                                      | Notes                                                                                                                                         |
-| ---------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Fluidbox`                   | → same                                                   | Members change (§1.5).                                                                                                                        |
-| `FluidboxBindOptions`        | → same                                                   | `returns` removed: the bound value can be a list.                                                                                             |
-| `FluidboxCommandOptions`     | → same                                                   |                                                                                                                                               |
-| `FluidboxControlName`        | → same                                                   | `zoomReset` stays; `"counter"` added.                                                                                                         |
-| `FluidboxCustomItem`         | removed                                                  | `type: "custom"` goes away. Your own types extend `FluidboxCustomItemBase` and join the union through `FluidboxItemTypes` (§2.3).             |
-| `FluidboxEventMap`           | → same                                                   | Entries change (§1.6).                                                                                                                        |
-| `FluidboxFilmstripOptions`   | `FluidboxThumbnailsOptions`                              |                                                                                                                                               |
-| `FluidboxIframeItem`         | → same                                                   |                                                                                                                                               |
-| `FluidboxImageItem`          | → same                                                   | `type: "img"` → `"image"`; `zoomSrc`/`zoomSrcset` → `zoom`.                                                                                   |
-| `FluidboxItem`               | → same                                                   | Now `FluidboxItemTypes[keyof FluidboxItemTypes]`.                                                                                             |
-| `FluidboxItemBase`           | → same                                                   | Gains `caption`.                                                                                                                              |
-| `FluidboxItemList`           | → same                                                   |                                                                                                                                               |
-| `FluidboxItemListOptions`    | → same                                                   |                                                                                                                                               |
-| `FluidboxItems`              | → same                                                   |                                                                                                                                               |
-| `FluidboxLabels`             | → same                                                   | Keys change (§1.9).                                                                                                                           |
-| `FluidboxLoading`            | `FluidboxPreload`                                        | Values `"hover"` → `"intent"`, `"press"`, `"eager"`.                                                                                          |
-| `FluidboxOptions`            | → same                                                   | Fields change (§1.3).                                                                                                                         |
-| `FluidboxOrigin`             | removed from the public API                              | `findTrigger` returns an element; the runtime resolves the visual from `data-fluidbox-origin`, as `bind` does today. Stays internal.          |
-| `FluidboxOriginAdapter`      | removed                                                  | Replaced by the `findTrigger` and `revealTrigger` options.                                                                                    |
-| `FluidboxOverlayOptions`     | → same                                                   | `travel` + `frameLayer` → `flight`; `returns` removed.                                                                                        |
-| `FluidboxPictureSource`      | → same                                                   |                                                                                                                                               |
-| `FluidboxReason`             | → same                                                   | Same values.                                                                                                                                  |
-| `FluidboxRenderContext`      | → same                                                   |                                                                                                                                               |
-| `FluidboxRenderer`           | → same                                                   | Still draws thumbnails, the sheet and live overlays.                                                                                          |
-| `FluidboxRevealContext`      | → same                                                   | Passed to `revealTrigger`.                                                                                                                    |
-| `FluidboxSheet`              | → same                                                   | `stop` → `snap`, `set` → `setSnap`.                                                                                                           |
-| `FluidboxSheetOptions`       | → same                                                   | `render` stays.                                                                                                                               |
-| `FluidboxSheetSnapPoint`     | → same                                                   |                                                                                                                                               |
-| `FluidboxSlideRenderContext` | `FluidboxSlide`                                          | The object a slide renderer gets (§2.8). `target` → `media` and `layer`; adds `holdOpen`, `drawImage`, `drawVideo`, `drawIframe`, `zoomable`. |
-| `FluidboxSlideRenderer`      | → same                                                   | Keyed by item type in `slides`.                                                                                                               |
-| `FluidboxState`              | → same                                                   | `id` → `value`.                                                                                                                               |
-| `FluidboxStatus`             | → same                                                   |                                                                                                                                               |
-| `FluidboxTarget`             | → same                                                   | An index, an id or an item.                                                                                                                   |
-| `FluidboxThumbnail`          | → same                                                   |                                                                                                                                               |
-| `FluidboxToggleState`        | removed                                                  | No toggle events. `FluidboxValueChangeEvent.action` says `"open"`, `"move"` or `"close"`.                                                     |
-| `FluidboxUpdateOptions`      | → same                                                   | Keys follow the options.                                                                                                                      |
-| `FluidboxVideoItem`          | → same                                                   |                                                                                                                                               |
-| `FluidboxVideoTrack`         | → same                                                   |                                                                                                                                               |
-| `FluidboxViewerContext`      | → same                                                   |                                                                                                                                               |
-| `FluidboxViewerRenderer`     | → same                                                   |                                                                                                                                               |
-| `FluidboxZoomCommandOptions` | → same                                                   |                                                                                                                                               |
-| `FluidboxZoomState`          | → same                                                   |                                                                                                                                               |
-| `FluidboxImageProps`         | → same                                                   |                                                                                                                                               |
-| —                            | `FluidboxItemTypes`                                      | New. The interface you merge your item types into.                                                                                            |
-| —                            | `FluidboxCustomItemBase<TType>`                          | New. `{ type, title, width, height }` plus the base fields.                                                                                   |
-| —                            | `FluidboxValue`                                          | New. `string \| null`.                                                                                                                        |
-| —                            | `FluidboxValueChangeEvent`, `FluidboxValueChangeDetails` | New (§2.6).                                                                                                                                   |
-| —                            | `FluidboxSlides`                                         | New. The `slides` option's type.                                                                                                              |
+| Current                      | New                                                         | Notes                                                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Fluidbox`                   | → same                                                      | Members change (§1.5).                                                                                                                         |
+| `FluidboxBindOptions`        | → same                                                      | `returns` removed: the bound value can be a list.                                                                                              |
+| `FluidboxCommandOptions`     | → same                                                      |                                                                                                                                                |
+| `FluidboxControlName`        | → same                                                      | `zoomReset` stays; `"counter"` added.                                                                                                          |
+| `FluidboxCustomItem`         | removed                                                     | `type: "custom"` goes away. Your own types extend `FluidboxCustomItemBase` and join the union through `FluidboxItemTypes` (§2.3).              |
+| `FluidboxEventMap`           | → same                                                      | Entries change (§1.6).                                                                                                                         |
+| `FluidboxFilmstripOptions`   | `FluidboxThumbnailsOptions`                                 |                                                                                                                                                |
+| `FluidboxIframeItem`         | → same                                                      |                                                                                                                                                |
+| `FluidboxImageItem`          | → same                                                      | `type: "img"` → `"image"`; `zoomSrc`/`zoomSrcset` → `zoom`.                                                                                    |
+| `FluidboxItem`               | → same                                                      | Now `FluidboxItemTypes[keyof FluidboxItemTypes]`.                                                                                              |
+| `FluidboxItemBase`           | → same                                                      | Gains `caption`.                                                                                                                               |
+| `FluidboxItemList`           | → same                                                      |                                                                                                                                                |
+| `FluidboxItemListOptions`    | → same                                                      |                                                                                                                                                |
+| `FluidboxItems`              | → same                                                      |                                                                                                                                                |
+| `FluidboxLabels`             | → same                                                      | Keys change (§1.9).                                                                                                                            |
+| `FluidboxLoading`            | `FluidboxPreload`                                           | Values `"hover"` → `"intent"`, `"press"`, `"eager"`.                                                                                           |
+| `FluidboxOptions`            | → same                                                      | Fields change (§1.3).                                                                                                                          |
+| `FluidboxOrigin`             | removed from the public API                                 | `findTrigger` returns an element; the runtime resolves the visual from `data-fluidbox-origin`, as `bind` does today. Stays internal.           |
+| `FluidboxOriginAdapter`      | removed                                                     | Replaced by the `findTrigger` and `revealTrigger` options.                                                                                     |
+| `FluidboxOverlayOptions`     | → same                                                      | `travel` + `frameLayer` → `flight`; `returns` removed.                                                                                         |
+| `FluidboxPictureSource`      | → same                                                      |                                                                                                                                                |
+| `FluidboxReason`             | → same                                                      | Same values.                                                                                                                                   |
+| `FluidboxRenderContext`      | → same                                                      |                                                                                                                                                |
+| `FluidboxRenderer`           | → same                                                      | Still draws thumbnails, the sheet and live overlays.                                                                                           |
+| `FluidboxRevealContext`      | → same                                                      | Passed to `revealTrigger`.                                                                                                                     |
+| `FluidboxSheet`              | → same                                                      | `stop` → `snap`, `set` → `setSnap`.                                                                                                            |
+| `FluidboxSheetOptions`       | → same                                                      | `render` stays.                                                                                                                                |
+| `FluidboxSheetSnapPoint`     | → same                                                      |                                                                                                                                                |
+| `FluidboxSlideRenderContext` | `FluidboxSlide`                                             | The object a slide renderer gets (§2.8). `target` → `media` and `layer`; adds `waitUntil`, `drawImage`, `drawVideo`, `drawIframe`, `zoomable`. |
+| `FluidboxSlideRenderer`      | → same                                                      | Keyed by item type in `slides`.                                                                                                                |
+| `FluidboxState`              | → same                                                      | `id` → `value`.                                                                                                                                |
+| `FluidboxStatus`             | → same                                                      |                                                                                                                                                |
+| `FluidboxTarget`             | → same                                                      | An index, an id or an item.                                                                                                                    |
+| `FluidboxThumbnail`          | → same                                                      |                                                                                                                                                |
+| `FluidboxToggleState`        | removed                                                     | No toggle events. `FluidboxValueChangeEvent.action` says `"open"`, `"move"` or `"close"`.                                                      |
+| `FluidboxUpdateOptions`      | → same                                                      | Keys follow the options.                                                                                                                       |
+| `FluidboxVideoItem`          | → same                                                      | Adds `sources` (§2.8).                                                                                                                         |
+| —                            | `FluidboxVideoSource`, `FluidboxVideoOptions`, `videoSlide` | New: video `sources`, and `attach` for a streaming engine (§2.8).                                                                              |
+| `FluidboxVideoTrack`         | → same                                                      |                                                                                                                                                |
+| `FluidboxViewerContext`      | → same                                                      |                                                                                                                                                |
+| `FluidboxViewerRenderer`     | → same                                                      |                                                                                                                                                |
+| `FluidboxZoomCommandOptions` | → same                                                      |                                                                                                                                                |
+| `FluidboxZoomState`          | → same                                                      |                                                                                                                                                |
+| `FluidboxImageProps`         | → same                                                      |                                                                                                                                                |
+| —                            | `FluidboxItemTypes`                                         | New. The interface you merge your item types into.                                                                                             |
+| —                            | `FluidboxCustomItemBase<TType>`                             | New. `{ type, title, width, height }` plus the base fields.                                                                                    |
+| —                            | `FluidboxValue`                                             | New. `string \| null`.                                                                                                                         |
+| —                            | `FluidboxValueChangeEvent`, `FluidboxValueChangeDetails`    | New (§2.6).                                                                                                                                    |
+| —                            | `FluidboxSlides`                                            | New. The `slides` option's type.                                                                                                               |
 
 ## 1.3 Options (`createFluidbox(options)`)
 
@@ -124,24 +126,26 @@ Conventions in this part:
 
 ## 1.4 Item fields
 
-| Current                                                                                                | New                                | Notes                                                                                          |
-| ------------------------------------------------------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `type: "img"`                                                                                          | `type: "image"`                    |                                                                                                |
-| `type: "video"`                                                                                        | → same                             |                                                                                                |
-| `type: "iframe"`                                                                                       | → same                             |                                                                                                |
-| `type: "custom"`                                                                                       | removed                            | The item's `type` names its slide directly.                                                    |
-| `render` (custom)                                                                                      | removed                            | The `type` is the key into `slides`.                                                           |
-| `id`                                                                                                   | → same                             | Required on items without `src`.                                                               |
-| `thumbnail`                                                                                            | → same                             |                                                                                                |
-| `placeholder`                                                                                          | → same                             |                                                                                                |
-| `src`, `srcset`, `sizes`, `alt`, `width`, `height`, `sources` (image)                                  | → same                             |                                                                                                |
-| `zoomSrc`                                                                                              | `zoom.src`                         |                                                                                                |
-| `zoomSrcset`                                                                                           | `zoom.srcset`                      |                                                                                                |
-| `title`, `poster`, `autoplay`, `loop`, `muted`, `playsInline`, `controls`, `preload`, `tracks` (video) | → same                             |                                                                                                |
-| `title`, `allow`, `referrerPolicy`, `sandbox` (iframe)                                                 | → same                             |                                                                                                |
-| `title`, `width`, `height` (custom)                                                                    | → same on `FluidboxCustomItemBase` |                                                                                                |
-| `FluidboxVideoTrack.{src,kind,srclang,label,default}`                                                  | → same                             |                                                                                                |
-| —                                                                                                      | `caption`                          | New, optional, on every type. Read by `<Fluidbox.Caption>` and the default `aria-describedby`. |
+| Current                                                                                                | New                                               | Notes                                                                                          |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `type: "img"`                                                                                          | `type: "image"`                                   |                                                                                                |
+| `type: "video"`                                                                                        | → same                                            |                                                                                                |
+| `type: "iframe"`                                                                                       | → same                                            |                                                                                                |
+| `type: "custom"`                                                                                       | removed                                           | The item's `type` names its slide directly.                                                    |
+| `render` (custom)                                                                                      | removed                                           | The `type` is the key into `slides`.                                                           |
+| `id`                                                                                                   | → same                                            | Required on items without `src`.                                                               |
+| `thumbnail`                                                                                            | → same                                            |                                                                                                |
+| `placeholder`                                                                                          | → same                                            |                                                                                                |
+| `src`, `srcset`, `sizes`, `alt`, `width`, `height`, `sources` (image)                                  | → same                                            |                                                                                                |
+| `zoomSrc`                                                                                              | `zoom.src`                                        |                                                                                                |
+| `zoomSrcset`                                                                                           | `zoom.srcset`                                     |                                                                                                |
+| `title`, `poster`, `autoplay`, `loop`, `muted`, `playsInline`, `controls`, `preload`, `tracks` (video) | → same                                            |                                                                                                |
+| —                                                                                                      | `sources` (video)                                 | New. `<source>` children before `src`.                                                         |
+| —                                                                                                      | `fit: "contain" \| "fill"` (every type but image) | New (§5.4). `width` and `height` become optional when `"fill"`.                                |
+| `title`, `allow`, `referrerPolicy`, `sandbox` (iframe)                                                 | → same                                            |                                                                                                |
+| `title`, `width`, `height` (custom)                                                                    | → same on `FluidboxCustomItemBase`                |                                                                                                |
+| `FluidboxVideoTrack.{src,kind,srclang,label,default}`                                                  | → same                                            |                                                                                                |
+| —                                                                                                      | `caption`                                         | New, optional, on every type. Read by `<Fluidbox.Caption>` and the default `aria-describedby`. |
 
 ## 1.5 The instance (`Fluidbox`)
 
@@ -430,16 +434,16 @@ becomes `--fluidbox-thumbnails-hide`.
 
 ### Other props
 
-| Current                                                                     | New                                            |
-| --------------------------------------------------------------------------- | ---------------------------------------------- |
-| Trigger `asChild`                                                           | → same                                         |
-| Trigger `item`, `returns`                                                   | `value`                                        |
-| Trigger `children(preview)`                                                 | → same: `({ item, index, status })`            |
-| `FluidboxControlsProps.zoom`                                                | removed (see `Controls`)                       |
-| Filmstrip `children({ item, index })`                                       | Thumbnails `children({ item, index, active })` |
-| Sheet `snapPoints`, `dismiss`, `children({ item, index })`, HTML attributes | → same; adds `onSnapChange`                    |
-| SheetStop `stop`                                                            | SheetSnap `to`                                 |
-| ThumbnailOverlay `travel`                                                   | Overlay `flight`                               |
+| Current                                                                     | New                                                              |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Trigger `asChild`                                                           | → same                                                           |
+| Trigger `item`, `returns`                                                   | `value`                                                          |
+| Trigger `children(preview)`                                                 | → same: `({ item, index, status })`                              |
+| `FluidboxControlsProps.zoom`                                                | removed (see `Controls`)                                         |
+| Filmstrip `children({ item, index })`                                       | Thumbnails `children({ item, index, active })`                   |
+| Sheet `snapPoints`, `dismiss`, `children({ item, index })`, HTML attributes | → same, `dismiss` → `dismissMotion` (§2.14); adds `onSnapChange` |
+| SheetStop `stop`                                                            | SheetSnap `to`                                                   |
+| ThumbnailOverlay `travel`                                                   | Overlay `flight`                                                 |
 
 ### Hooks and types
 
@@ -479,7 +483,7 @@ becomes `--fluidbox-thumbnails-hide`.
 | Trigger `as-child`, `item`, `returns`, slot `(preview)`                                                                                                                                                  | `as-child`, `value`, slot `(preview)`                            |                                             |
 | Controls `zoom`                                                                                                                                                                                          | removed                                                          |                                             |
 | Filmstrip slot                                                                                                                                                                                           | Thumbnails slot                                                  |                                             |
-| Sheet `snap-points`, `dismiss`, slot                                                                                                                                                                     | → same                                                           |                                             |
+| Sheet `snap-points`, `dismiss` (→ `dismiss-motion`, §2.14), slot                                                                                                                                         | → same                                                           |                                             |
 | SheetStop `stop`                                                                                                                                                                                         | SheetSnap `to`                                                   |                                             |
 | ThumbnailOverlay `travel`, FrameLayer                                                                                                                                                                    | Overlay `flight`                                                 |                                             |
 | `useFluidbox()`, `useFluidbox(selector)`, `useFluidboxSheet()`                                                                                                                                           | → same, plus `useFluidboxSlide()`                                |                                             |
@@ -551,7 +555,7 @@ becomes `--fluidbox-thumbnails-hide`.
 | `<fluidbox-item>` attr `placeholder`, `aria-label`; slots `trigger`, `content`, `sheet`; props `itemId`, `returns`, `trigger` | → same; `itemId` → `value`; `returns` removed                                                                               |                               |
 | `fluidbox-preview-change`                                                                                                     | → same                                                                                                                      |                               |
 | `<fluidbox-filmstrip>` / `FluidboxFilmstripElement` (`render`)                                                                | `<fluidbox-thumbnails>` / `FluidboxThumbnailsElement`                                                                       |                               |
-| `<fluidbox-sheet>` / `FluidboxSheetElement` (`snap-points`, `dismiss`, `render`)                                              | → same                                                                                                                      |                               |
+| `<fluidbox-sheet>` / `FluidboxSheetElement` (`snap-points`, `dismiss` → `dismiss-motion`, `render`)                           | → same                                                                                                                      |                               |
 | `FluidboxPreviewChangeEvent`                                                                                                  | → same                                                                                                                      |                               |
 | Content-template mapping (`img`/`picture`, `video` + `track`, `iframe[src]`, other markup → custom)                           | → same, other markup → the slide of the item's `type` attribute, else a markup slide                                        |                               |
 | —                                                                                                                             | `<img data-zoom-src data-zoom-srcset>`                                                                                      | New: sets `zoom` from markup. |
@@ -576,16 +580,18 @@ becomes `--fluidbox-thumbnails-hide`.
 
 ### `./embeds` → `./embed`
 
-| Current                                                                                   | New                                                        | Notes                            |
-| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------- |
-| `FluidboxEmbedProvider`                                                                   | → same                                                     |                                  |
-| `FluidboxEmbedItem` (custom + `provider`, `video`, `hash`, `start`, `poster`)             | → same, `type: "embed"`                                    |                                  |
-| `FluidboxEmbedItemOptions` (`title, id, width, height, thumbnail, poster, start, render`) | → same without `render`                                    |                                  |
-| `parseYouTube`, `parseVimeo`, `embedUrl`, `EMBED_ALLOW`                                   | → same                                                     |                                  |
-| `youtubeItem`, `vimeoItem`                                                                | → same                                                     | Produce `type: "embed"`.         |
-| `isEmbedItem`                                                                             | removed                                                    | `item.type === "embed"` narrows. |
-| `createEmbedRenderer({ label })`, `FluidboxEmbedRendererOptions`                          | `createEmbedSlide({ label })`, `FluidboxEmbedSlideOptions` |                                  |
-| `renderEmbed`                                                                             | `embedSlide`                                               |                                  |
+| Current                                                                                   | New                                                                                                          | Notes                                                            |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `FluidboxEmbedProvider` (`"youtube" \| "vimeo"`)                                          | `FluidboxEmbedProvider`, the provider object                                                                 | `name: string` on it; `FluidboxEmbedItem.provider` is that name. |
+| —                                                                                         | `createEmbedProvider`, `FluidboxEmbedProviderOptions`, `FluidboxEmbedVideo`, `youtube`, `vimeo`, `embedItem` | New: providers as a public API (§4.2).                           |
+| `FluidboxEmbedItem` (custom + `provider`, `video`, `hash`, `start`, `poster`)             | → same, `type: "embed"`                                                                                      |                                                                  |
+| `FluidboxEmbedItemOptions` (`title, id, width, height, thumbnail, poster, start, render`) | → same without `render`                                                                                      |                                                                  |
+| `parseYouTube`, `parseVimeo`, `embedUrl`                                                  | `youtube.parse`, `vimeo.parse`, `youtube.url`, `vimeo.url`                                                   | Moved into the providers.                                        |
+| `EMBED_ALLOW`                                                                             | → same                                                                                                       | The default `allow`.                                             |
+| `youtubeItem`, `vimeoItem`                                                                | → same                                                                                                       | Produce `type: "embed"`.                                         |
+| `isEmbedItem`                                                                             | removed                                                                                                      | `item.type === "embed"` narrows.                                 |
+| `createEmbedRenderer({ label })`, `FluidboxEmbedRendererOptions`                          | `createEmbedSlide({ providers, label })`, `FluidboxEmbedSlideOptions`                                        | `providers` defaults to `[youtube, vimeo]`.                      |
+| `renderEmbed`                                                                             | `embedSlide`                                                                                                 |                                                                  |
 
 ### `./spin`
 
@@ -598,12 +604,12 @@ becomes `--fluidbox-thumbnails-hide`.
 
 ### `./model`
 
-| Current                                                                                                                   | New                                                                    | Notes         |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------- |
-| `FluidboxModelItem` (`model: true`, `src`, `poster`, `ar`, `arModes`, `iosSrc`, `attributes`), `FluidboxModelItemOptions` | → same, `type: "model"`; the `model: true` marker and `render` removed |               |
-| `modelItem`                                                                                                               | → same                                                                 |               |
-| `isModelItem`                                                                                                             | removed                                                                | Discriminant. |
-| `createModelRenderer({ load })`, `FluidboxModelRendererOptions`                                                           | `createModelSlide({ load })`, `FluidboxModelSlideOptions`              |               |
+| Current                                                                                                                   | New                                                                    | Notes                                                           |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `FluidboxModelItem` (`model: true`, `src`, `poster`, `ar`, `arModes`, `iosSrc`, `attributes`), `FluidboxModelItemOptions` | → same, `type: "model"`; the `model: true` marker and `render` removed |                                                                 |
+| `modelItem`                                                                                                               | → same                                                                 | Sets `fit: "fill"`; `width` and `height` optional (§4.4, §5.4). |
+| `isModelItem`                                                                                                             | removed                                                                | Discriminant.                                                   |
+| `createModelRenderer({ load })`, `FluidboxModelRendererOptions`                                                           | `createModelSlide({ load })`, `FluidboxModelSlideOptions`              |                                                                 |
 
 ## 1.19 Stale or wrong docs found while reading
 
@@ -621,3 +627,38 @@ Fix these as part of the docs step (§9):
 - Solid's `Viewer` doc says the default Close stays; the code removes all defaults.
 - `docs/BINDINGS.md` describes the bindings as wrappers of `<fluidbox-gallery>` with a `source`
   prop. That is a previous design. Replace it with part 3.
+
+## 1.20 Additions from the third amendment
+
+All new; nothing old is renamed except the sheet's `dismiss`. "Step" is the plan step (§9.2).
+
+| Where                          | Name                                                                                     | Step                | §          |
+| ------------------------------ | ---------------------------------------------------------------------------------------- | ------------------- | ---------- |
+| Options / Root                 | `dismiss: { drag, backdrop }`, `wheel`                                                   | 1                   | 2.14       |
+| Options / Root                 | `shareUrl`                                                                               | 1                   | 2.12       |
+| Options / Root                 | `slideshow`, `reachEndThreshold`                                                         | 7                   | 2.19, 2.20 |
+| `FluidboxSheetOptions.dismiss` | → `dismissMotion: "flight" \| "scroll"`; `"none"` → Root `dismiss.drag: false`           | 1                   | 2.14       |
+| Item fields                    | `download`, `data`                                                                       | 1                   | 2.12, 2.15 |
+| Image item                     | `tiles` (read by the deep-zoom add-on)                                                   | 7                   | 2.18       |
+| State                          | `fullscreen`                                                                             | 1                   | 2.11       |
+| State                          | `playing`                                                                                | 7                   | 2.19       |
+| Commands                       | `setFullscreen`, `download`, `share`                                                     | 1                   | 2.11, 2.12 |
+| Commands                       | `play`, `pause`                                                                          | 7                   | 2.19       |
+| Events                         | `mediaerror` / `FluidboxMediaErrorEvent`, `FluidboxMediaErrorKind`                       | 1                   | 2.13       |
+| Events                         | `reachend` / `FluidboxReachEndEvent`                                                     | 7                   | 2.20       |
+| `FluidboxReason`               | `"slideshow"`                                                                            | 7                   | 2.19       |
+| `FluidboxSlide`                | `fail`, `onZoom`; `zoomable(on \| { max, sharpen })`                                     | 1 (`onZoom` in 1.4) | 2.13, 2.18 |
+| `FluidboxSlide`                | `hotspot`                                                                                | 7                   | 2.17       |
+| Types                          | `FluidboxZoomPose`, `FluidboxZoomableOptions`, `FluidboxSlideshowOptions`                | 1, 7                | 2.18, 2.19 |
+| `FluidboxControlName`          | `"fullscreen"`, `"download"`, `"share"`                                                  | 1                   | 3.18       |
+| `FluidboxControlName`          | `"slideshow"`                                                                            | 7                   | 3.18       |
+| Labels                         | `enterFullscreen`, `exitFullscreen`, `download`, `share`, `linkCopied`                   | 1                   | 2.9        |
+| Labels                         | `playSlideshow`, `pauseSlideshow`                                                        | 7                   | 2.9        |
+| Item lists                     | `withCount(count)` on `createItemList` lists                                             | 7                   | 2.20       |
+| CSS                            | `--fluidbox-motion-speed` (input), `--fluidbox-zoom-scale` (published, on the media box) | 7, 1.4              | 2.16, 2.17 |
+| Data attributes                | `data-fluidbox-fullscreen`, `-download`, `-share`, `data-copied`, item `data-*`          | 1                   | 3.18, 2.15 |
+| Data attributes                | `data-fluidbox-slideshow`, `-hotspot`                                                    | 7                   | 3.18       |
+| Parts (all bindings)           | `Fullscreen`, `Download`, `Share`; Root `onMediaError`                                   | 2, 4                | 3.18       |
+| Parts (all bindings)           | `Slideshow`, `Hotspot`; Root `onReachEnd`                                                | 7                   | 3.18       |
+| Hooks                          | `useFluidboxSlide().fail`, `.onZoom`                                                     | 2                   | 3.18       |
+| Entry                          | `@ogdakke/fluidbox/deep-zoom` (`deepZoomSlide`, `DeepZoom` parts)                        | after 1.0           | 2.18       |

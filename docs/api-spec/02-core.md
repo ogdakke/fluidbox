@@ -54,6 +54,16 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   ) => void | Promise<void>;
   /** When the viewer's code loads. @default "intent" */
   readonly preload?: FluidboxPreload;
+  /** Which gestures close the viewer. Escape always does. (§2.14) */
+  readonly dismiss?: { readonly drag?: boolean; readonly backdrop?: boolean };
+  /** What a vertical wheel or trackpad scroll does on an unzoomed slide. @default "dismiss" (§2.14) */
+  readonly wheel?: "dismiss" | "zoom" | "navigate" | "none";
+  /** The link Share shares. Without it, the Root's `href`; without both, Share hides. (§2.12) */
+  readonly shareUrl?: (item: TItem) => string | undefined;
+  /** Advance on a timer. Off until `play()`, or `autoplay: true`. (§2.19, plan step 7) */
+  readonly slideshow?: FluidboxSlideshowOptions;
+  /** How near the end `reachend` fires. @default 2 (§2.20, plan step 7) */
+  readonly reachEndThreshold?: number;
 }
 
 export type FluidboxPreload = "intent" | "press" | "eager";
@@ -78,6 +88,20 @@ export interface FluidboxItemBase {
   readonly placeholder?: string;
   /** Text shown by <Fluidbox.Caption>; becomes the dialog's description. */
   readonly caption?: string;
+  /**
+   * How the media box is sized. "contain": to the item's width and height,
+   * fitted in the stage. "fill": to the whole stage, less its insets (§5.4).
+   * Ignored on image items.
+   * @default "contain"; modelItem() sets "fill"
+   */
+  readonly fit?: "contain" | "fill";
+  /**
+   * The file Download saves: a URL, `{ src, filename }`, or false for none.
+   * @default image: `zoom.src ?? src`; video: `src`; others: none (§2.12)
+   */
+  readonly download?: string | false | { readonly src: string; readonly filename?: string };
+  /** Becomes `data-*` on the slide and its thumbnail: `{ tone: "light" }` → `data-tone="light"`. (§2.15) */
+  readonly data?: Readonly<Record<string, string>>;
 }
 
 export interface FluidboxImageItem extends FluidboxItemBase {
@@ -91,12 +115,29 @@ export interface FluidboxImageItem extends FluidboxItemBase {
   readonly sources?: readonly FluidboxPictureSource[];
   /** The larger image zoom and hover zoom load: a master, or width candidates. */
   readonly zoom?: { readonly src?: string; readonly srcset?: string };
+  /** A tiled pyramid for the deep-zoom add-on. The core ignores it. (§2.18, plan step 7) */
+  readonly tiles?: { readonly format: "iiif" | "dzi"; readonly url: string };
 }
 
 export interface FluidboxVideoItem extends FluidboxItemBase {
   readonly type: "video";
-  // src, title, width, height, poster, autoplay, loop, muted,
+  /** The last resort: drawn as the last <source>, after `sources`. */
+  readonly src: string;
+  /**
+   * Encodings to try first, in order of preference, such as AV1, then WebM,
+   * then `src` as MP4. Each is a <source> child of the <video>.
+   */
+  readonly sources?: readonly FluidboxVideoSource[];
+  // title, width, height, poster, autoplay, loop, muted,
   // playsInline, controls, preload, tracks: unchanged.
+}
+
+export interface FluidboxVideoSource {
+  readonly src: string;
+  /** The MIME type with codecs, as `video/mp4; codecs="av01.0.05M.08"`. */
+  readonly type?: string;
+  /** A media query, as `(min-width: 1200px)`. */
+  readonly media?: string;
 }
 
 export interface FluidboxIframeItem extends FluidboxItemBase {
@@ -109,8 +150,9 @@ export interface FluidboxCustomItemBase<TType extends string> extends FluidboxIt
   readonly type: TType;
   /** The accessible name of the slide and the dialog. */
   readonly title: string;
-  readonly width: number;
-  readonly height: number;
+  /** Required unless `fit` is "fill"; then they only shape the poster. */
+  readonly width?: number;
+  readonly height?: number;
 }
 
 /**
@@ -161,7 +203,9 @@ TypeScript program see each other's types. That is acceptable for a component li
 ### Ids and validation
 
 Unchanged, apart from names: `id` defaults to `src`; repeated `src` gets `src#2`; an item without
-either throws a `TypeError`; URL checks per type stay (`media-url.ts`). An item whose `type` has
+either throws a `TypeError`; URL checks per type stay (`media-url.ts`), and now cover every
+`sources[].src` of a video item too. An item without `width` and `height` throws unless its
+`fit` is `"fill"`; the check runs where items are checked now (`toList`, `createItemList`). An item whose `type` has
 no slide (no built-in, no entry in `slides`, no `default`) shows the slide's error state with
 `labels.error` and logs once in development. Today an unknown `render` throws inside the strip
 (`viewer-strip.ts:987`), which breaks the viewer for every item; an error slide is kinder.
@@ -182,6 +226,15 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean>;
   zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
   zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
+  /** Enter or leave fullscreen; toggles without an argument. Resolves the new state. (§2.11) */
+  setFullscreen(on?: boolean): Promise<boolean>;
+  /** Download the open item's file, as the Download control does. (§2.12) */
+  download(): Promise<boolean>;
+  /** Share the open item's link, as the Share control does. (§2.12) */
+  share(): Promise<boolean>;
+  /** Start and stop the slideshow. (§2.19, plan step 7) */
+  play(): void;
+  pause(): void;
   update(options: FluidboxUpdateOptions<TItem>): void;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   preload(target: FluidboxTarget<TItem>): () => void;
@@ -239,6 +292,10 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly hasNext: boolean;
   /** Non-null while open on a slide whose media box zooms (§5.2), with zoom on. */
   readonly zoom: FluidboxZoomState | null;
+  /** The viewer is the document's fullscreen element (§2.11). */
+  readonly fullscreen: boolean;
+  /** The slideshow is advancing on its timer (§2.19, plan step 7). */
+  readonly playing: boolean;
 }
 ```
 
@@ -274,6 +331,10 @@ export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   valuechangecomplete: FluidboxValueChangeEvent<TItem>;
   sheetchange: FluidboxSheetEvent;
   zoomchange: FluidboxZoomEvent;
+  /** A slide entered its error state, or a zoom image failed (§2.13). */
+  mediaerror: FluidboxMediaErrorEvent<TItem>;
+  /** The open item came within `reachEndThreshold` of the end (§2.20, plan step 7). */
+  reachend: FluidboxReachEndEvent<TItem>;
 }
 ```
 
@@ -364,21 +425,39 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   /** Aborted when the slide is disposed. */
   readonly signal: AbortSignal;
   readonly active: boolean;
+  /**
+   * True while an open is waiting for this slide: it mounted as the item
+   * being opened. Neighbours that mount with it are false. Lets a slide start
+   * heavy work early only when an open waits for it, as the model add-on does.
+   */
+  readonly opening: boolean;
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
   /**
    * Let the media box zoom (pinch, double-tap, wheel, the zoom controls).
    * Off by default for your own media; on for drawImage.
    */
-  zoomable(this: void, on: boolean): void;
+  zoomable(this: void, on: boolean | FluidboxZoomableOptions): void;
   /**
-   * Hold the opening flight until the returned function is called, at most
-   * three seconds. Call it while the slide mounts, before the next frame.
-   * See §5.3.
+   * Put the slide in its error state: the error message and Retry, and a
+   * `mediaerror` event with kind "custom". Retry disposes and renders the
+   * slide again. (§2.13)
    */
-  holdOpen(this: void): () => void;
+  fail(this: void, error?: unknown): void;
+  /**
+   * Follow the box's zoom pose, every frame it changes. The hook hotspots and
+   * deep zoom build on; built in step 1.4. (§2.18)
+   */
+  onZoom(this: void, listener: (pose: FluidboxZoomPose) => void): () => void;
+  /**
+   * Make the opening flight also wait for `promise`, as
+   * ExtendableEvent.waitUntil does. For what the engine can't see in the box,
+   * such as a canvas having painted. Every open already waits for the box's
+   * images and videos, at most three seconds in all. See §5.3.
+   */
+  waitUntil(this: void, promise: Promise<unknown>): void;
   /** Draw the built-in image, video or iframe for an item into `media`. */
   drawImage(this: void, item?: FluidboxImageItem): () => void;
-  drawVideo(this: void, item?: FluidboxVideoItem): () => void;
+  drawVideo(this: void, item?: FluidboxVideoItem, options?: FluidboxVideoOptions): () => void;
   drawIframe(this: void, item?: FluidboxIframeItem): () => void;
 }
 ```
@@ -391,11 +470,79 @@ Rules, which hold for every binding too:
 - Slides outside the window are disposed and may mount again as new instances. Unchanged.
 - The runtime empties `media` and `layer` after the disposer runs. It never moves a node you put
   in them; it may move `media` itself (§5.1).
-- If nothing is drawn into `media` by the time the open plans its flight, the slide opens and
-  closes with a fade instead of a flight (§5.1).
+- Every open waits until the opened slide is ready, at most 3 seconds (§5.3). Ready means the
+  renderer has returned (or the binding has committed), every `<img>` in `media` has decoded,
+  every `<video>` in it can show a frame or has a decoded poster, and every `waitUntil` promise has
+  settled. What `draw*` drew follows today's rules and adds no wait. The slide layer never holds
+  the open.
+- If `media` is empty when the slide commits, the slide opens and closes with a fade instead of a
+  flight (§5.1).
 - `drawImage()` without an argument draws `slide.item`, which must then be an image item; the
   other `draw*` likewise. With an argument it draws that item: a product slide can draw its
   `image` field.
+
+### Video sources and streaming
+
+Today the built-in video sets one `src` (`viewer-strip.ts:962`), so a page can't offer AV1 or
+WebM with an MP4 fallback, and can't plug in a streaming engine such as hls.js or dash.js. Both
+change in the built-in video, so a streamed video keeps everything else it does: controls,
+tracks, the poster, pausing as it leaves, autoplay as it comes on show, its size, and continuing
+from the trigger's video (`continueVideo`, `:600`).
+
+**Sources.** With `sources`, the video gets one `<source>` per entry, in order, then a last
+`<source src={item.src}>`. It never also gets a `src` attribute, because a `src` attribute makes
+the browser ignore every `<source>` child. Two changes follow:
+
+- Unloading a slide removes the `<source>` children before `load()` (`#unload`, `:1032-1034`).
+  Otherwise `load()` picks a source again and the unloaded video keeps downloading.
+- When every source fails, the `error` event fires on the last `<source>`, not on the video. The
+  slide listens there for its error state and Retry.
+
+Without `sources`, the video sets `src` as now. The server copy is images only, so it is
+unaffected. The hand-off from a playing trigger video works the same, because it waits for
+`loadedmetadata` and syncs by `currentTime` (`:660-664`), whichever source the browser chose.
+
+**Attaching an engine.**
+
+```ts
+export interface FluidboxVideoOptions {
+  /**
+   * Load the media yourself: the runtime sets no src and no <source>. Called
+   * when the slide loads; clean up when `signal` aborts, which happens before
+   * the runtime empties the video.
+   */
+  readonly attach?: (video: HTMLVideoElement, signal: AbortSignal, item: FluidboxVideoItem) => void;
+}
+
+/** A slide for video items that draws the built-in video with these options. */
+export function videoSlide(options: FluidboxVideoOptions): FluidboxSlideRenderer<FluidboxVideoItem>;
+```
+
+```ts
+// plain JS: every video item through hls.js, or natively where the browser plays HLS
+import Hls from "hls.js";
+
+const attachHls = (video, signal, item) => {
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = item.src;
+    return;
+  }
+  const hls = new Hls();
+  hls.loadSource(item.src);
+  hls.attachMedia(video);
+  signal.addEventListener("abort", () => hls.destroy(), { once: true });
+};
+
+createFluidbox({ items, slides: { video: videoSlide({ attach: attachHls }) } });
+```
+
+`attach` runs where the runtime would set `src` (`#load`, `:961`), so it runs for neighbours
+too, as `preload="metadata"` does now. An engine that should not fetch segments for a neighbour
+starts loading on `play` or when `slide.active` turns true (the HLS add-on does, §4.8). The
+runtime still sets `poster`, the attributes and the tracks. `item.src` must still pass the URL
+check (the manifest URL); what `attach` loads is the app's responsibility. A built-in video with
+`attach` is still exempt from the generic readiness rule (§5.3). An open doesn't wait for the
+engine's first segment.
 
 ### Plain-JS example
 
@@ -436,11 +583,24 @@ export interface FluidboxLabels {
   readonly sheet: string;
   readonly error: string;
   readonly retry: string;
+  /** §2.11 */
+  readonly enterFullscreen: string;
+  readonly exitFullscreen: string;
+  /** §2.12 */
+  readonly download: string;
+  readonly share: string;
+  /** Announced after Share copied the link. */
+  readonly linkCopied: string;
+  /** §2.19, plan step 7 */
+  readonly playSlideshow: string;
+  readonly pauseSlideshow: string;
 }
 ```
 
 Defaults are today's, with `thumbnails: "Gallery thumbnails"`, `thumbnailsList: "Choose a gallery
-item"` and `counter: (index, count) => \`${index + 1} / ${count}\``.
+item"` and `counter: (index, count) => \`${index + 1} / ${count}\``. The new keys default to
+`"Enter full screen"`, `"Exit full screen"`, `"Download"`, `"Share"`, `"Link copied"`, `"Play
+slideshow"`and`"Pause slideshow"`.
 
 ## 2.10 Sheet and thumbnails options
 
@@ -448,8 +608,12 @@ item"` and `counter: (index, count) => \`${index + 1} / ${count}\``.
 export interface FluidboxSheetOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** @default ["60%", "content"] */
   readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
-  /** @default "flight" */
-  readonly dismiss?: "flight" | "scroll" | "none";
+  /**
+   * How a swipe down on the photo closes the viewer while the sheet is down.
+   * Was `dismiss`; "none" moved to the Root's `dismiss: { drag: false }` (§2.14).
+   * @default "flight"
+   */
+  readonly dismissMotion?: "flight" | "scroll";
   readonly render?: FluidboxRenderer<TItem>;
 }
 
@@ -463,3 +627,336 @@ export interface FluidboxThumbnailsOptions<TItem extends FluidboxItem = Fluidbox
   readonly render?: FluidboxRenderer<TItem>;
 }
 ```
+
+## 2.11 Fullscreen
+
+`fluidbox.setFullscreen(on?)`, `state.fullscreen`, the `"fullscreen"` control name, the
+`Fullscreen` part (§3.18), and the labels `enterFullscreen` and `exitFullscreen`.
+
+- It calls `requestFullscreen()` on the viewer root (`[data-fluidbox-viewer]`), falling back to
+  `webkitRequestFullscreen()` for older iPad Safari.
+- **Availability.** The control is `hidden` when `document.fullscreenEnabled` (or
+  `webkitFullscreenEnabled`) is false, which is the case on iPhone Safari. There only a `<video>`
+  can go fullscreen, through its own controls. `setFullscreen()` then resolves false.
+- **Over a modal dialog.** Over an open modal `<dialog>`, the viewer mounts inside the dialog and
+  shows in the top layer as a manual popover (`viewer-portal.ts:67-90`). Browsers disagree about
+  calling `requestFullscreen` on a showing popover, so the runtime hides the popover first
+  (`hidePopover()`) and requests fullscreen. Fullscreen then puts the viewer in the top layer
+  above the dialog by itself. The viewer is inside the dialog, so the dialog's inertness doesn't
+  reach it. On leaving fullscreen the runtime shows the popover again. This needs a browser test
+  in Chromium, WebKit and Firefox (§9.4), because it is the one path the spec can't settle by
+  reading.
+- **Closing exits fullscreen first.** The close awaits `exitFullscreen()` and the
+  `fullscreenchange` that follows (at most 500 ms), then measures the trigger and flies home. A
+  close planned while the viewer still covers the screen would fly to stale geometry.
+- **Leaving fullscreen doesn't close the viewer.** In fullscreen the browser takes Escape to
+  leave fullscreen and doesn't deliver it to the page, so the next Escape closes. The runtime adds
+  no code for this.
+- A move or a zoom keeps fullscreen. `destroy()` exits it. The viewer listens for
+  `fullscreenchange` to keep `state.fullscreen` true to the document, whoever changed it.
+- The control's name switches between the two labels. It doesn't also use `aria-pressed`,
+  because a toggle button whose name changes shouldn't also report a pressed state.
+
+## 2.12 Download and Share
+
+### Download
+
+The item's `download` field (§2.3) says what to save. By default that is the largest file:
+`zoom.src ?? src` for images and `src` for video. Models, embeds, iframes and custom types have
+none unless they set it. `false` turns it off. The URL must pass the media URL check (http(s),
+relative or `blob:`).
+
+The control is an `<a download>` with a real `href`, so "Save link as" and a middle click work.
+On a click:
+
+1. Same origin (or `blob:`): the browser downloads it. `download` is the filename: the
+   `filename` given, else the URL's last path segment, else the item's id.
+2. Cross origin: browsers ignore `download` there and navigate instead, so the runtime prevents
+   the default and fetches the file (`mode: "cors"`). If that succeeds, it saves the blob through
+   a temporary object URL and revokes it afterwards. The control has `aria-busy` while fetching,
+   and a move or a close aborts the fetch.
+3. If the fetch fails (no CORS, network), it opens the URL in a new tab
+   (`noopener,noreferrer`), where the browser's own save works.
+
+`fluidbox.download()` does the same for the open item and resolves whether a download or a tab
+started. The control is `hidden` on items without a file.
+
+### Share
+
+The link is `shareUrl(item)` (option), else the Root's `href(value)` in the bindings, resolved
+against `location`. The title is the item's label (`itemLabel`).
+
+1. If `navigator.share` exists and `navigator.canShare({ url })` allows it, call
+   `navigator.share({ title, url })`. When the user cancels (`AbortError`), nothing happens.
+2. Otherwise, or on `NotAllowedError`, copy the link with `navigator.clipboard.writeText` and
+   announce `labels.linkCopied` in the viewer's live region. The button gets `data-copied` for two
+   seconds, for styling.
+3. With neither API, or no link, the control is `hidden`.
+
+`fluidbox.share()` does the same and resolves whether something was shared or copied. Both
+controls live in the lazy viewer chunk; their parts are a few lines that call these commands
+(§3.18).
+
+## 2.13 Media errors
+
+```ts
+export type FluidboxMediaErrorKind = "image" | "video" | "iframe" | "zoom" | "custom";
+
+export class FluidboxMediaErrorEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
+  readonly value: string;
+  readonly index: number;
+  readonly item: TItem;
+  readonly kind: FluidboxMediaErrorKind;
+  /** The DOM event, the TypeError of a failed URL check, or what `slide.fail` got. */
+  readonly cause: unknown;
+}
+```
+
+It fires every time a slide enters its error state. Today those are the `#fail` call sites
+(`viewer-strip.ts:492`, `:951`, `:960`), plus the video error now heard on the last `<source>`
+(§2.8). Neighbours count too: a slide loaded beside the current one that fails fires with its own
+index. A Retry that fails again fires again.
+
+- **Zoom images.** When the image zoom loads (the sharper candidate in `sharpen`, `:837`, or the
+  zoom master a zoom command waits for) fails, it fires with `kind: "zoom"`, and no error slide
+  shows. The slide keeps the image it has, as today, where the failure is swallowed
+  (`viewer-strip.ts`, the `.catch(() => {})` in `sharpen`).
+- **Custom slides** call `slide.fail(error)`: the slide shows `labels.error` and Retry, and the
+  event fires with `kind: "custom"`. Retry disposes the slide's renderer (or unmounts the
+  framework content) and renders it again. In the bindings `useFluidboxSlide().fail`.
+- Not cancelable. It reports; the error UI is the slide's.
+
+Bindings: `onMediaError(event)` (React, Solid), `@media-error` (Vue), `(mediaError)` (Angular),
+and the `mediaerror` event on `<fluidbox-gallery>`.
+
+## 2.14 Turning gestures off
+
+What closes the viewer today: Escape, the Close button, a drag down on the media, a tap on the
+backdrop, and a vertical wheel or trackpad scroll on an unzoomed slide. The last is the wheel
+dismiss (`#onWheel`, `dom-viewer-driver.ts:2184`, and `#commitWheelDismiss`, `:1835`), which a
+sheet takes first to raise itself. Other wheel input today: a horizontal scroll moves between
+slides (the strip's native scroll), Ctrl + wheel and trackpad pinch zoom (`fluidbox-zoom.ts:638`),
+and a plain wheel pans a zoomed image.
+
+```ts
+dismiss?: { drag?: boolean; backdrop?: boolean }; // both default true
+wheel?: "dismiss" | "zoom" | "navigate" | "none"; // default "dismiss"
+```
+
+- `dismiss.drag: false`: a drag down doesn't close. The media follows with a short rubber band and
+  springs back. With a sheet, a drag up still raises it.
+- `dismiss.backdrop: false`: a tap on the backdrop does nothing.
+- Escape and Close always close. A viewer without a way out would fail WCAG 2.1.2.
+- `wheel` governs a vertical wheel on an unzoomed slide. `"dismiss"` is today's behaviour.
+  `"zoom"` makes a plain wheel zoom as Ctrl + wheel does, as photo apps do. `"navigate"` makes one
+  wheel gesture one move to the previous or next slide; a gesture ends after 150 ms without wheel
+  input, so trackpad inertia doesn't skip slides. `"none"` ignores it and keeps the page still.
+  In every mode a horizontal scroll still moves between slides, and Ctrl + wheel still zooms.
+- The brief's sketch had `wheel: "zoom" | "navigate" | "none"`, with today's behaviour as the
+  default. Today's behaviour is dismissing, so it gets a name and is the default.
+
+**The name clash with the sheet.** The sheet's `dismiss: "flight" | "scroll" | "none"`
+(`public-api.ts:417-422`) says how a swipe down on the photo closes the viewer while the sheet is
+down. It becomes `dismissMotion: "flight" | "scroll"`. Its `"none"` ("keep the viewer open") is
+the same as the Root's `dismiss: { drag: false }` and moves there. One `dismiss` remains, on the
+Root, and it means "what may close the viewer". The `SheetSnap` and `Sheet` parts take
+`dismissMotion`.
+
+Both options can change through `update` and are Root props in the bindings.
+
+## 2.15 Styling by item
+
+```ts
+{ type: "image", src, alt, width, height, data: { tone: "light", kind: "product" } }
+```
+
+Each entry becomes `data-<name>="<value>"` on the slide (`[data-fluidbox-slide]`), on the item's
+Thumbnails button, and on the server copy's slide:
+
+```css
+[data-fluidbox-slide][data-tone="light"] {
+  --fluidbox-backdrop-background: #f4f1ea;
+}
+[data-fluidbox-viewer]:has([data-fluidbox-slide][data-active][data-tone="light"])
+  [data-fluidbox-close] {
+  color: #111;
+}
+```
+
+- Names must match `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`: lower case, digits, single dashes. Names
+  starting `fluidbox-` are reserved for the runtime. Values are strings. Items are checked where
+  they are checked now (`toList`, `createItemList`). A bad name throws a `TypeError` that names the
+  item and the key.
+- A slide reused across `setItems` (same id, new data) has stale keys removed and new ones set.
+- `data-active` on the slide on show (§1.11) is what makes viewer-wide rules like the second
+  example work.
+
+## 2.16 Motion speed (plan step 7)
+
+Flight timing is fixed today: the open is `OPEN_DURATION` 300 ms (`dom-viewer-driver.ts:60`), the
+close 220–480 ms by distance (`:819`), the drag release 140–220 ms (`:1914`), each with a spring
+`response` proportional to its duration (`:873`, `:1923`).
+
+One CSS custom property, `--fluidbox-motion-speed`: a number, default `1`, clamped to
+`0.25`–`4`. `2` is twice as fast. The driver reads it from the viewer root with one
+`getComputedStyle` when it plans a flight, a close, a release or a zoom animation, and divides
+every duration and spring `response` by it. Being CSS, it can change by breakpoint, theme or
+`:has()`. Reduced motion is unchanged: no flights, whatever the speed.
+
+One gap: a move between slides is the strip's native smooth scroll (`viewer-strip.ts:220`),
+whose duration the browser picks. At a speed other than 1, the strip drives that scroll with its
+own animation (`scrollLeft` per frame, 300 ms ÷ speed) and keeps scroll-snap for gestures.
+
+Hook now: step 1.4 routes every duration through one `#duration(ms)` helper in the driver and the
+zoom engine, so step 7 changes one function.
+
+## 2.17 Hotspots (plan step 7)
+
+`<Fluidbox.Hotspot x="42%" y="30%">` inside `Media` (§3.18) marks a point on the media.
+
+- **Positioned against the painted content, not the box.** The runtime keeps a hotspot layer
+  inside the media box sized to the painted rectangle of the box's main `<img>` or `<video>`.
+  That rectangle comes from its natural size, `object-fit` and `object-position`, so a hotspot
+  stays on the product with `object-fit: contain` and in a fill box (§5.4). Without an image or
+  video, the layer is the box. `x` and `y` are percentages of that layer, or numbers in the
+  item's pixel space (`x={412}`), converted with `width` and `height`.
+- **Zoom.** The layer is inside the box, so it zooms with it. Pins keep their screen size by
+  `scale: calc(1 / var(--fluidbox-zoom-scale))`, a property the zoom engine sets on the box (hook
+  below). `scaleWithZoom` turns that off.
+- **Accessibility.** Each hotspot is a `<button>` with the app's content and an accessible name,
+  in DOM order inside the slide, which is reading order. Focusing a hotspot while zoomed pans it
+  into view. It stops pointer events from starting a pan or a dismiss
+  (`data-fluidbox-owns-input`).
+- **Flights.** Hotspots hide during the flights and fade in with the controls, so they don't fly
+  as a smear of small buttons.
+- Elements: `<fluidbox-hotspot x="42%" y="30%">` inside a slide template's media. Plain JS:
+  `slide.hotspot({ x, y, scaleWithZoom }): HTMLButtonElement`, which returns the positioned button
+  for the app to fill.
+
+Hook now: step 1.4 sets `--fluidbox-zoom-scale` on the media box on every pose (1 at rest), and
+keeps the box's children inside the element the zoom transforms. Both are true of the design in
+§5.1; the plan states them as requirements so step 1.4 doesn't drop them.
+
+## 2.18 The zoom pose hook, and deep zoom (deep zoom after 1.0)
+
+```ts
+export interface FluidboxZoomPose {
+  readonly scale: number;
+  /** The box's translation in CSS pixels, as the zoom engine's pose has it. */
+  readonly x: number;
+  readonly y: number;
+  /** The part of the media on screen, in the item's own pixels (0…width, 0…height). */
+  readonly visible: DOMRectReadOnly;
+  /** True while a pinch, wheel or animation moves it; false once it rests. */
+  readonly moving: boolean;
+}
+
+export interface FluidboxZoomableOptions {
+  /** This box's maximum scale, overriding the Root's `zoom.max`. */
+  readonly max?: number;
+  /** Load the sharper `zoom` image when zoomed. @default true for drawImage */
+  readonly sharpen?: boolean;
+}
+```
+
+`slide.onZoom(listener)` calls back on every frame the pose changes and once when it rests. It
+covers both of the zoom engine's modes: the transform during a gesture and the native scroller at
+rest (`fluidbox-zoom.ts:175-254`, where the pose is read back from the scroll offsets). That is
+what step 1.4 must build now, since it is rewriting the zoom target anyway. It costs one callback
+list per slide.
+
+Deep zoom (`@ogdakke/fluidbox/deep-zoom`) is then an add-on with no further engine changes:
+
+```ts
+createFluidbox({ items, slides: { image: deepZoomSlide() } });
+<Fluidbox.Slides image={() => <DeepZoom />} />
+```
+
+For an image item with `tiles: { format: "iiif" | "dzi", url }`, it draws the image with
+`drawImage`, calls `zoomable({ max: naturalWidth / fittedWidth, sharpen: false })`, reads the
+IIIF `info.json` or the DZI XML, and keeps a tile layer inside the box. On each `onZoom` it picks
+the pyramid level for `scale` and loads the tiles that intersect `visible`. While `moving` it
+only loads tiles; once at rest it also evicts tiles off screen. Images without `tiles` get the
+plain built-in slide. Size estimate: 3–5 KB gzip, its own bundle-check consumer.
+
+## 2.19 Slideshow (plan step 7)
+
+```ts
+export interface FluidboxSlideshowOptions {
+  /** Time on each slide once it is ready, in ms. @default 5000 */
+  readonly interval?: number;
+  /** Go from the last slide to the first. @default the Root's `loop` */
+  readonly loop?: boolean;
+  /** Start playing when the viewer opens. @default false */
+  readonly autoplay?: boolean;
+}
+```
+
+`play()`, `pause()`, `state.playing`, the `"slideshow"` control name and the `Slideshow` part
+(§3.18), named `playSlideshow` or `pauseSlideshow`.
+
+- **Never starts by itself** unless `autoplay: true` or the app calls `play()`.
+- **Advancing.** After `interval` on a slide, it moves with `reason: "slideshow"` (a new
+  `FluidboxReason`). It first waits for the next slide's readiness: the commit and media wait of
+  §5.3, capped at the interval. Without `loop` it stops on the last slide and `playing` turns
+  false.
+- **Pauses on any user interaction**: a pointer or touch gesture on the viewer, a key, a zoom, a
+  move the user made, opening the sheet. It pauses when the tab is hidden (`visibilitychange`) and
+  while a `<video>` in the active slide plays. It stays paused until `play()` or the control.
+  Only the tab coming back and a video ending resume it, and only if those paused it.
+- **WCAG 2.2.2 (Pause, Stop, Hide).** The control is always reachable while playing, and
+  interaction pauses. While playing, the viewer's live region is set to `aria-live="off"`, so a
+  screen reader isn't interrupted every few seconds, as the WAI carousel tutorial recommends. It
+  goes back to polite on pause.
+- **Reduced motion.** Moves are instant, with no flight and no strip animation.
+- Closing stops it.
+
+Hooks now: §5.3's `ready(index, cap)` is index-based and must stay callable outside an open (step
+1.5). The driver gets one choke point that every user gesture, key and zoom goes through
+(`#userInteraction()`), which step 7 subscribes to. `waitUntil` promises a slide registered while
+mounting stay pending for the slideshow's wait, rather than being dropped outside an open.
+
+## 2.20 `reachend` (plan step 7)
+
+```ts
+export class FluidboxReachEndEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
+  readonly value: string;
+  readonly index: number;
+  readonly count: number;
+}
+```
+
+- Fires when the open item's index comes to `count - 1 - reachEndThreshold` or later (default
+  threshold 2), on an open or a move.
+- Once per count: after it fires for a count it doesn't fire again until `count` changes. Then it
+  re-arms, and fires at once if the open item is already within the threshold of the new end.
+- Never fires with `loop` on, since there is no end.
+- Bindings: `onReachEnd` (React, Solid), `@reach-end` (Vue), `(reachEnd)` (Angular), `reachend`
+  on `<fluidbox-gallery>`.
+
+**Appending.** The app appends with `setItems`. The viewer keeps the open item by id, which
+`#setSource` already does (`create-fluidbox.ts:844-866`): it finds the previous id in the new
+source and keeps that index, and slides are reused by id. So `value` doesn't change, and nothing
+moves or reloads.
+
+**Growing a `FluidboxItemList`.** A list is immutable: `count` is fixed when it is made
+(`items.ts:97`). To grow, make a new list with a larger count and pass it to `setItems`.
+`setItems` always applies a lazy list (`create-fluidbox.ts:500-503`). The only cost is the id
+lookup that keeps the open item, which for `createItemList` scans without an `index` option. A
+helper keeps the cache:
+
+```ts
+const list = createItemList({
+  count: 50,
+  item: (i) => photoAt(i),
+  index: (id) => Number(id.slice(6)),
+});
+viewer.addEventListener("reachend", async () => {
+  await fetchMore();
+  fluidbox.setItems(list.withCount(total())); // same item() and index(), and the items already made
+});
+```
+
+`withCount(count)` is new on the lists `createItemList` returns: a new list over the same
+`item`/`index` functions that shares the made-items map, so the ids already known resolve at
+once. Hook now: none beyond what `setItems` does today.

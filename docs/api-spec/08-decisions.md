@@ -122,18 +122,29 @@ mirror the bindings' `onValueChange` and `onValueChangeComplete`, so the docs te
 Cost: listeners that used `toggle` to lazy-load something change to
 `event.action === "open"` (getting-started.md:85-91 is the one docs case, §6.14).
 
-## 8.6 Holding the open is opt-in
+## 8.6 Waiting for the slide is the default
 
-**Recommendation: `useFluidboxSlide({ holdOpen: true })` returns `ready()`; plain JS calls
-`slide.holdOpen()`, which returns `ready`.**
+**Decided (the user's call, replacing the opt-in this spec first proposed): every open waits for
+the opened slide to be ready, at most 3 s. `slide.waitUntil(promise)` covers what the engine
+can't see.**
 
-The brief's agreed direction was a bare `ready()` on the slide. The engine has to know before the
-flight starts whether to wait, and it starts the flight in the frame after the press
-(`dom-viewer-driver.ts:657`). A slide that might call `ready()` later can't be told apart from one
-that never will, so either every open waits for the cap, or the call has to be declared up front.
-The opt-in is the declaration. ramka's `onBeforeOpen` is the same idea at the Root level with no
-time limit; the spec keeps the 3 s cap the image path already has (`#mediaReady`, `:957`), so a
-slide that never calls `ready` still opens. Details in §5.3.
+The brief's sketch was a bare `ready()` on the slide. That can't work alone: a slide that might
+call `ready()` later can't be told apart from one that never will. The first draft of this spec
+made the hold opt-in (`holdOpen`). The user asked for waiting to be the default instead, and that
+works because the engine doesn't need to be told whether to wait. Every slide's content lands in
+a mount window the engine waits through anyway: a React microtask, Vue's `nextTick`, Solid
+synchronously, Angular's `detectChanges()`, a renderer's return. The bindings report the commit.
+After it the engine reads the box: images decoded, videos able to show a frame. Then it waits for
+any `waitUntil` promises.
+
+Compared with ramka's `onBeforeOpen` (a root callback, no time limit): the wait sits on the slide,
+where the canvas and its "painted" signal live, and keeps the 3 s cap, so a slide that never
+settles still opens. A root-level hook can be added later on top of the same wait.
+
+The trade is latency for custom slides. A slide whose own `<img>` hasn't decoded used to fly an
+empty box at once; now it waits for the image. Photos are unaffected, because built-in media keeps
+today's rules. The pointerdown preparation starts the wait before the click. §5.3 has the details
+and the costs, and §9.4 has the latency test.
 
 ## 8.7 Two layers in a slide, and Media holds framework content
 
@@ -196,3 +207,69 @@ anywhere inside the gallery, not only as a direct child.
 **Recommendation: none.** The package is `0.0.0` and unpublished. Old names are removed in the same
 change that adds the new ones; the inventory (part 1) is the migration table for the examples and
 docs in this repo, and nothing outside it depends on the old names.
+
+## 8.14 The third amendment: ten additions
+
+**Decided (approved by the user):** fullscreen, download and share, a media error event, turning
+gestures off, styling by item, motion speed, hotspots, deep zoom (after 1.0, as an add-on), a
+slideshow and `reachend`. Items 1–5 are built in steps 1 and 2; items 6–10 in a new step 7, after
+React (§9.2). The decisions below are the refinements made while specifying them. Each is
+recommended, and can be overturned on its own.
+
+## 8.15 `wheel` names today's behaviour
+
+**Recommendation: `wheel: "dismiss" | "zoom" | "navigate" | "none"`, default `"dismiss"`.**
+
+The sketch had `"zoom" | "navigate" | "none"` with "today's behaviour" as the default. Today a
+vertical wheel on an unzoomed slide dismisses the viewer (`#onWheel`,
+`dom-viewer-driver.ts:2184`). An option whose default can't be written as one of its values is
+hard to document and to set back, so it gets a name.
+
+## 8.16 One `dismiss`
+
+**Recommendation: the Root's `dismiss: { drag, backdrop }` keeps the name; the sheet's
+`dismiss: "flight" | "scroll" | "none"` becomes `dismissMotion: "flight" | "scroll"`.**
+
+The two answered different questions: "what may close the viewer" and "how does the photo leave
+when it does". The sheet's `"none"` was the first question asked in the wrong place, and it equals
+`dismiss: { drag: false }`.
+
+## 8.17 Unavailable controls are hidden
+
+**Recommendation: Fullscreen, Download, Share and Slideshow get `hidden` when they can't work
+(iPhone, an item with no file, no Web Share and no clipboard, no `slideshow` option).**
+
+`disabled` suits a control that will work later in the same session, as Previous at the first
+slide does. A control that never works on this device or item would be a dead stop in the tab
+order. Apps that want a placeholder style `[data-fluidbox-download][hidden]`.
+
+## 8.18 Motion speed is a CSS property
+
+**Recommendation: `--fluidbox-motion-speed`, read when each motion is planned. No JS option.**
+
+That was the user's preference. It varies by breakpoint, theme or container like any custom
+property, and costs one `getComputedStyle` per flight, which the planner already pays for layout.
+A JS option would need `update()` plumbing and would only duplicate it. The strip's native smooth
+scroll can't be timed, so at a speed other than 1 the strip animates the scroll itself (§2.16).
+
+## 8.19 The slideshow never starts by itself
+
+**Recommendation: off until `play()` or `autoplay: true`; any interaction pauses it; the live
+region goes quiet while it plays.**
+
+WCAG 2.2.2 requires a way to pause motion that starts automatically and lasts over five seconds.
+Starting only on request, pausing on interaction and keeping the control reachable go past the
+minimum. Resuming after a tab comes back is limited to pauses the tab caused, so a user's pause
+always sticks.
+
+## 8.20 The new parts ship in the binding entries
+
+**Recommendation: as the overseer specified. Fullscreen, Download, Share, Slideshow and Hotspot are
+in `@ogdakke/fluidbox/react` (and each binding), with their logic in the lazy viewer chunk.**
+
+Each part is a button or anchor calling a command, 60–120 B gzip, so separate entries would cost
+more in import lines than they save. The behaviour (fullscreen dance, fetch-to-blob, share
+fallback, slideshow timer, hotspot layout) lives in the viewer chunk, which loads on intent
+anyway. The exception is deep zoom, whose tile code is its own add-on entry. If the React initial
+measurement comes in over the estimate (§9.3), Slideshow and Hotspot are the two to move to
+`@ogdakke/fluidbox/react/slideshow` and `/hotspot`, since step 7 hasn't shipped them yet.

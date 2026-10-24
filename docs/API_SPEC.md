@@ -5,17 +5,17 @@ old names are deleted, not deprecated.
 
 The spec is split by topic:
 
-| Part | File                                                                     | What it settles                                                         |
-| ---- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| 1    | [Inventory and mapping](api-spec/01-inventory.md)                        | Every current public name and what it becomes.                          |
-| 2    | [Core API](api-spec/02-core.md)                                          | Options, item types, the instance, events, the plain-JS slide contract. |
-| 3    | [Anatomy](api-spec/03-anatomy.md)                                        | Every part, in React, Vue, Solid, Angular and the custom elements.      |
-| 4    | [Add-ons](api-spec/04-addons.md)                                         | Hover zoom, embed, spin, model; entry points; the bundle split.         |
-| 5    | [Engine additions](api-spec/05-engine.md)                                | `Fluidbox.Media` as the flight and zoom target, and holding the open.   |
-| 6    | [Patterns](api-spec/06-patterns.md)                                      | All 13 patterns in React and Angular, plus the docs snippets.           |
-| 7    | [State, server, lists, labels](api-spec/07-state-server-lists-labels.md) | Controlled state and URL sync, server rendering, lazy lists, i18n.      |
-| 8    | [Open decisions](api-spec/08-decisions.md)                               | Each with a recommendation.                                             |
-| 9    | [Implementation plan](api-spec/09-plan.md)                               | Order, scope, bundle impact, tests, parallel work.                      |
+| Part | File                                                                     | What it settles                                                                   |
+| ---- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| 1    | [Inventory and mapping](api-spec/01-inventory.md)                        | Every current public name and what it becomes.                                    |
+| 2    | [Core API](api-spec/02-core.md)                                          | Options, item types, the instance, events, the plain-JS slide contract.           |
+| 3    | [Anatomy](api-spec/03-anatomy.md)                                        | Every part, in React, Vue, Solid, Angular and the custom elements.                |
+| 4    | [Add-ons](api-spec/04-addons.md)                                         | Hover zoom, embed, spin, model; entry points; the bundle split.                   |
+| 5    | [Engine additions](api-spec/05-engine.md)                                | `Fluidbox.Media` as the flight and zoom target, and waiting for the opened slide. |
+| 6    | [Patterns](api-spec/06-patterns.md)                                      | All 13 patterns in React and Angular, plus the docs snippets.                     |
+| 7    | [State, server, lists, labels](api-spec/07-state-server-lists-labels.md) | Controlled state and URL sync, server rendering, lazy lists, i18n.                |
+| 8    | [Open decisions](api-spec/08-decisions.md)                               | Each with a recommendation.                                                       |
+| 9    | [Implementation plan](api-spec/09-plan.md)                               | Order, scope, bundle impact, tests, parallel work.                                |
 
 ## Summary
 
@@ -66,6 +66,31 @@ The main changes:
   from their own entries.
 - **`<Fluidbox.Media>` is the box that flies and zooms.** Built-in media and add-ons render one.
   This is the largest engine change (part 5).
+- **Every open waits for the opened slide to be ready**, at most 3 s, so a flight never lands on
+  an undecoded image or a blank canvas. `waitUntil(promise)` on the slide covers what the engine
+  can't see. Photos open as fast as now.
+- **Video takes `sources` and `attach`.** `sources` lists encodings in order of preference
+  (AV1, WebM, then `src`). `attach` plugs hls.js or dash.js into the built-in video, which keeps
+  its controls, tracks, autoplay and hand-off.
+- **Embed providers are public.** `createEmbedProvider({ name, origin, parse, url, … })` makes a
+  provider; YouTube and Vimeo are two built with it. Items store the provider's name.
+- **`fit: "fill"`** sizes a box to the whole stage. Models default to it, so `<model-viewer>`
+  is no longer an 800 × 800 square.
+- **Ten approved additions.** These are built with the redesign (steps 1–2):
+  - `Fullscreen`, `Download` and `Share` controls;
+  - a `mediaerror` event with `slide.fail`;
+  - `dismiss: { drag, backdrop }` and `wheel`;
+  - item `data-*` for styling.
+
+  These come later (step 7):
+  - a `--fluidbox-motion-speed` property;
+  - `Hotspot`;
+  - a `Slideshow`;
+  - `reachend` for appending;
+  - deep zoom as an add-on after 1.0.
+
+  The sheet's `dismiss` becomes `dismissMotion` (§2.11–2.20, §3.18, §8.14).
+
 - **Every control is a part**, including the new `Counter`, `Caption` and `ZoomControls`.
   `Controls` and its `zoom` flag go away.
 - **Renames:** `Filmstrip` → `Thumbnails`, `ThumbnailOverlay` + `FrameLayer` + `travel` →
@@ -79,9 +104,12 @@ gestures, zoom, the server-rendered open viewer and the accessibility work.
 
 These are argued in [part 8](api-spec/08-decisions.md). In short:
 
-1. **`ready()` on its own can't work.** The engine must know _before_ the flight starts that it
-   should wait. The spec uses an opt-in: `useFluidboxSlide({ holdOpen: true })` returns
-   `ready`. Plain JS calls `slide.holdOpen()`.
+1. **Opens wait for the slide, with no `ready()` call.** A bare `ready()` can't work, because the
+   engine can't tell a slide that will call it from one that never will. Instead every open waits
+   for the opened slide's mount window, which it already waits through. Then it reads the media
+   box: images decoded, videos able to show a frame. It also waits on any
+   `slide.waitUntil(promise)`, all capped at 3 s. Built-in photos keep today's rules and add no
+   wait. The add-ons call `waitUntil` themselves (part 5, §5.3).
 2. **`<Fluidbox.Media>` can't make a framework element the transform target.** The zoom moves
    its target into a scroller. A spike showed that React then throws `removeChild` when the slide
    unmounts, and leaves the node behind (part 5, "Spike"). So the runtime keeps owning the box,
