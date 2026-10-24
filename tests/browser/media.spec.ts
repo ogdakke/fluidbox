@@ -500,7 +500,7 @@ test.describe("3D model", () => {
     expect(await index(page)).toBe(6);
   });
 
-  test("a swipe on the model turns it; one beside it still moves the viewer", async ({
+  test("a swipe on the model turns it, and the controls still move the viewer", async ({
     page,
   }, testInfo) => {
     test.skip(testInfo.project.name !== "pixel-7", "Touch goes through Chromium's CDP.");
@@ -531,10 +531,11 @@ test.describe("3D model", () => {
     await page.waitForTimeout(300);
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
     expect(await index(page)).toBe(6);
-    // Under the model, the strip still swipes.
-    const below = { x: box.x + box.width * 0.8, y: box.y + box.height + 40 };
-    expect(below.y).toBeLessThan(page.viewportSize()!.height);
-    await swipe(below, -box.width * 0.6);
+    // Sideways too: a fill model is the whole stage, and every swipe on it is its own.
+    await swipe(centre, -box.width * 0.6);
+    await page.waitForTimeout(300);
+    expect(await index(page)).toBe(6);
+    await page.locator(`${dialog} [data-fluidbox-next]`).click();
     await expect.poll(() => index(page)).toBe(7);
   });
 });
