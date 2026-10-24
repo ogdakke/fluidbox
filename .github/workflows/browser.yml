@@ -5,13 +5,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  browser:
+  checks:
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -26,20 +22,42 @@ jobs:
       - run: bun run test:ssr
       - run: bun run build:examples
       - run: bun run build:docs
+
+  browser:
+    runs-on: ubuntu-26.04
+    # Each shard stops itself at its 18-minute --global-timeout, so the blob report and
+    # recordings are still written and uploaded before the job is cancelled.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      # With the browsers cached this only installs their system packages.
       - run: bunx playwright install --with-deps chromium firefox webkit
       - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-      - run: bunx playwright test --shard=${{ matrix.shard }}/8 --reporter=dot,blob
+      - run: bun run build
+      - run: bunx playwright test --shard=${{ matrix.shard }}/8 --global-timeout=1080000 --reporter=dot,blob
       - name: Index failure videos
         if: failure()
         run: bun run inspect:failures
       - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: always()
         with:
           name: blob-${{ matrix.shard }}
           path: blob-report
           retention-days: 14
       - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: always()
         with:
           name: browser-results-${{ matrix.shard }}
           path: test-results
@@ -48,7 +66,7 @@ jobs:
 
   merge-reports:
     needs: browser
-    if: ${{ !cancelled() }}
+    if: always()
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
@@ -64,7 +82,7 @@ jobs:
           merge-multiple: true
       - run: bunx playwright merge-reports --reporter=html,github ./all-blobs
       - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: always()
         with:
           name: browser-report
           path: playwright-report
@@ -84,7 +102,7 @@ jobs:
       - run: bunx playwright install --with-deps chromium firefox webkit
       - run: bun run test:browser:baseline
       - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
+        if: always()
         with:
           name: current-fluidbox-baseline
           path: |
