@@ -7,6 +7,7 @@ import {
   forwardRef,
   Fragment,
   isValidElement,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -823,14 +824,27 @@ function SlideHost({
     setActive(slide.active);
     return slide.onActiveChange(setActive);
   }, [slide]);
-  useIsomorphicLayoutEffect(() => release(), [release]);
   const content = props?.[type] ?? props?.default;
   const value = useMemo(() => ({ slide, active }), [slide, active]);
+  // Content that suspends waits inside the slide, not the app around the
+  // viewer, and the open waits with it: the commit is reported beside the
+  // content, so once the boundary shows it.
   return createElement(
     SlideContext.Provider,
     { value },
-    content?.({ item: slide.item, index: slide.index }) ?? null,
+    createElement(
+      Suspense,
+      { fallback: null },
+      content?.({ item: slide.item, index: slide.index }) ?? null,
+      createElement(SlideCommitted, { release }),
+    ),
   );
+}
+
+/** Report the slide's commit as it mounts, which is when the content beside it has. */
+function SlideCommitted({ release }: { release: () => void }): null {
+  useIsomorphicLayoutEffect(() => release(), [release]);
+  return null;
 }
 
 /** The slide this part is inside: its item, whether it is on show, and its hooks into the open. */

@@ -64,7 +64,7 @@ const initialGzipLimits: Record<Entry, number> = {
   model: 1_500,
   spin: 2_450,
   "react-embed": 19_750,
-  "react-model": 18_350,
+  "react-model": 18_400,
   "react-spin": 19_150,
 };
 const cssGzipLimit = 2_850;
@@ -78,7 +78,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   root: 44_050,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
   elements: 47_400,
-  react: 50_750,
+  react: 50_850,
   solid: 47_250,
   vue: 47_900,
   angular: 48_250,
@@ -90,8 +90,8 @@ const activationJsGzipLimits: Record<Entry, number> = {
   model: 1_500,
   spin: 2_450,
   "react-embed": 53_350,
-  "react-model": 51_900,
-  "react-spin": 52_650,
+  "react-model": 52_000,
+  "react-spin": 52_750,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -116,7 +116,7 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
 const reachableJsGzipLimits: Record<Entry, number> = {
   root: 45_200,
   elements: 48_550,
-  react: 51_900,
+  react: 52_000,
   solid: 48_400,
   vue: 49_050,
   angular: 49_400,
@@ -128,8 +128,8 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   model: 1_500,
   spin: 2_450,
   "react-embed": 54_500,
-  "react-model": 53_050,
-  "react-spin": 53_800,
+  "react-model": 53_150,
+  "react-spin": 53_900,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
@@ -148,7 +148,7 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   spin: 5_250,
   "react-embed": 56_150,
   "react-model": 54_750,
-  "react-spin": 55_450,
+  "react-spin": 55_550,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
