@@ -68,10 +68,36 @@ export interface FluidboxVideoTrack {
   readonly default?: boolean;
 }
 
+/** An encoding of a video to try before its `src`: a `<source>` of the `<video>`. */
+export interface FluidboxVideoSource {
+  readonly src: string;
+  /** The MIME type with codecs, as `video/mp4; codecs="av01.0.05M.08"`. */
+  readonly type?: string;
+  /** A media query, as `(min-width: 1200px)`. */
+  readonly media?: string;
+}
+
+/** How the built-in video loads. */
+export interface FluidboxVideoOptions {
+  /**
+   * Load the media yourself: the runtime sets no `src` and no `<source>`.
+   * Called when the slide loads, neighbours too; clean up when `signal`
+   * aborts, which happens before the runtime empties the video. The item's
+   * URLs are still checked; what `attach` loads is yours to trust.
+   */
+  readonly attach?: (video: HTMLVideoElement, signal: AbortSignal, item: FluidboxVideoItem) => void;
+}
+
 /** A `<video>`. */
 export interface FluidboxVideoItem extends FluidboxItemBase {
   readonly type: "video";
+  /** The video, or with `sources` the last resort: drawn as the last `<source>`. */
   readonly src: string;
+  /**
+   * Encodings to try first, in order of preference, such as AV1, then WebM,
+   * then `src` as MP4. Each is a `<source>` child of the `<video>`.
+   */
+  readonly sources?: readonly FluidboxVideoSource[];
   /** The video's accessible name. */
   readonly title: string;
   readonly width: number;
@@ -253,8 +279,11 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    * Returns a function that takes it out.
    */
   drawImage(this: void, item?: FluidboxImageItem): () => void;
-  /** Draw the built-in video into `media`, as `drawImage` does the image. */
-  drawVideo(this: void, item?: FluidboxVideoItem): () => void;
+  /**
+   * Draw the built-in video into `media`, as `drawImage` does the image.
+   * `attach` loads the media yourself, as a streaming engine does.
+   */
+  drawVideo(this: void, item?: FluidboxVideoItem, options?: FluidboxVideoOptions): () => void;
   /** Draw the built-in iframe into `media`, as `drawImage` does the image. */
   drawIframe(this: void, item?: FluidboxIframeItem): () => void;
 }

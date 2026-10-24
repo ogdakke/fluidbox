@@ -8,6 +8,7 @@ import {
   FluidboxZoomEvent,
   idOf,
   itemLabel as rootItemLabel,
+  videoSlide,
   type Fluidbox,
   type FluidboxCustomItemBase,
   type FluidboxItemTypes,
@@ -426,6 +427,29 @@ fluidbox.destroy();
 const options: FluidboxOptions = { items: [photo, video, embed, note] };
 void options;
 
+// A video tries its sources in order, then src; attach loads it through an engine.
+const encoded: Root.FluidboxVideoItem = {
+  type: "video",
+  src: "/clip.mp4",
+  title: "Clip",
+  width: 1920,
+  height: 1080,
+  sources: [
+    { src: "/clip.av1.mp4", type: 'video/mp4; codecs="av01.0.05M.08"' },
+    { src: "/clip.webm" },
+  ],
+};
+const streamed: Root.FluidboxSlideRenderer<Root.FluidboxVideoItem> = videoSlide({
+  attach(element: HTMLVideoElement, signal: AbortSignal, item: Root.FluidboxVideoItem) {
+    element.src = item.src;
+    void signal;
+  },
+});
+createFluidbox({ items: [encoded], slides: { video: streamed } });
+const productVideo: Root.FluidboxSlideRenderer<Root.FluidboxVideoItem> = (slide) =>
+  slide.drawVideo(slide.item, { attach: (element) => void element });
+void productVideo;
+
 // The root holds no kit helpers, elements or old names.
 type RootValues = keyof typeof Root;
 assert<
@@ -436,6 +460,7 @@ assert<
     | "idOf"
     | "itemLabel"
     | "imageItem"
+    | "videoSlide"
     | "FluidboxSheetEvent"
     | "FluidboxValueChangeEvent"
     | "FluidboxZoomEvent"

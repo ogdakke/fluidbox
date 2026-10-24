@@ -21,6 +21,9 @@ export function checkItemUrls(item: FluidboxItem): void {
   const urls: [string, unknown][] = [
     ["src", item.src],
     ["poster", (item as { poster?: unknown }).poster],
+    ...(item.type === "video" ? (item.sources ?? []) : []).map(
+      (source) => ["source src", source.src] as [string, unknown],
+    ),
     // A video's caption tracks load from where the video may.
     ...(item.type === "video" ? (item.tracks ?? []) : []).map(
       (track) => ["track src", track.src] as [string, unknown],

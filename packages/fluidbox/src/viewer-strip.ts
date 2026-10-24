@@ -16,6 +16,7 @@ import type {
   FluidboxImageItem,
   FluidboxThumbnail,
   FluidboxVideoItem,
+  FluidboxVideoOptions,
   FluidboxZoomableOptions,
   FluidboxZoomPose,
 } from "./public-api";
@@ -109,6 +110,8 @@ interface ViewerSlide {
   controller?: AbortController;
   /** A playing origin's picture, shown until the slide's player catches up with it. */
   videoHandoff?: AbortController;
+  /** How a custom slide's drawn video loads: `attach` from `drawVideo`. */
+  videoOptions?: FluidboxVideoOptions;
   /** The load of a sharper candidate for the zoom, until it swaps in. */
   sharpening?: AbortController;
   /** The URL of the sharper candidate the image shows for the zoom, if any. */
@@ -1258,8 +1261,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       // Item lists reject these already; a list of your own still stops here.
       this.#fail(slide);
     } else if (item.type === "video" && slide.image instanceof HTMLVideoElement) {
-      slide.image.src = item.src;
-      if (item.poster) slide.image.poster = item.poster;
+      this.#loadVideo(slide, item, slide.image);
       // Autoplay only on the slide in view: its neighbours load too.
       if (item.autoplay && index === this.#index) void slide.image.play().catch(() => {});
     } else if (item.type === "iframe" && slide.image instanceof HTMLIFrameElement) {
@@ -1284,6 +1286,47 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.src = item.src;
     }
     slide.loaded = true;
+  }
+
+  /**
+   * Load a video: through `attach`, else from a `<source>` per entry of
+   * `sources` and a last one for `src`, else from `src`. A `src` attribute
+   * would make the browser ignore every `<source>`, so it gets none with them.
+   */
+  #loadVideo(slide: ViewerSlide, item: FluidboxVideoItem, video: HTMLVideoElement) {
+    for (const source of video.querySelectorAll(":scope > source")) source.remove();
+    if (item.poster) video.poster = item.poster;
+    const attach = slide.videoOptions?.attach;
+    if (!attach && !item.sources?.length) {
+      video.src = item.src;
+      return;
+    }
+    const controller = new AbortController();
+    slide.controller = controller;
+    if (attach) {
+      try {
+        attach(video, controller.signal, item);
+      } catch (error) {
+        console.error(error);
+        this.#fail(slide);
+      }
+      return;
+    }
+    // Sources go before the tracks, as the content model wants them.
+    const tracks = video.querySelector(":scope > track");
+    let last: HTMLSourceElement | undefined;
+    for (const { src, type, media } of [...item.sources!, { src: item.src }] as const) {
+      last = this.#ownerDocument.createElement("source");
+      last.src = src;
+      if (type) last.type = type;
+      if (media) last.media = media;
+      video.insertBefore(last, tracks);
+    }
+    // When every source fails, the error fires on the last one, not the video.
+    last!.addEventListener("error", () => this.#fail(slide), { signal: controller.signal });
+    // A fresh video picks its source as the first one goes in; one that failed
+    // before, as on Retry, waits for load().
+    if (video.networkState !== HTMLMediaElement.NETWORK_EMPTY) video.load();
   }
 
   /**
@@ -1377,7 +1420,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         };
       },
       drawImage: (image?: FluidboxItem) => this.#draw(slide, signal, "image", image ?? item),
-      drawVideo: (video?: FluidboxItem) => this.#draw(slide, signal, "video", video ?? item),
+      drawVideo: (video?: FluidboxItem, options?: FluidboxVideoOptions) =>
+        this.#draw(slide, signal, "video", video ?? item, options),
       drawIframe: (iframe?: FluidboxItem) => this.#draw(slide, signal, "iframe", iframe ?? item),
     };
     try {
@@ -1392,14 +1436,24 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * Draw built-in media into a custom slide's box, in place of what it drew
    * before. Returns a function that takes it out again.
    */
-  #draw(slide: ViewerSlide, signal: AbortSignal, type: DrawnItem["type"], item: FluidboxItem) {
+  #draw(
+    slide: ViewerSlide,
+    signal: AbortSignal,
+    type: DrawnItem["type"],
+    item: FluidboxItem,
+    videoOptions?: FluidboxVideoOptions,
+  ) {
     if (item.type !== type) {
       throw new TypeError(`Fluidbox draws ${type} items here, not "${item.type}" ones.`);
     }
     if (signal.aborted) return () => {};
     this.#undraw(slide);
     const drawing = new AbortController();
-    Object.assign(slide, this.#build(item, slide.frame, slide.media), { drawn: item, drawing });
+    Object.assign(slide, this.#build(item, slide.frame, slide.media), {
+      drawn: item,
+      drawing,
+      videoOptions,
+    });
     this.#wire(slide, drawing.signal);
     const origin = slide.origin;
     slide.origin = undefined;
@@ -1435,6 +1489,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       preview: undefined,
       cover: undefined,
       image: undefined,
+      videoOptions: undefined,
     });
     this.#zoomableChanged(slide);
   }
@@ -1512,6 +1567,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
     if (slide.image instanceof HTMLMediaElement) {
       slide.image.pause();
+      // Without its sources, load() can't pick one again and keep downloading.
+      for (const source of slide.image.querySelectorAll(":scope > source")) source.remove();
       slide.image.removeAttribute("src");
       slide.image.load();
     } else if (slide.image instanceof HTMLIFrameElement) {

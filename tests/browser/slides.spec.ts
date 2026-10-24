@@ -7,6 +7,9 @@ declare global {
       fluidbox: Fluidbox;
       replaced: Fluidbox;
       hooks: Fluidbox;
+      videos: Fluidbox;
+      streamed: Fluidbox;
+      attached: string[];
       log: string[];
       poses: {
         scale: number;
@@ -379,5 +382,90 @@ test.describe("an open waits for its slide", () => {
     await page.evaluate(() => window.slidesFixture.gate.open!());
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
     await expect(page.locator("[data-fluidbox-flight]")).toHaveCount(0);
+  });
+});
+
+test.describe("video sources and attach", () => {
+  const video = `${shown} video`;
+
+  test("a video with sources tries them in order before src, and has no src of its own", async ({
+    page,
+  }) => {
+    await load(page);
+    await open(page, "#videos", "encoded");
+    const player = page.locator(video);
+    await expect(player).not.toHaveAttribute("src");
+    // The sources come first, then the tracks.
+    expect(
+      await player.evaluate((element) => [...element.children].map((child) => child.localName)),
+    ).toEqual(["source", "source", "track"]);
+    expect(
+      await player
+        .locator("source")
+        .evaluateAll((sources) =>
+          sources.map((source) => [source.getAttribute("src"), source.getAttribute("type")]),
+        ),
+    ).toEqual([
+      ["/video/drift.webm", "video/webm"],
+      ["/video/drift.mp4", null],
+    ]);
+    await expect
+      .poll(() => player.evaluate((element: HTMLVideoElement) => element.readyState))
+      .toBeGreaterThanOrEqual(1);
+    expect(await player.evaluate((element: HTMLVideoElement) => element.currentSrc)).toMatch(
+      /\/video\/drift\.(webm|mp4)$/,
+    );
+    await expect(page.locator(`${shown} [data-fluidbox-error]`)).toBeHidden();
+  });
+
+  test("a video whose every source fails shows the error, and Retry tries them again", async ({
+    page,
+  }) => {
+    await load(page);
+    await open(page, "#videos", "broken");
+    const error = page.locator(`${shown} [data-fluidbox-error]`);
+    await expect(error).toBeVisible();
+    const last = page.locator(`${shown} video source`).last();
+    await last.evaluate((source) => Object.assign(window, { failed: source }));
+    await error.getByRole("button").click();
+    // New sources, and the error again once the last of them fails.
+    await expect(page.locator(`${shown} video source`)).toHaveCount(2);
+    expect(
+      await last.evaluate((source) => source === (window as unknown as { failed: Element }).failed),
+    ).toBe(false);
+    await expect(error).toBeVisible();
+  });
+
+  test("a video slide unloads its sources, so the video stops loading", async ({ page }) => {
+    await load(page);
+    await open(page, "#videos", "encoded");
+    await page.locator(video).evaluate((element) => Object.assign(window, { unloaded: element }));
+    for (const position of [2, 3, 4]) {
+      await page.keyboard.press("ArrowRight");
+      await expect(page.locator(shown)).toHaveAttribute("aria-label", `Item ${position} of 4`);
+    }
+    expect(
+      await page.evaluate(() => {
+        const element = (window as unknown as { unloaded: HTMLVideoElement }).unloaded;
+        return [element.querySelectorAll("source").length, element.hasAttribute("src")];
+      }),
+    ).toEqual([0, false]);
+  });
+
+  test("attach loads the video itself, and its signal aborts before the video empties", async ({
+    page,
+  }) => {
+    await load(page);
+    await open(page, "#streamed", "stream");
+    const player = page.locator(video);
+    await expect(player).toHaveAttribute("src", "/video/drift.mp4");
+    await expect(player.locator("source")).toHaveCount(0);
+    for (const position of [2, 3]) {
+      await page.keyboard.press("ArrowRight");
+      await expect(page.locator(shown)).toHaveAttribute("aria-label", `Item ${position} of 3`);
+    }
+    await expect
+      .poll(() => page.evaluate(() => window.slidesFixture.attached))
+      .toEqual(["attach stream 0", "abort stream /video/drift.mp4"]);
   });
 });

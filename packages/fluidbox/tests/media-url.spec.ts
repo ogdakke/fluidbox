@@ -69,6 +69,18 @@ describe("checkItemUrls", () => {
     expect(() => checkItemUrls(video("/clip.mp4", "/poster.jpg"))).not.toThrow();
   });
 
+  it("checks every source of a video, as its src", () => {
+    const clip = (...sources: string[]) => ({
+      ...video("/clip.mp4"),
+      sources: sources.map((src) => ({ src, type: "video/webm" })),
+    });
+    expect(() => checkItemUrls(clip("/clip.webm", "blob:https://example.com/uuid"))).not.toThrow();
+    expect(() => checkItemUrls(clip("/clip.webm", "javascript:alert(1)"))).toThrow(
+      "The source src of fluidbox video item",
+    );
+    expect(() => toList([clip("data:video/webm;base64,")])).toThrow(TypeError);
+  });
+
   it("leaves images and custom content alone", () => {
     expect(() =>
       checkItemUrls({ type: "image", src: "data:image/png;base64,", alt: "", width: 1, height: 1 }),

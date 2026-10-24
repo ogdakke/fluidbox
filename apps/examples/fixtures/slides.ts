@@ -8,6 +8,7 @@ import {
   type FluidboxImageItem,
   type FluidboxItem,
   type FluidboxVideoItem,
+  videoSlide,
 } from "@ogdakke/fluidbox";
 import "./media.css";
 
@@ -205,6 +206,54 @@ const hooks: Fluidbox = createFluidbox({
   },
 });
 
+const clip = (id: string, sources: string[], src: string): FluidboxVideoItem => ({
+  type: "video",
+  id,
+  title: `Clip ${id}`,
+  src,
+  sources: sources.map((source) => ({ src: source, type: "video/webm" })),
+  muted: true,
+  width: 640,
+  height: 360,
+  poster: "/video/drift-poster.jpg",
+  thumbnail: { src: "/video/drift-poster.jpg" },
+  tracks: [{ src: "/video/drift.vtt", kind: "captions", srclang: "en", label: "English" }],
+});
+
+const videoItems: FluidboxItem[] = [
+  clip("encoded", ["/video/drift.webm"], "/video/drift.mp4"),
+  clip("broken", ["/video/missing.webm"], "/video/missing.mp4"),
+  photo("still-1", "/photo-square.svg"),
+  photo("still-2", "/photo-square.svg"),
+];
+
+const videos: Fluidbox = createFluidbox({ items: videoItems });
+
+/** Each attach and its abort, with the src the video still had as it aborted. */
+const attached: string[] = [];
+
+const streamedItems: FluidboxItem[] = [
+  { ...clip("stream", [], "/video/drift.mp4"), sources: undefined },
+  photo("frame-1", "/photo-square.svg"),
+  photo("frame-2", "/photo-square.svg"),
+];
+
+const streamed: Fluidbox = createFluidbox({
+  items: streamedItems,
+  slides: {
+    // As an engine would: it sets the src itself, and lets go as the signal aborts.
+    video: videoSlide({
+      attach(video, signal, item) {
+        attached.push(`attach ${item.id} ${video.querySelectorAll("source").length}`);
+        video.src = item.src;
+        signal.addEventListener("abort", () =>
+          attached.push(`abort ${item.id} ${video.getAttribute("src")}`),
+        );
+      },
+    }),
+  },
+});
+
 function grid(selector: string, box: Fluidbox, list: readonly FluidboxItem[]) {
   const root = document.querySelector<HTMLElement>(selector)!;
   for (const item of list) {
@@ -224,5 +273,9 @@ function grid(selector: string, box: Fluidbox, list: readonly FluidboxItem[]) {
 grid("#slides", fluidbox, items);
 grid("#replaced", replaced, replacedItems);
 grid("#hooks", hooks, hookItems);
+grid("#videos", videos, videoItems);
+grid("#streamed", streamed, streamedItems);
 
-Object.assign(window, { slidesFixture: { fluidbox, replaced, hooks, log, poses, gate } });
+Object.assign(window, {
+  slidesFixture: { fluidbox, replaced, hooks, videos, streamed, attached, log, poses, gate },
+});
