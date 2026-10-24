@@ -306,6 +306,7 @@ export const internal: readonly string[] = [
   "data-fluidbox-server-viewer",
   "data-fluidbox-controls-revealing",
   "data-fluidbox-drawn",
+  "data-fluidbox-fill",
   "data-fluidbox-thumbnails-thumbnail",
   "data-fluidbox-thumbnails-track",
   "data-fluidbox-flight-source-hidden",

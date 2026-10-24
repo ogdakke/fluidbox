@@ -19,6 +19,13 @@ export interface FluidboxItemBase {
   readonly placeholder?: string;
   /** Text shown by a caption part, which becomes the dialog's description. */
   readonly caption?: string;
+  /**
+   * How the media box is sized. `"contain"`: to the item's `width` and
+   * `height`, fitted in the stage. `"fill"`: to the whole stage, less its
+   * insets, as a 3D view or a map wants. Ignored on image items.
+   * @default "contain"; `modelItem()` sets `"fill"`
+   */
+  readonly fit?: "contain" | "fill";
 }
 
 /** An `<img>`'s source attributes. */
@@ -134,8 +141,9 @@ export interface FluidboxCustomItemBase<TType extends string> extends FluidboxIt
   readonly type: TType;
   /** The accessible name of the slide and the dialog. */
   readonly title: string;
-  readonly width: number;
-  readonly height: number;
+  /** Required unless `fit` is `"fill"`; then they only shape the poster. */
+  readonly width?: number;
+  readonly height?: number;
 }
 
 /**

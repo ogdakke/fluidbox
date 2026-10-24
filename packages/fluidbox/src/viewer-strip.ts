@@ -6,7 +6,7 @@ import type {
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
-import { fitSize } from "./fit-size";
+import { fillsStage, fitSize, posterAspect } from "./fit-size";
 import { idOf, itemLabel, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
 import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
@@ -641,7 +641,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       media = drawn.image;
     }
     media.dataset.fluidboxMedia = "";
-    media.style.setProperty("--fluidbox-media-aspect", `${item.width} / ${item.height}`);
+    if (fillsStage(item)) {
+      // The box is the stage. The flight starts from the poster inside it: the
+      // item's aspect when it has one, else the trigger's own.
+      media.dataset.fluidboxFill = String(posterAspect(item) ?? "");
+    } else {
+      media.style.setProperty("--fluidbox-media-aspect", `${item.width} / ${item.height}`);
+    }
     frame.append(error);
     element.append(frame);
     const slide: ViewerSlide = {

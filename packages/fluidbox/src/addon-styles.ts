@@ -70,6 +70,10 @@ export const posterStyles = `
   pointer-events: none;
   user-select: none;
 }
+/* In a box as large as the stage, the poster keeps its own shape. */
+:where([data-fluidbox-fill] [data-fluidbox-media-addon] > [data-fluidbox-media-poster]) {
+  object-fit: contain;
+}
 :where([data-fluidbox-media-addon] > [data-fluidbox-media-pending]) {
   opacity: 0;
 }

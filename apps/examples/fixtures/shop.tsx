@@ -347,7 +347,7 @@ function Gallery({ carousel }: { carousel: Carousel }) {
                 <Photo
                   item={item}
                   src={cover(item)}
-                  size={item.width}
+                  size={item.width ?? 800}
                   origin
                   eager={at < 2}
                   zoom={item.type === "image"}

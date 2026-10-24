@@ -54,7 +54,7 @@ import type { FluidboxLabels } from "./labels";
 import { ViewerStrip } from "./viewer-strip";
 import { activeViewer } from "./viewer-ownership";
 import { mapRadii, mixInsets, type ImageClip } from "./transition-geometry";
-import { originPose, originPicture } from "./origin-pose";
+import { fillContent, originPose, originPicture } from "./origin-pose";
 import type { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 
@@ -1661,13 +1661,16 @@ export class DomViewerDriver<
     const view = this.#portal.overlay.ownerDocument.defaultView!;
     // The flight lives in document coordinates, so the pose is relative to its
     // origin wherever the page has scrolled to now.
+    const width = media.offsetWidth;
+    const height = media.offsetHeight;
     return originPose({
       origin,
       picture,
-      width: media.offsetWidth,
-      height: media.offsetHeight,
+      width,
+      height,
       left: this.#flightOrigin.x - view.scrollX,
       top: this.#flightOrigin.y - view.scrollY,
+      content: fillContent(media, width, height, picture ?? origin),
     });
   }
 

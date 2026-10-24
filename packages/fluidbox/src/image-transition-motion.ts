@@ -1,5 +1,5 @@
 import { dismissCloseValue } from "./fluidbox-gesture";
-import { originPose, radiiOf } from "./origin-pose";
+import { fillContent, originPose, radiiOf } from "./origin-pose";
 import { cropPose, emptyClip, mixClip, type ImageClip } from "./transition-geometry";
 
 export interface ImageTransitionPose {
@@ -73,13 +73,16 @@ export function originTransitionPose(
   current: ImageTransitionPose,
 ): ImageTransitionPose | null {
   const imageRect = image.getBoundingClientRect();
+  const width = image.offsetWidth;
+  const height = image.offsetHeight;
   return originPose({
     origin,
     picture,
-    width: image.offsetWidth,
-    height: image.offsetHeight,
+    width,
+    height,
     left: imageRect.left - current.transform.e,
     top: imageRect.top - current.transform.f,
+    content: fillContent(image, width, height, picture ?? origin),
   });
 }
 

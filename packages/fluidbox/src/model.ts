@@ -46,9 +46,13 @@ export interface FluidboxModelItemOptions extends Omit<
   readonly thumbnail?: FluidboxThumbnail;
 }
 
-/** A model item for the model renderer. */
+/**
+ * A model item for the model renderer. Its box fills the stage unless you
+ * pass `fit: "contain"`; `width` and `height` then only shape the poster.
+ */
 export function modelItem(options: FluidboxModelItemOptions): FluidboxModelItem {
   return {
+    fit: "fill",
     ...options,
     type: "model",
     id: options.id ?? options.src,

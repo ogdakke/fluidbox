@@ -10,6 +10,8 @@ import {
   type FluidboxVideoItem,
   videoSlide,
 } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/sheet";
+import "@ogdakke/fluidbox/sheet.css";
 import "./media.css";
 
 mountSite("fixtures", {
@@ -38,6 +40,7 @@ declare module "@ogdakke/fluidbox" {
     own: FluidboxCustomItemBase<"own">;
     film: FluidboxCustomItemBase<"film">;
     gated: FluidboxCustomItemBase<"gated">;
+    map: FluidboxCustomItemBase<"map">;
   }
 }
 
@@ -254,6 +257,38 @@ const streamed: Fluidbox = createFluidbox({
   },
 });
 
+/** A map-like slide: it paints the whole box, and its poster keeps its own shape. */
+const mapSlide = (slide: { media: HTMLElement; item: FluidboxItem }) => {
+  const art = document.createElement("div");
+  art.className = "slides-map";
+  art.style.cssText = "width: 100%; height: 100%; background: linear-gradient(90deg, #234, #9bd)";
+  slide.media.append(art);
+};
+
+const filledItems: FluidboxItem[] = [
+  // A square poster: the flight starts from the square in the middle of the stage.
+  { type: "map", id: "map", title: "Map", fit: "fill", width: 600, height: 600 },
+  // No size: the flight starts from the trigger's own shape.
+  { type: "map", id: "sky", title: "Sky", fit: "fill" },
+  // Images ignore fit.
+  { ...photo("photo-fill", "/photo-square.svg"), fit: "fill" },
+];
+
+const filled: Fluidbox = createFluidbox({ items: filledItems, slides: { map: mapSlide } });
+
+const sheetedItems: FluidboxItem[] = [
+  { type: "map", id: "sheeted-map", title: "Map with details", fit: "fill" },
+];
+
+const sheeted: Fluidbox = createFluidbox({
+  items: sheetedItems,
+  slides: { map: mapSlide },
+  sheet: {
+    snapPoints: ["50%"],
+    render: ({ target }) => target.append("Details of the place"),
+  },
+});
+
 function grid(selector: string, box: Fluidbox, list: readonly FluidboxItem[]) {
   const root = document.querySelector<HTMLElement>(selector)!;
   for (const item of list) {
@@ -275,7 +310,21 @@ grid("#replaced", replaced, replacedItems);
 grid("#hooks", hooks, hookItems);
 grid("#videos", videos, videoItems);
 grid("#streamed", streamed, streamedItems);
+grid("#filled", filled, filledItems);
+grid("#sheeted", sheeted, sheetedItems);
 
 Object.assign(window, {
-  slidesFixture: { fluidbox, replaced, hooks, videos, streamed, attached, log, poses, gate },
+  slidesFixture: {
+    fluidbox,
+    replaced,
+    hooks,
+    videos,
+    streamed,
+    filled,
+    sheeted,
+    attached,
+    log,
+    poses,
+    gate,
+  },
 });

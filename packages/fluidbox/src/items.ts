@@ -5,6 +5,7 @@ import type {
   FluidboxItems,
   FluidboxTarget,
 } from "./public-api";
+import { fillsStage } from "./fit-size";
 import { checkItemUrls } from "./media-url";
 import type { FluidboxSource } from "./runtime-types";
 
@@ -110,7 +111,7 @@ export function createItemList<TItem extends FluidboxItem>(
     let found = made.get(at);
     if (!found) {
       found = item(at);
-      checkItemUrls(found);
+      checkItem(found);
       made.set(at, found);
       indices.set(idOf(found), at);
     }
@@ -138,6 +139,21 @@ export function createItemList<TItem extends FluidboxItem>(
 }
 
 /**
+ * Throw a TypeError for an item the viewer can't show: a URL it refuses, or no
+ * `width` and `height` to size its box by, which only a fill box goes without.
+ */
+function checkItem(item: FluidboxItem) {
+  checkItemUrls(item);
+  if (fillsStage(item)) return;
+  const { width, height } = item;
+  if (!(width! > 0 && height! > 0)) {
+    throw new TypeError(
+      `Fluidbox item ${idOf(item)} needs a positive width and height, or fit: "fill".`,
+    );
+  }
+}
+
+/**
  * A list over arrays and lazy lists alike. An array's own ids must be unique;
  * an item without one whose src repeats gets the next free `src#n`, in order.
  */
@@ -153,9 +169,9 @@ export function toList<TItem extends FluidboxItem>(
   const indices = new Map<string, number>();
   // Own ids first, so a derived one never takes an id an item named itself by.
   for (const [index, item] of snapshot.entries()) {
+    checkItem(item);
     if (item.id === undefined) continue;
     const id = idOf(item);
-    checkItemUrls(item);
     if (indices.has(id)) throw new TypeError(`Duplicate fluidbox item id: ${id}`);
     indices.set(id, index);
   }

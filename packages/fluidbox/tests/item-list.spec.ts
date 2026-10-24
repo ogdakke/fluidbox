@@ -116,3 +116,27 @@ describe("an array of items", () => {
     expect(() => toList([media("/a.jpg", "")])).toThrow(TypeError);
   });
 });
+
+describe("an item's size", () => {
+  const map = (fields: object) => ({ type: "map", id: "map", title: "Map", ...fields }) as never;
+
+  it("is required, so the box has a shape, unless the item fills the stage", () => {
+    expect(() => toList([map({})])).toThrow(
+      'Fluidbox item map needs a positive width and height, or fit: "fill".',
+    );
+    expect(() => toList([map({ width: 4, height: 0 })])).toThrow(TypeError);
+    expect(toList([map({ fit: "fill" })]).count).toBe(1);
+    expect(toList([map({ fit: "fill", width: 4, height: 3 })]).count).toBe(1);
+  });
+
+  it("is checked as a lazy list makes each item", () => {
+    const list = createItemList({ count: 2, item: (at) => (at ? map({}) : photo(0)) });
+    expect(list.get(0).id).toBe("photo-0");
+    expect(() => list.get(1)).toThrow(TypeError);
+  });
+
+  it("is always required of an image, which ignores fit", () => {
+    const { width: _width, height: _height, ...unsized } = photo(0);
+    expect(() => toList([{ ...unsized, fit: "fill" } as never])).toThrow(TypeError);
+  });
+});

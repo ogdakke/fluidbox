@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { holdMotion } from "./support/hold-motion";
 import type { Fluidbox } from "@ogdakke/fluidbox";
 
 declare global {
@@ -9,6 +10,8 @@ declare global {
       hooks: Fluidbox;
       videos: Fluidbox;
       streamed: Fluidbox;
+      filled: Fluidbox;
+      sheeted: Fluidbox;
       attached: string[];
       log: string[];
       poses: {
@@ -467,5 +470,116 @@ test.describe("video sources and attach", () => {
     await expect
       .poll(() => page.evaluate(() => window.slidesFixture.attached))
       .toEqual(["attach stream 0", "abort stream /video/drift.mp4"]);
+  });
+});
+
+test.describe("fill boxes", () => {
+  const box = `${shown} [data-fluidbox-media]`;
+
+  /** The box's layout size, its slide's width, and whether it has an aspect of its own. */
+  const measure = (page: Page) =>
+    page.locator(box).evaluate((element: HTMLElement) => ({
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+      slide: element.closest<HTMLElement>("[data-fluidbox-slide]")!.offsetWidth,
+      aspect: element.style.getPropertyValue("--fluidbox-media-aspect"),
+    }));
+
+  test("a fill box takes the stage, with no aspect, and follows it as it resizes", async ({
+    page,
+  }) => {
+    await load(page);
+    await open(page, "#filled", "map");
+    const first = await measure(page);
+    expect(first.aspect).toBe("");
+    expect(Math.abs(first.width - first.slide)).toBeLessThanOrEqual(1);
+    // The stage less its insets: most of the window's height, and not the item's square.
+    const viewport = page.viewportSize()!;
+    expect(first.height).toBeGreaterThan(viewport.height * 0.6);
+    expect(first.height).toBeLessThanOrEqual(viewport.height);
+    expect(Math.abs(first.width - first.height)).toBeGreaterThan(20);
+    await page.setViewportSize({ width: viewport.width - 100, height: viewport.height - 80 });
+    await expect.poll(async () => (await measure(page)).width).toBe(first.width - 100);
+    await expect.poll(async () => (await measure(page)).height).toBe(first.height - 80);
+  });
+
+  test("an image ignores fit", async ({ page }) => {
+    await load(page);
+    await open(page, "#filled", "photo-fill");
+    const photo = await measure(page);
+    expect(photo.aspect).toBe("800 / 800");
+    expect(Math.abs(photo.width - photo.height)).toBeLessThanOrEqual(1);
+    await expect(page.locator(box)).not.toHaveAttribute("data-fluidbox-fill");
+  });
+
+  for (const id of ["map", "sky"]) {
+    test(`the opening flight starts from the poster's place in the box (${id})`, async ({
+      page,
+    }) => {
+      test.skip(
+        await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches),
+        "Reduced motion has no flight.",
+      );
+      await load(page);
+      await page.locator(`#filled [data-item="${id}"]`).scrollIntoViewIfNeeded();
+      await holdMotion(page);
+      await page.locator(`#filled [data-item="${id}"]`).click();
+      await page.evaluate(() => window.__motion.ready());
+      const from = (await page.locator(`#filled [data-item="${id}"] img`).boundingBox())!;
+      const start = await page.evaluate(() => {
+        const slide = document.querySelector('[data-fluidbox-slide][aria-hidden="false"]')!;
+        const frame = slide.querySelector<HTMLElement>("[data-fluidbox-frame]")!;
+        const media = slide.querySelector<HTMLElement>("[data-fluidbox-media]")!;
+        const { x, y, width, height } = frame.getBoundingClientRect();
+        const box = media.getBoundingClientRect();
+        return { x, y, width, height, box: { width: box.width, height: box.height } };
+      });
+      // What shows is the square the trigger shows, not the stage-wide box.
+      expect(Math.abs(start.x - from.x)).toBeLessThanOrEqual(2);
+      expect(Math.abs(start.y - from.y)).toBeLessThanOrEqual(2);
+      expect(Math.abs(start.width - from.width)).toBeLessThanOrEqual(2);
+      expect(Math.abs(start.height - from.height)).toBeLessThanOrEqual(2);
+      // The box itself is the stage's shape, so it reaches past the square on one axis.
+      expect(
+        Math.max(start.box.width - from.width, start.box.height - from.height),
+      ).toBeGreaterThan(2);
+      await page.evaluate(() => window.__motion.release());
+      await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+      const open = await measure(page);
+      expect(Math.abs(open.width - open.slide)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  test("a fill box keeps its size while the sheet rises", async ({ page }) => {
+    await load(page);
+    await open(page, "#sheeted", "sheeted-map");
+    const before = await measure(page);
+    const sizes: { width: number; height: number }[] = [];
+    // Record the box's layout size every frame while the sheet rises.
+    await page.evaluate(() => {
+      const media = document.querySelector<HTMLElement>(
+        '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
+      )!;
+      const seen: { width: number; height: number }[] = [];
+      const record = () => {
+        seen.push({ width: media.offsetWidth, height: media.offsetHeight });
+        if (seen.length < 40) requestAnimationFrame(record);
+      };
+      requestAnimationFrame(record);
+      Object.assign(window, { sheetSizes: seen });
+      window.slidesFixture.sheeted.sheet!.setSnap(1);
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-sheet", "1");
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as { sheetSizes: unknown[] }).sheetSizes.length),
+      )
+      .toBe(40);
+    sizes.push(
+      ...(await page.evaluate(
+        () => (window as unknown as { sheetSizes: { width: number; height: number }[] }).sheetSizes,
+      )),
+    );
+    for (const size of sizes) expect(size).toEqual({ width: before.width, height: before.height });
   });
 });
