@@ -40,11 +40,54 @@ The parts take the add-on's renderer options as props. They read the item from t
 
 ## 4.2 Embed (`@ogdakke/fluidbox/embed`)
 
-YouTube and Vimeo facades: a poster and a Play button, then the player in a sandboxed iframe.
+Video-site facades: a poster and a Play button, then the provider's player in a sandboxed iframe.
+A provider is a public object, so an app can add any site. YouTube and Vimeo are two providers
+built with the same function the app uses.
 
 ```ts
+/** What a provider's parse finds in a URL or id. */
+export interface FluidboxEmbedVideo {
+  readonly video: string;
+  readonly hash?: string;
+  readonly start?: number;
+  /** This video's width / height, when the URL says (a YouTube Short is 9 / 16). */
+  readonly aspect?: number;
+}
+
+export interface FluidboxEmbedProviderOptions {
+  /** Stored on items, so items stay serialisable. Lower case, digits and "-". */
+  readonly name: string;
+  /** The player's https origin: the postMessage target, checked against url(), preconnected. */
+  readonly origin: string;
+  /** A URL or id → the video, or null when it isn't this provider's. */
+  readonly parse: (source: string) => FluidboxEmbedVideo | null;
+  /** The player's URL. Must pass the media URL check and be on `origin`. */
+  readonly url: (item: FluidboxEmbedItem, options: { readonly autoplay: boolean }) => string;
+  /** A default poster when the item has none (YouTube: i.ytimg.com). */
+  readonly poster?: (item: FluidboxEmbedItem) => string | undefined;
+  /** Pause the player. Without it, leaving the slide unloads the player back to its poster. */
+  readonly pause?: (frame: HTMLIFrameElement) => void;
+  /** @default EMBED_ALLOW */
+  readonly allow?: string;
+  /** @default IFRAME_SANDBOX_DEFAULT */
+  readonly sandbox?: string;
+  /** @default "strict-origin-when-cross-origin" */
+  readonly referrerPolicy?: ReferrerPolicy;
+  /** Width / height when neither the item nor parse gives one. @default 16 / 9 */
+  readonly aspect?: number;
+}
+
+export interface FluidboxEmbedProvider extends FluidboxEmbedProviderOptions {
+  /** url() with its result checked. Throws a TypeError for a URL off `origin`. */
+  readonly url: (item: FluidboxEmbedItem, options?: { readonly autoplay?: boolean }) => string;
+}
+export function createEmbedProvider(options: FluidboxEmbedProviderOptions): FluidboxEmbedProvider;
+export const youtube: FluidboxEmbedProvider;
+export const vimeo: FluidboxEmbedProvider;
+
 export interface FluidboxEmbedItem extends FluidboxCustomItemBase<"embed"> {
-  readonly provider: "youtube" | "vimeo";
+  /** The provider's name. */
+  readonly provider: string;
   readonly video: string;
   readonly hash?: string;
   readonly start?: number;
@@ -57,16 +100,20 @@ declare module "@ogdakke/fluidbox" {
   }
 }
 
+/** An item from a provider and a URL or id. Throws a TypeError when parse finds nothing. */
+export function embedItem(
+  provider: FluidboxEmbedProvider,
+  source: string,
+  options: FluidboxEmbedItemOptions,
+): FluidboxEmbedItem;
+/** embedItem(youtube, …) and embedItem(vimeo, …). */
 export function youtubeItem(source: string, options: FluidboxEmbedItemOptions): FluidboxEmbedItem;
 export function vimeoItem(source: string, options: FluidboxEmbedItemOptions): FluidboxEmbedItem;
-export function parseYouTube(
-  source: string,
-): { video: string; start?: number; short?: boolean } | null;
-export function parseVimeo(source: string): { video: string; hash?: string; start?: number } | null;
-export function embedUrl(item: FluidboxEmbedItem, options?: { autoplay?: boolean }): string;
 export const EMBED_ALLOW: string;
 
 export interface FluidboxEmbedSlideOptions {
+  /** The providers this slide plays. @default [youtube, vimeo] */
+  readonly providers?: readonly FluidboxEmbedProvider[];
   /** The Play button's name. @default (item) => `Play ${item.title}` */
   readonly label?: (item: FluidboxEmbedItem) => string;
 }
@@ -76,10 +123,65 @@ export function createEmbedSlide(
 export const embedSlide: FluidboxSlideRenderer<FluidboxEmbedItem>;
 ```
 
+An app's own provider:
+
+```ts
+import { createEmbedProvider, embedItem, youtube, vimeo } from "@ogdakke/fluidbox/embed";
+
+const wistia = createEmbedProvider({
+  name: "wistia",
+  origin: "https://fast.wistia.net",
+  parse: (source) => {
+    const video = /(?:medias|iframe)\/(\w+)/.exec(source)?.[1] ?? (/^\w{10}$/.test(source) ? source : null);
+    return video ? { video } : null;
+  },
+  url: (item, { autoplay }) =>
+    `https://fast.wistia.net/embed/iframe/${item.video}?autoPlay=${autoplay}`,
+  pause: (frame) =>
+    frame.contentWindow?.postMessage(JSON.stringify({ method: "pause" }), "https://fast.wistia.net"),
+});
+
+const demo = embedItem(wistia, "https://fast.wistia.net/medias/abc123defg", { title: "Demo" });
+// { type: "embed", provider: "wistia", video: "abc123defg", id: "wistia:abc123defg", … }
+
+createFluidbox({ items, slides: { embed: createEmbedSlide({ providers: [youtube, vimeo, wistia] }) } });
+<Embed providers={[youtube, vimeo, wistia]} />; // in the bindings
+```
+
+Rules:
+
+- **Items hold the provider's name, not the object**, so items can come from JSON or a server
+  component. The slide looks the name up in its `providers`. An item whose provider isn't
+  registered shows the error slide (`labels.error`), and development builds warn and name the
+  missing provider. Two providers with the same name in one list throw.
+- **`url()` is checked.** `createEmbedProvider` wraps it. The result must pass `isSafeMediaUrl`
+  for iframes (http(s) or relative; the check in `media-url.ts:9` is http(s), not https only) and
+  its origin must equal `origin`. Otherwise it throws, and the slide shows its error state rather
+  than loading a page off the provider's origin. `origin` itself must be `https:`.
+- **The iframe** gets the provider's `allow`, `sandbox` and `referrerPolicy`, set before `src`
+  as now (`embeds.ts:334-339`).
+- **Pausing.** With `pause`, a slide that leaves while playing is paused and keeps its place, as
+  YouTube and Vimeo are today. Without it, leaving puts the slide back to its poster and unloads
+  the player, which always stops it.
+- **Preconnect.** When an embed slide mounts (the strip's neighbours, or `prepare` on pointerdown),
+  it adds one `<link rel="preconnect">` per origin per document. The overseer's note asked for "on
+  intent". The core has no add-on hook on hover, and the player only loads when Play is pressed,
+  so a slide mount is early enough.
+- **Size.** `width` and `height` from the options, else from `parse`'s `aspect`, else the
+  provider's `aspect`, at 1280 wide. A YouTube Short is 720 × 1280, as today.
+- **Today's per-provider code moves into the two providers:** `parseYouTube`/`parseVimeo` become
+  `youtube.parse`/`vimeo.parse`, `embedUrl` becomes `youtube.url`/`vimeo.url`, the `origins` map
+  becomes each `origin`, `pause()` becomes each `pause`, and the YouTube poster and its
+  referrer rule become `youtube.poster` and `youtube.referrerPolicy`. Their behaviour and the
+  tests in `embeds.spec.ts` carry over unchanged.
+
 `FluidboxEmbedItemOptions` loses `render`; the rest is unchanged (`title`, `id`, `width`,
-`height`, `thumbnail`, `poster`, `start`). Behaviour, DOM and styles are unchanged
-(`embeds.ts:292`): draw into `slide.media`, pause on deactivate, reset to the poster when the box
-leaves the document.
+`height`, `thumbnail`, `poster`, `start`). The slide's DOM and styles are unchanged
+(`createEmbedRenderer`, `embeds.ts:292`), except that `data-fluidbox-embed` holds any provider's name.
+
+Elements: `@ogdakke/fluidbox/elements/embed` registers `createEmbedSlide()` with the two built-in
+providers. A page with its own calls
+`defineSlide("embed", createEmbedSlide({ providers: [youtube, vimeo, wistia] }))`.
 
 Opening waits for the poster: the slide calls `slide.waitUntil(poster.decode())` while it mounts
 (§5.3). The thumbnail layer is the trigger's own decoded picture, so this only waits when a
@@ -160,6 +262,12 @@ export function createModelSlide(
 ): FluidboxSlideRenderer<FluidboxModelItem>;
 ```
 
+`modelItem()` sets `fit: "fill"` unless its options say otherwise, so a model fills the stage
+instead of an 800 × 800 box (§5.4). Its `width` and `height` become optional and only shape the
+poster. The core doesn't know the model type, and the flight is planned before the slide renders,
+so the default lives in `modelItem()`. A hand-written `{ type: "model" }` item without `fit`
+gets `"contain"`, and the docs show `modelItem()` or an explicit `fit: "fill"`.
+
 The `model: true` marker goes: `type: "model"` says the same thing. `load` becomes optional so the
 custom elements entry can register a model slide for pages that load `<model-viewer>` with their own
 `<script>`. Never bundles `@google/model-viewer`, as now.
@@ -239,15 +347,46 @@ entries keep that:
 
 Estimated sizes, gzip, against `baseline/bundle-budget.md`:
 
-| Entry                                               |   Today |                             Estimate | Why                                                  |
-| --------------------------------------------------- | ------: | -----------------------------------: | ---------------------------------------------------- |
-| `embed` (was `embeds`)                              | 2,711 B |                        2,650–2,700 B | Drops `isEmbedItem` and the `render` default.        |
-| `spin`                                              | 2,426 B |                              2,400 B | Drops `isSpinItem`.                                  |
-| `model`                                             | 1,300 B |                              1,280 B | Drops `isModelItem` and the marker.                  |
-| `hover-zoom`                                        | 1,456 B |                              1,456 B | Field names only.                                    |
-| `react/model`, `react/embed`, `react/spin`          |       — | 150–250 B each, on top of the add-on | A component calling `useMemo` and rendering `Media`. |
-| Vue, Solid, Angular add-on parts                    |       — |                       150–300 B each | Angular's component metadata is the largest.         |
-| `elements/model`, `elements/embed`, `elements/spin` |       — | 250–450 B each, on top of the add-on | The markup reader is the larger half.                |
+| Entry                                               |   Today |                             Estimate | Why                                                                                                                                                                                                        |
+| --------------------------------------------------- | ------: | -----------------------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `embed` (was `embeds`)                              | 2,711 B |                        2,800–2,950 B | `createEmbedProvider` with its URL and origin checks, the provider lookup and preconnect; drops `isEmbedItem` and the `render` default. YouTube and Vimeo stay in the default list, so neither shakes out. |
+| `spin`                                              | 2,426 B |                              2,400 B | Drops `isSpinItem`.                                                                                                                                                                                        |
+| `model`                                             | 1,300 B |                              1,280 B | Drops `isModelItem` and the marker.                                                                                                                                                                        |
+| `hover-zoom`                                        | 1,456 B |                              1,456 B | Field names only.                                                                                                                                                                                          |
+| `react/model`, `react/embed`, `react/spin`          |       — | 150–250 B each, on top of the add-on | A component calling `useMemo` and rendering `Media`.                                                                                                                                                       |
+| Vue, Solid, Angular add-on parts                    |       — |                       150–300 B each | Angular's component metadata is the largest.                                                                                                                                                               |
+| `elements/model`, `elements/embed`, `elements/spin` |       — | 250–450 B each, on top of the add-on | The markup reader is the larger half.                                                                                                                                                                      |
 
 These are estimates from the size of the code they replace (the `AddonSlide` adapters are about
 40 lines each). The bundle check measures the real numbers once the entries exist (§9).
+
+## 4.8 HLS (`@ogdakke/fluidbox/hls`), later and low priority
+
+A small `attach` for the built-in video (§2.8), so streaming needs no app code:
+
+```ts
+export interface FluidboxHlsOptions {
+  /** Loads hls.js where the browser can't play HLS itself. */
+  readonly load: () => Promise<{ default: typeof import("hls.js").default }>;
+  /** Passed to `new Hls()`. */
+  readonly config?: Partial<import("hls.js").HlsConfig>;
+}
+export function hlsAttach(options: FluidboxHlsOptions): FluidboxVideoOptions["attach"];
+```
+
+```tsx
+const attachHls = hlsAttach({ load: () => import("hls.js") });
+<Fluidbox.Slides video={() => <Fluidbox.Video attach={attachHls} />} />;
+```
+
+- Native HLS first: if `video.canPlayType("application/vnd.apple.mpegurl")` says `"maybe"` or
+  `"probably"` (Safari, iOS), it sets `video.src` and loads nothing.
+- Otherwise it loads hls.js once per page, and if `Hls.isSupported()`, attaches with
+  `autoStartLoad: false`, then calls `startLoad()` on the video's first `play` or when
+  `preload` is `"auto"`. A neighbour slide then fetches only the manifest, not segments. If hls.js
+  isn't supported, it sets `video.src` so the slide shows its error state.
+- On `signal` abort it calls `hls.destroy()`.
+- Never bundles hls.js: `load` is the app's dynamic import, as the model add-on's `load` is.
+
+Size estimate: 350–500 B gzip. Bundle-check consumer `hls`, which must not contain hls.js. Plan
+step 3 or later (§9.2). It is optional, because the `attach` option already covers streaming.

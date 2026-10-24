@@ -188,6 +188,18 @@ They draw the runtime's built-in media into the box with `slide.drawImage` / `dr
 retry, video hand-off and iframe sandbox. They render nothing themselves. Outside a `Media`, each
 renders its own. Outside a slide, they throw.
 
+`Video` also takes `attach`, the `FluidboxVideoOptions.attach` of §2.8: a function that loads the
+media into the runtime's `<video>` (hls.js, dash.js, or native HLS) and cleans up when its signal
+aborts. With it the runtime sets no `src` or `<source>`. To stream every video item:
+
+```tsx
+<Fluidbox.Slides video={() => <Fluidbox.Video attach={attachHls} />} />
+```
+
+Vue `<Fluidbox.Video :attach>`, Solid `<Fluidbox.Video attach>`, Angular
+`<fluidbox-video [attach]>`, elements `gallery.slides = { video: videoSlide({ attach }) }`. Pass a
+stable function; a new `attach` reloads the video.
+
 ## 3.8 Toolbar, ZoomControls and the controls
 
 **Toolbar** — `<div role="group" data-fluidbox-toolbar>`, HTML attributes passed through. With no

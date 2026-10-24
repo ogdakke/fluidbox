@@ -1,8 +1,9 @@
 # 5. Engine additions
 
-Two real additions: the media box as the flight and zoom target for content the framework renders
-(`Fluidbox.Media`), and making every open wait until the opened slide is ready (`waitUntil` for what the engine
-can't see). Everything else in this redesign is naming and binding work on top of the existing
+Three real additions. The media box becomes the flight and zoom target for content the framework
+renders (`Fluidbox.Media`). Every open waits until the opened slide is ready (`waitUntil` covers
+what the engine can't see). And a box can fill the stage (`fit: "fill"`). The built-in video also
+gains `sources` and `attach` (§2.8), which change only how it loads. Everything else in this redesign is naming and binding work on top of the existing
 engine.
 
 File and line references are to `packages/fluidbox/src` at `59cb944`.
@@ -318,3 +319,51 @@ the box (`img.decode()`, video `readyState` or poster), adds the `waitUntil` pro
 
 Since the wait already covers commit, the `prepareOpening` gap in the risks table closes: a custom
 slide's `Fluidbox.Image` has drawn before the flight plays.
+
+## 5.4 Fill boxes (`fit: "fill"`)
+
+### Need
+
+A `<model-viewer>` slide shows in an 800 × 800 box in the middle of a wide screen, because every
+media box is sized from the item's `width / height` (`--fluidbox-media-aspect`,
+`viewer-strip.ts:536`; `fitSize`, `fit-size.ts:15`). A 3D view, a map or a full-page iframe has
+no intrinsic aspect, and should use the whole stage.
+
+### Design
+
+`fit: "fill"` on an item (§2.3) sizes its media box to the stage. That means the slide's width
+(`100cqw`, a size container) and `--fluidbox-content-height`, which is the viewport height less
+`--fluidbox-stage-top` and `--fluidbox-stage-bottom`. `fitSize` returns those two instead of the
+ratio expressions, and the box gets no `--fluidbox-media-aspect`. `"contain"`, the default, is
+today's behaviour. It is an item field rather than a `Media` prop because the opening flight is
+planned before the slide renders (on pointerdown when prepared, `prepare`,
+`dom-viewer-driver.ts:544`), so the runtime must know the box's size from data. `fit` is ignored
+on image items: a photo has an aspect, and zoom and the sharper image work on it.
+
+`width` and `height` become optional for fill items. When given, they are the poster's aspect.
+
+### The flight
+
+The box goes from the trigger's rectangle to the stage's. Their aspects differ (a square card, a
+16:9 stage), and the flight already handles that by cropping the frame (`cropPose`,
+`transition-geometry.ts:56`). For a fill box the start crop is the poster's rectangle inside the
+box: the item's `width / height` fitted with `contain` and centred, or, without them, the
+trigger visual's own aspect. The flight then starts showing exactly what the card showed and
+opens the crop out to the full stage as it lands. The close reverses it. The poster and any
+thumbnail layer inside use `object-fit: contain`, so they are never stretched.
+
+### Interactions
+
+| With                                | Behaviour                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stage insets (`--fluidbox-stage-*`) | Respected: the box is the stage less its insets, so the controls' insets stay clear.                                                                                                                                                                                                                                                    |
+| Thumbnails dock                     | A horizontal dock lowers `--fluidbox-content-height` (`filmstrip.css:50`), and the box shrinks with it. A vertical dock uses the stage's side insets.                                                                                                                                                                                   |
+| Sheet                               | The peek sets `--fluidbox-stage-bottom` (`sheet.css:94`), so the box sits above it. As the sheet rises, the stage moves up with it as it does for a photo, and the slide fades by `--fluidbox-sheet-expand`. The box is not resized while the sheet moves, so a `<model-viewer>` never re-renders at every frame of a drag.             |
+| Zoom                                | A fill box is zoomable only if its `Media` says so (§5.2), as for any custom box. Fit is scale 1 at the stage's size, `zoom.max` is relative to that, and panning is clamped to the stage as `--fluidbox-zoom-stage-*` already does. The model add-on owns its input (`data-fluidbox-owns-input`), so it is never zoomed by the viewer. |
+| Swipe and drag to dismiss           | Unchanged: they move the box. A content that owns its input keeps its gestures.                                                                                                                                                                                                                                                         |
+| Resize and rotation                 | The box follows the stage by CSS alone. Nothing is measured again.                                                                                                                                                                                                                                                                      |
+| Neighbours                          | The strip's slides are each a stage wide already, so fill boxes don't change paging.                                                                                                                                                                                                                                                    |
+| Server copy                         | Images only, so unaffected.                                                                                                                                                                                                                                                                                                             |
+| Reduced motion                      | No flight. The box appears at its stage size.                                                                                                                                                                                                                                                                                           |
+
+Readiness (§5.3) is unchanged: a fill model slide waits for its first frame like any other.

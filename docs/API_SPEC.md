@@ -69,6 +69,13 @@ The main changes:
 - **Every open waits for the opened slide to be ready**, at most 3 s, so a flight never lands on
   an undecoded image or a blank canvas. `waitUntil(promise)` on the slide covers what the engine
   can't see. Photos open as fast as now.
+- **Video takes `sources` and `attach`.** `sources` lists encodings in order of preference
+  (AV1, WebM, then `src`). `attach` plugs hls.js or dash.js into the built-in video, which keeps
+  its controls, tracks, autoplay and hand-off.
+- **Embed providers are public.** `createEmbedProvider({ name, origin, parse, url, … })` makes a
+  provider; YouTube and Vimeo are two built with it. Items store the provider's name.
+- **`fit: "fill"`** sizes a box to the whole stage. Models default to it, so `<model-viewer>`
+  is no longer an 800 × 800 square.
 - **Every control is a part**, including the new `Counter`, `Caption` and `ZoomControls`.
   `Controls` and its `zoom` flag go away.
 - **Renames:** `Filmstrip` → `Thumbnails`, `ThumbnailOverlay` + `FrameLayer` + `travel` →

@@ -68,7 +68,16 @@ In sub-steps that can each be reviewed alone, in this order:
    `counter` label. `css-api.ts` is the list the CSS reference page is generated from; update it in
    the same commit.
 
-Sub-steps 1, 2 and 7 are renames and API reshaping; 3–6 are the engine work and carry the risk
+8. **Video sources and attach** (§2.8). In `#makeSlide` and `#load`: `<source>` children from
+   `sources` then `src`, with no `src` attribute when there are sources. The error listener goes on
+   the last `<source>`. `#unload` removes the sources, and aborts `attach`'s signal before it empties
+   the video. `checkItemUrls` covers `sources[].src`. `drawVideo(item, { attach })` and
+   `videoSlide({ attach })`. Independent of 3–6 except that `drawVideo` comes from 3.
+9. **Fill boxes** (§5.4). `fit` on items, `fitSize` returning the stage size for `"fill"`, no
+   `--fluidbox-media-aspect` on a fill box, optional `width`/`height` validation, and the flight's
+   start crop at the poster's contained rectangle. Needs 4, because a fill box is a media box.
+
+Sub-steps 1, 2 and 7 are renames and API reshaping; 3–6, 8 and 9 are the engine work and carry the risk
 (§5.1 risks table). 3 and 4 must land together for any non-image slide to fly.
 
 ### Step 2: React
@@ -76,7 +85,7 @@ Sub-steps 1, 2 and 7 are renames and API reshaping; 3–6 are the engine work an
 `packages/react/src/index.ts` (1,121 lines) and `types.ts`. In order: `value`/`defaultValue`/
 `onValueChange`/`onValueChangeComplete` on Root; `Trigger value`; `Slides` (a map passed to the
 core, replacing the `renderers` proxy at `index.ts:294`); `Media` with `render` and children
-(portal into the box); `Image`/`Video`/`Iframe`; `useFluidboxSlide` with `waitUntil` and
+(portal into the box); `Image`/`Video`/`Iframe`, with `attach` on `Video`; `useFluidboxSlide` with `waitUntil` and
 `opening`; reporting each slide's commit to the core from a layout effect in the slide host, after
 the children's effects (so `Media render` and add-ons have called `waitUntil`);
 `Toolbar`, `ZoomControls`, `Counter`, `Caption`; `Overlay` replacing `ThumbnailOverlay` and
@@ -87,6 +96,15 @@ the children's effects (so `Media render` and add-ons have called `waitUntil`);
 
 `embeds.ts` → `embed.ts` (`createEmbedSlide`, `embedSlide`), `spin.ts`, `model.ts`; package exports
 `./embed`; drop the `is*Item` guards and the model marker. Small; can run alongside step 2.
+
+- **Embed providers** (§4.2): `createEmbedProvider` with its URL and origin checks; YouTube and
+  Vimeo rebuilt as `youtube` and `vimeo` from today's parsers, URLs, origins, `pause()` and
+  poster and referrer rules; `embedItem`; `providers` on `createEmbedSlide`, with lookup by name,
+  the error slide for an unknown name, and preconnect. `embeds.spec.ts` moves to the providers and
+  gains a third provider made in the test.
+- **`modelItem()` sets `fit: "fill"`** (§4.4). Needs step 1.9.
+- **Later, low priority: `@ogdakke/fluidbox/hls`** (§4.8), `hlsAttach`, with a bundle-check
+  consumer. Needs step 1.8. Nothing else depends on it.
 
 ### Step 4: Vue, Solid, Angular, elements
 
@@ -120,18 +138,18 @@ dozen lines (§4.1). Done by whoever does that framework in step 4.
 
 Estimates, gzip, against `baseline/bundle-budget.md` (2026-10-23):
 
-| Entry                      | Initial today | Initial estimate | Activation today | Activation estimate | Why                                                                                                                                                                                                                                                   |
-| -------------------------- | ------------: | ---------------: | ---------------: | ------------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Root                       |       9,126 B |    +50 to +150 B |         37,231 B |      +400 to +800 B | Initial: `value` option and state, item type checks, slide lookup. Activation: media box and layer for every type, zoom on any box, the readiness wait, the drawing split, overlay frame registration. Merging five events into three saves a little. |
-| React                      |      14,864 B | +600 to +1,200 B |         42,551 B |  +1,000 to +2,000 B | New parts (`Slides`, `Media`, `Image`/`Video`/`Iframe`, `Toolbar`, `ZoomControls`, `Counter`, `Caption`), `useFluidboxSlide`, the details object; less `Controls`, `FrameLayer` and the open/index double sync. Activation includes the core's.       |
-| Vue                        |      13,443 B | +600 to +1,200 B |         41,138 B |            as React | Same parts.                                                                                                                                                                                                                                           |
-| Solid                      |      12,723 B | +500 to +1,000 B |         40,379 B |            as React | Solid's parts are the smallest.                                                                                                                                                                                                                       |
-| Angular                    |      13,898 B | +700 to +1,300 B |         41,578 B |            as React | Directive metadata per new part.                                                                                                                                                                                                                      |
-| Elements                   |      13,082 B |   +500 to +900 B |         40,620 B |    +900 to +1,700 B | Four new elements, the template-slide reader and the registry.                                                                                                                                                                                        |
-| Thumbnails (was Filmstrip) |       3,644 B |            ±30 B |          3,644 B |               ±30 B | Rename; `data-active`.                                                                                                                                                                                                                                |
-| Sheet                      |       7,249 B |            ±30 B |          7,249 B |               ±30 B | `snap` naming.                                                                                                                                                                                                                                        |
-| Kit                        |       1,635 B |            ±50 B |          1,635 B |               ±50 B | `takeOverFluidbox` takes a value.                                                                                                                                                                                                                     |
-| Add-ons                    |               |                  |                  |                     | §4.7                                                                                                                                                                                                                                                  |
+| Entry                      | Initial today | Initial estimate | Activation today | Activation estimate | Why                                                                                                                                                                                                                                                                                           |
+| -------------------------- | ------------: | ---------------: | ---------------: | ------------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root                       |       9,126 B |    +50 to +150 B |         37,231 B |    +550 to +1,050 B | Initial: `value` option and state, item type checks, slide lookup. Activation: media box and layer for every type, zoom on any box, the readiness wait, the drawing split, video sources and `attach`, fill boxes, overlay frame registration. Merging five events into three saves a little. |
+| React                      |      14,864 B | +600 to +1,200 B |         42,551 B |  +1,000 to +2,000 B | New parts (`Slides`, `Media`, `Image`/`Video`/`Iframe`, `Toolbar`, `ZoomControls`, `Counter`, `Caption`), `useFluidboxSlide`, the details object; less `Controls`, `FrameLayer` and the open/index double sync. Activation includes the core's.                                               |
+| Vue                        |      13,443 B | +600 to +1,200 B |         41,138 B |            as React | Same parts.                                                                                                                                                                                                                                                                                   |
+| Solid                      |      12,723 B | +500 to +1,000 B |         40,379 B |            as React | Solid's parts are the smallest.                                                                                                                                                                                                                                                               |
+| Angular                    |      13,898 B | +700 to +1,300 B |         41,578 B |            as React | Directive metadata per new part.                                                                                                                                                                                                                                                              |
+| Elements                   |      13,082 B |   +500 to +900 B |         40,620 B |    +900 to +1,700 B | Four new elements, the template-slide reader and the registry.                                                                                                                                                                                                                                |
+| Thumbnails (was Filmstrip) |       3,644 B |            ±30 B |          3,644 B |               ±30 B | Rename; `data-active`.                                                                                                                                                                                                                                                                        |
+| Sheet                      |       7,249 B |            ±30 B |          7,249 B |               ±30 B | `snap` naming.                                                                                                                                                                                                                                                                                |
+| Kit                        |       1,635 B |            ±50 B |          1,635 B |               ±50 B | `takeOverFluidbox` takes a value.                                                                                                                                                                                                                                                             |
+| Add-ons                    |               |                  |                  |                     | §4.7                                                                                                                                                                                                                                                                                          |
 
 The React figure is the one to watch: 1.2 KB is about 8% on 14.9 KB. Two ways to keep it near the
 low end if the measurement comes in high:
@@ -143,7 +161,7 @@ low end if the measurement comes in high:
 New bundle-check consumers (`tests/bundle/*.ts` and the `entrypoints` list in
 `scripts/check-bundles.ts:4`): rename `filmstrip` → `thumbnails` and `embeds` → `embed`; add
 `react-embed`, `react-model`, `react-spin`, the same for Vue, Solid and Angular, and
-`elements-embed`, `elements-model`, `elements-spin` (15 new). Each asserts it carries only its
+`elements-embed`, `elements-model`, `elements-spin` (15 new), and `hls` once that add-on exists. Each asserts it carries only its
 own add-on and its own framework (§4.7). The new limits are the measurements plus 40 B, rounded up
 to the next 50 B, as now.
 
@@ -210,20 +228,35 @@ New tests:
 - `onValueChange` cancel for open, move and close, per binding.
 - `Counter`, `Caption`, `Toolbar` roles and labels in `a11y.spec.ts`.
 - An unknown item type shows the error slide with `labels.error`.
+- Video `sources`: the browser picks the first playable source (a WebM-or-MP4 fixture), the
+  error state shows when every source fails (the event on the last `<source>`), an unloaded slide
+  stops downloading, a source with a `javascript:` URL is rejected, and the hand-off from a
+  playing trigger video still continues at its time.
+- Video `attach`: called once per load with the runtime's `<video>`, no `src` set by the runtime,
+  the signal aborts on unload, and autoplay, pause on leave and tracks still work (a stub engine
+  that sets a blob URL).
+- Embed providers: a provider made in the test plays, pauses and preconnects; a `url()` off its
+  `origin` shows the error slide; an item naming an unregistered provider shows the error slide
+  and warns.
+- Fill boxes: a `fit: "fill"` slide's box equals the stage less its insets, with the thumbnails
+  dock and with a sheet's peek; the opening flight's first frame shows the poster at the trigger's
+  rectangle; resizing the window resizes the box; a model item from `modelItem()` fills.
 
 ## 9.5 What runs in parallel
 
-| Track                              | Depends on                                            | Can run with                                                                    |
-| ---------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1.1 item types, 1.7 renames        | —                                                     | each other; they touch different names, but rebase often, as both edit fixtures |
-| 1.2 state and events               | 1.1                                                   | 1.3                                                                             |
-| 1.3–1.5 slides, Media box, waiting | 1.1                                                   | 1.2, 1.6                                                                        |
-| 1.6 triggers and overlays          | 1.2                                                   | 1.3–1.5                                                                         |
-| 2 React                            | 1's public types (write them first, implement behind) | 3                                                                               |
-| 3 plain-JS add-on slides           | 1.3's slide contract                                  | 2                                                                               |
-| 4 Vue, Solid, Angular, elements    | 1 done, 2's `Media` portal proven                     | each other                                                                      |
-| 5 add-on parts                     | 3, and that framework's step 4                        | the other frameworks                                                            |
-| 6 docs and examples                | each framework's step                                 | per page; patterns per framework                                                |
+| Track                                     | Depends on                                            | Can run with                                                                    |
+| ----------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1.1 item types, 1.7 renames               | —                                                     | each other; they touch different names, but rebase often, as both edit fixtures |
+| 1.2 state and events                      | 1.1                                                   | 1.3                                                                             |
+| 1.3–1.5 slides, Media box, waiting        | 1.1                                                   | 1.2, 1.6                                                                        |
+| 1.6 triggers and overlays                 | 1.2                                                   | 1.3–1.5                                                                         |
+| 1.8 video sources and `attach`            | 1.3 (`drawVideo`)                                     | 1.4–1.6, 1.9                                                                    |
+| 1.9 fill boxes                            | 1.4                                                   | 1.5, 1.6, 1.8                                                                   |
+| 2 React                                   | 1's public types (write them first, implement behind) | 3                                                                               |
+| 3 plain-JS add-on slides, embed providers | 1.3's slide contract; `modelItem` fill needs 1.9      | 2                                                                               |
+| 4 Vue, Solid, Angular, elements           | 1 done, 2's `Media` portal proven                     | each other                                                                      |
+| 5 add-on parts                            | 3, and that framework's step 4                        | the other frameworks                                                            |
+| 6 docs and examples                       | each framework's step                                 | per page; patterns per framework                                                |
 
 With four people or agents: one on 1.3–1.5 (the engine), one on 1.1/1.2/1.6/1.7, one on 2 then
 Vue, one on 3 then Angular; Solid and elements follow. The critical path is 1.3 → 1.4 → React

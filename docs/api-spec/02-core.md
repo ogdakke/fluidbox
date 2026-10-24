@@ -78,6 +78,13 @@ export interface FluidboxItemBase {
   readonly placeholder?: string;
   /** Text shown by <Fluidbox.Caption>; becomes the dialog's description. */
   readonly caption?: string;
+  /**
+   * How the media box is sized. "contain": to the item's width and height,
+   * fitted in the stage. "fill": to the whole stage, less its insets (§5.4).
+   * Ignored on image items.
+   * @default "contain"; modelItem() sets "fill"
+   */
+  readonly fit?: "contain" | "fill";
 }
 
 export interface FluidboxImageItem extends FluidboxItemBase {
@@ -95,8 +102,23 @@ export interface FluidboxImageItem extends FluidboxItemBase {
 
 export interface FluidboxVideoItem extends FluidboxItemBase {
   readonly type: "video";
-  // src, title, width, height, poster, autoplay, loop, muted,
+  /** The last resort: drawn as the last <source>, after `sources`. */
+  readonly src: string;
+  /**
+   * Encodings to try first, in order of preference, such as AV1, then WebM,
+   * then `src` as MP4. Each is a <source> child of the <video>.
+   */
+  readonly sources?: readonly FluidboxVideoSource[];
+  // title, width, height, poster, autoplay, loop, muted,
   // playsInline, controls, preload, tracks: unchanged.
+}
+
+export interface FluidboxVideoSource {
+  readonly src: string;
+  /** The MIME type with codecs, as `video/mp4; codecs="av01.0.05M.08"`. */
+  readonly type?: string;
+  /** A media query, as `(min-width: 1200px)`. */
+  readonly media?: string;
 }
 
 export interface FluidboxIframeItem extends FluidboxItemBase {
@@ -109,8 +131,9 @@ export interface FluidboxCustomItemBase<TType extends string> extends FluidboxIt
   readonly type: TType;
   /** The accessible name of the slide and the dialog. */
   readonly title: string;
-  readonly width: number;
-  readonly height: number;
+  /** Required unless `fit` is "fill"; then they only shape the poster. */
+  readonly width?: number;
+  readonly height?: number;
 }
 
 /**
@@ -161,7 +184,9 @@ TypeScript program see each other's types. That is acceptable for a component li
 ### Ids and validation
 
 Unchanged, apart from names: `id` defaults to `src`; repeated `src` gets `src#2`; an item without
-either throws a `TypeError`; URL checks per type stay (`media-url.ts`). An item whose `type` has
+either throws a `TypeError`; URL checks per type stay (`media-url.ts`), and now cover every
+`sources[].src` of a video item too. An item without `width` and `height` throws unless its
+`fit` is `"fill"`; the check runs where items are checked now (`toList`, `createItemList`). An item whose `type` has
 no slide (no built-in, no entry in `slides`, no `default`) shows the slide's error state with
 `labels.error` and logs once in development. Today an unknown `render` throws inside the strip
 (`viewer-strip.ts:987`), which breaks the viewer for every item; an error slide is kinder.
@@ -385,7 +410,7 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   waitUntil(this: void, promise: Promise<unknown>): void;
   /** Draw the built-in image, video or iframe for an item into `media`. */
   drawImage(this: void, item?: FluidboxImageItem): () => void;
-  drawVideo(this: void, item?: FluidboxVideoItem): () => void;
+  drawVideo(this: void, item?: FluidboxVideoItem, options?: FluidboxVideoOptions): () => void;
   drawIframe(this: void, item?: FluidboxIframeItem): () => void;
 }
 ```
@@ -408,6 +433,69 @@ Rules, which hold for every binding too:
 - `drawImage()` without an argument draws `slide.item`, which must then be an image item; the
   other `draw*` likewise. With an argument it draws that item: a product slide can draw its
   `image` field.
+
+### Video sources and streaming
+
+Today the built-in video sets one `src` (`viewer-strip.ts:962`), so a page can't offer AV1 or
+WebM with an MP4 fallback, and can't plug in a streaming engine such as hls.js or dash.js. Both
+change in the built-in video, so a streamed video keeps everything else it does: controls,
+tracks, the poster, pausing as it leaves, autoplay as it comes on show, its size, and continuing
+from the trigger's video (`continueVideo`, `:600`).
+
+**Sources.** With `sources`, the video gets one `<source>` per entry, in order, then a last
+`<source src={item.src}>`. It never also gets a `src` attribute, because a `src` attribute makes
+the browser ignore every `<source>` child. Two changes follow:
+
+- Unloading a slide removes the `<source>` children before `load()` (`#unload`, `:1032-1034`).
+  Otherwise `load()` picks a source again and the unloaded video keeps downloading.
+- When every source fails, the `error` event fires on the last `<source>`, not on the video. The
+  slide listens there for its error state and Retry.
+
+Without `sources`, the video sets `src` as now. The server copy is images only, so it is
+unaffected. The hand-off from a playing trigger video works the same, because it waits for
+`loadedmetadata` and syncs by `currentTime` (`:660-664`), whichever source the browser chose.
+
+**Attaching an engine.**
+
+```ts
+export interface FluidboxVideoOptions {
+  /**
+   * Load the media yourself: the runtime sets no src and no <source>. Called
+   * when the slide loads; clean up when `signal` aborts, which happens before
+   * the runtime empties the video.
+   */
+  readonly attach?: (video: HTMLVideoElement, signal: AbortSignal, item: FluidboxVideoItem) => void;
+}
+
+/** A slide for video items that draws the built-in video with these options. */
+export function videoSlide(options: FluidboxVideoOptions): FluidboxSlideRenderer<FluidboxVideoItem>;
+```
+
+```ts
+// plain JS: every video item through hls.js, or natively where the browser plays HLS
+import Hls from "hls.js";
+
+const attachHls = (video, signal, item) => {
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = item.src;
+    return;
+  }
+  const hls = new Hls();
+  hls.loadSource(item.src);
+  hls.attachMedia(video);
+  signal.addEventListener("abort", () => hls.destroy(), { once: true });
+};
+
+createFluidbox({ items, slides: { video: videoSlide({ attach: attachHls }) } });
+```
+
+`attach` runs where the runtime would set `src` (`#load`, `:961`), so it runs for neighbours
+too, as `preload="metadata"` does now. An engine that should not fetch segments for a neighbour
+starts loading on `play` or when `slide.active` turns true (the HLS add-on does, §4.8). The
+runtime still sets `poster`, the attributes and the tracks. `item.src` must still pass the URL
+check (the manifest URL); what `attach` loads is the app's responsibility. A built-in video with
+`attach` is still exempt from the generic readiness rule (§5.3). An open doesn't wait for the
+engine's first segment.
 
 ### Plain-JS example
 
