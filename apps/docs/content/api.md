@@ -48,7 +48,7 @@ fluidbox.update({
 
 ## Renderers
 
-<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlides, FluidboxSlideRenderer, FluidboxSlide, FluidboxViewerRenderer, FluidboxViewerContext -->
+<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlides, FluidboxSlideRenderer, FluidboxSlide, FluidboxSlideOrigin, FluidboxPlayback, FluidboxPlaybackSource, FluidboxViewerRenderer, FluidboxViewerContext -->
 
 ## Triggers
 

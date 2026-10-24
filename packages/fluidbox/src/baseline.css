@@ -360,9 +360,10 @@
     [data-fluidbox-media] {
     cursor: grab;
   }
-  /* A mouse zooms an image with one click; the cursor says so. */
+  /* A mouse zooms an image with one click; the cursor says so. Under a
+     double-click or none, a zoom cursor would promise what a click doesn't do. */
   @media (hover: hover) and (pointer: fine) {
-    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    :where([data-fluidbox-viewer][data-fluidbox-zoom-click="single"])
       [data-fluidbox-dialog][data-zoomable]
       [data-fluidbox-slide]
       [data-fluidbox-image-frame]

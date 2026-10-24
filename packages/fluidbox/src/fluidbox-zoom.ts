@@ -16,7 +16,14 @@ interface View {
 export type ZoomReason = "api" | "keyboard" | "pointer" | "wheel";
 interface Options {
   prepare: () => View | null;
-  config: () => { step: number; max: number };
+  config: () => {
+    step: number;
+    max: number;
+    /** What a mouse click on the media does. */
+    click: "single" | "double" | false;
+    /** What a touch or pen tap does. */
+    tap: "double" | false;
+  };
   /** The zoomed image scroller's name. */
   label: string;
   state: (locked: boolean) => void;
@@ -848,11 +855,16 @@ export class FluidboxZoom {
     if (event.detail === 0) return false;
     this.#options.interact();
     const anchor = { x: event.clientX, y: event.clientY };
+    const { click, tap } = this.#options.config();
     // A mouse zooms with one click, as on a product page: the cursor says so.
     // The second click of a double-click is the same intent, not a toggle back.
+    // Under "double" the browser's click count, which follows the OS setting,
+    // says when, and a single click waits for nothing.
     if (this.#pointerType === "mouse") {
-      if (event.detail === 1) this.#toggleAt(anchor);
-    } else this.#tapAt(anchor);
+      if (event.detail === (click === "single" ? 1 : click === "double" ? 2 : -1)) {
+        this.#toggleAt(anchor);
+      }
+    } else if (tap) this.#tapAt(anchor);
     return true;
   }
 

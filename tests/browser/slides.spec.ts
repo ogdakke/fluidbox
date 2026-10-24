@@ -22,6 +22,14 @@ declare global {
         visible: { x: number; y: number; width: number; height: number };
       }[];
       gate: { open?: () => void; wait?: (promise: Promise<unknown>) => void };
+      player: Fluidbox;
+      playback: {
+        returns: "stub" | "null" | "none";
+        origins: {
+          index: number;
+          origin: { video?: { currentTime: number; paused: boolean; muted: boolean } } | null;
+        }[];
+      };
     };
   }
 }
@@ -601,4 +609,86 @@ test.describe("fill boxes", () => {
     );
     for (const size of sizes) expect(size).toEqual({ width: before.width, height: before.height });
   });
+});
+
+test.describe("a player of your own and the trigger's video", () => {
+  const card = '#playback [data-item="film-a"] video';
+
+  async function playing(page: Page) {
+    await page.goto("/slides.html");
+    await page.locator(card).scrollIntoViewIfNeeded();
+    await page.waitForFunction((selector) => {
+      const video = document.querySelector<HTMLVideoElement>(selector);
+      return !!video && !video.paused && video.currentTime > 0.2;
+    }, card);
+  }
+
+  test("the slide opened from a playing trigger reads it live, and its neighbour reads null", async ({
+    page,
+  }) => {
+    await playing(page);
+    await page.locator('#playback [data-item="film-a"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    const read = () =>
+      page.evaluate(() =>
+        window.slidesFixture.playback.origins.map(({ index, origin }) => ({
+          index,
+          time: origin?.video?.currentTime ?? null,
+          muted: origin?.video?.muted ?? null,
+        })),
+      );
+    const first = await read();
+    expect(first.find((entry) => entry.index === 0)?.muted).toBe(true);
+    expect(first.find((entry) => entry.index === 1)?.time).toBeNull();
+    // Live: a later read is the trigger's time then.
+    await page.waitForTimeout(300);
+    const later = await read();
+    expect(later.find((entry) => entry.index === 0)!.time!).toBeGreaterThan(
+      first.find((entry) => entry.index === 0)!.time!,
+    );
+  });
+
+  test("an open without a trigger gives no origin", async ({ page }) => {
+    await page.goto("/slides.html");
+    await page.evaluate(() => window.slidesFixture.player.open("film-a"));
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    const origins = await page.evaluate(() =>
+      window.slidesFixture.playback.origins.map(({ origin }) => origin),
+    );
+    expect(origins.length).toBeGreaterThan(0);
+    expect(origins.every((origin) => origin === null)).toBe(true);
+  });
+
+  for (const [returns, expected] of [
+    ["stub", { time: 2.5, paused: false }],
+    ["null", { time: 0.5, paused: true }],
+    ["none", { time: 0.5, paused: true }],
+  ] as const) {
+    test(`closing hands the trigger's video ${returns === "stub" ? "the player's time" : `nothing (${returns})`}`, async ({
+      page,
+    }) => {
+      await playing(page);
+      await page.evaluate((returns) => (window.slidesFixture.playback.returns = returns), returns);
+      await page.locator('#playback [data-item="film-a"]').click();
+      await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+      // The trigger rests at a known frame, so a seek and a play show.
+      await page.locator(card).evaluate(async (video: HTMLVideoElement) => {
+        video.pause();
+        const seeked = new Promise((resolve) =>
+          video.addEventListener("seeked", resolve, { once: true }),
+        );
+        video.currentTime = 0.5;
+        await seeked;
+      });
+      await page.keyboard.press("Escape");
+      await expect(page.locator(dialog)).toHaveCount(0);
+      const back = await page.locator(card).evaluate((video: HTMLVideoElement) => ({
+        time: video.currentTime,
+        paused: video.paused,
+      }));
+      expect(back.paused).toBe(expected.paused);
+      expect(back.time).toBeGreaterThanOrEqual(expected.time - 0.01);
+      expect(back.time).toBeLessThan(expected.time + 1);
+    });
+  }
 });

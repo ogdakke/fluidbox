@@ -329,6 +329,77 @@ test.describe("zoom by pointer", () => {
     ]);
   });
 
+  test('zoom.click "double" zooms on a double-click only, and "false" not at all', async ({
+    page,
+  }, testInfo) => {
+    test.skip(!!testInfo.project.use.isMobile, "A mouse click.");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openOn(page, "ladder");
+    const viewer = page.locator("[data-fluidbox-viewer]");
+    await expect(viewer).toHaveAttribute("data-fluidbox-zoom-click", "single");
+    await page.evaluate(() => window.zoomViewer.update({ zoom: { click: "double" } }));
+    await expect(viewer).toHaveAttribute("data-fluidbox-zoom-click", "double");
+    const box = (await page.locator(activeMedia).boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    // One click does nothing, and doesn't close.
+    await page.mouse.click(x, y);
+    await page.waitForTimeout(400);
+    expect((await zoomState(page))!.scale).toBe(1);
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await page.mouse.dblclick(x, y);
+    await expect.poll(async () => (await zoomState(page))!.scale).toBe(2);
+    // A click beside the zoomed image still zooms out, in the wider gap beside it.
+    const clickBeside = async () => {
+      // Narrower than the stage at 1.1, so there is room beside it.
+      await page.evaluate(() => window.zoomViewer.zoomTo(1.1));
+      const viewport = (await page.locator("[data-fluidbox-zoom-viewport]").boundingBox())!;
+      const image = (await page
+        .locator("[data-fluidbox-zoom-viewport] [data-fluidbox-media]")
+        .boundingBox())!;
+      const left = image.x - viewport.x;
+      const right = viewport.x + viewport.width - (image.x + image.width);
+      const x = left > right ? viewport.x + left / 2 : viewport.x + viewport.width - right / 2;
+      // Below Previous and Next, which sit in the gaps at mid-height.
+      await page.mouse.click(x, viewport.y + viewport.height * 0.75);
+    };
+    await clickBeside();
+    await expect.poll(async () => (await zoomState(page))!.scale).toBe(1);
+
+    await page.evaluate(() => window.zoomViewer.update({ zoom: { click: false } }));
+    await expect(viewer).toHaveAttribute("data-fluidbox-zoom-click", "off");
+    await page.mouse.click(x, y);
+    await page.mouse.dblclick(x, y);
+    await page.waitForTimeout(400);
+    expect((await zoomState(page))!.scale).toBe(1);
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    // The controls and keys still zoom, and a click beside the image zooms out.
+    await page.locator("[data-fluidbox-zoom-in]").click();
+    await expect.poll(async () => (await zoomState(page))!.scale).toBe(1.5);
+    await clickBeside();
+    await expect.poll(async () => (await zoomState(page))!.scale).toBe(1);
+  });
+
+  test('zoom.tap "false" ignores a double tap', async ({ page }, testInfo) => {
+    test.skip(!testInfo.project.use.hasTouch, "Taps.");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await openOn(page, "ladder");
+    await page.evaluate(() => window.zoomViewer.update({ zoom: { tap: false } }));
+    const box = (await page.locator(activeMedia).boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.touchscreen.tap(x, y);
+    await page.waitForTimeout(100);
+    await page.touchscreen.tap(x, y);
+    await page.waitForTimeout(400);
+    expect((await zoomState(page))!.scale).toBe(1);
+    await page.evaluate(() => window.zoomViewer.update({ zoom: { tap: "double" } }));
+    await page.touchscreen.tap(x, y);
+    await page.waitForTimeout(100);
+    await page.touchscreen.tap(x, y);
+    await expect.poll(async () => (await zoomState(page))!.scale).toBe(2);
+  });
+
   test("two taps a little slower than 250 ms apart still zoom", async ({ page }, testInfo) => {
     test.skip(!testInfo.project.use.hasTouch, "Taps.");
     await page.emulateMedia({ reducedMotion: "reduce" });

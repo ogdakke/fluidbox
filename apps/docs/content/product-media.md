@@ -162,6 +162,35 @@ const clip: FluidboxSlideRenderer = ({ item, media, active, onActiveChange }) =>
 
 The framework bindings hand a custom slide's component the same `active` and `onActiveChange` beside `item`, `index` and `signal`. Angular sets an `active` input on a component that declares one, and `active` on a template's context, as `let-active="active"`.
 
+### A player of your own continues the trigger's video
+
+The built-in video picks up where a playing trigger video is, and hands its time back as the viewer closes. A player of your own, such as Mux Player, Vidstack or Video.js, gets the same through two members of its slide:
+
+- `origin` is set on the slide an open starts from a trigger whose picture is a `<video>`: `origin.video` reads that video's `currentTime`, `paused` and `muted` live. It is null on the neighbours, on slides reached by moving, and for an open with no trigger.
+- `returnPlayback(source)` registers what a close from this slide reads once, before its flight: anything with `currentTime` and `paused`, or a function that returns them or null. The trigger's video seeks to that time and plays unless it is paused. With nothing registered, the trigger's video is left alone.
+
+```ts
+const film: FluidboxSlideRenderer = (slide) => {
+  const element = document.createElement("video");
+  slide.media.append(element);
+  const player = videojs(element);
+  const from = slide.origin?.video;
+  if (from) {
+    player.ready(() => {
+      player.muted(from.muted);
+      player.currentTime(from.currentTime);
+      if (!from.paused) void player.play();
+    });
+  }
+  return slide.returnPlayback(() => ({
+    currentTime: player.currentTime(),
+    paused: player.paused(),
+  }));
+};
+```
+
+An open doesn't wait for your player's seek. To land the flight on the trigger's frame, wrap the seek in `slide.waitUntil`.
+
 ### The add-ons in a framework
 
 The add-ons' slides are plain renderers: they draw into the slide's media box. The custom elements and the plain JS API take them as they are, in `slides`. The framework bindings' slides take the framework's own content instead:

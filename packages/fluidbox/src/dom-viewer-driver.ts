@@ -152,7 +152,7 @@ function zoomConfig(
   if (!Number.isFinite(max) || max <= 1 || !Number.isFinite(step) || step <= 1 || step > max) {
     throw new RangeError("Fluidbox zoom step must be greater than 1 and no greater than max.");
   }
-  return { max, step };
+  return { max, step, click: options?.click ?? "single", tap: options?.tap ?? "double" };
 }
 
 export class DomViewerDriver<
@@ -351,6 +351,7 @@ export class DomViewerDriver<
     });
     this.#zoomOptions = zoomConfig(zoomOptions);
     this.#portal.dialog.toggleAttribute("data-zoomable", !!this.#zoomOptions);
+    this.#markZoomClick();
   }
 
   /** What may close the viewer, and what a vertical wheel does, with their defaults. */
@@ -498,14 +499,27 @@ export class DomViewerDriver<
 
   setZoom(options: false | FluidboxZoomOptions | undefined) {
     const next = zoomConfig(options);
-    if (next?.max === this.#zoomOptions?.max && next?.step === this.#zoomOptions?.step) return;
+    const current = this.#zoomOptions;
+    if (
+      next?.max === current?.max &&
+      next?.step === current?.step &&
+      next?.click === current?.click &&
+      next?.tap === current?.tap
+    )
+      return;
     this.#zoomOptions = next;
     this.#portal.dialog.toggleAttribute("data-zoomable", !!next);
+    this.#markZoomClick();
     if (next) return;
     this.#zoom?.reset("api");
     this.#zoom?.destroy();
     this.#zoom = undefined;
     this.#zoomLoad = undefined;
+  }
+
+  /** Say on the viewer what a click on the media does, for the cursor. */
+  #markZoomClick() {
+    this.#portal.overlay.dataset.fluidboxZoomClick = this.#zoomOptions?.click || "off";
   }
 
   /** Show the labels again after they changed in place. */
@@ -570,7 +584,7 @@ export class DomViewerDriver<
         prepare: () => this.#prepareZoom(),
         // Read on every gesture, so a change of options applies to the next one.
         config: () => {
-          const options = this.#zoomOptions ?? { max: 1, step: 1 };
+          const options = this.#zoomOptions ?? { max: 1, step: 1, click: false, tap: false };
           // A box of your own can zoom further, or less far, than the rest.
           const max = this.#strip?.zoomable()?.max;
           return max ? { ...options, max } : options;
@@ -776,8 +790,9 @@ export class DomViewerDriver<
       return () => {};
     }
     this.#stage(context.origin?.trigger ?? null);
-    // The slide mounts knowing an open may wait for it.
+    // The slide mounts knowing an open may wait for it, and what it opens from.
     this.#strip?.setOpening(context.index);
+    this.#strip?.setOriginVideo(context.index, this.#originVideo(context));
     void this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
     this.#render(context.item, context.index, false);
@@ -840,6 +855,7 @@ export class DomViewerDriver<
     if (!prepared) this.#discardPreparation();
     else this.#preparedOpen = undefined;
     this.#strip?.setOpening(context.index);
+    this.#strip?.setOriginVideo(context.index, this.#originVideo(context));
     const focused = this.#portal.overlay.ownerDocument.activeElement;
     this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
@@ -1047,7 +1063,8 @@ export class DomViewerDriver<
     const closing = this.#strip?.shownItem;
     const crossfade = !!from && !!closing && !originMatchesItem(context.origin, closing);
     const picture = this.#originPicture(from, context.origin, crossfade);
-    if (picture instanceof HTMLVideoElement) this.#handBackVideo(picture);
+    const video = this.#originVideo(context);
+    if (video) this.#handBackVideo(video);
     this.#keepThumbnailVisible(crossfade ? context.origin?.thumbnail : undefined);
     const start = interruptedPose ?? {
       ...readImageTransitionPose(this.#frame, this.#media),
@@ -1372,15 +1389,32 @@ export class DomViewerDriver<
     return thumbnail && originShowsItem(thumbnail, context.item) ? thumbnail : undefined;
   }
 
-  /** The card's own video picks up where the player is, so it lands on the same frame. */
+  /**
+   * The card's own video picks up where the closing slide's player is, so it
+   * lands on the same frame: the built-in video's, or what a custom slide
+   * registered with `returnPlayback`.
+   */
   #handBackVideo(origin: HTMLVideoElement) {
-    const player = this.#media;
-    if (!(player instanceof HTMLVideoElement) || player.readyState < HTMLMediaElement.HAVE_METADATA)
-      return;
-    if (Math.abs(origin.currentTime - player.currentTime) > 0.01) {
-      origin.currentTime = player.currentTime;
+    const playback = this.#strip?.returnedPlayback();
+    if (!playback) return;
+    if (Math.abs(origin.currentTime - playback.currentTime) > 0.01) {
+      origin.currentTime = playback.currentTime;
     }
-    if (!player.paused && !player.ended) void origin.play().catch(() => undefined);
+    if (!playback.paused) void origin.play().catch(() => undefined);
+  }
+
+  /**
+   * The trigger's video: what an opening slide gets as `origin`, and what a
+   * close hands the playback back to. Whether the flight crossfades doesn't
+   * matter, as a custom player's item never matches the clip the trigger plays.
+   */
+  #originVideo(context: { origin?: FluidboxOrigin | null }) {
+    const picture = this.#originPicture(
+      visibleOrigin(context.origin?.visual),
+      context.origin,
+      false,
+    );
+    return picture instanceof HTMLVideoElement ? picture : null;
   }
 
   /** The element that paints the item in the origin, unless the flight crossfades over it. */

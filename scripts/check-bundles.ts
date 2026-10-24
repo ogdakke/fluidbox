@@ -47,7 +47,7 @@ const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fl
 // The React binding's redesigned parts added about 1,430 B to its initial chunk.
 const initialGzipLimits: Record<Entry, number> = {
   root: 10_400,
-  elements: 14_450,
+  elements: 14_550,
   react: 17_850,
   solid: 14_250,
   vue: 14_900,
@@ -74,13 +74,13 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 44_650,
+  root: 45_100,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 47_900,
-  react: 51_450,
-  solid: 47_800,
-  vue: 48_500,
-  angular: 48_850,
+  elements: 48_400,
+  react: 51_900,
+  solid: 48_250,
+  vue: 48_950,
+  angular: 49_300,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_750,
@@ -88,17 +88,17 @@ const activationJsGzipLimits: Record<Entry, number> = {
   embed: 3_050,
   model: 1_450,
   spin: 2_500,
-  "react-embed": 54_000,
-  "react-model": 52_550,
-  "react-spin": 53_350,
+  "react-embed": 54_450,
+  "react-model": 52_950,
+  "react-spin": 53_800,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 47_500,
-  elements: 50_700,
-  react: 54_300,
-  solid: 50_650,
-  vue: 51_350,
-  angular: 51_650,
+  root: 47_900,
+  elements: 51_200,
+  react: 54_700,
+  solid: 51_050,
+  vue: 51_750,
+  angular: 52_100,
   thumbnails: 4_900,
   sheet: 8_350,
   kit: 4_550,
@@ -107,9 +107,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   embed: 5_850,
   model: 4_250,
   spin: 5_250,
-  "react-embed": 56_800,
-  "react-model": 55_350,
-  "react-spin": 56_150,
+  "react-embed": 57_250,
+  "react-model": 55_750,
+  "react-spin": 56_600,
 };
 
 const jsonIndex = process.argv.indexOf("--json");

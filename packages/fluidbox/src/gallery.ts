@@ -62,7 +62,15 @@ const ITEM_ATTRIBUTES = new Set([
   "aria-label",
 ]);
 /** Attributes whose change updates the viewer. */
-const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max", "loop", "preload"];
+const VIEWER_ATTRIBUTES = [
+  "nozoom",
+  "zoom-step",
+  "zoom-max",
+  "zoom-click",
+  "zoom-tap",
+  "loop",
+  "preload",
+];
 /** Your state for the viewer: `open`, and the `index` it shows. */
 const CONTROL_ATTRIBUTES = ["open", "index"];
 const PRELOADS: readonly string[] = ["intent", "press", "eager"] satisfies FluidboxPreload[];
@@ -500,9 +508,19 @@ export class FluidboxGalleryElement extends HTMLElement {
       const value = Number(this.getAttribute(name));
       return this.hasAttribute(name) && Number.isFinite(value) && value > 0 ? value : undefined;
     };
-    const step = number("zoom-step");
-    const max = number("zoom-max");
-    return step || max ? { ...(step ? { step } : {}), ...(max ? { max } : {}) } : undefined;
+    // `off` is false; anything else it doesn't name leaves the default.
+    const mode = <T extends string>(name: string, modes: readonly T[]) => {
+      const value = this.getAttribute(name);
+      return value === "off" ? false : modes.find((each) => each === value);
+    };
+    const zoom = {
+      step: number("zoom-step"),
+      max: number("zoom-max"),
+      click: mode("zoom-click", ["single", "double"] as const),
+      tap: mode("zoom-tap", ["double"] as const),
+    };
+    const given = Object.entries(zoom).filter(([, value]) => value !== undefined);
+    return given.length ? Object.fromEntries(given) : undefined;
   }
 
   /** Hand the viewer the current options. It loads the add-ons they turn on. */

@@ -13,9 +13,13 @@ Images zoom with pinch (or Ctrl + wheel), a click or double-tap, the zoom contro
 
 The first gallery zooms to 3× on a double-click and stops at 6×. Its viewer has the zoom controls, and a readout of `state.zoom` in each framework's own way: a selector hook, a signal, the root's slot, an injected signal, or `subscribe`. Its photos list two widths in `srcset` and the full-size file as `zoomSrc`, so a zoom past the 1280w candidate loads the sharper file (see [A sharper image as the zoom grows](#a-sharper-image-as-the-zoom-grows)). The second gallery turns zoom off.
 
-- `zoom: { step, max }` or `zoom: false` on the viewer. The custom elements also read the `zoom-step`, `zoom-max` and `nozoom` attributes.
+- `zoom: { step, max, click, tap }` or `zoom: false` on the viewer. The custom elements also read the `zoom-step`, `zoom-max`, `zoom-click`, `zoom-tap` and `nozoom` attributes.
 - Zoom options apply live, even while the viewer is open. Call `fluidbox.update({ zoom })`, or set a new `zoom` prop or property. Turning zoom off zooms a zoomed photo back out.
 - `step` defaults to `2` and `max` to `4`.
+- `click` is what a mouse click on the photo does: `"single"` (the default) zooms on one click, `"double"` on a double-click, as the system's double-click speed counts it, and `false` not at all. A single click under `"double"` waits for nothing and doesn't close the viewer.
+- `tap` is what a touch or pen tap does: `"double"` (the default) zooms on two taps within 350 ms, and `false` not at all.
+- With either off, pinch, the wheel, the keys, the zoom controls and `zoomTo` still zoom, and a click beside a zoomed photo zooms out in every mode.
+- The viewer has `data-fluidbox-zoom-click="single"`, `"double"` or `"off"`. `baseline.css` shows the zoom cursors only under `"single"`.
 - While zoomed, the dialog has `data-zoomed`. Pans can reach under the browser's bars; set `--fluidbox-zoom-bleed: 0px` to keep them inside the window, or `--fluidbox-zoom-clip` to keep them inside the stage insets.
 
 ## Commands and state

@@ -253,6 +253,29 @@ export type FluidboxRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxRenderContext<TItem>,
 ) => void | (() => void);
 
+/** What a slide's trigger showed. */
+export interface FluidboxSlideOrigin {
+  /** The trigger's `<video>`, when that is what the trigger showed. */
+  readonly video?: FluidboxPlayback;
+}
+
+/** A video's playback, read live: each read returns its state now. */
+export interface FluidboxPlayback {
+  readonly currentTime: number;
+  readonly paused: boolean;
+  readonly muted: boolean;
+}
+
+/**
+ * Anything with `currentTime` and `paused`, read when the close starts: a
+ * `<video>`, `<mux-player>`, Vidstack's player. Or a function, for players
+ * whose state is behind methods (Video.js). Return null to leave the trigger
+ * alone.
+ */
+export type FluidboxPlaybackSource =
+  | { readonly currentTime: number; readonly paused: boolean }
+  | (() => { readonly currentTime: number; readonly paused: boolean } | null);
+
 /**
  * A slide, as its renderer gets it: the item, the media box to draw it in,
  * and whether it is on show.
@@ -288,6 +311,19 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    * play and pause. Returns a function that stops listening; `signal` stops it too.
    */
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
+  /**
+   * What the trigger showed, when this slide is the one an open started from
+   * a trigger. `video` is set when the trigger's picture is a playing or
+   * paused `<video>`. Null on neighbours, on slides reached by moving, and for
+   * opens without a trigger. It stays set for the slide's lifetime.
+   */
+  readonly origin: FluidboxSlideOrigin | null;
+  /**
+   * Hand the playback position back to the trigger's video on close. Read
+   * once, when a close starts from this slide, before the closing flight.
+   * Returns a function that unregisters it.
+   */
+  returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
   /**
    * Let the media box zoom (pinch, double-tap, wheel, the zoom controls), or
    * stop it. Off by default for your own media; on for `drawImage`.
@@ -679,10 +715,21 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    * Pinch, double-tap, click, wheel and keyboard zoom of images. `step` is the
    * scale of a click or double-tap, and `max` the largest scale for every
    * input. The `+` and `-` keys, `zoomIn`, `zoomOut` and the zoom controls zoom
-   * by 1.5. `false` turns zoom off.
-   * @default { step: 2, max: 4 }
+   * by 1.5. `click` is what a mouse click on the media does, and `tap` what a
+   * touch or pen tap does. A click beside a zoomed image zooms out in every
+   * mode. `false` turns zoom off.
+   * @default { step: 2, max: 4, click: "single", tap: "double" }
    */
-  readonly zoom?: false | { readonly step?: number; readonly max?: number };
+  readonly zoom?:
+    | false
+    | {
+        readonly step?: number;
+        readonly max?: number;
+        /** What a mouse click on the media does: zoom on one click, on a double-click, or nothing. */
+        readonly click?: "single" | "double" | false;
+        /** What a touch or pen tap on the media does: zoom on a double tap, or nothing. */
+        readonly tap?: "double" | false;
+      };
   /** Draw slides by item type: your own types, or the built-in ones. Read when a slide mounts. */
   readonly slides?: FluidboxSlides<TItem>;
   /**

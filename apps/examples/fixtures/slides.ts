@@ -7,6 +7,7 @@ import {
   type FluidboxCustomItemBase,
   type FluidboxImageItem,
   type FluidboxItem,
+  type FluidboxSlideOrigin,
   type FluidboxVideoItem,
   videoSlide,
 } from "@ogdakke/fluidbox";
@@ -42,6 +43,7 @@ declare module "@ogdakke/fluidbox" {
     film: FluidboxCustomItemBase<"film">;
     gated: FluidboxCustomItemBase<"gated">;
     map: FluidboxCustomItemBase<"map">;
+    player: FluidboxCustomItemBase<"player">;
   }
 }
 
@@ -325,8 +327,61 @@ grid("#streamed", streamed, streamedItems);
 grid("#filled", filled, filledItems);
 grid("#sheeted", sheeted, sheetedItems);
 
+/**
+ * A player of your own, as Mux's or Vidstack's would be: it reads the trigger
+ * video it opened from, and hands a time back as it closes. `returns` says
+ * what it registers: a stub at 2.5 s, playing; a function that returns null;
+ * or nothing.
+ */
+const playback = {
+  returns: "stub" as "stub" | "null" | "none",
+  origins: [] as { index: number; origin: FluidboxSlideOrigin | null }[],
+};
+const playerItems: FluidboxItem[] = ["film-a", "film-b"].map((id) => ({
+  type: "player",
+  id,
+  title: `Film ${id}`,
+  width: 960,
+  height: 540,
+}));
+const player: Fluidbox = createFluidbox({
+  items: playerItems,
+  slides: {
+    player: (slide) => {
+      playback.origins.push({ index: slide.index, origin: slide.origin });
+      const screen = document.createElement("div");
+      screen.className = "player-screen";
+      screen.textContent = slide.item.title;
+      slide.media.append(screen);
+      if (playback.returns === "stub") {
+        return slide.returnPlayback({ currentTime: 2.5, paused: false });
+      }
+      if (playback.returns === "null") return slide.returnPlayback(() => null);
+      return undefined;
+    },
+  },
+});
+{
+  const root = document.querySelector<HTMLElement>("#playback")!;
+  for (const item of playerItems) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.item = item.id;
+    button.setAttribute("aria-label", `Open ${itemLabel(item)}`);
+    // The first trigger shows a playing clip; the second a still.
+    button.innerHTML =
+      item.id === "film-a"
+        ? `<video data-fluidbox-origin autoplay loop muted playsinline src="/video/drift.webm"></video>`
+        : `<img alt="" src="/video/drift-poster.jpg" />`;
+    root.append(button);
+    player.bind(button, item);
+  }
+}
+
 Object.assign(window, {
   slidesFixture: {
+    player,
+    playback,
     fluidbox,
     replaced,
     hooks,

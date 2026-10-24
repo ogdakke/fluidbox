@@ -128,6 +128,10 @@ export interface FluidboxZoomOptions {
   readonly step?: number;
   /** Maximum pinch, wheel, and keyboard zoom scale. @default 4 */
   readonly max?: number;
+  /** What a mouse click on the media does. @default "single" */
+  readonly click?: "single" | "double" | false;
+  /** What a touch or pen tap on the media does. @default "double" */
+  readonly tap?: "double" | false;
 }
 
 export interface FluidboxExtensionContext<TItem extends FluidboxItem = FluidboxItem> {

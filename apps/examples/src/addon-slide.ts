@@ -33,6 +33,8 @@ export function addonSlide<TItem extends FluidboxItem>(
       const stop = context.onActiveChange(listener);
       return () => void stop();
     },
+    origin: null,
+    returnPlayback: () => () => {},
     zoomable: () => {},
     onZoom: () => () => {},
     waitUntil: () => {},

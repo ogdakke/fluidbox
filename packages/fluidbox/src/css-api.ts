@@ -242,6 +242,11 @@ export const states: readonly CssName[] = [
   { names: ["data-zoomed"], on: "Dialog" },
   /** Zoom is on: a mouse click zooms an image, and the cursor says so. */
   { names: ["data-zoomable"], on: "Dialog" },
+  /**
+   * What a mouse click on an image does, from `zoom.click`: `single`,
+   * `double` or `off`. `baseline.css` shows the zoom cursors only under `single`.
+   */
+  { names: ["data-fluidbox-zoom-click"], on: "Viewer" },
   /** The hover zoom add-on magnifies its image. */
   { names: ["data-fluidbox-hover-zooming"], on: "An element given to `hoverZoom`" },
   /** There is more than one item. */

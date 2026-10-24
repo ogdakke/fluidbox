@@ -105,15 +105,17 @@ The gallery reads the boolean attributes of a `<video>` as HTML does, so an attr
 
 ## `<fluidbox-gallery>`
 
-| Attribute   | What it does                                                                                                                                                                     |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nozoom`    | Turns zoom off.                                                                                                                                                                  |
-| `zoom-step` | The scale of a click or double-tap zoom. Default `2`.                                                                                                                            |
-| `zoom-max`  | The largest zoom scale. Default `4`.                                                                                                                                             |
-| `loop`      | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                                                   |
-| `preload`   | When the viewer's code loads: `intent` (the default), `press` or `eager`. The `loading` property reflects it. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
-| `open`      | Opens the viewer on `index` as it is added, and closes it as it is removed. Leave it off to let the triggers own the viewer.                                                     |
-| `index`     | The item the viewer shows while `open` is set, as an index. Changing it moves the open viewer. An index out of range is ignored.                                                 |
+| Attribute    | What it does                                                                                                                                                                     |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nozoom`     | Turns zoom off.                                                                                                                                                                  |
+| `zoom-step`  | The scale of a click or double-tap zoom. Default `2`.                                                                                                                            |
+| `zoom-click` | What a mouse click on the photo does: `single`, `double` or `off`. Default `single`.                                                                                             |
+| `zoom-tap`   | What a touch tap does: `double` or `off`. Default `double`.                                                                                                                      |
+| `zoom-max`   | The largest zoom scale. Default `4`.                                                                                                                                             |
+| `loop`       | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                                                   |
+| `preload`    | When the viewer's code loads: `intent` (the default), `press` or `eager`. The `loading` property reflects it. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
+| `open`       | Opens the viewer on `index` as it is added, and closes it as it is removed. Leave it off to let the triggers own the viewer.                                                     |
+| `index`      | The item the viewer shows while `open` is set, as an index. Changing it moves the open viewer. An index out of range is ignored.                                                 |
 
 The properties are the [`createFluidbox` options](./javascript.md#createfluidboxoptions) the markup can't say, and the [fluidbox's](./javascript.md#the-fluidbox) state and handles:
 
@@ -227,7 +229,7 @@ strip.render = ({ index, target }) => {
 
 **Markup changes are picked up.** The gallery watches its children. Adding or removing items, or changing an item's `item-id`, `returns`, `placeholder`, `aria-label` or `slot`, re-reads the items on the next microtask. An open viewer stays on the same item id if it is still there. The content inside a trigger is yours. Swapping its picture, as an album cover does, changes nothing in the gallery. The gallery reads the trigger's thumbnail when it reads the item, and reads a `<template slot="content">` when it re-reads the items.
 
-**Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step`, `zoom-max` or `preload`, adding or removing a `<fluidbox-thumbnails>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
+**Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step`, `zoom-max`, `zoom-click`, `zoom-tap` or `preload`, adding or removing a `<fluidbox-thumbnails>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
 
 **Focus.** After a close whose trigger is gone, the gallery focuses itself, so focus doesn't fall to the page. For that it sets `tabindex="-1"` on itself, unless it already has one.
 
