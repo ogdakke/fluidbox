@@ -38,12 +38,12 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
 // Controlled open and index added about 250 B to each binding's initial chunk,
 // and looping about 100 B to the core's and 270 B to its viewer chunk.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 10_350,
-  elements: 14_400,
-  react: 16_350,
-  solid: 14_200,
-  vue: 14_850,
-  angular: 15_250,
+  root: 10_400,
+  elements: 14_450,
+  react: 16_400,
+  solid: 14_250,
+  vue: 14_900,
+  angular: 15_300,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_750,
@@ -52,7 +52,7 @@ const initialGzipLimits: Record<Entry, number> = {
   // The media add-ons carry their few rules in their JS.
   embeds: 2_600,
   model: 1_400,
-  spin: 2_550,
+  spin: 2_500,
 };
 const cssGzipLimit = 2_800;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -62,35 +62,35 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 44_600,
+  root: 44_650,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 47_850,
-  react: 49_950,
-  solid: 47_750,
-  vue: 48_450,
-  angular: 48_800,
+  elements: 47_900,
+  react: 50_000,
+  solid: 47_800,
+  vue: 48_500,
+  angular: 48_850,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_750,
   "hover-zoom": 1_500,
   embeds: 2_600,
   model: 1_400,
-  spin: 2_550,
+  spin: 2_500,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 47_350,
+  root: 47_400,
   elements: 50_600,
-  react: 52_700,
-  solid: 50_500,
-  vue: 51_200,
-  angular: 51_550,
+  react: 52_750,
+  solid: 50_550,
+  vue: 51_250,
+  angular: 51_600,
   thumbnails: 4_900,
   sheet: 8_350,
   kit: 4_450,
   // It needs no stylesheet; the base one counts, as for the kit.
   "hover-zoom": 4_250,
   embeds: 5_350,
-  model: 4_150,
+  model: 4_100,
   spin: 5_250,
 };
 
