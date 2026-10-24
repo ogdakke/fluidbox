@@ -26,6 +26,17 @@ export interface FluidboxItemBase {
    * @default "contain"; `modelItem()` sets `"fill"`
    */
   readonly fit?: "contain" | "fill";
+  /**
+   * The file Download saves: a URL, `{ src, filename }`, or false for none.
+   * @default an image's `zoom.src ?? src`, a video's `src`, none for the others
+   */
+  readonly download?: string | false | { readonly src: string; readonly filename?: string };
+  /**
+   * Becomes `data-*` on the slide, its thumbnail and the server copy's slide:
+   * `{ tone: "light" }` gives `data-tone="light"`. Names are lower case, with
+   * digits and single dashes, and don't start with `fluidbox-`.
+   */
+  readonly data?: Readonly<Record<string, string>>;
 }
 
 /** An `<img>`'s source attributes. */
@@ -296,6 +307,12 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    */
   waitUntil(this: void, promise: Promise<unknown>): void;
   /**
+   * Put the slide in its error state: the error message and Retry, and a
+   * `mediaerror` event of kind "custom" with `error` as its cause. Retry
+   * disposes the slide and renders it again.
+   */
+  fail(this: void, error?: unknown): void;
+  /**
    * Draw the built-in image into `media`: it loads, sharpens and fails as a
    * photo's does. Without an argument it draws `item`, which must be an image
    * item. A slide draws one built-in media at a time: drawing again replaces it.
@@ -404,6 +421,8 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
    * doesn't zoom, or with zoom off. It changes as the zoom comes to rest.
    */
   readonly zoom: FluidboxZoomState | null;
+  /** The viewer is the document's fullscreen element. */
+  readonly fullscreen: boolean;
 }
 
 /**
@@ -520,6 +539,40 @@ export class FluidboxZoomEvent extends Event {
  * they run out, fires it too, not cancelable. An open fires
  * `beforevaluechange`, `valuechange`, and `valuechangecomplete` after the flight.
  */
+/** What failed: a slide's built-in media, a sharper zoom image, or a slide that called `fail`. */
+export type FluidboxMediaErrorKind = "image" | "video" | "iframe" | "zoom" | "custom";
+
+/**
+ * Fired each time a slide enters its error state, neighbours too, and when a
+ * zoom image fails to load (then no error shows). Not cancelable.
+ */
+export class FluidboxMediaErrorEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
+  readonly value: string;
+  readonly index: number;
+  readonly item: TItem;
+  readonly kind: FluidboxMediaErrorKind;
+  /** The DOM event, the TypeError of a refused URL, or what `slide.fail` got. */
+  readonly cause: unknown;
+
+  constructor(
+    type: "mediaerror",
+    init: EventInit & {
+      value: string;
+      index: number;
+      item: TItem;
+      kind: FluidboxMediaErrorKind;
+      cause?: unknown;
+    },
+  ) {
+    super(type, init);
+    this.value = init.value;
+    this.index = init.index;
+    this.item = init.item;
+    this.kind = init.kind;
+    this.cause = init.cause;
+  }
+}
+
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   /** Before an open, a move or a close. Cancelable: the command resolves false. */
   beforevaluechange: FluidboxValueChangeEvent<TItem>;
@@ -531,6 +584,8 @@ export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   sheetchange: FluidboxSheetEvent;
   /** The image on show comes to rest at another zoom. */
   zoomchange: FluidboxZoomEvent;
+  /** A slide's media failed, or a zoom image did. */
+  mediaerror: FluidboxMediaErrorEvent<TItem>;
 }
 
 // Add-ons. Each needs its entry imported once: `import "@ogdakke/fluidbox/sheet"`.
@@ -549,12 +604,12 @@ export interface FluidboxSheetOptions<TItem extends FluidboxItem = FluidboxItem>
    */
   readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
   /**
-   * What a swipe down on the photo does with the sheet down. "flight" flies the
-   * photo home; "scroll" scrolls it off the bottom of the screen and closes;
-   * "none" keeps the viewer open.
+   * How a swipe down on the photo closes the viewer with the sheet down.
+   * "flight" flies the photo home; "scroll" scrolls it off the bottom of the
+   * screen and closes. The root's `dismiss: { drag: false }` keeps it open.
    * @default "flight"
    */
-  readonly dismiss?: "flight" | "scroll" | "none";
+  readonly dismissMotion?: "flight" | "scroll";
   /**
    * Fills the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`,
    * for the item on show. It runs again when the item changes; the `signal`
@@ -582,8 +637,8 @@ export interface FluidboxThumbnailsOptions<TItem extends FluidboxItem = Fluidbox
 // The fluidbox.
 
 /**
- * A default control. `previous`, `next` and `close` show by default; the zoom
- * controls only when you list them in `controls`.
+ * A default control. `previous`, `next` and `close` show by default; the
+ * others only when you list them in `controls`.
  */
 export type FluidboxControlName =
   | "previous"
@@ -591,7 +646,11 @@ export type FluidboxControlName =
   | "close"
   | "zoomIn"
   | "zoomOut"
-  | "zoomReset";
+  | "zoomReset"
+  | "counter"
+  | "fullscreen"
+  | "download"
+  | "share";
 
 /**
  * When the viewer's code loads. `"intent"` loads it when a mouse rests on a
@@ -669,6 +728,21 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    * @default "intent"
    */
   readonly preload?: FluidboxPreload;
+  /**
+   * Which gestures close the viewer: a drag down on the media, and a tap on
+   * the backdrop. Escape and Close always do.
+   * @default { drag: true, backdrop: true }
+   */
+  readonly dismiss?: { readonly drag?: boolean; readonly backdrop?: boolean };
+  /**
+   * What a vertical wheel or trackpad scroll does on an unzoomed slide:
+   * close the viewer, zoom as Ctrl + wheel does, move one slide per gesture,
+   * or nothing. A horizontal scroll still moves, and Ctrl + wheel still zooms.
+   * @default "dismiss"
+   */
+  readonly wheel?: "dismiss" | "zoom" | "navigate" | "none";
+  /** The link Share shares for an item. Without one, Share hides. */
+  readonly shareUrl?: (item: TItem) => string | undefined;
 }
 
 /**
@@ -684,7 +758,10 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
     | "viewer"
     | "thumbnails"
     | "sheet"
-    | "preload"]?: FluidboxOptions<TItem>[K] | undefined;
+    | "preload"
+    | "dismiss"
+    | "wheel"
+    | "shareUrl"]?: FluidboxOptions<TItem>[K] | undefined;
 };
 
 export interface FluidboxCommandOptions {
@@ -775,6 +852,22 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
   /** Zoom back out to fit, as the `0` key does. */
   zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
+  /**
+   * Make the open viewer fullscreen, or leave it; without an argument, toggle.
+   * Resolves whether it is fullscreen after. Where only a video may go
+   * fullscreen, as on iPhone, it resolves false.
+   */
+  setFullscreen(on?: boolean): Promise<boolean>;
+  /**
+   * Download the open item's file, as the Download control does. Resolves
+   * whether a download or a tab with the file started.
+   */
+  download(): Promise<boolean>;
+  /**
+   * Share the open item's link, through the system's share sheet or else the
+   * clipboard. Resolves whether it was shared or copied.
+   */
+  share(): Promise<boolean>;
   /**
    * Change options without closing the viewer. Labels and zoom apply in place, so
    * a zoomed photo zooms out when zoom turns off. A change of `controls`, `viewer`

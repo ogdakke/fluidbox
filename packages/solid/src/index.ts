@@ -22,7 +22,6 @@ import {
   createFluidbox,
   type Fluidbox as FluidboxHandle,
   type FluidboxEventMap,
-  type FluidboxControlName,
   type FluidboxThumbnailsOptions,
   type FluidboxItem,
   type FluidboxItemList,
@@ -38,6 +37,7 @@ import {
   type FluidboxTarget,
 } from "@ogdakke/fluidbox";
 import {
+  type FluidboxIconControlName,
   controlNames,
   createTrigger,
   fluidboxControlIcon,
@@ -520,7 +520,7 @@ function Viewer(props: FluidboxViewerProps): JSX.Element {
   return null;
 }
 
-function action(name: FluidboxControlName) {
+function action(name: FluidboxIconControlName) {
   const control = fluidboxControls[name];
   return function FluidboxAction(props: FluidboxActionProps): JSX.Element {
     const [local, attributes] = splitProps(props, ["children", "onClick"]);
@@ -563,7 +563,7 @@ function action(name: FluidboxControlName) {
   };
 }
 
-function defaultIcon(name: FluidboxControlName): JSX.Element {
+function defaultIcon(name: FluidboxIconControlName): JSX.Element {
   return createComponent(
     Dynamic,
     mergeProps(fluidboxControlIcon.attributes, {
@@ -641,7 +641,7 @@ function Thumbnails<TItem extends FluidboxItem>(
 function Sheet<TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>): JSX.Element {
   const context = useFluidboxContext();
   const owner = getOwner();
-  const [local, attributes] = splitProps(props, ["snapPoints", "dismiss", "children"]);
+  const [local, attributes] = splitProps(props, ["snapPoints", "dismissMotion", "children"]);
   const render: FluidboxRenderer<TItem> = ({ item, index, target }) =>
     mountInto(
       target,
@@ -653,7 +653,7 @@ function Sheet<TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>): JS
     );
   const option = createMemo(() => ({
     snapPoints: local.snapPoints,
-    dismiss: local.dismiss,
+    dismissMotion: local.dismissMotion,
     render,
   }));
   onCleanup(
@@ -793,6 +793,9 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
     },
     get hasNext() {
       return state().hasNext;
+    },
+    get fullscreen() {
+      return state().fullscreen;
     },
     open: (target, options) => fluidbox.open(target, options),
     close: (options) => fluidbox.close(options),

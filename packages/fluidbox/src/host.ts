@@ -24,6 +24,8 @@ export interface FluidboxHost {
    * decoded, to take over from a copy of it that the server rendered.
    */
   takeOver(value: string): Promise<boolean>;
+  /** The link Share shares for an item, or undefined. */
+  shareLink(item: FluidboxItem): string | undefined;
   /** Drop the viewer and close at once, keeping the bindings, as a binding's unmount does. */
   unload(): void;
 }

@@ -25,13 +25,13 @@ import {
   type Signal,
 } from "@angular/core";
 import type {
-  FluidboxControlName,
   FluidboxItem,
   FluidboxRenderer,
   FluidboxTarget,
   FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
 import {
+  type FluidboxIconControlName,
   createTrigger,
   fluidboxControlIcon,
   fluidboxControls,
@@ -345,7 +345,7 @@ const SVG = "http://www.w3.org/2000/svg";
 export abstract class FluidboxControlDirective implements OnInit, AfterContentInit, OnDestroy {
   /** Overrides the disabled state the viewer gives the control. */
   @Input() disabled?: boolean;
-  protected abstract readonly control: FluidboxControlName;
+  protected abstract readonly control: FluidboxIconControlName;
   readonly #root = injectRoot("A fluidbox control");
   readonly #element = inject<ElementRef<HTMLButtonElement>>(ElementRef);
   readonly #renderer = inject(Renderer2);

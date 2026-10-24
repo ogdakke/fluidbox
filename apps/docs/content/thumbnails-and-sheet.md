@@ -82,11 +82,11 @@ The sheet is a panel that rises from the bottom over the photo, for details, com
 
 `sheet: true` turns it on with the defaults. An object, `FluidboxSheetOptions`, sets them:
 
-| Option       | Type                             | Default              | What it does                                   |
-| ------------ | -------------------------------- | -------------------- | ---------------------------------------------- |
-| `snapPoints` | `FluidboxSheetSnapPoint[]`       | `["60%", "content"]` | The stops above the resting one, lowest first. |
-| `dismiss`    | `"flight" \| "scroll" \| "none"` | `"flight"`           | What a swipe down on the photo does at rest.   |
-| `render`     | `FluidboxRenderer<TItem>`        |                      | Fill the sheet for the item on show.           |
+| Option          | Type                       | Default              | What it does                                             |
+| --------------- | -------------------------- | -------------------- | -------------------------------------------------------- |
+| `snapPoints`    | `FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
+| `dismissMotion` | `"flight" \| "scroll"`     | `"flight"`           | How a swipe down on the photo closes the viewer at rest. |
+| `render`        | `FluidboxRenderer<TItem>`  |                      | Fill the sheet for the item on show.                     |
 
 ### Stops
 
@@ -98,7 +98,7 @@ Stop `0` is the sheet at rest, either out of sight or showing `--fluidbox-sheet-
 
 A sheet is always tall enough for its highest pixel or percentage stop. No stop goes above `--fluidbox-sheet-top` from the top of the screen. Stops closer than 24 pixels count as one.
 
-`dismiss` sets what a swipe down on the photo does while the sheet is at rest. `"flight"` closes the viewer with the usual flight home. A second flick down while the sheet is still lowering goes straight into it. `"scroll"` scrolls the photo off the bottom of the screen and closes, and the backdrop fades as it goes. `"none"` keeps the viewer open, as for a caption that always peeks.
+`dismissMotion` sets how a swipe down on the photo closes the viewer while the sheet is at rest. `"flight"` closes the viewer with the usual flight home. A second flick down while the sheet is still lowering goes straight into it. `"scroll"` scrolls the photo off the bottom of the screen and closes, and the backdrop fades as it goes. To keep the viewer open, as for a caption that always peeks, set the viewer's `dismiss: { drag: false }`; a swipe up still raises the sheet.
 
 ### The sheet handle
 
@@ -123,7 +123,7 @@ In the frameworks, `useFluidboxSheet()` returns `{ stop, set }`, with `stop` in 
 
 The sheet is a `<section data-fluidbox-sheet data-fluidbox-chrome>` that the runtime makes, named by the `sheet` [label](./api.md#labels). `render({ item, index, target, signal })` fills it for the item on show. When the viewer moves to another item, `signal` aborts, the returned function runs, and the runtime empties the section before the next item's render. The framework `Sheet` parts render through it, so their children re-render with the app's state, and they put their own attributes on the section.
 
-`<fluidbox-sheet>` shows the active item's `<template slot="sheet">`, else its own `<template>`. Set its `render` property to draw the sheet yourself. Its `snap-points` and `dismiss` attributes are the options: `<fluidbox-sheet snap-points="40% 90%" dismiss="scroll">`.
+`<fluidbox-sheet>` shows the active item's `<template slot="sheet">`, else its own `<template>`. Set its `render` property to draw the sheet yourself. Its `snap-points` and `dismiss-motion` attributes are the options: `<fluidbox-sheet snap-points="40% 90%" dismiss-motion="scroll">`.
 
 Put these inside the sheet element:
 
@@ -153,7 +153,7 @@ As the sheet moves, these variables on the overlay follow its scroll. Use them f
 
 <!-- css: published --fluidbox-sheet-visible --fluidbox-sheet-progress --fluidbox-sheet-expand --fluidbox-sheet-dismiss -->
 
-The dialog gets `data-sheet` with the stop number, `data-sheet-raised` above stop `0`, `data-sheet-expanded` at the top stop, `data-sheet-peeking` while the peek is above zero and `data-sheet-off` while the sheet is turned off. The overlay gets `data-sheet-dismiss` with the `dismiss` option.
+The dialog gets `data-sheet` with the stop number, `data-sheet-raised` above stop `0`, `data-sheet-expanded` at the top stop, `data-sheet-peeking` while the peek is above zero and `data-sheet-off` while the sheet is turned off. The overlay gets `data-sheet-dismiss` with the `dismissMotion` option, or `none` while a drag may not close the viewer.
 
 ```css
 [data-fluidbox-dialog] .caption {

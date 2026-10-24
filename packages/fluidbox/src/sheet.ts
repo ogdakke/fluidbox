@@ -18,7 +18,8 @@ import { PhotoRoom } from "./photo-room";
 export type { FluidboxSheet, FluidboxSheetOptions, FluidboxSheetSnapPoint } from "./public-api";
 import type { FluidboxSheetSnapPoint } from "./public-api";
 
-type FluidboxSheetDismiss = NonNullable<FluidboxSheetOptions["dismiss"]>;
+/** How a swipe down closes the viewer, or "none" while the Root's `dismiss.drag` is off. */
+type FluidboxSheetDismiss = NonNullable<FluidboxSheetOptions["dismissMotion"]> | "none";
 
 const DEFAULT_SNAP_POINTS: readonly FluidboxSheetSnapPoint[] = ["60%", "content"];
 /** Stops closer than this are one stop. */
@@ -190,7 +191,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     this.#overlay = this.#dialog.closest<HTMLElement>("[data-fluidbox-viewer]") ?? this.#dialog;
     this.#source = context.source;
     this.#options = options;
-    this.#dismiss = options.dismiss ?? "flight";
+    this.#dismiss = context.gestures.dismiss.drag ? (options.dismissMotion ?? "flight") : "none";
     this.#announce = announce;
     this.#onDestroy = onDestroy;
     const document = this.#dialog.ownerDocument;

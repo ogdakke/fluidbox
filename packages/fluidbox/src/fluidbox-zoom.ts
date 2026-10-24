@@ -31,6 +31,8 @@ interface Options {
   pose: (image: HTMLElement, pose: ZoomPose) => void;
   /** A person zoomed or panned, rather than code. */
   interact: () => void;
+  /** True when a plain vertical wheel zooms, as Ctrl + wheel does. */
+  wheelZooms: () => boolean;
 }
 /** A zoom pose, with the zoomed element's layout rectangle at fit, in client pixels. */
 export interface ZoomPose extends Pose {
@@ -753,17 +755,20 @@ export class FluidboxZoom {
       this.#consume(event);
       return;
     }
-    if (!event.ctrlKey && this.#viewport) {
+    const pinch =
+      event.ctrlKey ||
+      (this.#options.wheelZooms() && Math.abs(event.deltaY) > Math.abs(event.deltaX) * 1.3);
+    if (!pinch && this.#viewport) {
       event.stopImmediatePropagation();
       return;
     }
-    if (!event.ctrlKey && !this.zoomed) return;
+    if (!pinch && !this.zoomed) return;
     // A pinch on content that owns its input is the content's; the page still doesn't zoom.
     if (!this.zoomed && ownsInput(event)) {
       event.preventDefault();
       return;
     }
-    if (!event.ctrlKey) {
+    if (!pinch) {
       this.#freeze();
       this.#settle();
       event.stopImmediatePropagation();

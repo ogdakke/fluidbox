@@ -27,6 +27,7 @@ import {
   type FluidboxValueChangeAction,
   type FluidboxZoomCommandOptions,
   type FluidboxZoomState,
+  FluidboxMediaErrorEvent,
   FluidboxSheetEvent,
   FluidboxZoomEvent,
 } from "./public-api";
@@ -45,6 +46,7 @@ import type {
   SessionController,
   SessionReason,
   SessionTarget,
+  ViewerGestures,
   ViewerSessionMotionContext,
 } from "./runtime-types";
 import { bindTrigger, resolveOrigin } from "./trigger";
@@ -99,6 +101,17 @@ export type FluidboxRuntimeDriver<TItem extends FluidboxItem> = Pick<
   DomViewerDriver<TItem>,
   keyof DomViewerDriver<TItem>
 >;
+
+/** The gestures that close the viewer, and what the wheel does, with their defaults. */
+function gesturesOf({
+  dismiss,
+  wheel,
+}: Pick<FluidboxOptions, "dismiss" | "wheel">): ViewerGestures {
+  return {
+    dismiss: { drag: dismiss?.drag ?? true, backdrop: dismiss?.backdrop ?? true },
+    wheel: wheel ?? "dismiss",
+  };
+}
 
 /** Options objects with the same members, so a binding may pass a fresh literal each render. */
 function sameOptions(a: unknown, b: unknown): boolean {
@@ -186,6 +199,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** The scale the zoom last rested at, and the item it belongs to. */
   #zoomScale = 1;
   #zoomId: string | null = null;
+  /** Whether the viewer is the document's fullscreen element, as it last said. */
+  #fullscreen = false;
+  #gestures: ViewerGestures;
+  #shareUrl: FluidboxOptions<TItem>["shareUrl"];
   readonly [hostKey]: FluidboxHost;
 
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
@@ -202,6 +219,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
     this.#slides = options.slides;
+    this.#gestures = gesturesOf(options);
+    this.#shareUrl = options.shareUrl;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
     this.#makeAddons();
@@ -225,6 +244,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** Give a new viewer what it would have seen, had it been there from the start. */
   #attach(viewer: FluidboxRuntimeDriver<TItem>) {
     viewer.setLoop(this.#loop);
+    viewer.setGestures(this.#gestures);
     viewer.setSource(this.#source);
     viewer.connect(this.#controls, this.#portal(), this.#extensions());
     for (const overlay of this.#overlays) {
@@ -321,6 +341,23 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         const next = this.#zoomFor(status, index, item);
         if (next?.max !== zoom?.max || !next !== !zoom) this.#publish(status, index);
       },
+      fullscreenChanged: (on) => {
+        if (on === this.#fullscreen) return;
+        this.#fullscreen = on;
+        this.#publish(this.#state.status, this.#state.index);
+      },
+      mediaError: (index, kind, cause) => {
+        const item = this.#source.getItem(index);
+        this.dispatchEvent(
+          new FluidboxMediaErrorEvent("mediaerror", {
+            value: idOf(item),
+            index,
+            item,
+            kind,
+            cause,
+          }),
+        );
+      },
     };
   }
 
@@ -379,6 +416,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     };
     this.#settings = next;
     if (has("preload")) this.#setPreload(options.preload);
+    if (has("shareUrl")) this.#shareUrl = options.shareUrl;
+    if (has("dismiss") || has("wheel")) {
+      this.#gestures = gesturesOf({
+        dismiss: has("dismiss") ? options.dismiss : this.#gestures.dismiss,
+        wheel: has("wheel") ? options.wheel : this.#gestures.wheel,
+      });
+      this.#viewer?.setGestures(this.#gestures);
+      // A sheet reads whether a drag may close as it mounts.
+      if (has("dismiss") && !this.#addonsLoading) this.#viewer?.setExtensions(this.#extensions());
+    }
     if (has("zoom")) {
       this.#zoom = options.zoom;
       this.#viewer?.setZoom(options.zoom);
@@ -501,6 +548,30 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     // The scale belongs to the item it rested on; another item starts fitted.
     const scale = this.#zoomId === idOf(item) ? this.#zoomScale : 1;
     return Object.freeze({ scale, min: 1, max: box.max ?? this.#zoom?.max ?? 4 });
+  }
+
+  setFullscreen(on?: boolean) {
+    if (this.#state.status !== "open" || !this.#viewer) return Promise.resolve(false);
+    return this.#viewer.setFullscreen(on ?? !this.#fullscreen);
+  }
+
+  download() {
+    const item = this.#state.item;
+    if (this.#state.status !== "open" || !item || !this.#viewer) return Promise.resolve(false);
+    return this.#viewer.download(item);
+  }
+
+  share() {
+    const item = this.#state.item;
+    const url = item && this.#shareLink(item);
+    if (this.#state.status !== "open" || !url || !this.#viewer) return Promise.resolve(false);
+    return this.#viewer.share(item, url);
+  }
+
+  /** The link Share shares, resolved against the page; undefined when there is none. */
+  #shareLink(item: TItem) {
+    const url = this.#shareUrl?.(item);
+    return url ? new URL(url, location.href).href : undefined;
   }
 
   next(options?: FluidboxCommandOptions) {
@@ -743,6 +814,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
       takeOver: (value) => this.#command("open", value, "api", { instant: true }),
+      shareLink: (item) => this.#shareLink(item as TItem),
       zoom: (name, reason) =>
         this.#zoomCommand(
           (from) =>
@@ -1311,6 +1383,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       hasPrevious: index !== null && (index > 0 || this.#loops),
       hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
       zoom: this.#zoomFor(status, index, item),
+      fullscreen: this.#fullscreen,
     });
   }
 

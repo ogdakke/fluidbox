@@ -33,7 +33,6 @@ import {
 import {
   createFluidbox,
   type Fluidbox as FluidboxInstance,
-  type FluidboxControlName,
   type FluidboxThumbnailsOptions,
   type FluidboxItem,
   type FluidboxItemList,
@@ -56,6 +55,7 @@ import {
   type FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import {
+  type FluidboxIconControlName,
   createSlots,
   createTrigger,
   fluidboxControlIcon,
@@ -464,6 +464,9 @@ const Root = defineComponent(
       get zoom() {
         return state.value.zoom;
       },
+      get fullscreen() {
+        return state.value.fullscreen;
+      },
       open: (target, options) => fluidbox.open(target, options),
       close: (options) => fluidbox.close(options),
       next: (options) => fluidbox.next(options),
@@ -702,7 +705,7 @@ const FrameLayer = defineComponent({
   },
 });
 
-function control(name: FluidboxControlName, displayName: string) {
+function control(name: FluidboxIconControlName, displayName: string) {
   const definition = fluidboxControls[name];
   return defineComponent({
     name: displayName,
@@ -737,7 +740,7 @@ function control(name: FluidboxControlName, displayName: string) {
   });
 }
 
-function controlIcon(name: FluidboxControlName): VNode {
+function controlIcon(name: FluidboxIconControlName): VNode {
   return h("svg", { ...fluidboxControlIcon.attributes, "data-fluidbox-icon": "" }, [
     h("path", { d: fluidboxControlIcon.paths[name] }),
   ]);
@@ -819,7 +822,7 @@ export interface FluidboxSheetProps {
    * What a swipe down on the photo does with the sheet down.
    * @default "flight"
    */
-  readonly dismiss?: "flight" | "scroll" | "none";
+  readonly dismissMotion?: "flight" | "scroll";
 }
 
 /**
@@ -833,7 +836,7 @@ const Sheet = defineComponent({
   inheritAttrs: false,
   props: {
     snapPoints: Array as PropType<readonly FluidboxSheetSnapPoint[]>,
-    dismiss: String as PropType<FluidboxSheetProps["dismiss"]>,
+    dismissMotion: String as PropType<FluidboxSheetProps["dismissMotion"]>,
   },
   slots: Object as SlotsType<{
     default?: (sheet: FluidboxItemContext) => VNode[];
@@ -851,7 +854,7 @@ const Sheet = defineComponent({
     const part: SheetPart = {
       options: () => ({
         snapPoints: props.snapPoints && [...toRaw(props.snapPoints)],
-        dismiss: props.dismiss,
+        dismissMotion: props.dismissMotion,
         render: sheet.render,
       }),
     };

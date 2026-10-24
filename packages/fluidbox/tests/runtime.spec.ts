@@ -63,6 +63,16 @@ class TestDriver {
   }
   setZoom() {}
   setLoop() {}
+  setGestures() {}
+  setFullscreen() {
+    return Promise.resolve(false);
+  }
+  download() {
+    return Promise.resolve(false);
+  }
+  share() {
+    return Promise.resolve(false);
+  }
   relabel() {}
   setPortal() {}
   setExtensions() {}

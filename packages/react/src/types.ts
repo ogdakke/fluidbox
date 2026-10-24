@@ -131,7 +131,7 @@ export interface FluidboxThumbnailsProps<TItem extends FluidboxItem = FluidboxIt
 export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem>
   extends
     Omit<HTMLAttributes<HTMLElement>, keyof DOMAttributes<HTMLElement>>,
-    Pick<FluidboxSheetOptions<TItem>, "snapPoints" | "dismiss"> {
+    Pick<FluidboxSheetOptions<TItem>, "snapPoints" | "dismissMotion"> {
   /** The sheet's content for the item on show. */
   readonly children?: (context: FluidboxItemContext<TItem>) => ReactNode;
 }

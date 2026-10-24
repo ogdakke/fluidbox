@@ -101,6 +101,10 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-close", "data-fluidbox-previous", "data-fluidbox-next"] },
   /** The zoom controls. On a button of yours in the viewer, it zooms the image on show. */
   { names: ["data-fluidbox-zoom-in", "data-fluidbox-zoom-out", "data-fluidbox-zoom-reset"] },
+  /** Full screen, Download and Share. Each hides where it can't work: no fullscreen, no file, no link. */
+  { names: ["data-fluidbox-fullscreen", "data-fluidbox-download", "data-fluidbox-share"] },
+  /** The default counter, as "3 / 12". Hidden from assistive technology, which hears the position already. */
+  { names: ["data-fluidbox-counter"] },
   /** The group of the default zoom controls, under the photo. */
   { names: ["data-fluidbox-zoom-controls"] },
   /** The hover zoom add-on's magnified view, over the hovered image. */
@@ -220,7 +224,7 @@ export const states: readonly CssName[] = [
   { names: ["data-sheet-raised", "data-sheet-expanded"], on: "Dialog" },
   /** The sheet peeks at rest; the sheet is turned off. */
   { names: ["data-sheet-peeking", "data-sheet-off"], on: "Dialog" },
-  /** The sheet's `dismiss` option. */
+  /** The sheet's `dismissMotion` option, or `none` while a drag may not close the viewer. */
   { names: ["data-sheet-dismiss"], on: "Viewer" },
   /** A scroll dismiss is committed. */
   { names: ["data-sheet-dismissed"], on: "Viewer" },
@@ -237,6 +241,10 @@ export const states: readonly CssName[] = [
   { names: ["aria-selected", "data-fluidbox-selected"], on: "Thumbnails items" },
   /** The slide on show, and the thumbnail of its item. */
   { names: ["data-active"], on: "Slides, thumbnails items" },
+  /** The link was copied, for two seconds. */
+  { names: ["data-copied"], on: "Share" },
+  /** Download is fetching a file from another origin. */
+  { names: ["aria-busy"], on: "Download" },
   /** The poster is still decoding, and hidden. */
   { names: ["data-fluidbox-media-pending"], on: "A media add-on's poster" },
   /** Play was pressed; the player has loaded over the poster. */

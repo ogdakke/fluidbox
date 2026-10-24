@@ -132,8 +132,8 @@ export function mountControls(gallery: HTMLElement, form: HTMLFormElement): void
     dismiss.disabled = !sheetOn;
     photo.disabled = !sheetOn;
     root.dataset.sheetPhoto = photo.value;
-    if (sheet.getAttribute("dismiss") !== dismiss.value)
-      sheet.setAttribute("dismiss", dismiss.value);
+    if (sheet.getAttribute("dismiss-motion") !== dismiss.value)
+      sheet.setAttribute("dismiss-motion", dismiss.value);
     toggle(sheet, sheetOn);
     toggle(viewer, sheetOn);
     toggle(thumbnails, field<HTMLInputElement>("thumbnails").checked);

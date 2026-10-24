@@ -97,6 +97,7 @@ const closedState: FluidboxState = Object.freeze({
   hasPrevious: false,
   hasNext: false,
   zoom: null,
+  fullscreen: false,
 });
 
 function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined {
@@ -630,10 +631,10 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   #sheetOptions(element: FluidboxSheetElement): FluidboxSheetOptions<FluidboxItem> {
-    const dismiss = element.getAttribute("dismiss");
+    const dismissMotion = element.getAttribute("dismiss-motion");
     return {
       snapPoints: snapPoints(element.getAttribute("snap-points")),
-      ...(dismiss === "flight" || dismiss === "scroll" || dismiss === "none" ? { dismiss } : {}),
+      ...(dismissMotion === "flight" || dismissMotion === "scroll" ? { dismissMotion } : {}),
       render: element.render ?? this.#sheetTemplate,
     };
   }

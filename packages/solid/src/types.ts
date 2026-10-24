@@ -150,7 +150,7 @@ export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem> e
    */
   readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
   /** What a swipe down on the photo does with the sheet down. @default "flight" */
-  readonly dismiss?: "flight" | "scroll" | "none";
+  readonly dismissMotion?: "flight" | "scroll";
   /** Renders the sheet's content for the active item. */
   readonly children?: (active: FluidboxItemContext<TItem>) => JSX.Element;
 }

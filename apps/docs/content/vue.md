@@ -108,7 +108,7 @@ A renderer's `ctx` also has `active` and `onActiveChange`, to play and pause as 
 
 The events are the fluidbox's own; see [Events](./javascript.md#events) for their fields and reasons. `event.item` is your own object, of the type of `items`.
 
-Root makes one viewer when it mounts and keeps it until it unmounts. Changing `zoom` or `labels`, or adding or removing a `Viewer`, `Thumbnails` or `Sheet`, or changing the sheet's `snap-points` or `dismiss`, applies to that viewer in place, through `fluidbox.update()`, without closing it. Root compares these by value, so an inline `:zoom="{ step: 3 }"` changes nothing on each render. A thumbnails or a sheet that changes is drawn again. A sheet that goes or comes back starts at rest. `items` changes go through `setItems`. Root reads `origins`, `renderers` and the event listeners when it uses them.
+Root makes one viewer when it mounts and keeps it until it unmounts. Changing `zoom` or `labels`, or adding or removing a `Viewer`, `Thumbnails` or `Sheet`, or changing the sheet's `snap-points` or `dismiss-motion`, applies to that viewer in place, through `fluidbox.update()`, without closing it. Root compares these by value, so an inline `:zoom="{ step: 3 }"` changes nothing on each render. A thumbnails or a sheet that changes is drawn again. A sheet that goes or comes back starts at rest. `items` changes go through `setItems`. Root reads `origins`, `renderers` and the event listeners when it uses them.
 
 The default slot gets the `useFluidbox()` object, with the state and the commands. Use it to drive the viewer from the same template:
 
@@ -176,10 +176,10 @@ No props. Rendering it turns the thumbnails on. Without a slot, each thumbnail i
 
 ### `Fluidbox.Sheet` and `Fluidbox.SheetStop`
 
-| Prop          | Type                                | Default              | Purpose                                                  |
-| ------------- | ----------------------------------- | -------------------- | -------------------------------------------------------- |
-| `snap-points` | `readonly FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
-| `dismiss`     | `"flight" \| "scroll" \| "none"`    | `"flight"`           | What a swipe down on the photo does with the sheet down. |
+| Prop             | Type                                | Default              | Purpose                                                              |
+| ---------------- | ----------------------------------- | -------------------- | -------------------------------------------------------------------- |
+| `snap-points`    | `readonly FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.                       |
+| `dismiss-motion` | `"flight" \| "scroll"`              | `"flight"`           | How a swipe down on the photo closes the viewer with the sheet down. |
 
 Rendering it turns the sheet on. The runtime makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`, and the part's own attributes (`class`, `style`, `data-*`, `aria-*`) go on that section. Its default slot is the section's content for the active item, and gets `{ item, index }` (`FluidboxItemContext`). To read or move the sheet, listen for `@sheetchange` on Root, use a `SheetStop`, or call `useFluidboxSheet()` in a component inside Root. Its `stop` is where the sheet rests, 0 at rest and then one per snap point, and `set(stop)` moves it. Import `@ogdakke/fluidbox/sheet.css` once. See [Thumbnails and sheet](./thumbnails-and-sheet.md).
 

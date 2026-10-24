@@ -39,6 +39,14 @@ export interface FluidboxLabels {
   readonly error: string;
   /** The button that loads failed media again. */
   readonly retry: string;
+  /** The fullscreen control, while the viewer isn't fullscreen. */
+  readonly enterFullscreen: string;
+  /** The fullscreen control, while the viewer is fullscreen. */
+  readonly exitFullscreen: string;
+  readonly download: string;
+  readonly share: string;
+  /** Announced once Share copied the link. */
+  readonly linkCopied: string;
 }
 
 /** The labels the viewer uses for any you don't pass. */
@@ -64,6 +72,11 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   sheet: "Details",
   error: "Unable to load media.",
   retry: "Retry",
+  enterFullscreen: "Enter full screen",
+  exitFullscreen: "Exit full screen",
+  download: "Download",
+  share: "Share",
+  linkCopied: "Link copied",
 });
 
 /** Your labels over the defaults. */

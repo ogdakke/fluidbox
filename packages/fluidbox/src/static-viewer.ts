@@ -1,6 +1,7 @@
 import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS } from "./control-icons";
 import { defaultLabels, type FluidboxLabels } from "./labels";
 import { idOf, indexIn, toList } from "./items";
+import { dataAttributes } from "./item-data";
 import type { FluidboxItem, FluidboxItems } from "./public-api";
 
 /** What the server needs to draw the open viewer. */
@@ -205,6 +206,7 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
               "aria-label": position,
               "aria-hidden": "false",
               "data-active": "",
+              ...dataAttributes(item.data),
             },
             node(
               "div",

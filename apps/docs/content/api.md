@@ -36,7 +36,7 @@ fluidbox.update({
 
 ## Events
 
-<!-- api: FluidboxEventMap, FluidboxValueChangeEvent, FluidboxValueChangeDetails, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxReason -->
+<!-- api: FluidboxEventMap, FluidboxValueChangeEvent, FluidboxValueChangeDetails, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxMediaErrorEvent, FluidboxMediaErrorKind, FluidboxReason -->
 
 ## Items
 

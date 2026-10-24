@@ -10,6 +10,7 @@ import { fillsStage, fitSize, posterAspect } from "./fit-size";
 import { idOf, itemLabel, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
 import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
+import { paintItemData } from "./item-data";
 import { checkItemUrls } from "./media-url";
 import type {
   FluidboxIframeItem,
@@ -17,6 +18,7 @@ import type {
   FluidboxThumbnail,
   FluidboxVideoItem,
   FluidboxVideoAttachSlide,
+  FluidboxMediaErrorKind,
   FluidboxVideoOptions,
   FluidboxZoomableOptions,
   FluidboxZoomPose,
@@ -94,6 +96,8 @@ interface ViewerSlide {
   loaded: boolean;
   /** The renderer of a custom slide has run, and not been disposed. */
   rendered: boolean;
+  /** The renderer called `slide.fail`, so Retry renders it again. */
+  failed?: boolean;
   /** Aborts the renderer's signal. */
   content?: AbortController;
   /** The origin an open prepared before the renderer drew, for the image it draws. */
@@ -269,6 +273,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   onUnload: ((media: HTMLElement) => void) | undefined;
   /** Called when the slide on show may have started or stopped being zoomable. */
   onZoomableChange: (() => void) | undefined;
+  /** Called as a slide shows its error, and when a sharper image for the zoom fails. */
+  onMediaError: ((index: number, kind: FluidboxMediaErrorKind, cause: unknown) => void) | undefined;
 
   /** The item on show. */
   get index() {
@@ -451,6 +457,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const { slide } = kept.splice(found, 1)[0]!;
     slide.position = position;
     this.#labelSlide(slide.element, position);
+    // The same item, but its data may have changed.
+    paintItemData(slide.element, item.data);
     this.#present(slide, position === this.#index);
     return slide;
   }
@@ -612,6 +620,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     element.dataset.fluidboxSlide = "";
     element.setAttribute("role", "group");
     this.#labelSlide(element, index);
+    paintItemData(element, item.data);
     const frame = this.#ownerDocument.createElement("div");
     frame.dataset.fluidboxFrame = "";
     const size = fitSize(item);
@@ -762,7 +771,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       },
       { signal },
     );
-    image.addEventListener("error", () => this.#fail(slide), { signal });
+    image.addEventListener("error", (event) => this.#fail(slide, "image", event), { signal });
   }
 
   /** Where a slide's drawn media sits: its frame, or a custom slide's box. */
@@ -1192,7 +1201,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         image.srcset = `${next.src} ${loader.naturalWidth}w`;
         slide.sharpened = next.src;
       })
-      .catch(() => {})
+      .catch((error) => {
+        // The slide keeps the image it has.
+        if (controller.signal.aborted || slide.imageVersion !== version) return;
+        this.onMediaError?.(this.#item(slide.position), "zoom", error);
+      })
       .finally(() => {
         if (slide.sharpening === controller) slide.sharpening = undefined;
       });
@@ -1256,8 +1269,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
             // New items may have moved the slide while it decoded.
             this.#applyImage(slide.position, slide);
           })
-          .catch(() => {
-            if (!controller.signal.aborted) this.#fail(slide);
+          .catch((error) => {
+            if (!controller.signal.aborted) this.#fail(slide, "image", error);
           })
           .finally(() => {
             controller.signal.removeEventListener("abort", abort);
@@ -1266,7 +1279,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       }
     } else if (!safeUrls(item)) {
       // Item lists reject these already; a list of your own still stops here.
-      this.#fail(slide);
+      this.#fail(
+        slide,
+        item.type,
+        new TypeError(`Fluidbox item ${idOf(item)} has a URL it doesn't load.`),
+      );
     } else if (item.type === "video" && slide.image instanceof HTMLVideoElement) {
       this.#loadVideo(slide, item, slide.image);
       // Autoplay only on the slide in view: its neighbours load too.
@@ -1315,7 +1332,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         attach(video, controller.signal, item, shown!);
       } catch (error) {
         console.error(error);
-        this.#fail(slide);
+        this.#fail(slide, "video", error);
       }
       return;
     }
@@ -1330,7 +1347,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       video.insertBefore(last, tracks);
     }
     // When every source fails, the error fires on the last one, not the video.
-    last!.addEventListener("error", () => this.#fail(slide), { signal: controller.signal });
+    last!.addEventListener("error", (event) => this.#fail(slide, "video", event), {
+      signal: controller.signal,
+    });
     // A fresh video picks its source as the first one goes in; one that failed
     // before, as on Retry, waits for load().
     if (video.networkState !== HTMLMediaElement.NETWORK_EMPTY) video.load();
@@ -1352,7 +1371,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           `Fluidbox has no slide for items of type "${item.type}". Add one to the slides option.`,
         );
       }
-      this.#fail(slide);
+      this.#fail(slide, "custom", new TypeError(`Fluidbox has no slide for "${item.type}" items.`));
       return;
     }
     const controller = new AbortController();
@@ -1425,6 +1444,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           reported = true;
           if (--holds === 0) release();
         };
+      },
+      fail: (error?: unknown) => {
+        if (signal.aborted) return;
+        slide.failed = true;
+        this.#fail(slide, "custom", error);
       },
       drawImage: (image?: FluidboxItem) => this.#draw(slide, signal, "image", image ?? item),
       drawVideo: (video?: FluidboxItem, options?: FluidboxVideoOptions) =>
@@ -1554,6 +1578,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.commit = undefined;
       slide.waits = undefined;
       slide.rendered = false;
+      slide.failed = false;
       this.#undraw(slide);
       slide.error.hidden = true;
       slide.element.removeAttribute("aria-busy");
@@ -1746,8 +1771,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #retry(index: number) {
     const slide = this.#slides.get(index);
     if (!slide) return;
-    // A custom slide with nothing drawn draws again from the start.
-    if (slide.custom && !slide.drawn) this.#unload(slide);
+    // A custom slide with nothing drawn, or that failed itself, draws again from the start.
+    if (slide.custom && (!slide.drawn || slide.failed)) this.#unload(slide);
     this.#reset(slide);
     this.#load(index, slide);
   }
@@ -1760,9 +1785,12 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.decoded = false;
   }
 
-  #fail(slide: ViewerSlide) {
+  /** Show the slide's error, and report it as it first shows. */
+  #fail(slide: ViewerSlide, kind: FluidboxMediaErrorKind, cause: unknown) {
     slide.element.removeAttribute("aria-busy");
+    if (!slide.error.hidden) return;
     slide.error.hidden = false;
+    this.onMediaError?.(this.#item(slide.position), kind, cause);
   }
 
   /** Fill the slide's alert again, so it is announced. */

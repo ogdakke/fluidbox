@@ -162,12 +162,12 @@ The strip marks the selected button `data-fluidbox-selected`, so your thumbnails
 
 ### `Fluidbox.Sheet` and `Fluidbox.SheetStop`
 
-| Prop         | Type                                                | Default              | Purpose                                                                                     |
-| ------------ | --------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------- |
-| `snapPoints` | `readonly FluidboxSheetSnapPoint[]`                 | `["60%", "content"]` | The stops above the resting one, lowest first: pixels, a percentage, or `"content"`.        |
-| `dismiss`    | `"flight" \| "scroll" \| "none"`                    | `"flight"`           | What a swipe down on the photo does with the sheet down.                                    |
-| `children`   | `(ctx: FluidboxItemContext<TItem>) => ReactNode`    |                      | The sheet's content for the item on show, `{ item, index }`.                                |
-| ...          | `className`, `style`, `id`, `aria-*`, `data-*`, ... |                      | Set on the viewer's `<section data-fluidbox-sheet>`, which is the sheet. No event handlers. |
+| Prop            | Type                                                | Default              | Purpose                                                                                     |
+| --------------- | --------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------- |
+| `snapPoints`    | `readonly FluidboxSheetSnapPoint[]`                 | `["60%", "content"]` | The stops above the resting one, lowest first: pixels, a percentage, or `"content"`.        |
+| `dismissMotion` | `"flight" \| "scroll"`                              | `"flight"`           | How a swipe down on the photo closes the viewer with the sheet down.                        |
+| `children`      | `(ctx: FluidboxItemContext<TItem>) => ReactNode`    |                      | The sheet's content for the item on show, `{ item, index }`.                                |
+| ...             | `className`, `style`, `id`, `aria-*`, `data-*`, ... |                      | Set on the viewer's `<section data-fluidbox-sheet>`, which is the sheet. No event handlers. |
 
 The viewer makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`. The render child draws into it for the item on show, and draws again when the item changes. Annotate the item type with `<Fluidbox.Sheet<Photo>>` when you need your own fields.
 
@@ -228,7 +228,7 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 
 ## React notes
 
-**Props change the open viewer in place.** Changes to `labels` and `zoom` go to the viewer through `update` without closing it. So does adding or removing `Fluidbox.Viewer`, `Fluidbox.Thumbnails` or its render child, or `Fluidbox.Sheet`, and so does changing the sheet's `snapPoints` and `dismiss`. The binding compares these by value, so inline objects and arrays are fine. It reads `renderers`, `origins`, `labels.position` and the event props when it uses them.
+**Props change the open viewer in place.** Changes to `labels` and `zoom` go to the viewer through `update` without closing it. So does adding or removing `Fluidbox.Viewer`, `Fluidbox.Thumbnails` or its render child, or `Fluidbox.Sheet`, and so does changing the sheet's `snapPoints` and `dismissMotion`. The binding compares these by value, so inline objects and arrays are fine. It reads `renderers`, `origins`, `labels.position` and the event props when it uses them.
 
 **New `items` are compared, not just replaced.** A new `items` value goes to `setItems` in the next layout effect. Items equal to the current ones, field by field, change nothing, so `items={products.map(toItem)}` can be a fresh array on every render. Changed items keep the slides of the ones that stayed the same. An open viewer stays on the same item id when the new items still have it.
 

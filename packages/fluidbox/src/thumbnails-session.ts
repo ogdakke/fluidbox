@@ -1,5 +1,6 @@
 import { ThumbnailsRuntime, type ThumbnailsLayout } from "./thumbnails-runtime";
 import { thumbnailsThumbnailSources, loadThumbnailsThumbnail } from "./thumbnails-thumbnail";
+import { paintItemData } from "./item-data";
 import type {
   SessionController,
   FluidboxDispose,
@@ -117,6 +118,7 @@ export class ThumbnailsSession<TItem extends FluidboxItem = FluidboxItem> {
     button.type = "button";
     button.dataset.fluidboxThumbnailsItem = "";
     button.dataset.index = String(index);
+    paintItemData(button, item.data);
     button.setAttribute("role", "option");
     // An item without a name, as a decorative photo, is named by its place.
     button.setAttribute(

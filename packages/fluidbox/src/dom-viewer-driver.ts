@@ -41,6 +41,7 @@ import type { FluidboxZoom, ZoomReason } from "./fluidbox-zoom";
 import type {
   ViewerSessionCloseContext,
   ViewerSessionDriver,
+  ViewerGestures,
   ViewerSessionMotionContext,
 } from "./runtime-types";
 import {
@@ -52,6 +53,8 @@ import {
 } from "./viewer-portal";
 import type { FluidboxLabels } from "./labels";
 import { ViewerStrip } from "./viewer-strip";
+import { downloadItem, shareItem } from "./file-actions";
+import { canGoFullscreen } from "./item-file";
 import { activeViewer } from "./viewer-ownership";
 import { mapRadii, mixInsets, type ImageClip } from "./transition-geometry";
 import { fillContent, originPose, originPicture } from "./origin-pose";
@@ -129,6 +132,13 @@ function finitePose(pose: PaintedPose) {
     ...clip.radii,
   ].every(Number.isFinite);
 }
+
+/** A wheel gesture in `"navigate"` mode ends after this long without wheel input. */
+const NAVIGATE_WHEEL_GAP = 150;
+
+/** How far a drag that may not close moves the media: a short way, slowing as it goes. */
+const rubberBand = (distance: number) =>
+  Math.sign(distance) * 48 * (1 - Math.exp(-Math.abs(distance) / 160));
 
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 /** Zoom options with their defaults, or undefined when zoom is off. */
@@ -236,6 +246,17 @@ export class DomViewerDriver<
   #operation = 0;
 
   readonly #labels: FluidboxLabels;
+  #gestures: ViewerGestures = {
+    dismiss: { drag: true, backdrop: true },
+    wheel: "dismiss",
+  };
+  /** When the last wheel event of a `"navigate"` gesture came. */
+  #lastNavigateWheel = -Infinity;
+  /** The viewer left the top layer as a popover to go fullscreen, and goes back on leaving. */
+  #fullscreenPopover = false;
+  /** A cross-origin download's fetch, which a move or a close aborts. */
+  #fileFetch: AbortController | undefined;
+  #copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     ownerDocument: Document,
@@ -261,6 +282,7 @@ export class DomViewerDriver<
           event.stopImmediatePropagation();
           return;
         }
+        if (!this.#gestures.dismiss.backdrop) return;
         if (
           event.target === this.#portal.dialog ||
           event.target === this.#portal.backdrop ||
@@ -291,6 +313,11 @@ export class DomViewerDriver<
     ] as const) {
       this.#portal.container.addEventListener(type, listener as EventListener, {
         passive,
+        signal: this.#lifetime.signal,
+      });
+    }
+    for (const type of ["fullscreenchange", "webkitfullscreenchange"]) {
+      ownerDocument.addEventListener(type, this.#onFullscreenChange, {
         signal: this.#lifetime.signal,
       });
     }
@@ -325,7 +352,133 @@ export class DomViewerDriver<
     this.#portal.dialog.toggleAttribute("data-zoomable", !!this.#zoomOptions);
   }
 
-  /** Change the zoom options. Turning zoom off zooms the photo back out. */
+  /** What may close the viewer, and what a vertical wheel does. */
+  setGestures(gestures: ViewerGestures) {
+    this.#gestures = gestures;
+  }
+
+  /** The document's fullscreen element, by the WebKit name too, as older iPad Safari has it. */
+  #fullscreenElement() {
+    const ownerDocument = this.#portal.overlay.ownerDocument as Document & {
+      webkitFullscreenElement?: Element | null;
+    };
+    return ownerDocument.fullscreenElement ?? ownerDocument.webkitFullscreenElement ?? null;
+  }
+
+  #isFullscreen() {
+    return this.#fullscreenElement() === this.#portal.overlay;
+  }
+
+  /**
+   * Make the viewer fill the screen, or stop. Over a modal dialog the viewer
+   * is a popover in the top layer, which browsers disagree about taking
+   * fullscreen, so it stops being one first; fullscreen keeps it above the
+   * dialog by itself. Resolves whether the viewer is as asked.
+   */
+  async setFullscreen(on: boolean): Promise<boolean> {
+    if (on === this.#isFullscreen()) return true;
+    if (!on) {
+      await this.#exitFullscreen();
+      return !this.#isFullscreen();
+    }
+    const overlay = this.#portal.overlay as HTMLDivElement & {
+      webkitRequestFullscreen?: () => void;
+    };
+    if (!canGoFullscreen() || !overlay.isConnected || this.#controller?.state.status !== "open") {
+      return false;
+    }
+    const focused = overlay.ownerDocument.activeElement;
+    if (overlay.hasAttribute("popover")) {
+      overlay.hidePopover();
+      overlay.removeAttribute("popover");
+      this.#fullscreenPopover = true;
+    }
+    try {
+      if (overlay.requestFullscreen) await overlay.requestFullscreen();
+      else overlay.webkitRequestFullscreen?.();
+    } catch {
+      this.#raiseAgain();
+      return false;
+    } finally {
+      // Hiding the popover may have moved focus out of it.
+      if (focused instanceof HTMLElement && focused !== overlay.ownerDocument.activeElement) {
+        focused.focus({ preventScroll: true });
+      }
+    }
+    return true;
+  }
+
+  /** Leave fullscreen, waiting for it at most 500 ms. */
+  #exitFullscreen() {
+    if (!this.#isFullscreen()) return Promise.resolve();
+    const ownerDocument = this.#portal.overlay.ownerDocument as Document & {
+      webkitExitFullscreen?: () => void;
+    };
+    return new Promise<void>((resolve) => {
+      const done = new AbortController();
+      const finish = () => {
+        clearTimeout(timer);
+        done.abort();
+        resolve();
+      };
+      const timer = setTimeout(finish, 500);
+      for (const type of ["fullscreenchange", "webkitfullscreenchange"]) {
+        ownerDocument.addEventListener(type, finish, { signal: done.signal });
+      }
+      try {
+        if (ownerDocument.exitFullscreen) void ownerDocument.exitFullscreen().catch(finish);
+        else ownerDocument.webkitExitFullscreen?.();
+      } catch {
+        finish();
+      }
+    });
+  }
+
+  /** Back into the top layer as a popover, as the viewer was before it went fullscreen. */
+  #raiseAgain() {
+    if (!this.#fullscreenPopover) return;
+    this.#fullscreenPopover = false;
+    const overlay = this.#portal.overlay;
+    overlay.popover = "manual";
+    if (overlay.isConnected) overlay.showPopover();
+  }
+
+  #onFullscreenChange = () => {
+    const on = this.#isFullscreen();
+    if (!on) this.#raiseAgain();
+    this.#controller?.fullscreenChanged?.(on);
+  };
+
+  /** The controls marked `name` in the viewer, default or your own. */
+  #controlsNamed(name: string) {
+    return this.#portal.dialog.querySelectorAll<HTMLElement>(`[data-fluidbox-${name}]`);
+  }
+
+  /** Save the item's file; a move or a close stops a fetch under way. */
+  download(item: TItem) {
+    this.#fileFetch?.abort();
+    const fetching = (this.#fileFetch = new AbortController());
+    return downloadItem(this.#portal.overlay.ownerDocument, item, fetching.signal, (busy) => {
+      for (const control of this.#controlsNamed("download")) {
+        if (busy) control.setAttribute("aria-busy", "true");
+        else control.removeAttribute("aria-busy");
+      }
+    });
+  }
+
+  /** Share a link to the item, or copy it and say so. */
+  share(item: TItem, url: string) {
+    return shareItem(item, url, () => {
+      this.#announce(this.#labels.linkCopied);
+      const controls = this.#controlsNamed("share");
+      for (const control of controls) control.toggleAttribute("data-copied", true);
+      clearTimeout(this.#copiedTimer);
+      this.#copiedTimer = setTimeout(() => {
+        for (const control of controls) control.removeAttribute("data-copied");
+      }, 2000);
+    });
+  }
+
   /** Go round the gallery, or stop at its ends. */
   setLoop(loop: boolean) {
     if (loop === this.#loop) return;
@@ -386,6 +539,7 @@ export class DomViewerDriver<
           controller,
           source: this.#source,
           labels: this.#labels,
+          gestures: this.#gestures,
           signal,
         }),
       );
@@ -443,6 +597,7 @@ export class DomViewerDriver<
         watched: () => this.#strip?.watchesZoom() ?? false,
         pose: (image, pose) => this.#strip?.zoomPose(image, pose),
         interact: () => this.#userInteraction(),
+        wheelZooms: () => this.#gestures.wheel === "zoom",
       }));
     });
     return this.#zoomLoad;
@@ -558,6 +713,8 @@ export class DomViewerDriver<
       this.#zoom.release();
     };
     this.#strip.onZoomableChange = () => this.#controller?.zoomableChanged?.();
+    this.#strip.onMediaError = (index, kind, cause) =>
+      this.#controller?.mediaError?.(index, kind, cause);
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
   }
@@ -797,6 +954,7 @@ export class DomViewerDriver<
   }
 
   async select(context: ViewerSessionMotionContext<TItem>) {
+    this.#fileFetch?.abort();
     this.#preparedFlight = undefined;
     this.#cancelAnimations(true);
     this.#zoom?.suspend();
@@ -829,7 +987,14 @@ export class DomViewerDriver<
   }
 
   async close(context: ViewerSessionCloseContext) {
-    ++this.#operation;
+    const operation = ++this.#operation;
+    const immediate = this.#forceImmediateClose;
+    this.#fileFetch?.abort();
+    // A close planned while the viewer covers the screen would fly to stale geometry.
+    if (this.#isFullscreen()) {
+      await this.#exitFullscreen();
+      if (context.signal.aborted || this.#destroyed || operation !== this.#operation) return;
+    }
     const settling = this.#extensions
       .map((extension) => extension.beforeClose?.())
       .filter((result): result is Promise<void> => result instanceof Promise);
@@ -847,6 +1012,7 @@ export class DomViewerDriver<
       this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
     }
     if (
+      immediate ||
       this.#forceImmediateClose ||
       this.#prefersReducedMotion() ||
       // An open called off before the viewer showed has nothing painted to fly
@@ -1004,6 +1170,10 @@ export class DomViewerDriver<
     this.#dragGesture.cancel();
     this.#preparedFlight = undefined;
     this.#endWheelHandoff();
+    this.#fileFetch?.abort();
+    clearTimeout(this.#copiedTimer);
+    if (this.#isFullscreen()) void this.#exitFullscreen();
+    this.#raiseAgain();
     this.#zoom?.destroy();
     this.#mediaObserver?.disconnect();
     this.#mediaObserver = undefined;
@@ -1989,6 +2159,7 @@ export class DomViewerDriver<
     const { state, inputDistance, inputSpeed, velocityX, velocityY } = release;
     const commit =
       !cancel &&
+      this.#gestures.dismiss.drag &&
       (inputDistance > TOUCH_DISMISS_DISTANCE ||
         (inputDistance > 30 &&
           inputSpeed > 0.6 &&
@@ -2256,7 +2427,9 @@ export class DomViewerDriver<
       return;
     }
     this.#beginDrag();
-    this.#dragGesture.moveTouch(x, y);
+    // A drag that may not close follows the finger a little way, and springs back.
+    if (this.#gestures.dismiss.drag) this.#dragGesture.moveTouch(x, y);
+    else this.#dragGesture.moveTouch(rubberBand(x), rubberBand(y));
   };
 
   #onPointerEnd = (event: PointerEvent) => {
@@ -2303,6 +2476,22 @@ export class DomViewerDriver<
       }
     }
     event.preventDefault();
+    const mode = this.#gestures.wheel;
+    // "zoom" is the zoom's, which takes the wheel before this does; "none" keeps the page still.
+    if (mode === "zoom" || mode === "none") return;
+    if (mode === "navigate") {
+      // One gesture, one move: trackpad inertia keeps the gesture going.
+      const now = performance.now();
+      const fresh = now - this.#lastNavigateWheel > NAVIGATE_WHEEL_GAP;
+      this.#lastNavigateWheel = now;
+      if (fresh && this.#controller?.state.status === "open") {
+        const options = { reason: "wheel" as const };
+        void (event.deltaY > 0
+          ? this.#controller.next(options)
+          : this.#controller.previous(options));
+      }
+      return;
+    }
     const direction = Math.sign(-event.deltaY);
     this.#beginDrag(direction);
     this.#dragGesture.moveWheel(event.deltaY * unit);

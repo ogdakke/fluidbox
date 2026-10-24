@@ -28,7 +28,7 @@ export class FluidboxThumbnailsElement extends HTMLElement {
  * `<template>`, else what `render` draws.
  */
 export class FluidboxSheetElement extends HTMLElement {
-  static readonly observedAttributes = ["snap-points", "dismiss"];
+  static readonly observedAttributes = ["snap-points", "dismiss-motion"];
   #render: FluidboxRenderer<any> | undefined;
 
   connectedCallback() {

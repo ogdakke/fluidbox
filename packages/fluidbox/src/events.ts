@@ -1,23 +1,26 @@
 import {
+  FluidboxMediaErrorEvent,
   FluidboxSheetEvent,
   FluidboxValueChangeEvent,
   FluidboxZoomEvent,
   type FluidboxEventMap,
 } from "./public-api";
 
-/** The five event names, for bindings that forward them as props, emits or outputs. */
+/** The six event names, for bindings that forward them as props, emits or outputs. */
 export const fluidboxEventTypes = [
   "beforevaluechange",
   "valuechange",
   "valuechangecomplete",
   "sheetchange",
   "zoomchange",
+  "mediaerror",
 ] as const satisfies readonly (keyof FluidboxEventMap)[];
 
 const eventClasses: (new (type: any, init: any) => Event)[] = [
   FluidboxValueChangeEvent,
   FluidboxSheetEvent,
   FluidboxZoomEvent,
+  FluidboxMediaErrorEvent,
 ];
 
 /** A copy of a fluidbox event, to fire on another target. */

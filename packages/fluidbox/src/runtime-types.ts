@@ -25,6 +25,7 @@ export type { FluidboxRevealContext, FluidboxStatus } from "./public-api";
 import type {
   Fluidbox,
   FluidboxControlName,
+  FluidboxMediaErrorKind,
   FluidboxRevealContext,
   FluidboxState,
   FluidboxViewerRenderer,
@@ -140,6 +141,8 @@ export interface FluidboxExtensionContext<TItem extends FluidboxItem = FluidboxI
   readonly controller: SessionController<TItem>;
   readonly source: FluidboxSource<TItem>;
   readonly labels: FluidboxLabels;
+  /** What may close the viewer, as it was when the extension mounted. */
+  readonly gestures: ViewerGestures;
   /** Aborted when the viewer is destroyed. */
   readonly signal: AbortSignal;
 }
@@ -197,6 +200,16 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   zoomed?(scale: number, reason: SessionReason | undefined): void;
   /** The box on show may have started or stopped being zoomable. */
   zoomableChanged?(): void;
+  /** The viewer became the document's fullscreen element, or stopped being it. */
+  fullscreenChanged?(on: boolean): void;
+  /** A slide's media failed, or a zoom image did. */
+  mediaError?(index: number, kind: FluidboxMediaErrorKind, cause: unknown): void;
+}
+
+/** What may close the viewer, and what a vertical wheel does. */
+export interface ViewerGestures {
+  readonly dismiss: { readonly drag: boolean; readonly backdrop: boolean };
+  readonly wheel: "dismiss" | "zoom" | "navigate" | "none";
 }
 
 export interface ViewerSessionMotionContext<TItem extends FluidboxItem = FluidboxItem> {

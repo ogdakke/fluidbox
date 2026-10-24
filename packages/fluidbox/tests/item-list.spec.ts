@@ -140,3 +140,29 @@ describe("an item's size", () => {
     expect(() => toList([{ ...unsized, fit: "fill" } as never])).toThrow(TypeError);
   });
 });
+
+describe("an item's data", () => {
+  const tagged = (data: Record<string, unknown>) => ({ ...photo(0), data }) as never;
+
+  it("takes lower-case names with digits and single dashes", () => {
+    expect(toList([tagged({ tone: "light", "kind-2": "product", a1: "" })]).count).toBe(1);
+  });
+
+  it("throws a TypeError that names the item and the key for any other name", () => {
+    expect(() => toList([tagged({ Tone: "light" })])).toThrow(
+      /Fluidbox item photo-0 has data "Tone"/,
+    );
+    for (const name of ["2tone", "tone-", "to--ne", "to_ne", "-tone", "fluidbox-status", ""]) {
+      expect(() => toList([tagged({ [name]: "x" })]), name).toThrow(TypeError);
+    }
+  });
+
+  it("takes string values only", () => {
+    expect(() => toList([tagged({ tone: 1 })])).toThrow(TypeError);
+  });
+
+  it("is checked as a lazy list makes each item", () => {
+    const list = createItemList({ count: 1, item: () => tagged({ Bad: "x" }) });
+    expect(() => list.get(0)).toThrow(TypeError);
+  });
+});

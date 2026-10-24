@@ -517,7 +517,7 @@ function InstagramViewer() {
         It can't be put away; a swipe down scrolls the photo off. */}
       <Fluidbox.Sheet
         snapPoints={["55%", "content"]}
-        dismiss="scroll"
+        dismissMotion="scroll"
         className="ig-sheet"
         data-fluidbox-chrome
         aria-label="Post"

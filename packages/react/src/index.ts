@@ -28,7 +28,6 @@ import { createPortal, flushSync } from "react-dom";
 import {
   createFluidbox,
   type Fluidbox as FluidboxInstance,
-  type FluidboxControlName,
   type FluidboxItem,
   type FluidboxLabels,
   type FluidboxSlideRenderer,
@@ -37,6 +36,7 @@ import {
   type FluidboxViewerRenderer,
 } from "@ogdakke/fluidbox";
 import {
+  type FluidboxIconControlName,
   controlNames,
   createSlots,
   createTrigger,
@@ -159,7 +159,7 @@ const noMounts: readonly Mount[] = [];
 /** What the Thumbnails and Sheet parts ask of the viewer. Their presence turns each on. */
 interface Addons {
   thumbnails: { readonly custom: boolean } | null;
-  sheet: Pick<FluidboxSheetProps, "snapPoints" | "dismiss"> | null;
+  sheet: Pick<FluidboxSheetProps, "snapPoints" | "dismissMotion"> | null;
 }
 
 interface FluidboxContextValue {
@@ -339,7 +339,11 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
             : true
           : undefined,
         sheet: sheet
-          ? { render: slots.sheet.render, snapPoints: sheet.snapPoints, dismiss: sheet.dismiss }
+          ? {
+              render: slots.sheet.render,
+              snapPoints: sheet.snapPoints,
+              dismissMotion: sheet.dismissMotion,
+            }
           : undefined,
       });
     });
@@ -692,7 +696,7 @@ function Viewer({ children }: FluidboxViewerProps): ReactElement | null {
   return viewerTarget ? createPortal(children, viewerTarget) : null;
 }
 
-function action(name: FluidboxControlName) {
+function action(name: FluidboxIconControlName) {
   const control = fluidboxControls[name];
   return forwardRef<HTMLButtonElement, FluidboxActionProps>(function FluidboxAction(
     { children, onClick, ...attributes },
@@ -724,7 +728,7 @@ function action(name: FluidboxControlName) {
   });
 }
 
-function defaultIcon(name: FluidboxControlName) {
+function defaultIcon(name: FluidboxIconControlName) {
   const {
     "stroke-width": strokeWidth,
     "stroke-linecap": strokeLinecap,
@@ -820,7 +824,7 @@ function Thumbnails<TItem extends FluidboxItem>({
   );
 }
 
-type SheetAttributes = Omit<FluidboxSheetProps, "snapPoints" | "dismiss" | "children">;
+type SheetAttributes = Omit<FluidboxSheetProps, "snapPoints" | "dismissMotion" | "children">;
 
 /**
  * Turns the sheet on. The viewer's `<section data-fluidbox-sheet>` is the
@@ -829,7 +833,7 @@ type SheetAttributes = Omit<FluidboxSheetProps, "snapPoints" | "dismiss" | "chil
  */
 function Sheet<TItem extends FluidboxItem>({
   snapPoints,
-  dismiss,
+  dismissMotion,
   children,
   ...attributes
 }: FluidboxSheetProps<TItem>): ReactElement {
@@ -838,11 +842,11 @@ function Sheet<TItem extends FluidboxItem>({
   serverHints.sheet = true;
   const pointsKey = JSON.stringify(snapPoints ?? null);
   useIsomorphicLayoutEffect(() => {
-    setAddon("sheet", { snapPoints, dismiss });
+    setAddon("sheet", { snapPoints, dismissMotion });
     return () => setAddon("sheet", null);
     // snapPoints is compared by value, so an inline array changes nothing.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [setAddon, pointsKey, dismiss]);
+  }, [setAddon, pointsKey, dismissMotion]);
   const current = useSlots(sheetSlots as FluidboxSlots<TItem>);
   return createElement(
     Fragment,

@@ -25,6 +25,14 @@ describe("fluidboxStaticViewer", () => {
     expect(html).toMatch(/<img data-fluidbox-media alt="Photo 1" width="17778" height="10000"/);
   });
 
+  it("puts the item's data on its slide", () => {
+    const tagged = [{ ...photo(0), data: { tone: "light", "kind-2": "a&b" } }];
+    const html = fluidboxStaticViewer({ items: tagged, value: "photo-0" })!;
+    expect(html).toMatch(
+      /<div data-fluidbox-slide [^>]*data-active data-tone="light" data-kind-2="a&#38;b">/,
+    );
+  });
+
   it("is a labelled region, not a dialog, until the viewer takes over", () => {
     const html = fluidboxStaticViewer({ items, value: "photo-0" })!;
     expect(html).not.toContain('role="dialog"');

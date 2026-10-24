@@ -196,7 +196,7 @@ A `<fluidbox-thumbnails>` child turns the thumbnails on, and a `<fluidbox-sheet>
 | `<fluidbox-sheet>` attribute | What it does                                                                           |
 | ---------------------------- | -------------------------------------------------------------------------------------- |
 | `snap-points`                | The stops above rest, lowest first: `"40% 90%"`, pixels such as `"240"`, or `content`. |
-| `dismiss`                    | `flight`, `scroll` or `none`. See [Stops](./thumbnails-and-sheet.md#stops).            |
+| `dismiss-motion`             | `flight` or `scroll`. See [Stops](./thumbnails-and-sheet.md#stops).                    |
 
 The sheet shows the active item's `<template slot="sheet">`, else the `<template>` inside `<fluidbox-sheet>`. Set the sheet element's `render` property to draw it yourself, and the thumbnails element's `render` to fill each thumbnail button. Both are [renderers](./media.md#custom) that get `{ item, index, target, signal }`.
 

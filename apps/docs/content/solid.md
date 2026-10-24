@@ -228,7 +228,7 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 
 ## Solid notes
 
-**Options apply live.** `Root` makes its viewer once, in the browser. A change to `labels` or `zoom` goes to `fluidbox.update()`. So does mounting or unmounting a `Thumbnails` or `Sheet`, and changing the sheet's `snapPoints` or `dismiss`. An open viewer stays open, and only the thumbnails or sheet whose options changed draws again. Mounting or unmounting a `Viewer` swaps the viewer's controls in place. The binding reads `origins`, `renderers` and the event props when it uses them.
+**Options apply live.** `Root` makes its viewer once, in the browser. A change to `labels` or `zoom` goes to `fluidbox.update()`. So does mounting or unmounting a `Thumbnails` or `Sheet`, and changing the sheet's `snapPoints` or `dismissMotion`. An open viewer stays open, and only the thumbnails or sheet whose options changed draws again. Mounting or unmounting a `Viewer` swaps the viewer's controls in place. The binding reads `origins`, `renderers` and the event props when it uses them.
 
 **Reactive items.** `items` is tracked: pass a signal's value (`items={photos()}`) and set a new array to change the gallery. An open viewer stays on the same item id if the new items still have it. `useFluidbox().setItems` does the same from inside.
 

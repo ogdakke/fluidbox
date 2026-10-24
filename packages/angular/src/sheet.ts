@@ -29,7 +29,7 @@ export class FluidboxSheetDirective<TItem extends FluidboxItem = FluidboxItem>
   /** The stops above the resting one, lowest first. @default ["60%", "content"] */
   @Input() snapPoints?: readonly FluidboxSheetSnapPoint[];
   /** What a swipe down on the photo does with the sheet down. @default "flight" */
-  @Input() dismiss?: "flight" | "scroll" | "none";
+  @Input() dismissMotion?: "flight" | "scroll";
 
   readonly #root = injectRoot<TItem>("fluidboxSheet");
   readonly #template = inject<TemplateRef<FluidboxItemContext<TItem>>>(TemplateRef);

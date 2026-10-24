@@ -93,7 +93,7 @@ export interface FluidboxThumbnailsPart<TItem extends FluidboxItem = FluidboxIte
 /** A `fluidboxSheet` template, as the root sees it. */
 export interface FluidboxSheetPart<TItem extends FluidboxItem = FluidboxItem> {
   readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
-  readonly dismiss?: "flight" | "scroll" | "none";
+  readonly dismissMotion?: "flight" | "scroll";
   /** Fills the sheet for the active item. Stable for the part's life. */
   readonly render: FluidboxRenderer<TItem>;
 }
@@ -368,7 +368,11 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
             : true
           : undefined,
         sheet: sheet
-          ? { snapPoints: sheet.snapPoints, dismiss: sheet.dismiss, render: sheet.render }
+          ? {
+              snapPoints: sheet.snapPoints,
+              dismissMotion: sheet.dismissMotion,
+              render: sheet.render,
+            }
           : undefined,
       });
     });

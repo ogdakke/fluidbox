@@ -36,6 +36,7 @@ export function addonSlide<TItem extends FluidboxItem>(
     zoomable: () => {},
     onZoom: () => () => {},
     waitUntil: () => {},
+    fail: () => {},
     drawImage: none,
     drawVideo: none,
     drawIframe: none,

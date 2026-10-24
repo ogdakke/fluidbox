@@ -9,7 +9,13 @@ import { defaultLabels, resolveLabels } from "./labels";
 import { fluidboxEventTypes } from "./events";
 import type { Fluidbox, FluidboxItem, FluidboxRenderer, FluidboxSlide } from "./public-api";
 
-export { controlNames, fluidboxControls, zoomControlNames, type FluidboxControl } from "./controls";
+export {
+  controlNames,
+  fluidboxControls,
+  zoomControlNames,
+  type FluidboxControl,
+  type FluidboxIconControlName,
+} from "./controls";
 export { defaultLabels, resolveLabels };
 export {
   bindTrigger,

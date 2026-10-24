@@ -5,6 +5,7 @@ import type {
   FluidboxItems,
   FluidboxTarget,
 } from "./public-api";
+import { checkItemData } from "./item-data";
 import { fillsStage } from "./fit-size";
 import { checkItemUrls } from "./media-url";
 import type { FluidboxSource } from "./runtime-types";
@@ -144,6 +145,7 @@ export function createItemList<TItem extends FluidboxItem>(
  */
 function checkItem(item: FluidboxItem) {
   checkItemUrls(item);
+  checkItemData(item, idOf(item));
   if (fillsStage(item)) return;
   const { width, height } = item;
   if (!(width! > 0 && height! > 0)) {

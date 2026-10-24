@@ -68,7 +68,11 @@ function ContractExample(): ReactElement {
       <Fluidbox.Thumbnails<Photo>>
         {({ item, index }) => <img src={item.src} alt={`${item.credit} ${index}`} />}
       </Fluidbox.Thumbnails>
-      <Fluidbox.Sheet<Photo> snapPoints={["40%", "content"]} dismiss="scroll" className="details">
+      <Fluidbox.Sheet<Photo>
+        snapPoints={["40%", "content"]}
+        dismissMotion="scroll"
+        className="details"
+      >
         {({ item, index }) => (
           <>
             <p>{`${item.credit} ${index}`}</p>

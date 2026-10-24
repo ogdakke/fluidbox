@@ -207,7 +207,7 @@ const fluidbox = createFluidbox({
   viewer,
   controls: ["close"],
   thumbnails: { render: ({ item, target }) => void (target.title = item.credit) },
-  sheet: { snapPoints: ["40%", 600, "content"], dismiss: "scroll", render: () => {} },
+  sheet: { snapPoints: ["40%", 600, "content"], dismissMotion: "scroll", render: () => {} },
   findTrigger,
   revealTrigger,
 });
@@ -303,8 +303,8 @@ createFluidbox<Shop>({
 createFluidbox({ items: photos, slides: { note: { mount: note2 } } });
 // @ts-expect-error the renderers option is now slides
 createFluidbox({ items: photos, renderers: { note: note2 } });
-// @ts-expect-error a sheet dismissal is one of flight, scroll or none
-createFluidbox({ items: photos, sheet: { dismiss: "swipe" } });
+// @ts-expect-error a sheet dismisses by flight or scroll; "none" is the Root's dismiss.drag
+createFluidbox({ items: photos, sheet: { dismissMotion: "none" } });
 
 void fluidbox.open();
 void fluidbox.open(0);
@@ -461,6 +461,7 @@ assert<
     | "itemLabel"
     | "imageItem"
     | "videoSlide"
+    | "FluidboxMediaErrorEvent"
     | "FluidboxSheetEvent"
     | "FluidboxValueChangeEvent"
     | "FluidboxZoomEvent"
@@ -471,7 +472,7 @@ assert<
 assert<Equal<keyof typeof SheetEntry, never>>();
 assert<Equal<keyof typeof ThumbnailsEntry, never>>();
 const snap: FluidboxSheetSnapPoint[] = [120, "50%", "content"];
-const sheetOptions: FluidboxSheetOptions<Photo> = { snapPoints: snap, dismiss: "none" };
+const sheetOptions: FluidboxSheetOptions<Photo> = { snapPoints: snap, dismissMotion: "scroll" };
 const thumbnailsOptions: FluidboxThumbnailsOptions<Photo> = {
   render: ({ item, target }) => void (target.title = item.credit),
 };
