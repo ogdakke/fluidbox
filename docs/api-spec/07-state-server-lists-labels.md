@@ -193,8 +193,9 @@ The add-ons keep their strings as options (§4.2), not label keys: `Embed label`
 | Elements     | `labels` property on `<fluidbox-gallery>`; `lang` and `dir` from the page |
 | Server copy  | `labels` in `FluidboxStaticViewerOptions`                                 |
 
-A part with children uses the children instead of the label: `<Fluidbox.Close>Schließen</Fluidbox.Close>`
-names the button by its text; an icon-only part takes `aria-label`, which wins over the label.
+A part without children shows its label as text. A part with children (an icon, say) gets
+the label as `aria-label`. The part's own `aria-label` wins, and `label={false}` names it by its
+content instead: `<Fluidbox.Close label={false}>Schließen</Fluidbox.Close>` (§2.21, §3.19).
 
 ### With react-i18next and vue-i18n
 

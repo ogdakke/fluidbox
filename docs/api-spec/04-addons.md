@@ -390,3 +390,34 @@ const attachHls = hlsAttach({ load: () => import("hls.js") });
 
 Size estimate: 350–500 B gzip. Bundle-check consumer `hls`, which must not contain hls.js. Plan
 step 3 or later (§9.2). It is optional, because the `attach` option already covers streaming.
+
+## 4.9 No glyphs in the add-ons
+
+The fourth amendment removes every icon from the package's JavaScript (§2.21). Among the
+add-ons, only the embed has one: the Play triangle (`embeds.ts:309-315`), sized in `embedStyles`
+(`:269-273`). Spin, model and hover zoom draw no glyphs. Their posters are images, and their
+cursors and the model's transparent background move to `baseline.css` (§10.3).
+
+**Embed Play button.** It follows the control rule. With no content it shows its label as text:
+the `label` option, `"Play <title>"` by default. That is visible, and also the accessible name.
+Content can come three ways:
+
+```ts
+createEmbedSlide({ play: () => playIcon.content.cloneNode(true) }); // plain JS: a Node factory, as `icons`
+```
+
+```tsx
+<Embed play={<PlayIcon />} /> // the bindings: a node; the label becomes aria-label
+```
+
+In markup, a `<template data-fluidbox-icon="embed-play">` inside the gallery works, as for the
+controls (§2.21). The button keeps `data-fluidbox-embed-play`, and gets `data-fluidbox-default`
+when it shows its text. The baseline draws today's triangle from `--fluidbox-icon-embed-play`
+over the hidden text. The functional `position: absolute; inset: 0; margin: auto` (§10.3, R8)
+keeps it above the poster in every case.
+
+**Injected styles.** The add-ons keep injecting their functional rules through `addStyles`, now
+inside `@layer fluidbox` like the stylesheets. Their look rules move to `baseline.css`: the Play
+button's size, shape, colours and hover; spin's `grab` cursors; the model's transparent backdrop
+and `--poster-color`. `posterStyles` and hover zoom's inline styles are all functional and
+unchanged.

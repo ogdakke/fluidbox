@@ -217,8 +217,8 @@ no children it renders ZoomIn, ZoomOut and ZoomReset. This replaces `<Controls z
 |                |                                                                                     |
 | -------------- | ----------------------------------------------------------------------------------- |
 | Element        | `<button type="button">`                                                            |
-| Props          | HTML button attributes; `children` replaces the default icon                        |
-| `aria-label`   | from the labels when the button has no children                                     |
+| Props          | HTML button attributes; `children` replace the label text; `label` (§3.19)          |
+| `aria-label`   | from the labels when the button has children (§2.21)                                |
 | Disabled       | native `disabled` from state: no previous, no next, not zoomable, at a zoom bound   |
 | Data attribute | `data-fluidbox-close`, `-previous`, `-next`, `-zoom-in`, `-zoom-out`, `-zoom-reset` |
 | Click          | your `onClick` first; `preventDefault()` there skips the command                    |
@@ -603,7 +603,7 @@ of each is in §2.11–2.20; this section covers the binding surface.
 | `Share`              | `<button type="button">` | `share`                              | no link, or neither Web Share nor the clipboard | `data-fluidbox-share`; `data-copied` after a copy               |
 | `Slideshow` (step 7) | `<button type="button">` | `playSlideshow` / `pauseSlideshow`   | no `slideshow` option                           | `data-fluidbox-slideshow`, plus `data-active` while playing     |
 
-They follow the control rules of §3.8: HTML attributes pass through, children replace the icon,
+They follow the control rules of §3.8: HTML attributes pass through, children replace the label text,
 your `onClick` runs first and `preventDefault()` skips the command. `Download` is an anchor so
 its `href` works without the click handler. Unavailable controls get `hidden`, not `disabled`:
 a control that can never work on this device or item shouldn't sit in the tab order looking
@@ -695,3 +695,91 @@ that order.
 | Share                 | After a copy, `labels.linkCopied` is announced in the viewer's polite live region.                                                                               |
 | Hotspot               | A `<button>` in DOM order within the slide. Needs a name from its content or `aria-label`; development builds warn without one. Focus pans a zoomed image to it. |
 | Slideshow playing     | The live region goes `aria-live="off"`; it is polite again on pause (§2.19).                                                                                     |
+
+## 3.19 Headless parts: children, `Loading`, `Error`, `Retry`
+
+### Children
+
+Every control part (Close, Previous, Next, the zoom buttons, Fullscreen, Download, Share,
+Slideshow, Retry, SheetSnap) follows §2.21:
+
+```tsx
+<Fluidbox.Close />                        // <button data-fluidbox-close data-fluidbox-default>Close</button>
+<Fluidbox.Close><XIcon /></Fluidbox.Close> // <button data-fluidbox-close aria-label="Close"><svg…/></button>
+<Fluidbox.Close label={false}>Done</Fluidbox.Close> // named "Done" by its text
+<Fluidbox.Close aria-label="Close photo"><XIcon /></Fluidbox.Close>
+```
+
+| Prop       | Type              | Default        |                                                                                                                                                                                         |
+| ---------- | ----------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `children` | node              | the label text | With children, the label becomes `aria-label`.                                                                                                                                          |
+| `label`    | `string \| false` | from `labels`  | A string overrides the label for this part. `false` names the part by its children; use it when they hold visible text, so the visible name and the accessible name agree (WCAG 2.5.3). |
+
+Vue and Solid: the default slot and a `label` prop. Angular: content projection and a `[label]`
+input. Elements: the button's content and `data-fluidbox-label`.
+
+The Toolbar and ZoomControls defaults render their buttons with text, as above. Lucide, Heroicons
+or any SVG component works as a child. The docs show lucide-react, lucide-vue-next,
+lucide-solid and lucide-angular next to the starter (§10.4).
+
+### Loading
+
+A slide that is loading has `aria-busy="true"` (today, `viewer-strip.ts:918`) and now also
+`data-busy`, for styling. The functional CSS draws nothing for it. Today's spinner moves to the
+baseline stylesheet.
+
+`<Fluidbox.Loading>` renders its children while the item on show is busy, and nothing
+otherwise. Inside `Slides` it follows that slide. It is `aria-hidden`, because `aria-busy` on
+the slide already tells assistive technology.
+
+```tsx
+<Fluidbox.Viewer>
+  <Fluidbox.Loading>
+    <Spinner />
+  </Fluidbox.Loading>
+  <Fluidbox.Toolbar />
+</Fluidbox.Viewer>
+```
+
+Plain JS reads `data-busy` or `aria-busy` on `[data-fluidbox-slide][data-active]`. Elements:
+`<fluidbox-loading>` in the viewer template.
+
+### Error and Retry
+
+The runtime keeps drawing a default error UI in the slide, as today
+(`viewer-strip.ts:440-446`): a `role="alert"` container with `labels.error` as text and a Retry
+`<button>` with `labels.retry`. Both are unstyled now. The slide gets `data-error`.
+
+`<Fluidbox.Error>` replaces it for the item on show: while the slide is in its error state it
+renders its children, and the runtime hides its own default UI for that slide.
+`<Fluidbox.Retry>` is a control part (§2.21) that loads the failed media again.
+`children` can be a function of `{ item, error }`, where `error` is the `cause` of the last
+`mediaerror` (§2.13).
+
+```tsx
+<Fluidbox.Error>
+  {({ item }) => (
+    <div className="photo-error">
+      <p>{item.title} didn't load.</p>
+      <Fluidbox.Retry>
+        <RotateCwIcon />
+      </Fluidbox.Retry>
+    </div>
+  )}
+</Fluidbox.Error>
+```
+
+- Placed inside `Slides`, it is per slide. Placed in `Viewer`, it shows for the active slide.
+- The live announcement stays the runtime's (`#alert`, `viewer-strip.ts:1217`), so a custom
+  `Error` needn't be a live region. It mustn't be one either, or the error is announced twice.
+- Plain JS: `viewer` content can include `<button data-fluidbox-retry>` or call
+  `bindControl(button, "retry")`. The runtime hides its default while the layer holds a Retry
+  control, as it does for Close today (`viewer-layer.ts:57-68`). Elements: `<fluidbox-error>`
+  with a `<button data-fluidbox-retry>` inside.
+
+| Framework    | Loading                                                         | Error                                                    | Retry                          |
+| ------------ | --------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------ |
+| React, Solid | `Fluidbox.Loading`                                              | `Fluidbox.Error`                                         | `Fluidbox.Retry`               |
+| Vue          | same, default slot; `Error` has a scoped slot `{ item, error }` |                                                          |                                |
+| Angular      | `<ng-template fluidboxLoading>`                                 | `<ng-template fluidboxError let-item let-error="error">` | `button[fluidboxRetry]`        |
+| Elements     | `<fluidbox-loading>`                                            | `<fluidbox-error>`                                       | `<button data-fluidbox-retry>` |

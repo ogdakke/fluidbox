@@ -84,7 +84,7 @@ In sub-steps that can each be reviewed alone, in this order:
     `share()` with their fallbacks; `mediaerror` from every `#fail` site, the last `<source>`,
     the zoom image, and `slide.fail`; `dismiss: { drag, backdrop }` and `wheel` in `#onWheel` and
     the drag and backdrop handlers; the sheet's `dismiss` → `dismissMotion`; item `data` with its
-    validation; the new control names, labels and icons. Needs 2 (events) and 4 (the box, for
+    validation; the new control names and labels (no icons, §2.21). Needs 2 (events) and 4 (the box, for
     `slide.fail`).
 11. **Hooks step 7 needs, built now so nothing rules it out.** In 1.4: `slide.onZoom` with
     `FluidboxZoomPose` from both zoom modes, `zoomable({ max, sharpen })`,
@@ -94,6 +94,27 @@ In sub-steps that can each be reviewed alone, in this order:
     `waitUntil` promises kept per slide. In the driver: one `#userInteraction()` point that every
     gesture, key and zoom passes through. None of these is public behaviour yet except `onZoom`
     and `zoomable` options, so their cost is a few hundred bytes of activation JS.
+
+12. **The CSS split and icon removal** (part 10, §2.21). It runs once the engine sub-steps that
+    edit `styles.css` (1.4, 1.9) have landed, and before any control or part work. Session I
+    finishes the engine and then does this, so step 2's parts are written against the headless
+    rule from the start. In one change:
+    - Delete `control-icons.ts`, kit's `fluidboxControlIcon`, the icon in `controlButton` and the
+      static viewer, and the embed's Play SVG. Controls without content render their label text
+      and `data-fluidbox-default`.
+    - Add `bindControl`, the `icons` option, `"retry"`, `data-busy` and `data-error`.
+    - Split the three stylesheets by the tables of §10.3 into `@layer fluidbox`, with the
+      `Canvas` surfaces of §10.2. The look goes into a new `baseline.css` in
+      `@layer fluidbox-baseline`, with the glyph tokens and its forced-colours and CSP rules.
+      Move the add-ons' injected look rules there too.
+    - Add `./baseline.css` to the package exports.
+    - Import `baseline.css` in `apps/examples` (every pattern page, the demos, `csp.html` with
+      self-hosted glyph tokens) and in the docs site.
+    - Update `css-api.ts`, which feeds the CSS reference page and the contract test, with the
+      mechanics/look split of §10.5.
+
+    The migration rule: the visual snapshots don't move, except for glyph-edge antialiasing,
+    reviewed diff by diff (§10.4).
 
 Sub-steps 1, 2 and 7 are renames and API reshaping; 3–6, 8 and 9 are the engine work and carry the risk
 (§5.1 risks table). 3 and 4 must land together for any non-image slide to fly.
@@ -109,7 +130,9 @@ the children's effects (so `Media render` and add-ons have called `waitUntil`);
 `Toolbar`, `ZoomControls`, `Counter`, `Caption`; `Overlay` replacing `ThumbnailOverlay` and
 `FrameLayer`; `Thumbnails`, `SheetSnap`, `useFluidboxSheet` → `{ snap, setSnap }`;
 `Fullscreen`, `Download`, `Share`; Root `dismiss`, `wheel`, `shareUrl`, `onMediaError` (with
-`shareUrl` defaulting to `href`); `useFluidboxSlide().fail` and `.onZoom`; Sheet `dismissMotion`. Delete
+`shareUrl` defaulting to `href`); `useFluidboxSlide().fail` and `.onZoom`; Sheet `dismissMotion`;
+`Loading`, `Error`, `Retry`; the `label` prop and the children rule on every control (§3.19), with
+`defaultIcon` deleted. Delete
 `Controls`, `Filmstrip`, `SheetStop`.
 
 ### Step 3: plain-JS add-on slides
@@ -138,7 +161,8 @@ One agent or person each, from step 2's React code and the anatomy (§3.13–3.1
 | Elements | `gallery.ts`, `item.ts`, `elements.ts` | `value` attribute, `<template data-fluidbox-slide>`, `defineSlide`/`defineMarkup` registry, `<fluidbox-toolbar>`, `<fluidbox-zoom-controls>`, `<fluidbox-counter>`, `<fluidbox-caption>`, `<fluidbox-thumbnails>` |
 
 Each binding in step 4 also gets `Fullscreen`, `Download`, `Share`, the Root's `dismiss`, `wheel`,
-`shareUrl` and media-error output, and the icons-from-the-viewer change (§9.3), as React did in
+`shareUrl` and media-error output, `Loading`, `Error`, `Retry`, and the children rule with its
+icon code deleted (§3.19), as React did in
 step 2.
 
 ### Step 5: add-on parts
@@ -197,50 +221,61 @@ Estimates, gzip, against `baseline/bundle-budget.md` (2026-10-23):
 | Kit                        |       1,635 B |            ±50 B |          1,635 B |               ±50 B | `takeOverFluidbox` takes a value.                                                                                                                                                                                                                                                             |
 | Add-ons                    |               |                  |                  |                     | §4.7                                                                                                                                                                                                                                                                                          |
 
-The table above is steps 1–6 before the third amendment. The ten additions add, per entry:
+The table above is steps 1–6 before the third and fourth amendments. Those two change the
+estimates as follows. The figures are gzip, against the 2026-10-23 baseline.
 
-| Entry               | Steps 1–2 (features 1–5) initial | Step 7 initial | Steps 1–2 activation |  Step 7 activation |
-| ------------------- | -------------------------------: | -------------: | -------------------: | -----------------: |
-| Root                |                   +150 to +250 B |  +60 to +120 B |   +1,250 to +1,600 B | +1,600 to +2,100 B |
-| React               |                   +600 to +850 B | +400 to +550 B |              as Root |            as Root |
-| Vue, Solid, Angular |                   +550 to +900 B | +350 to +550 B |              as Root |            as Root |
-| Elements            |                   +500 to +800 B | +350 to +500 B |              as Root |            as Root |
+**What the fourth amendment removes.** The six icon paths are 209 B gzip, and the whole
+`control-icons.ts` is 653 B before tree-shaking. They ship in the shared `controls` chunk
+(1,227 B, with the control definitions), which the lazy viewer chunk and `kit` import. Every
+binding imports `kit` in its main module, so the icons sit in each binding's _initial_ chunk, not
+in the core's `index.js`. The bindings' own icon builders (React `defaultIcon`, Vue `controlIcon`,
+Solid `defaultIcon`, Angular `#icon()`) come out too. The third amendment's four new icons are
+never added.
+
+| Entry                         | Redesign (above) |                + features 1–5 |                                                                                       + fourth amendment |             Step 7 |         Total initial vs today |
+| ----------------------------- | ---------------: | ----------------------------: | -------------------------------------------------------------------------------------------------------: | -----------------: | -----------------------------: |
+| Root initial                  |    +50 to +150 B |                +120 to +200 B |                                                        +40 to +80 B (`bindControl` stub, `icons` option) |      +60 to +120 B |                 +270 to +550 B |
+| React initial                 | +600 to +1,200 B |                +300 to +500 B |             −300 to −500 B (icons, `defaultIcon`), +150 to +250 B (`Loading`, `Error`, `Retry`, `label`) |     +250 to +400 B | **+1,000 to +1,850 B (7–12%)** |
+| Vue, Solid initial            | +500 to +1,200 B |                +300 to +500 B |                                                                           −300 to −450 B, +150 to +250 B |     +250 to +400 B |               +900 to +1,900 B |
+| Angular initial               | +700 to +1,300 B |                +350 to +550 B |                                                                           −300 to −450 B, +200 to +300 B |     +300 to +450 B |             +1,250 to +2,150 B |
+| Elements initial              |   +500 to +900 B |                +300 to +450 B |                −250 to −400 B, +150 to +250 B (`<fluidbox-loading>`, `<fluidbox-error>`, icon templates) |     +250 to +400 B |               +950 to +1,600 B |
+| Activation (every core entry) | +550 to +1,050 B | +1,100 to +1,450 B (no icons) | −250 to −350 B (icon builder and paths), +200 to +300 B (`bindControl`, `icons`, default error UI hooks) | +1,550 to +2,000 B |             +3,150 to +4,450 B |
+| `styles.css`                  |          3,565 B |                               |                                                                                         2,650 to 2,800 B |                    |                 −750 to −900 B |
+| `thumbnails.css`              |          1,372 B |                               |                                                                                         1,050 to 1,150 B |                    |                 −220 to −320 B |
+| `sheet.css`                   |          1,310 B |                               |                                                                                         1,000 to 1,050 B |                    |                 −260 to −310 B |
+| `baseline.css`                |                — |                               |                                                                                 2,600 to 3,400 B, opt-in |                    |                 its own budget |
 
 **React initial, worked out.** Each new control is one line on the existing `action()` factory
-(`react/src/index.ts:685-715`), about 20 B gzip. The cost is elsewhere:
+(`react/src/index.ts:685-715`), about 20 B. Removing icons drops the 209 B of paths, the icon
+attributes and the `defaultIcon` switch (`:712-729`). In their place a part needs only
+`children ?? label`. Features 1–5 now cost their labels (80–100 B), control descriptors
+(100–150 B), state and command stubs (60–100 B) and the `Download` and `Share` specifics
+(150–200 B). `Loading`, `Error` and `Retry` add about 150–250 B. Altogether React grows by
+1.0–1.85 KB including step 7, or 7–12% on 14,864 B. That is down from 11–17% before this
+amendment, and it needs no lazy-icon workaround: the `hostOf(fluidbox).icon()` mitigation is
+dropped.
 
-| Piece                                                                                                                          | Lives in                          |          gzip |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- | ------------: |
-| Five label defaults                                                                                                            | core initial (`labels.ts`)        |      80–100 B |
-| Control descriptors for fullscreen, download, share (`hidden`, label switch)                                                   | core initial (`controls.ts`)      |     100–150 B |
-| Four icons (enter and exit fullscreen, download, share)                                                                        | core initial (`control-icons.ts`) |     200–320 B |
-| State fields, command stubs, option pass-through                                                                               | core initial                      |      60–100 B |
-| `Download` as an anchor variant, `Share`'s `data-copied`, `onMediaError` wiring, `shareUrl` from `href`                        | React                             |     150–200 B |
-| **Total, features 1–5**                                                                                                        |                                   | **600–850 B** |
-| Step 7: two slideshow icons, Slideshow line, `Hotspot` (props, portal into the hotspot layer), `onReachEnd`, two labels, state |                                   | **400–550 B** |
+A page that also imports `baseline.css` pays its 2.6–3.4 KB of CSS, once and cacheable. A page
+that styles the viewer itself pays nothing for looks it replaces. Together with the functional
+CSS, `styles.css` plus `baseline.css` is about 1.7–2.6 KB more than today's `styles.css`, almost
+all of it the glyph data URLs that replace the JS icons.
 
-Together with the redesign's +600 to +1,200 B, React initial grows by about 1,600–2,600 B, or
-11–17% on 14,864 B. That is more than the redesign alone, so the plan includes one mitigation
-up front:
+**Slideshow and Hotspot entry points: recommendation, keep them in the binding entries.** The
+pressure to split them came from the icon cost, which is gone. Each is 150–300 B, and with them
+the React total stays within 7–12%. Separate entries would cost every user an import line and the
+bundle check two consumers per framework. The fallback stays (§8.20): move them out if step 7's
+measurement exceeds the upper estimate.
 
-- **Icons from the viewer chunk.** A control only renders inside the open viewer, and the open
-  viewer means the lazy chunk has loaded. The parts can render their default icon from path data
-  the viewer exposes (`hostOf(fluidbox).icon(name)`) instead of importing `control-icons.ts`.
-  Applied to all controls, old and new, this takes about 400–650 B out of every binding's initial
-  chunk and lands React's total at +1,200 to +2,000 B. Do it in step 2 for React, and the same
-  in step 4.
-
-Then, if still high:
+If the measurement still comes in high:
 
 - The controls (`Toolbar`, `ZoomControls`, `Counter`, `Caption`, the zoom buttons) share one
   `controlPart(kind)` factory, as Angular's parts already share a base directive.
 - `Image`, `Video` and `Iframe` are one component with a `kind` prop under three names.
-- Step 7's `Slideshow` and `Hotspot` move to their own entries (§8.20).
 
 New bundle-check consumers (`tests/bundle/*.ts` and the `entrypoints` list in
 `scripts/check-bundles.ts:4`): rename `filmstrip` → `thumbnails` and `embeds` → `embed`; add
 `react-embed`, `react-model`, `react-spin`, the same for Vue, Solid and Angular, and
-`elements-embed`, `elements-model`, `elements-spin` (15 new), and `hls` and `deep-zoom` once those add-ons exist. Each asserts it carries only its
+`elements-embed`, `elements-model`, `elements-spin` (15 new), and `hls` and `deep-zoom` once those add-ons exist. `baseline.css` gets its own CSS budget, outside every entry's activation total. Each asserts it carries only its
 own add-on and its own framework (§4.7). The new limits are the measurements plus 40 B, rounded up
 to the next 50 B, as now.
 
@@ -344,6 +379,35 @@ Third amendment, steps 1–2:
 - `onZoom`: a listener sees the pose during a pinch and at rest, `visible` matches the scroller's
   viewport, and `--fluidbox-zoom-scale` is set on the box.
 
+Fourth amendment (sub-step 1.12):
+
+- **Snapshots.** `collapsed-visual`, `interactions` and `motion` run with `baseline.css` imported
+  and must match today's snapshots. Glyph-edge antialiasing is the only allowed diff, reviewed one
+  by one (§10.4).
+- **Headless smoke test**, new: the basic pattern with only `styles.css`. Open, swipe, zoom,
+  dismiss and close all work; Previous, Next and Close are text buttons named by their text; the
+  backdrop is opaque (`Canvas`); axe passes.
+- **No icons in the package.** A test greps the built `dist/` for `<svg`, `createElementNS` with
+  the SVG namespace, and path data. It allows them only in `baseline.css`'s data URLs.
+- **Children and names.** Per binding: a part with no children renders its label text with
+  `data-fluidbox-default`; with an icon child it gets `aria-label` from `labels`; `label={false}`
+  names it by its content; a consumer `aria-label` wins. `bindControl` wires the command,
+  disabled, hidden and the fullscreen label on a page button.
+- **`icons` and markup.** The option and `<template data-fluidbox-icon>` put the icon in each
+  default button, and `icons` wins over a template. Under Trusted Types (`csp.spec.ts`) neither
+  violates.
+- **CSP.** `csp.html` with self-hosted glyph tokens shows glyphs and records no violations. With
+  `data-fluidbox-glyphs="off"` it shows text.
+- **Forced colours** (`a11y.spec.ts`, emulated): baseline controls show their text, and focus
+  stays visible.
+- **Loading, Error, Retry**: `data-busy` and `data-error` toggle; a custom `Error` replaces the
+  default UI; `Retry` reloads; the error is announced once.
+- **Layers.** An unlayered app rule overrides a baseline token and a baseline rule. A late
+  baseline transition stays off under reduced motion.
+- **Moved assertions.** `a11y.spec.ts`, `headless.spec.ts`, `frameworks.spec.ts`, `patterns.spec.ts`
+  and `tests/public-api.contract.ts` stop expecting icon SVGs and `fluidboxControlIcon`, and
+  expect text or `aria-label` names.
+
 Step 7:
 
 - Motion speed: at `--fluidbox-motion-speed: 2` the open, close, release and move take half as
@@ -375,6 +439,7 @@ Step 7:
 | 6 docs and examples                          | each framework's step                                 | per page; patterns per framework                                                |
 | 1.10 features 1–5                            | 1.2 (events), 1.4 (the box)                           | 1.6, 1.8, 1.9                                                                   |
 | 1.11 hooks for step 7                        | inside 1.4 and 1.5                                    | —                                                                               |
+| 1.12 CSS split and icon removal              | 1.4 and 1.9 (they edit `styles.css`)                  | 1.5, 1.6, 1.8; before any control work in step 2                                |
 | 7.1–7.4 speed, reachend, slideshow, hotspots | 2 landed, 1.11                                        | each other, and step 4                                                          |
 | 7.5 deep zoom                                | `onZoom`, `zoomable({ max, sharpen })`; after 1.0     | anything                                                                        |
 

@@ -273,3 +273,72 @@ fallback, slideshow timer, hotspot layout) lives in the viewer chunk, which load
 anyway. The exception is deep zoom, whose tile code is its own add-on entry. If the React initial
 measurement comes in over the estimate (§9.3), Slideshow and Hotspot are the two to move to
 `@ogdakke/fluidbox/react/slideshow` and `/hotspot`, since step 7 hasn't shipped them yet.
+
+§8.24 revisits this after the fourth amendment.
+
+## 8.21 Headless: no icons, functional CSS only
+
+**Decided (the user, fourth amendment):** "I'm not super into having any icons baked in.
+Consumers should bring their own icons. … I would like to lean more into headless, with just the
+default styles we need to make things function, and everything else on the consumer."
+
+So the package's JavaScript draws no icons (§2.21). Controls without content render their label as
+text. `styles.css`, `thumbnails.css` and `sheet.css` keep only the rules without which layout,
+gestures, flights, zoom or structural accessibility break (part 10). This is what Radix and Base UI
+do. It is a break from PhotoSwipe and yet-another-react-lightbox, which ship a full skin; the
+baseline stylesheet (§8.22) covers the people who want that.
+
+## 8.22 An opt-in baseline stylesheet in the package
+
+**Decided (the user, clarifying):** "ofc we'd provide a baseline, maybe in docs or in a stylesheet
+you can import that'd give the default styles (still easily overridable), but the core should be
+headless."
+
+The spec first recommended a docs-only starter, with an importable file as the alternative. The
+user chose the file. So `@ogdakke/fluidbox/baseline.css` ships, is imported by no entry, and is
+also printed in the docs for anyone who would rather copy and own it (§10.4).
+
+- The name is `baseline.css`, not `theme.css`. It is the user's word, and "theme" suggests one of
+  several to choose from.
+- It is one file covering the viewer, the thumbnails and the sheet. Their look rules are small,
+  and rules for parts a page doesn't use match nothing. A companion file per add-on would mean
+  three imports to get today's look.
+- All of it sits in `@layer fluidbox-baseline` with `:where()` selectors, and its tokens are
+  custom properties, so one variable or any unlayered rule overrides it.
+
+## 8.23 The baseline draws its glyphs in CSS
+
+**Recommendation: yes, as the overseer proposed, with two fixes.** The baseline draws today's
+glyphs on `[data-fluidbox-default]` controls with `mask-image` and `background-color:
+currentColor`, and hides their text visually. Controls carrying the app's own content have no
+`data-fluidbox-default`, so they are left alone. The JavaScript stays icon-free.
+
+The two fixes:
+
+1. **Content Security Policy.** A `data:` URI in `mask-image` is fetched as an image, so it is
+   governed by `img-src`, not `style-src`. A page with `img-src 'self'` would lose the glyphs, and
+   because their text is visually hidden, those buttons would look empty. Each glyph is
+   therefore a custom property, `--fluidbox-icon-close: url("data:image/svg+xml,…")`. A strict
+   page points them at self-hosted SVG files. Or it adds `data-fluidbox-glyphs="off"` to an
+   ancestor (`<html>` works), which shows the text labels instead. This is an attribute rather
+   than a custom property because CSS can't branch on a property's value without container
+   style queries, which Firefox lacks. `csp.spec.ts` covers both.
+2. **Forced colours.** In forced-colours mode `background-color` is forced, so a masked glyph
+   would vanish. Under `@media (forced-colors: active)` the baseline drops the mask and shows the
+   label text. The text is the accessible name anyway, so nothing else changes.
+
+The alternative was inline SVG in a docs snippet only. It is more robust under CSP, but nobody
+gets today's look from one import. That is what the user asked the baseline to give.
+
+## 8.24 Slideshow and Hotspot stay in the binding entries
+
+**Recommendation: keep §8.20.** The overseer asked whether the headless change alters it. It
+does, in their favour. The worry behind §8.20's fallback was the React initial chunk growing by
+11–17%, and most of that growth was icons: today's six paths plus four new ones, and each
+binding's icon builder. With no icons, the React estimate including step 7 drops to 7–12%
+(§9.3). `Slideshow` and `Hotspot` are 150–300 B together. Separate entries would add an import
+line for every user and two bundle-check consumers per framework, to save less than the icon
+removal already did.
+
+The fallback is unchanged: if step 7's measurement exceeds the upper estimate in §9.3, those two
+move to their own entries before they ship.
