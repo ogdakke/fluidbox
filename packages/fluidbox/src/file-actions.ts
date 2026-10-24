@@ -1,27 +1,6 @@
-import { fileOf } from "./item-file";
-import { idOf, itemLabel } from "./items";
+import { crossOrigin, downloadName, fileOf } from "./item-file";
+import { itemLabel } from "./items";
 import type { FluidboxItem } from "./public-api";
-
-/** The name a download saves as: the one given, else the URL's last path segment, else the item's id. */
-export function downloadName(item: FluidboxItem, file: { src: string; filename?: string }) {
-  if (file.filename) return file.filename;
-  try {
-    const url = new URL(file.src, location.href);
-    if (url.protocol !== "blob:") {
-      const last = decodeURIComponent(url.pathname.split("/").pop() ?? "");
-      if (last) return last;
-    }
-  } catch {
-    // A URL that doesn't parse names nothing.
-  }
-  return idOf(item);
-}
-
-/** Whether a browser ignores `download` on a link to `href`, and navigates instead. */
-export function crossOrigin(href: string) {
-  const url = new URL(href, location.href);
-  return url.protocol !== "blob:" && url.origin !== location.origin;
-}
 
 function save(ownerDocument: Document, href: string, name: string) {
   const link = ownerDocument.createElement("a");

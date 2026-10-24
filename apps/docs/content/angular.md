@@ -81,7 +81,7 @@ Without a `fluidboxViewer` template, the viewer has the default Previous, Next a
 | `ng-template[fluidboxViewer]`                                                    | `FluidboxViewerDirective`                                                           | Renders the template into the viewer's body-level layer, in place of the default controls.                 |
 | `[fluidboxControls]`                                                             | `FluidboxControlsComponent`                                                         | The default Previous, Next and Close buttons, for a `fluidboxViewer` template. `zoom` adds the zoom group. |
 | `button[fluidboxZoomIn]`, `button[fluidboxZoomOut]`, `button[fluidboxZoomReset]` | `FluidboxZoomInDirective`, `FluidboxZoomOutDirective`, `FluidboxZoomResetDirective` | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                                      |
-| `button[fluidboxPrevious]`, `button[fluidboxNext]`, `button[fluidboxClose]`      | `FluidboxPreviousDirective`, `FluidboxNextDirective`, `FluidboxCloseDirective`      | Run the command, with the default icon and label, and disable themselves when they can't.                  |
+| `button[fluidboxPrevious]`, `button[fluidboxNext]`, `button[fluidboxClose]`      | `FluidboxPreviousDirective`, `FluidboxNextDirective`, `FluidboxCloseDirective`      | Run the command, showing their label as text when empty, and disable themselves when they can't.           |
 | `[fluidboxThumbnails]`                                                           | `FluidboxThumbnailsDirective`                                                       | Turns on the thumbnails; on an `ng-template`, the template fills each thumbnail.                           |
 | `ng-template[fluidboxSheet]`                                                     | `FluidboxSheetDirective`                                                            | Turns on the sheet and fills it for the active item.                                                       |
 | `button[fluidboxSheetStop]`                                                      | `FluidboxSheetStopDirective`                                                        | Moves the sheet to a stop when clicked.                                                                    |
@@ -181,7 +181,7 @@ It belongs to the enclosing trigger's item and its `fluidboxReturns`, and throws
 
 ### `fluidboxPrevious`, `fluidboxNext`, `fluidboxClose`
 
-On a `<button>`. A button that is empty after content init (bound text counts as content) gets the default icon and an `aria-label` from `labels`, and every button gets `type="button"` unless it has a `type`. The viewer's state disables the button: Previous and Next at the ends of the gallery, Close while the viewer is closed.
+On a `<button>`. A button that is empty after content init (bound text counts as content) shows its label from `labels` as text, marked `data-fluidbox-default`; a button with content gets the label as its `aria-label`, and every button gets `type="button"` unless it has a `type`. The viewer's state disables the button: Previous and Next at the ends of the gallery, Close while the viewer is closed.
 
 | Input      | Type      | Purpose                                        |
 | ---------- | --------- | ---------------------------------------------- |

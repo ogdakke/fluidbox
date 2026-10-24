@@ -1,8 +1,9 @@
 // The CSS reference's tables come from the package source, read on every build
 // and on every change in dev:
 //
-//   <!-- css: theme -->        the theme variables
-//   <!-- css: inputs -->       the other properties styles.css and thumbnails.css read
+//   <!-- css: theme -->        the theme variables, which baseline.css reads
+//   <!-- css: baseline -->     the other tokens baseline.css reads
+//   <!-- css: inputs -->       the properties styles.css and thumbnails.css read
 //   <!-- css: sheet -->        the properties sheet.css reads
 //   <!-- css: published -->    the properties the runtime sets
 //   <!-- css: parts -->        the viewer's parts, and the attributes that mark yours
@@ -16,7 +17,7 @@
 // `/** … */` comment. Before a declaration, the comment takes its name and
 // value from it; elsewhere, `@input --name` names it. `@default` overrides the
 // default read from the stylesheets, `@on` says where it is read and `@theme`
-// puts it with the theme variables. Published values, parts and states come
+// puts a baseline.css token with the theme variables. Published values, parts and states come
 // from the map in packages/fluidbox/src/css-api.ts.
 //
 // checkCss fails the build when a documented name is in neither the runtime
@@ -44,7 +45,15 @@ interface Row {
   readonly fallback?: string;
 }
 
-type Table = "theme" | "inputs" | "sheet" | "published" | "parts" | "sheet-parts" | "states";
+type Table =
+  | "theme"
+  | "baseline"
+  | "inputs"
+  | "sheet"
+  | "published"
+  | "parts"
+  | "sheet-parts"
+  | "states";
 
 interface Source {
   readonly path: string;
@@ -67,7 +76,7 @@ const blank = (text: string, start: number, end: number) =>
 
 function stylesheets(): (Source & { readonly text: string })[] {
   // In the order the reference lists them.
-  const order = ["styles.css", "thumbnails.css", "sheet.css"];
+  const order = ["styles.css", "thumbnails.css", "sheet.css", "baseline.css"];
   const missing = files(sourceDir, /\.css$/).filter((path) => !order.includes(basename(path)));
   if (missing.length) throw new Error(`css-source.ts doesn't read ${missing.join(", ")}.`);
   return order.map((name) => {
@@ -156,7 +165,7 @@ function registered(name: string, sheets: readonly Source[]): string | undefined
 // The inputs, from the stylesheets' doc comments.
 
 interface Input extends Row {
-  readonly table: "theme" | "inputs" | "sheet";
+  readonly table: "theme" | "baseline" | "inputs" | "sheet";
   readonly path: string;
 }
 
@@ -201,10 +210,12 @@ function inputs(): Input[] {
           }
         }
       }
-      const table = sheet.path.endsWith("sheet.css")
-        ? "sheet"
-        : "theme" in tag
+      const table = sheet.path.endsWith("baseline.css")
+        ? "theme" in tag
           ? "theme"
+          : "baseline"
+        : sheet.path.endsWith("sheet.css")
+          ? "sheet"
           : "inputs";
       found.push({ names, doc, on: tag.on, fallback, table, path: sheet.path });
     }
@@ -289,6 +300,10 @@ const COLUMNS: Record<Table, { head: string[]; row: (row: Row) => string[] }> = 
     head: ["Variable", "Default", "Used for"],
     row: (r) => [code(r.names), r.fallback!, r.doc],
   },
+  baseline: {
+    head: ["Token", "Default", "Read on", "What it does"],
+    row: (r) => [code(r.names), r.fallback!, r.on ?? "", r.doc],
+  },
   inputs: {
     head: ["Property", "Default", "Read on", "What it does"],
     row: (r) => [code(r.names), r.fallback!, r.on ?? "", r.doc],
@@ -305,7 +320,7 @@ const COLUMNS: Record<Table, { head: string[]; row: (row: Row) => string[] }> = 
 
 function tables(): Map<Table, Row[]> {
   const { rows } = map();
-  for (const table of ["theme", "inputs", "sheet"] as const) rows.set(table, []);
+  for (const table of ["theme", "baseline", "inputs", "sheet"] as const) rows.set(table, []);
   for (const input of inputs()) rows.get(input.table)!.push(input);
   return rows;
 }

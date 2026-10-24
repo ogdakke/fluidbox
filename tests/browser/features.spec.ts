@@ -42,7 +42,7 @@ test.describe("the new controls", () => {
     await expect(counter).toHaveText("1 / 5");
     await expect(counter).toHaveAttribute("aria-hidden", "true");
     const download = page.locator(`${dialog} a[data-fluidbox-download]`);
-    await expect(download).toHaveAttribute("aria-label", "Download");
+    await expect(download).toHaveText("Download");
     await expect(download).toHaveAttribute("download", "photo-square.svg");
     await expect(download).toHaveAttribute("href", "/photo-square.svg");
     await expect(page.locator(`${dialog} [data-fluidbox-share]`)).toBeVisible();
@@ -59,6 +59,74 @@ test.describe("the new controls", () => {
     await open(page, "one");
     await expect(page.locator(`${dialog} [data-fluidbox-share]`)).toBeHidden();
     expect(await page.evaluate(() => window.featuresFixture.fluidbox.share())).toBe(false);
+  });
+});
+
+test.describe("headless controls", () => {
+  test("show their labels as text, or your icon named by the label", async ({ page }) => {
+    await load(page);
+    await open(page, "one");
+    const close = page.locator(`${dialog} [data-fluidbox-close]`);
+    await expect(close).toHaveText("Close");
+    await expect(close).toHaveAttribute("data-fluidbox-default", "");
+    await expect(close).not.toHaveAttribute("aria-label");
+    await expect(close.locator("svg")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toBeVisible();
+
+    await load(page, "?icons");
+    await open(page, "one");
+    await expect(close.locator('[data-test="close-icon"]')).toHaveCount(1);
+    await expect(close).toHaveAttribute("aria-label", "Close");
+    await expect(close).not.toHaveAttribute("data-fluidbox-default");
+    // The others still show text.
+    await expect(page.locator(`${dialog} [data-fluidbox-next]`)).toHaveText("Next");
+  });
+
+  test("switch the full screen label as text", async ({ page, isMobile }) => {
+    test.skip(isMobile, "The desktop engines take an element fullscreen.");
+    await load(page);
+    await open(page, "one");
+    const control = page.locator(`${dialog} [data-fluidbox-fullscreen]`);
+    await expect(control).toHaveText("Enter full screen");
+    await control.click();
+    await expect(control).toHaveText("Exit full screen");
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute("data-fullscreen", "");
+    await control.click();
+    await expect(control).toHaveText("Enter full screen");
+  });
+
+  test("bindControl makes the page's own elements controls", async ({ page }) => {
+    await load(page);
+    const counter = page.locator("#page-counter");
+    const next = page.locator("#page-next");
+    await expect(counter).toHaveAttribute("data-fluidbox-counter", "");
+    await expect(counter).toHaveText("");
+    // Closed, there is nowhere to go.
+    await expect(next).toBeDisabled();
+    await open(page, "one");
+    await expect(counter).toHaveText("1 / 5");
+    // Its own name stays.
+    await expect(next).toHaveAttribute("aria-label", "Forward");
+    // The viewer covers the page; a click from a keyboard or script still reaches it.
+    await next.evaluate((button: HTMLButtonElement) => button.click());
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 5");
+    await expect(counter).toHaveText("2 / 5");
+    await expect(page.locator("#page-retry")).toHaveAttribute("aria-label", "Retry");
+  });
+
+  test("a Retry of your own loads the failed slide again", async ({ page }) => {
+    await load(page);
+    await open(page, "broken");
+    const slide = page.locator(shown);
+    await expect(slide).toHaveAttribute("data-error", "");
+    await expect(slide).not.toHaveAttribute("data-busy");
+    await expect(slide.locator("[data-fluidbox-error] [data-fluidbox-retry]")).toHaveText("Retry");
+    const count = async () =>
+      (await log(page)).filter((entry) => entry.startsWith("mediaerror broken")).length;
+    await expect.poll(count).toBe(1);
+    await page.locator("#page-retry").evaluate((button: HTMLButtonElement) => button.click());
+    await expect.poll(count).toBe(2);
+    await expect(slide).toHaveAttribute("data-error", "");
   });
 });
 
@@ -352,10 +420,10 @@ test.describe("full screen", () => {
     await load(page);
     await open(page, "one");
     const control = page.locator(`${dialog} [data-fluidbox-fullscreen]`);
-    await expect(control).toHaveAttribute("aria-label", "Enter full screen");
+    await expect(control).toHaveText("Enter full screen");
     await control.click();
     await expect.poll(() => fullscreen(page)).toBe(true);
-    await expect(control).toHaveAttribute("aria-label", "Exit full screen");
+    await expect(control).toHaveText("Exit full screen");
     expect(await page.evaluate(() => window.featuresFixture.fluidbox.state.fullscreen)).toBe(true);
     // A move keeps it.
     await page.keyboard.press("ArrowRight");
@@ -363,7 +431,7 @@ test.describe("full screen", () => {
     expect(await fullscreen(page)).toBe(true);
     await control.click();
     await expect.poll(() => fullscreen(page)).toBe(false);
-    await expect(control).toHaveAttribute("aria-label", "Enter full screen");
+    await expect(control).toHaveText("Enter full screen");
     expect(await page.evaluate(() => window.featuresFixture.fluidbox.state.fullscreen)).toBe(false);
   });
 

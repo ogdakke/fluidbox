@@ -67,6 +67,7 @@ Returns a `Fluidbox`. Only `items` is required.
 | --------------- | ----------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `items`         | `readonly TItem[] \| FluidboxItemList<TItem>`               |                                           | The items: an array, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                                                                                                                     |
 | `controls`      | `boolean \| readonly FluidboxControlName[]`                 | `true` without `viewer`, else `["close"]` | The default Previous, Next and Close buttons, or some of them, with `zoomIn`, `zoomOut` and `zoomReset` on request. With a `viewer`, Close steps aside while your content has its own. See [Zoom](./patterns/zoom.md#zoom-controls). |
+| `icons`         | `Partial<Record<FluidboxControlName, () => Node>>`          |                                           | Your icons for the default controls. Without one, a control shows its label as text, marked `data-fluidbox-default`; with one, the label becomes its `aria-label`. Each call returns a new Node.                                     |
 | `viewer`        | `({ target, fluidbox, signal }) => void \| (() => void)`    |                                           | Draw your own controls and captions into the viewer. See [Viewer content](#viewer-content).                                                                                                                                          |
 | `renderers`     | `Record<string, FluidboxSlideRenderer<TItem>>`              | `{}`                                      | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                                                                                                            |
 | `zoom`          | `false \| { step?: number; max?: number }`                  | `{ step: 2, max: 4 }`                     | `step` is the scale of a click or double-tap; `max` the largest scale. `false` turns zoom off. See [Zoom](./patterns/zoom.md).                                                                                                       |
@@ -105,6 +106,7 @@ To change `labels`, `zoom`, `controls`, `viewer`, `thumbnails`, `sheet` or `prel
 | `load()`                                 | `Promise<boolean>`        | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                         |
 | `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                                  |
 | `bindOverlay(element, target, options?)` | `() => void`              | Makes an element on a trigger a thumbnail overlay. See [Thumbnail overlays](#thumbnail-overlays).                       |
+| `bindControl(element, name, options?)`   | `() => void`              | Makes an element of yours a control, in the viewer or on the page. See [Controls of your own](#controls-of-your-own).   |
 | `subscribe(listener)`                    | `() => void`              | Calls `listener(state)` after every state change.                                                                       |
 | `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                               |
 | `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.                    |
@@ -278,7 +280,18 @@ const fluidbox = createFluidbox({
 
 The dialog is already named by the item's `alt` or `title`, so a caption that repeats it is read twice. Show something the name doesn't say, such as a credit or a date, and mark it `data-fluidbox-description`: the dialog gets `aria-describedby` pointing at it, whether it is in the layer or in a slide.
 
-The default buttons carry `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`. Any button in the viewer with one of them runs that command, gets the default styling, and is disabled while the command can do nothing. Call `event.preventDefault()` in your own click listener to stop the command. [Headless controls](./patterns/headless.md) has a full caption bar in every framework.
+The default buttons carry `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`. Any button in the viewer with one of them runs that command, is disabled while the command can do nothing, and is hidden where it can't work, as Full screen is on an iPhone. Call `event.preventDefault()` in your own click listener to stop the command. [Headless controls](./patterns/headless.md) has a full caption bar in every framework.
+
+### Controls of your own
+
+The default controls show their labels as text, "Close" and "Next", marked `data-fluidbox-default`; `baseline.css` draws glyphs over them. Give the `icons` option a function per control to put your own icon in instead, and the label becomes the control's `aria-label`:
+
+```ts
+const closeIcon = document.querySelector<HTMLTemplateElement>("#icon-close")!;
+createFluidbox({ items: photos, icons: { close: () => closeIcon.content.cloneNode(true) } });
+```
+
+`fluidbox.bindControl(element, name)` makes an element of yours a control anywhere, on the page as well as in the viewer: it runs the command on a click, gets the control's data attribute, `disabled` and `hidden` from the state, and an `aria-label` unless it has a name of its own. The names are those of `controls`, with `counter`, `fullscreen`, `download`, `share` and `retry`. It returns its cleanup, and takes a `signal`.
 
 ## Keyboard
 

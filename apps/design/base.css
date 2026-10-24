@@ -1,9 +1,11 @@
 /* Base elements and shared components. Class names use the `fb-` prefix. */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+@layer fb-base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 }
 
 html {
@@ -68,9 +70,11 @@ samp {
   border: 1px solid var(--fb-line);
 }
 
-:focus-visible {
-  outline: 1px solid var(--fb-fg);
-  outline-offset: 2px;
+@layer fb-base {
+  :focus-visible {
+    outline: 1px solid var(--fb-fg);
+    outline-offset: 2px;
+  }
 }
 
 ::selection {

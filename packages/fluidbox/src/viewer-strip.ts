@@ -6,8 +6,8 @@ import type {
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
-import { fillsStage, fitSize, posterAspect } from "./fit-size";
-import { idOf, itemLabel, sameItem } from "./items";
+import { fitSize, posterAspect } from "./fit-size";
+import { fillsStage, idOf, itemLabel, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
 import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
 import { paintItemData } from "./item-data";
@@ -632,6 +632,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     error.setAttribute("role", "alert");
     const retry = this.#ownerDocument.createElement("button");
     retry.type = "button";
+    retry.dataset.fluidboxRetry = "";
     retry.textContent = this.#labels.retry;
     retry.addEventListener("click", () => this.#retry(slide.position));
     error.append(`${this.#labels.error} `, retry);
@@ -1234,10 +1235,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
       return;
     }
-    slide.error.hidden = true;
+    this.#showError(slide, false);
     if (item.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
       // Busy until the full image shows, or fails.
-      slide.element.setAttribute("aria-busy", "true");
+      this.#busy(slide, true);
       const current = slide.image.getAttribute("src");
       if (!current) {
         // Nothing paints yet, so the full image can stream straight in.
@@ -1246,7 +1247,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         // The preview is the full image. Rewriting the same source would make
         // Safari decode it again and paint nothing in between.
         slide.fullApplied = true;
-        slide.element.removeAttribute("aria-busy");
+        this.#busy(slide, false);
         slide.image.loading = "eager";
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
       } else {
@@ -1580,8 +1581,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.rendered = false;
       slide.failed = false;
       this.#undraw(slide);
-      slide.error.hidden = true;
-      slide.element.removeAttribute("aria-busy");
+      this.#showError(slide, false);
+      this.#busy(slide, false);
       slide.media.replaceChildren();
       slide.layer?.replaceChildren();
       slide.layer?.remove();
@@ -1600,8 +1601,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.controller = undefined;
     slide.decoded = false;
     slide.fullApplied = false;
-    slide.error.hidden = true;
-    slide.element.removeAttribute("aria-busy");
+    this.#showError(slide, false);
+    this.#busy(slide, false);
     for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
     if (slide.image instanceof HTMLMediaElement) {
       slide.image.pause();
@@ -1660,7 +1661,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.image.src = item.src;
     void this.#revealImage(slide, version);
     slide.decoded = false;
-    slide.error.hidden = true;
+    this.#showError(slide, false);
   }
 
   #painted(image: HTMLImageElement) {
@@ -1753,8 +1754,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (slide.imageVersion !== version) return;
     delete image.dataset.fluidboxImagePending;
     if (slide.fullApplied) {
-      slide.error.hidden = true;
-      slide.element.removeAttribute("aria-busy");
+      this.#showError(slide, false);
+      this.#busy(slide, false);
     }
     // Zoomed in before the full image came: sharpen it now.
     const zoomed = this.#zoomed;
@@ -1785,11 +1786,31 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.decoded = false;
   }
 
+  /** Mark the slide as loading its media, for assistive technology and for styling. */
+  #busy(slide: ViewerSlide, on: boolean) {
+    if (on) slide.element.setAttribute("aria-busy", "true");
+    else slide.element.removeAttribute("aria-busy");
+    slide.element.toggleAttribute("data-busy", on);
+  }
+
+  #showError(slide: ViewerSlide, on: boolean) {
+    slide.error.hidden = !on;
+    slide.element.toggleAttribute("data-error", on);
+  }
+
+  /** Load the slide on show again if it failed. False when it hadn't. */
+  retry() {
+    const slide = this.current;
+    if (!slide || slide.error.hidden) return false;
+    this.#retry(this.#index);
+    return true;
+  }
+
   /** Show the slide's error, and report it as it first shows. */
   #fail(slide: ViewerSlide, kind: FluidboxMediaErrorKind, cause: unknown) {
-    slide.element.removeAttribute("aria-busy");
+    this.#busy(slide, false);
     if (!slide.error.hidden) return;
-    slide.error.hidden = false;
+    this.#showError(slide, true);
     this.onMediaError?.(this.#item(slide.position), kind, cause);
   }
 

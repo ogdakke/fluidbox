@@ -1,6 +1,9 @@
-// Package CSS first so the shared overrides in index.css win on equal specificity.
+// The layer order first, then the package CSS, so the shared overrides in
+// index.css win on equal specificity.
+import "./layers.css";
 import "@ogdakke/fluidbox/styles.css";
 import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 import "./index.css";
 import { mountCopyButtons } from "./copy";
 import { uiIcon } from "./icons";

@@ -4,6 +4,7 @@ import { For } from "solid-js";
 import { itemLabel, type FluidboxImageItem } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/solid";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { photos } from "../shared";
 
 function Details(props: { photo: FluidboxImageItem }) {

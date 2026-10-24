@@ -55,6 +55,9 @@ const initialGzipLimits: Record<Entry, number> = {
   spin: 2_500,
 };
 const cssGzipLimit = 3_650;
+// The opt-in look, glyphs included. No entry imports it, so it counts in no
+// entry's activation total.
+const baselineCssGzipLimit = 3_300;
 // Right-to-left support added about 200 B to every core entry's viewer chunk, and
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
@@ -103,6 +106,7 @@ const css = sizeOf(await readFile("packages/fluidbox/dist/styles.css"));
 // The sheet and the thumbnails ship their own stylesheets on top of the base one.
 const sheetCss = sizeOf(await readFile("packages/fluidbox/dist/sheet.css"));
 const thumbnailsCss = sizeOf(await readFile("packages/fluidbox/dist/thumbnails.css"));
+const baselineCss = sizeOf(await readFile("packages/fluidbox/dist/baseline.css"));
 const tsdownInfo = JSON.parse(await readFile("node_modules/tsdown/package.json", "utf8")) as {
   version: string;
 };
@@ -118,10 +122,12 @@ const report = {
   limits: {
     initialJsGzipBytes: initialGzipLimits,
     cssGzipBytes: cssGzipLimit,
+    baselineCssGzipBytes: baselineCssGzipLimit,
     activationJsGzipBytes: activationJsGzipLimits,
     activationWithCssGzipBytes: activationWithCssGzipLimits,
   },
   css,
+  baselineCss,
   entries: {} as Record<
     Entry,
     {
@@ -189,6 +195,13 @@ console.log(
 );
 if (css.gzipBytes > cssGzipLimit) {
   console.error(`styles: gzip budget exceeded (${cssGzipLimit} B)`);
+  failed = true;
+}
+console.log(
+  `baseline ${String(baselineCss.rawBytes).padStart(7)} B raw  ${String(baselineCss.gzipBytes).padStart(6)} B gzip`,
+);
+if (baselineCss.gzipBytes > baselineCssGzipLimit) {
+  console.error(`baseline: gzip budget exceeded (${baselineCssGzipLimit} B)`);
   failed = true;
 }
 if (jsonPath) await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`);

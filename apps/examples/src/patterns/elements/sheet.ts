@@ -1,6 +1,7 @@
 // #region example
 import { itemLabel } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 
 export function sheet(root: HTMLElement) {
   const gallery = root.querySelector("fluidbox-gallery")!;

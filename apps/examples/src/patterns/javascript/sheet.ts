@@ -7,6 +7,7 @@ import {
 } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { photos } from "../shared";
 
 export function mountSheet(root: HTMLElement) {

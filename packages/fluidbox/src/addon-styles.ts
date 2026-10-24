@@ -1,13 +1,14 @@
 /**
- * Add a media add-on's rules to a document once. The rules sit in `:where()`,
- * so any rule of the page's own wins over them.
+ * Add a media add-on's rules to a document once. The rules are the functional
+ * ones, in the package's first layer and in `:where()`, so any rule of the
+ * page's own wins over them; their look is in baseline.css.
  */
 export function addStyles(ownerDocument: Document, name: string, css: string) {
   const id = `fluidbox-${name}-styles`;
   if (ownerDocument.getElementById(id)) return;
   const style = ownerDocument.createElement("style");
   style.id = id;
-  style.textContent = css;
+  style.textContent = `@layer fluidbox, fluidbox-baseline;\n@layer fluidbox {${css}}\n`;
   ownerDocument.head.append(style);
 }
 

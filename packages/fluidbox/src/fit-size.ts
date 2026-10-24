@@ -1,3 +1,4 @@
+import { fillsStage } from "./items";
 import type { FluidboxItem } from "./public-api";
 
 /**
@@ -23,11 +24,6 @@ export function fitSize(item: FluidboxItem) {
     width: `min(100cqw, calc(${height} * ${itemWidth / itemHeight})${capped(itemWidth)})`,
     height: `min(${(itemHeight / itemWidth) * 100}cqw, ${height}${capped(itemHeight)})`,
   };
-}
-
-/** Whether an item's media box is the whole stage: `fit: "fill"`, which images ignore. */
-export function fillsStage(item: FluidboxItem): boolean {
-  return item.fit === "fill" && item.type !== "image";
 }
 
 /** The aspect of the poster in a fill box, from the item's `width` and `height` when it has them. */

@@ -92,6 +92,13 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
     (fluidbox, state) => !state.item || !canShare() || !hostOf(fluidbox).shareLink(state.item),
     (fluidbox) => fluidbox.share(),
   ),
+  // For an error of your own: it loads the slide on show again.
+  retry: {
+    attribute: "data-fluidbox-retry",
+    label: (labels) => labels.retry,
+    disabled: closed,
+    run: (fluidbox) => hostOf(fluidbox).retry(),
+  },
 };
 
 /** The default controls, in the order they render. */
@@ -113,4 +120,5 @@ export const allControlNames: readonly FluidboxControlName[] = [
   "fullscreen",
   "download",
   "share",
+  "retry",
 ];

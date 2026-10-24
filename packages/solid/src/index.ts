@@ -40,7 +40,6 @@ import {
   type FluidboxIconControlName,
   controlNames,
   createTrigger,
-  fluidboxControlIcon,
   fluidboxControls,
   latestFindTrigger,
   resolveLabels,
@@ -540,13 +539,17 @@ function action(name: FluidboxIconControlName) {
             return control.disabled(context.state());
           },
           get "aria-label"() {
-            return isEmpty() ? control.label(context.labels()) : undefined;
+            return isEmpty() ? undefined : control.label(context.labels());
           },
         },
         attributes,
         {
           [control.attribute]: "",
           "data-fluidbox-managed": "",
+          // Without children it shows its label as text, which names it.
+          get "data-fluidbox-default"() {
+            return isEmpty() ? "" : undefined;
+          },
           onClick(event: MouseEvent) {
             callHandler(local.onClick, event);
             if (event.defaultPrevented) return;
@@ -555,28 +558,12 @@ function action(name: FluidboxIconControlName) {
             void control.run(context.fluidbox, event);
           },
           get children() {
-            return isEmpty() ? defaultIcon(name) : content();
+            return isEmpty() ? control.label(context.labels()) : content();
           },
         },
       ) as never,
     );
   };
-}
-
-function defaultIcon(name: FluidboxIconControlName): JSX.Element {
-  return createComponent(
-    Dynamic,
-    mergeProps(fluidboxControlIcon.attributes, {
-      component: "svg",
-      "data-fluidbox-icon": "",
-      get children() {
-        return createComponent(Dynamic, {
-          component: "path",
-          d: fluidboxControlIcon.paths[name],
-        } as never);
-      },
-    }) as never,
-  );
 }
 
 const Close = action("close");

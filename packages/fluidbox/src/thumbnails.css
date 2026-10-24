@@ -1,4 +1,5 @@
-/* The thumbnails' layout and variables. */
+/* The thumbnails' layout and variables. Their look is in baseline.css. */
+@layer fluidbox, fluidbox-baseline;
 
 /* The thumbnails. It is viewer content like your own: it mounts beside the
    viewer's layer, in [data-fluidbox-addons], reveals and dismisses with it
@@ -6,265 +7,215 @@
    along the bottom and keeps the photo clear of itself; move [data-fluidbox-thumbnails-dock] anywhere with your own CSS,
    and set --fluidbox-thumbnails-axis: y on the dialog to run it as a column.
    :where() keeps every rule here at zero specificity, so yours win. */
-:where(:is([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
-  /**
-   * `y` runs the thumbnails as a column. The add-on reads it, so a media query
-   * can change it.
-   * @on Dialog
-   */
-  --fluidbox-thumbnails-axis: x;
-  /**
-   * The thumbnails' size. The strip's height and its end padding follow it,
-   * so the first and last thumbnails centre.
-   * @default `52px`; `38px` on touch
-   * @on Dialog
-   */
-  --fluidbox-thumbnails-item-size: 52px;
-  /** Space between thumbnails. @default `5px`; `3px` on touch @on Dialog */
-  --fluidbox-thumbnails-gap: 5px;
-  /* The strip is the thumbnails plus 6px either side; the space adds 10px
-     around it and the bottom safe area. */
-  /**
-   * The room a row keeps below the photo. `0px` lets the photo run under it.
-   * @default the item size plus `32px` (`30px` on touch) and the bottom safe area
-   * @on Dialog
-   */
-  --fluidbox-thumbnails-space: calc(
-    var(--fluidbox-thumbnails-item-size) + 32px + env(safe-area-inset-bottom, 0px)
-  );
-}
-@media (hover: none) and (pointer: coarse) {
+@layer fluidbox {
   :where(:is([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
-    --fluidbox-thumbnails-item-size: 38px;
-    --fluidbox-thumbnails-gap: 3px;
+    /**
+     * `y` runs the thumbnails as a column. The add-on reads it, so a media query
+     * can change it.
+     * @on Dialog
+     */
+    --fluidbox-thumbnails-axis: x;
+    /**
+     * The thumbnails' size. The strip's height and its end padding follow it,
+     * so the first and last thumbnails centre.
+     * @default `52px`; `38px` on touch
+     * @on Dialog
+     */
+    --fluidbox-thumbnails-item-size: 52px;
+    /** Space between thumbnails. @default `5px`; `3px` on touch @on Dialog */
+    --fluidbox-thumbnails-gap: 5px;
+    /* The strip is the thumbnails plus 6px either side; the space adds 10px
+       around it and the bottom safe area. */
+    /**
+     * The room a row keeps below the photo. `0px` lets the photo run under it.
+     * @default the item size plus `32px` (`30px` on touch) and the bottom safe area
+     * @on Dialog
+     */
     --fluidbox-thumbnails-space: calc(
-      var(--fluidbox-thumbnails-item-size) + 30px + env(safe-area-inset-bottom, 0px)
+      var(--fluidbox-thumbnails-item-size) + 32px + env(safe-area-inset-bottom, 0px)
     );
   }
-}
-/* A row keeps the photo above it, by --fluidbox-thumbnails-space; set that to
-   0px to let the photo run under a row you moved. The slides still reach
-   under it, so a swipe or a dismiss is never cut at its edge. */
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-dialog]:has([data-fluidbox-thumbnails-scroll][aria-orientation="horizontal"]) {
-  --fluidbox-content-height: calc(
-    var(--fluidbox-height, 100svh) - var(--fluidbox-thumbnails-space) - var(--fluidbox-stage-top) -
-      var(--fluidbox-stage-bottom)
-  );
-}
-
-:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-dock] {
-  position: absolute;
-  z-index: 5;
-  inset-inline: 0;
-  bottom: 0;
-  height: var(--fluidbox-thumbnails-space);
-  min-width: 0;
-  overflow: hidden;
-  background: transparent;
-}
-/** How fast the strip hides and returns, as on zoom. @input --fluidbox-thumbnails-zoom-duration @on Thumbnails */
-/** How far the strip drops as it hides. @input --fluidbox-thumbnails-zoom-travel @on Thumbnails */
-:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
-  /* Where the strip goes as it hides: down off the bottom, or aside. */
-  --fluidbox-thumbnails-hide: translateY(var(--fluidbox-thumbnails-zoom-travel, 18px));
-  position: relative;
-  inset-inline: 0;
-  align-self: start;
-  margin-block-start: 10px;
-  height: calc(var(--fluidbox-thumbnails-item-size) + 12px);
-  overflow: hidden;
-  touch-action: pan-x;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  will-change: transform, opacity;
-  opacity: 1;
-  transform: none;
-  transition:
-    opacity var(--fluidbox-thumbnails-zoom-duration, 180ms) linear,
-    transform var(--fluidbox-thumbnails-zoom-duration, 180ms) ease-out;
-}
-:where([data-fluidbox-viewer][data-fluidbox-prepared]) [data-fluidbox-thumbnails] {
-  visibility: hidden;
-  pointer-events: none;
-}
-/* It gives way as the photo is dismissed, fading with the rest of the
-   viewer's content, and as it is zoomed. */
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-dialog]:is([data-dismissing], [data-fluidbox-status="closing"])
-  [data-fluidbox-thumbnails] {
-  transform: var(--fluidbox-thumbnails-hide);
-  pointer-events: none;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-zoomed]
-  [data-fluidbox-thumbnails] {
-  opacity: 0;
-  transform: var(--fluidbox-thumbnails-hide);
-  pointer-events: none;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-zoomed]
-  [data-fluidbox-thumbnails-dock] {
-  pointer-events: none;
-}
-/* And to a sheet as it rises. */
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-fluidbox-sheet-host]
-  [data-fluidbox-thumbnails-dock] {
-  opacity: calc(1 - var(--fluidbox-sheet-progress) * 3 - var(--fluidbox-sheet-dismiss) * 3);
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-sheet-raised]
-  [data-fluidbox-thumbnails-dock] {
-  pointer-events: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
-    transition-duration: 0ms;
+  @media (hover: none) and (pointer: coarse) {
+    :where(:is([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-dialog]) {
+      --fluidbox-thumbnails-item-size: 38px;
+      --fluidbox-thumbnails-gap: 3px;
+      --fluidbox-thumbnails-space: calc(
+        var(--fluidbox-thumbnails-item-size) + 30px + env(safe-area-inset-bottom, 0px)
+      );
+    }
   }
-}
-
-:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-scroll] {
-  display: flex;
-  gap: var(--fluidbox-thumbnails-gap);
-  height: 100%;
-  /* Half the window less half a thumbnail, so the first and last centre. */
-  padding-inline: calc(50vw - var(--fluidbox-thumbnails-item-size) / 2);
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scroll-padding-inline: calc(50vw - var(--fluidbox-thumbnails-item-size) / 2);
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-  touch-action: pan-x;
-  overflow-anchor: none;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-scroll]::-webkit-scrollbar {
-  display: none;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-track] {
-  position: relative;
-  flex: 0 0 auto;
-  height: 100%;
-}
-/** The corners of thumbnails. @input --fluidbox-thumbnails-item-radius @theme */
-:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] {
-  all: unset;
-  position: absolute;
-  box-sizing: border-box;
-  width: var(--fluidbox-thumbnails-item-size);
-  height: var(--fluidbox-thumbnails-item-size);
-  margin-block: 6px;
-  overflow: hidden;
-  border-radius: var(--fluidbox-thumbnails-item-radius, 3px);
-  opacity: 0.58;
-  scroll-snap-align: center;
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-  transition: opacity 120ms linear;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-item][aria-selected="true"] {
-  opacity: 1;
-}
-/* Not by opacity alone: the current thumbnail has a bar along its foot. A
-   border, so it stays in forced colours. */
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-item][aria-selected="true"]::after {
-  content: "";
-  position: absolute;
-  inset-inline: 25%;
-  bottom: 3px;
-  border-top: 3px solid var(--fluidbox-color, white);
-  border-radius: 2px;
-  box-shadow: 0 0 2px oklch(0% 0 0 / 0.6);
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-item]:focus-visible {
-  outline: 2px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: 2px;
-}
-@media (forced-colors: active) {
+  /* A row keeps the photo above it, by --fluidbox-thumbnails-space; set that to
+     0px to let the photo run under a row you moved. The slides still reach
+     under it, so a swipe or a dismiss is never cut at its edge. */
   :where([data-fluidbox-viewer], [data-fluidbox-flight])
-    [data-fluidbox-thumbnails-item][aria-selected="true"] {
-    outline: 2px solid SelectedItem;
+    [data-fluidbox-dialog]:has([data-fluidbox-thumbnails-scroll][aria-orientation="horizontal"]) {
+    --fluidbox-content-height: calc(
+      var(--fluidbox-height, 100svh) - var(--fluidbox-thumbnails-space) -
+        var(--fluidbox-stage-top) - var(--fluidbox-stage-bottom)
+    );
   }
-}
-@media (prefers-contrast: more) {
-  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] {
-    opacity: 0.8;
-  }
-}
-@media (hover: none) and (pointer: coarse) {
-  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
-    margin-block-start: 8px;
-  }
-}
 
-/* A column (--fluidbox-thumbnails-axis: y), down the start side by default. It floats
-   over the slides, which still cross the whole window. */
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-dock]:has([aria-orientation="vertical"]) {
-  inset-block: 0;
-  inset-inline: 0 auto;
-  width: calc(var(--fluidbox-thumbnails-item-size) + 32px);
-  height: auto;
-  padding-inline-start: env(safe-area-inset-left, 0px);
-}
-:where([data-fluidbox-viewer][dir="rtl"])
-  [data-fluidbox-thumbnails-dock]:has([aria-orientation="vertical"]) {
-  padding-inline-start: env(safe-area-inset-right, 0px);
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails]:has([aria-orientation="vertical"]) {
-  --fluidbox-thumbnails-hide: translateX(calc(-1 * var(--fluidbox-thumbnails-zoom-travel, 18px)));
-  width: calc(var(--fluidbox-thumbnails-item-size) + 12px);
-  height: 100%;
-  margin: 0 auto;
-  touch-action: pan-y;
-}
-:where([data-fluidbox-viewer][dir="rtl"])
-  [data-fluidbox-thumbnails]:has([aria-orientation="vertical"]) {
-  --fluidbox-thumbnails-hide: translateX(var(--fluidbox-thumbnails-zoom-travel, 18px));
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-scroll][aria-orientation="vertical"] {
-  flex-direction: column;
-  padding-inline: 0;
-  padding-block: calc(
-    var(--fluidbox-height, 100svh) / 2 - var(--fluidbox-thumbnails-item-size) / 2
-  );
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-inline: 0;
-  scroll-padding-block: calc(
-    var(--fluidbox-height, 100svh) / 2 - var(--fluidbox-thumbnails-item-size) / 2
-  );
-  scroll-snap-type: y proximity;
-  touch-action: pan-y;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-scroll][aria-orientation="vertical"]
-  [data-fluidbox-thumbnails-track] {
-  width: 100%;
-}
-:where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-thumbnails-scroll][aria-orientation="vertical"]
-  [data-fluidbox-thumbnails-item] {
-  margin-block: 0;
-  margin-inline: 6px;
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-dock] {
+    position: absolute;
+    z-index: 5;
+    inset-inline: 0;
+    bottom: 0;
+    height: var(--fluidbox-thumbnails-space);
+    min-width: 0;
+    overflow: hidden;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
+    position: relative;
+    inset-inline: 0;
+    align-self: start;
+    margin-block-start: 10px;
+    height: calc(var(--fluidbox-thumbnails-item-size) + 12px);
+    overflow: hidden;
+    touch-action: pan-x;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    will-change: transform, opacity;
+    opacity: 1;
+    transform: none;
+  }
+  :where([data-fluidbox-viewer][data-fluidbox-prepared]) [data-fluidbox-thumbnails] {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  /* It gives way as the photo is dismissed and as it is zoomed. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog]:is([data-dismissing], [data-fluidbox-status="closing"])
+    [data-fluidbox-thumbnails] {
+    pointer-events: none;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-zoomed]
+    [data-fluidbox-thumbnails] {
+    opacity: 0;
+    pointer-events: none;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-zoomed]
+    [data-fluidbox-thumbnails-dock] {
+    pointer-events: none;
+  }
+  /* And to a sheet as it rises. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-sheet-raised]
+    [data-fluidbox-thumbnails-dock] {
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
+      transition-duration: 0ms;
+    }
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-scroll] {
+    display: flex;
+    gap: var(--fluidbox-thumbnails-gap);
+    height: 100%;
+    /* Half the window less half a thumbnail, so the first and last centre. */
+    padding-inline: calc(50vw - var(--fluidbox-thumbnails-item-size) / 2);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: calc(50vw - var(--fluidbox-thumbnails-item-size) / 2);
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    overflow-anchor: none;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-scroll]::-webkit-scrollbar {
+    display: none;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-track] {
+    position: relative;
+    flex: 0 0 auto;
+    height: 100%;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] {
+    all: unset;
+    position: absolute;
+    box-sizing: border-box;
+    width: var(--fluidbox-thumbnails-item-size);
+    height: var(--fluidbox-thumbnails-item-size);
+    margin-block: 6px;
+    overflow: hidden;
+    scroll-snap-align: center;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+  }
+  @media (forced-colors: active) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      [data-fluidbox-thumbnails-item][aria-selected="true"] {
+      outline: 2px solid SelectedItem;
+    }
+  }
+  @media (hover: none) and (pointer: coarse) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
+      margin-block-start: 8px;
+    }
+  }
+
+  /* A column (--fluidbox-thumbnails-axis: y), down the start side by default. It floats
+     over the slides, which still cross the whole window. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-dock]:has([aria-orientation="vertical"]) {
+    inset-block: 0;
+    inset-inline: 0 auto;
+    width: calc(var(--fluidbox-thumbnails-item-size) + 32px);
+    height: auto;
+    padding-inline-start: env(safe-area-inset-left, 0px);
+  }
+  :where([data-fluidbox-viewer][dir="rtl"])
+    [data-fluidbox-thumbnails-dock]:has([aria-orientation="vertical"]) {
+    padding-inline-start: env(safe-area-inset-right, 0px);
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails]:has([aria-orientation="vertical"]) {
+    width: calc(var(--fluidbox-thumbnails-item-size) + 12px);
+    height: 100%;
+    margin: 0 auto;
+    touch-action: pan-y;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-scroll][aria-orientation="vertical"] {
+    flex-direction: column;
+    padding-inline: 0;
+    padding-block: calc(
+      var(--fluidbox-height, 100svh) / 2 - var(--fluidbox-thumbnails-item-size) / 2
+    );
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-inline: 0;
+    scroll-padding-block: calc(
+      var(--fluidbox-height, 100svh) / 2 - var(--fluidbox-thumbnails-item-size) / 2
+    );
+    scroll-snap-type: y proximity;
+    touch-action: pan-y;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-scroll][aria-orientation="vertical"]
+    [data-fluidbox-thumbnails-track] {
+    width: 100%;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-scroll][aria-orientation="vertical"]
+    [data-fluidbox-thumbnails-item] {
+    margin-block: 0;
+    margin-inline: 6px;
+  }
 }

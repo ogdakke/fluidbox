@@ -1257,14 +1257,14 @@ test("update changes labels, controls, zoom and the thumbnails while the viewer 
   const overlay = page.locator("[data-fluidbox-viewer]");
   const close = page.locator("[data-fluidbox-portal] [data-fluidbox-close]");
   await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
-  await expect(close).toHaveAttribute("aria-label", "Close");
+  await expect(close).toHaveAccessibleName("Close");
 
   await page.evaluate(() =>
     window.headlessSecondaryViewer.update({
       labels: { close: "Sulje", position: (index, count) => `Kuva ${index + 1}/${count}` },
     }),
   );
-  await expect(close).toHaveAttribute("aria-label", "Sulje");
+  await expect(close).toHaveAccessibleName("Sulje");
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     /^Kuva 1\//,

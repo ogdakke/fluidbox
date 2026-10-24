@@ -1,4 +1,3 @@
-import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS } from "./control-icons";
 import { defaultLabels, type FluidboxLabels } from "./labels";
 import { idOf, indexIn, toList } from "./items";
 import { dataAttributes } from "./item-data";
@@ -29,13 +28,13 @@ export interface FluidboxStaticViewerOptions<TItem extends FluidboxItem = Fluidb
 }
 
 /**
- * An element of the server's copy, by HTML attribute names. A boolean
- * attribute that is on has the value `""`.
+ * An element of the server's copy, by HTML attribute names, or a text. A
+ * boolean attribute that is on has the value `""`.
  */
 export interface FluidboxStaticNode {
   readonly tag: string;
   readonly attributes: Readonly<Record<string, string>>;
-  readonly children: readonly FluidboxStaticNode[];
+  readonly children: readonly (FluidboxStaticNode | string)[];
 }
 
 type Attributes = Record<string, string | number | boolean | undefined>;
@@ -43,7 +42,7 @@ type Attributes = Record<string, string | number | boolean | undefined>;
 const node = (
   tag: string,
   values: Attributes,
-  ...children: (FluidboxStaticNode | null)[]
+  ...children: (FluidboxStaticNode | string | null)[]
 ): FluidboxStaticNode => {
   const attributes: Record<string, string> = {};
   for (const [name, value] of Object.entries(values)) {
@@ -52,13 +51,6 @@ const node = (
   }
   return { tag, attributes, children: children.filter((child) => child !== null) };
 };
-
-const icon = (name: keyof typeof CONTROL_ICON_PATHS) =>
-  node(
-    "svg",
-    { ...CONTROL_ICON_ATTRIBUTES, "data-fluidbox-icon": "" },
-    node("path", { d: CONTROL_ICON_PATHS[name] }),
-  );
 
 /**
  * The image's `width` and `height` in its own ratio, scaled past any screen.
@@ -142,13 +134,14 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
           ? href?.(null)
           : undefined
         : href?.(idOf(items.get(target)));
-    const common = { [`data-fluidbox-${name}`]: "", "aria-label": label };
+    // Its label as text, as the viewer draws it.
+    const common = { [`data-fluidbox-${name}`]: "", "data-fluidbox-default": "" };
     return link
-      ? node("a", { ...common, href: link }, icon(name))
+      ? node("a", { ...common, href: link }, label)
       : node(
           "button",
           { ...common, type: "button", disabled: name !== "close" && target === null, inert: true },
-          icon(name),
+          label,
         );
   };
   const step = (by: number) => {
@@ -229,7 +222,9 @@ const escape = (value: string) =>
 
 const VOID = new Set(["img", "source"]);
 
-const html = ({ tag, attributes, children }: FluidboxStaticNode): string => {
+const html = (each: FluidboxStaticNode | string): string => {
+  if (typeof each === "string") return escape(each);
+  const { tag, attributes, children } = each;
   const open = `<${tag}${Object.entries(attributes)
     .map(([name, value]) => (value === "" ? ` ${name}` : ` ${name}="${escape(value)}"`))
     .join("")}>`;

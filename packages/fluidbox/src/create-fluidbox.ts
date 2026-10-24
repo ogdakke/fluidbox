@@ -10,6 +10,7 @@ import {
   type Fluidbox,
   type FluidboxBindOptions,
   type FluidboxCommandOptions,
+  type FluidboxControlName,
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
@@ -27,7 +28,6 @@ import {
   type FluidboxValueChangeAction,
   type FluidboxZoomCommandOptions,
   type FluidboxZoomState,
-  FluidboxMediaErrorEvent,
   FluidboxSheetEvent,
   FluidboxZoomEvent,
 } from "./public-api";
@@ -132,7 +132,7 @@ function sameOptions(a: unknown, b: unknown): boolean {
 
 type Settings<TItem extends FluidboxItem> = Pick<
   FluidboxOptions<TItem>,
-  "controls" | "viewer" | "thumbnails" | "sheet"
+  "controls" | "icons" | "viewer" | "thumbnails" | "sheet"
 >;
 
 /**
@@ -213,8 +213,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       : undefined;
     this.#source = toSource(this.#list);
     this.#labels = { ...resolveLabels(options.labels) };
-    const { sheet, thumbnails, controls, viewer } = options;
-    this.#settings = { sheet, thumbnails, controls, viewer };
+    const { sheet, thumbnails, controls, icons, viewer } = options;
+    this.#settings = { sheet, thumbnails, controls, icons, viewer };
     this.#origins = new OriginRegistry(this.#triggerAdapter(options));
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
@@ -314,12 +314,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   /** The viewer's layer: the default controls, then your viewer content. */
   #portal(): FluidboxViewerLayer {
-    const { controls, viewer } = this.#settings;
+    const { controls, icons, viewer } = this.#settings;
     // The defaults until you draw your own viewer, and Close after, until it
     // draws its own: the one way out a screen reader's touch can count on.
     const shown = controls ?? (viewer ? (["close"] as const) : true);
     const names = shown === true ? defaultControls : shown || [];
-    return { fluidbox: this, controls: names, viewer, labels: this.#labels };
+    return { fluidbox: this, controls: names, viewer, labels: this.#labels, icons };
   }
 
   /** What the viewer and its add-ons drive this fluidbox with. */
@@ -346,18 +346,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         this.#fullscreen = on;
         this.#publish(this.#state.status, this.#state.index);
       },
-      mediaError: (index, kind, cause) => {
-        const item = this.#source.getItem(index);
-        this.dispatchEvent(
-          new FluidboxMediaErrorEvent("mediaerror", {
-            value: idOf(item),
-            index,
-            item,
-            kind,
-            cause,
-          }),
-        );
-      },
+      mediaError: (event) => void this.dispatchEvent(event),
     };
   }
 
@@ -410,6 +399,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const previous = this.#settings;
     const next: Settings<TItem> = {
       controls: has("controls") ? options.controls : previous.controls,
+      icons: has("icons") ? options.icons : previous.icons,
       viewer: has("viewer") ? options.viewer : previous.viewer,
       thumbnails: has("thumbnails") ? options.thumbnails : previous.thumbnails,
       sheet: has("sheet") ? options.sheet : previous.sheet,
@@ -453,6 +443,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     if (
       relabeled ||
       !sameOptions(next.controls, previous.controls) ||
+      !sameOptions(next.icons, previous.icons) ||
       next.viewer !== previous.viewer
     ) {
       this.#viewer?.setPortal(this.#portal());
@@ -667,6 +658,24 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     }, options.signal);
   }
 
+  bindControl(
+    element: HTMLElement,
+    name: FluidboxControlName,
+    options: { readonly signal?: AbortSignal } = {},
+  ) {
+    this.#assertAlive();
+    // The control code loads on first use, so a page that binds none skips it.
+    let release: (() => void) | undefined;
+    let released = false;
+    void import("./control-wiring").then(({ bindControl }) => {
+      if (!released) release = bindControl(this, element, name);
+    });
+    return this.#keep(() => {
+      released = true;
+      release?.();
+    }, options.signal);
+  }
+
   bindOverlay(
     element: HTMLElement,
     value: FluidboxTriggerValue<TItem>,
@@ -815,6 +824,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         this.#command(name, target, reason === "items" ? "api" : reason),
       takeOver: (value) => this.#command("open", value, "api", { instant: true }),
       shareLink: (item) => this.#shareLink(item as TItem),
+      retry: () => Promise.resolve(this.#state.status === "open" && !!this.#viewer?.retry()),
+      labels: this.#labels,
       zoom: (name, reason) =>
         this.#zoomCommand(
           (from) =>

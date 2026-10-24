@@ -74,7 +74,7 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 | `Fluidbox.Viewer`                           | its slot, in the viewer     | Your own controls and captions, teleported into the viewer's layer.                                       |
 | `Fluidbox.Controls`                         | three `<button>`s           | The default Previous, Next and Close, for a `Viewer` with content of its own. `zoom` adds the zoom group. |
 | `Fluidbox.ZoomIn`, `.ZoomOut`, `.ZoomReset` | a `<button>`                | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                                     |
-| `Fluidbox.Previous`, `.Next`, `.Close`      | a `<button>`                | Run the command, with the default icon and label, and disable themselves when they can't.                 |
+| `Fluidbox.Previous`, `.Next`, `.Close`      | a `<button>`                | Run the command, showing their label as text when empty, and disable themselves when they can't.          |
 | `Fluidbox.Thumbnails`                       | its slot, in each thumbnail | Turns the thumbnails on, with your thumbnails when it has a slot.                                         |
 | `Fluidbox.Sheet`                            | its slot, in the sheet      | Turns the sheet on, with your content for the active item; its attributes go on the sheet.                |
 | `Fluidbox.SheetStop`                        | a `<button>`                | Moves the sheet to a stop, or back down when it is there.                                                 |
@@ -162,7 +162,7 @@ No props. Inside a travelling `ThumbnailOverlay`, it renders a `<span data-fluid
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
-With an empty slot each shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of a gallery that doesn't loop, `Close` while the viewer is closed. Pass `:disabled` to override it. Your `@click` runs first; `event.preventDefault()` stops the command. They work anywhere inside `Root`, in the viewer or on the page.
+With an empty slot each shows its label from `labels` as text, marked `data-fluidbox-default`; with content, the label becomes its `aria-label`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of a gallery that doesn't loop, `Close` while the viewer is closed. Pass `:disabled` to override it. Your `@click` runs first; `event.preventDefault()` stops the command. They work anywhere inside `Root`, in the viewer or on the page.
 
 ### `Fluidbox.Thumbnails`
 

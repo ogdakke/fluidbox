@@ -3,6 +3,7 @@ import { Component } from "@angular/core";
 import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
 import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { arabic, photos } from "../shared";
 
 @Component({

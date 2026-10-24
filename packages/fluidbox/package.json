@@ -17,12 +17,14 @@
     "./src/styles.css",
     "./src/sheet.css",
     "./src/thumbnails.css",
+    "./src/baseline.css",
     "./dist/elements.js",
     "./dist/thumbnails.js",
     "./dist/sheet.js",
     "./dist/styles.css",
     "./dist/sheet.css",
-    "./dist/thumbnails.css"
+    "./dist/thumbnails.css",
+    "./dist/baseline.css"
   ],
   "exports": {
     ".": {
@@ -88,6 +90,10 @@
     "./thumbnails.css": {
       "types": "./dist/thumbnails.css.d.ts",
       "default": "./dist/thumbnails.css"
+    },
+    "./baseline.css": {
+      "types": "./dist/baseline.css.d.ts",
+      "default": "./dist/baseline.css"
     }
   },
   "scripts": {

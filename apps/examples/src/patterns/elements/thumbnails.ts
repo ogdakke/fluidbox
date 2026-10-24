@@ -1,5 +1,6 @@
 // #region example
 import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 
 export function thumbnails(root: HTMLElement) {
   // Your own thumbnails. The selected button has data-fluidbox-selected.

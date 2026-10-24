@@ -88,6 +88,9 @@ const overlayFlight = (overlay: HTMLElement) => {
   return flight === "copy" || flight === "frame" ? flight : "none";
 };
 
+/** One factory per icon template, so the same templates make the same icons option. */
+const iconFactories = new WeakMap<HTMLTemplateElement, () => Node>();
+
 const closedState: FluidboxState = Object.freeze({
   status: "closed",
   value: null,
@@ -169,6 +172,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   #revealTrigger: FluidboxOptions["revealTrigger"];
   #renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>> = {};
   #viewer: FluidboxViewerRenderer<any> | undefined;
+  #icons: FluidboxOptions["icons"];
   #labels: Partial<FluidboxLabels> | undefined;
   #zoom: FluidboxOptions["zoom"] | undefined;
   #definitions = new Map<string, DeclarativeFluidboxDefinition>();
@@ -343,6 +347,35 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#queueUpdate();
   }
 
+  /** Your icons for the default controls. They win over a `<template data-fluidbox-icon>`. */
+  get icons(): FluidboxOptions["icons"] {
+    return this.#icons;
+  }
+
+  set icons(icons: FluidboxOptions["icons"]) {
+    this.#icons = icons;
+    this.#queueUpdate();
+  }
+
+  /**
+   * The icons for the default controls: each `<template data-fluidbox-icon="close">`
+   * in the gallery, cloned into every button of that control, then the `icons` property.
+   */
+  #iconOptions(): FluidboxOptions["icons"] {
+    const icons: Record<string, () => Node> = {};
+    for (const template of this.querySelectorAll<HTMLTemplateElement>(
+      ":scope > template[data-fluidbox-icon]",
+    )) {
+      let factory = iconFactories.get(template);
+      if (!factory) {
+        factory = () => template.content.cloneNode(true);
+        iconFactories.set(template, factory);
+      }
+      icons[template.dataset.fluidboxIcon!] = factory;
+    }
+    return { ...icons, ...this.#icons };
+  }
+
   get labels(): Partial<FluidboxLabels> | undefined {
     return this.#labels;
   }
@@ -498,6 +531,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       loop: this.hasAttribute("loop"),
       preload: this.loading,
       controls: undefined,
+      icons: this.#iconOptions(),
       viewer: this.#viewerRenderer,
       thumbnails,
       sheet: sheetElement ? this.#sheetOptions(sheetElement) : undefined,

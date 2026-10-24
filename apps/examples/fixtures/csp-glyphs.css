@@ -1,0 +1,17 @@
+/* The glyph tokens as files of this origin: the strict CSP's img-src blocks the baseline's data: URLs. */
+:root {
+  --fluidbox-icon-close: url("/glyphs/close.svg");
+  --fluidbox-icon-previous: url("/glyphs/previous.svg");
+  --fluidbox-icon-next: url("/glyphs/next.svg");
+  --fluidbox-icon-zoom-in: url("/glyphs/zoom-in.svg");
+  --fluidbox-icon-zoom-out: url("/glyphs/zoom-out.svg");
+  --fluidbox-icon-zoom-reset: url("/glyphs/zoom-reset.svg");
+  --fluidbox-icon-enter-fullscreen: url("/glyphs/enter-fullscreen.svg");
+  --fluidbox-icon-exit-fullscreen: url("/glyphs/exit-fullscreen.svg");
+  --fluidbox-icon-download: url("/glyphs/download.svg");
+  --fluidbox-icon-share: url("/glyphs/share.svg");
+  --fluidbox-icon-play-slideshow: url("/glyphs/play-slideshow.svg");
+  --fluidbox-icon-pause-slideshow: url("/glyphs/pause-slideshow.svg");
+  --fluidbox-icon-retry: url("/glyphs/retry.svg");
+  --fluidbox-icon-embed-play: url("/glyphs/embed-play.svg");
+}

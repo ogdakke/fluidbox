@@ -1,0 +1,5 @@
+/* The cascade layers, in order: load this before any other stylesheet. The
+   design system's reset and focus ring sit under fluidbox's own layers, so the
+   viewer's rules and the baseline look win over them as they did before the
+   package used layers. The rest of the design system is unlayered and wins. */
+@layer fb-base, fluidbox, fluidbox-baseline;

@@ -535,8 +535,7 @@ test("gallery options change on the open viewer without a rebuild", async ({ pag
     gallery.labels = { close: "Sulje" };
     gallery.toggleAttribute("nozoom", true);
   });
-  await expect(page.locator("[data-fluidbox-portal] [data-fluidbox-close]")).toHaveAttribute(
-    "aria-label",
+  await expect(page.locator("[data-fluidbox-portal] [data-fluidbox-close]")).toHaveAccessibleName(
     "Sulje",
   );
   const result = await page.evaluate(() => {

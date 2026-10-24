@@ -3,6 +3,7 @@
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { ref } from "vue";
 import { photos } from "../shared";
 

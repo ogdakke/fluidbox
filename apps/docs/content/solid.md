@@ -72,19 +72,19 @@ With no `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close b
 
 All parts are properties of the `Fluidbox` object.
 
-| Part                                                        | Renders                           | Role                                                                                           |
-| ----------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `Fluidbox.Root`                                             | its children                      | Owns one viewer for its items. Every other part must be inside it.                             |
-| `Fluidbox.Trigger`                                          | a `<button>`, or the `as` element | Opens an item. Registers itself as the item's origin.                                          |
-| `Fluidbox.ThumbnailOverlay`                                 | a `<span>`                        | A badge or caption on the thumbnail that fades or flies with the photo.                        |
-| `Fluidbox.FrameLayer`                                       | a `<span>`                        | A layer of a travelling overlay, such as a scrim, that moves into the flying frame.            |
-| `Fluidbox.Viewer`                                           | its children, in the viewer       | Your controls and captions, in place of the default controls.                                  |
-| `Fluidbox.Controls`                                         | three `<button>`s                 | The default Previous, Next and Close, for a `Viewer` of your own. `zoom` adds the zoom group.  |
-| `Fluidbox.ZoomIn`, `Fluidbox.ZoomOut`, `Fluidbox.ZoomReset` | a `<button>`                      | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                          |
-| `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`      | a `<button>`                      | Run the command, with the default icon and label, and disable themselves when they can't.      |
-| `Fluidbox.Thumbnails`                                       | its children, in each thumbnail   | Turns the thumbnails on, with the default thumbnails or yours.                                 |
-| `Fluidbox.Sheet`                                            | its children, in the sheet        | Turns the sheet on, with your content for the active item, and gives the sheet its attributes. |
-| `Fluidbox.SheetStop`                                        | a `<button>`                      | Moves the sheet to a stop, and back down when it is there. Put it in the viewer or sheet.      |
+| Part                                                        | Renders                           | Role                                                                                             |
+| ----------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `Fluidbox.Root`                                             | its children                      | Owns one viewer for its items. Every other part must be inside it.                               |
+| `Fluidbox.Trigger`                                          | a `<button>`, or the `as` element | Opens an item. Registers itself as the item's origin.                                            |
+| `Fluidbox.ThumbnailOverlay`                                 | a `<span>`                        | A badge or caption on the thumbnail that fades or flies with the photo.                          |
+| `Fluidbox.FrameLayer`                                       | a `<span>`                        | A layer of a travelling overlay, such as a scrim, that moves into the flying frame.              |
+| `Fluidbox.Viewer`                                           | its children, in the viewer       | Your controls and captions, in place of the default controls.                                    |
+| `Fluidbox.Controls`                                         | three `<button>`s                 | The default Previous, Next and Close, for a `Viewer` of your own. `zoom` adds the zoom group.    |
+| `Fluidbox.ZoomIn`, `Fluidbox.ZoomOut`, `Fluidbox.ZoomReset` | a `<button>`                      | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                            |
+| `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`      | a `<button>`                      | Run the command, showing their label as text when empty, and disable themselves when they can't. |
+| `Fluidbox.Thumbnails`                                       | its children, in each thumbnail   | Turns the thumbnails on, with the default thumbnails or yours.                                   |
+| `Fluidbox.Sheet`                                            | its children, in the sheet        | Turns the sheet on, with your content for the active item, and gives the sheet its attributes.   |
+| `Fluidbox.SheetStop`                                        | a `<button>`                      | Moves the sheet to a stop, and back down when it is there. Put it in the viewer or sheet.        |
 
 ### `Fluidbox.Root`
 
@@ -158,7 +158,7 @@ It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbo
 
 ### `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`
 
-Each takes button attributes. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of a gallery that doesn't loop, `Close` while the viewer is closed. Pass `disabled` to override it. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
+Each takes button attributes. With no children it shows its label from `labels` as text, marked `data-fluidbox-default`; with children, the label becomes its `aria-label`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of a gallery that doesn't loop, `Close` while the viewer is closed. Pass `disabled` to override it. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
 
 ### `Fluidbox.Thumbnails`
 

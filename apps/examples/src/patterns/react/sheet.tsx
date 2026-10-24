@@ -2,6 +2,7 @@
 import { itemLabel, type FluidboxItem } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/react";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { photos } from "../shared";
 
 function Details({ item }: { item: FluidboxItem }) {

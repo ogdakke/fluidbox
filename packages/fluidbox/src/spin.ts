@@ -103,11 +103,7 @@ export interface FluidboxSpinRendererOptions {
 const spinStyles = `
 :where([data-fluidbox-spin]) {
   touch-action: none;
-  cursor: grab;
   outline-offset: -2px;
-}
-:where([data-fluidbox-spin][data-grabbing]) {
-  cursor: grabbing;
 }
 :where([data-fluidbox-spin] > [data-fluidbox-media-poster]) {
   object-fit: contain;

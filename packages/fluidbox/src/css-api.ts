@@ -109,8 +109,25 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-zoom-controls"] },
   /** The hover zoom add-on's magnified view, over the hovered image. */
   { names: ["data-fluidbox-hover-zoom"] },
-  /** The SVG inside a default control. */
+  /** Slideshow. On a button of yours in the viewer, it plays and pauses the slideshow. `data-active` while it plays. */
+  { names: ["data-fluidbox-slideshow"] },
+  /** The Retry button in a slide's error message. On a button of yours, it loads the failed media again. */
+  { names: ["data-fluidbox-retry"] },
+  /**
+   * On a control given no content, which shows its label as text and is named
+   * by it. `baseline.css` draws a glyph over the text; controls holding your
+   * own content don't have it.
+   */
+  { names: ["data-fluidbox-default"] },
+  /** On a control of yours in markup, `content` names it by its content instead of its label. */
+  { names: ["data-fluidbox-label"] },
+  /**
+   * On a `<template>` in a `<fluidbox-gallery>`: its content goes into every
+   * default button of the control its value names, such as `close`.
+   */
   { names: ["data-fluidbox-icon"] },
+  /** `off` on an ancestor of the viewer, such as `<html>`: `baseline.css` shows the controls' text instead of glyphs. */
+  { names: ["data-fluidbox-glyphs"] },
   /** A layer outside the viewer's layer that shows and hides with the controls. Content in the layer does this already. */
   { names: ["data-fluidbox-chrome"] },
   /**
@@ -241,6 +258,12 @@ export const states: readonly CssName[] = [
   { names: ["aria-selected", "data-fluidbox-selected"], on: "Thumbnails items" },
   /** The slide on show, and the thumbnail of its item. */
   { names: ["data-active"], on: "Slides, thumbnails items" },
+  /** The viewer is full screen. */
+  { names: ["data-fullscreen"], on: "Viewer" },
+  /** Its media is loading, as `aria-busy="true"` says. */
+  { names: ["data-busy"], on: "Slides" },
+  /** Its media failed to load, and it shows its error message. */
+  { names: ["data-error"], on: "Slides" },
   /** The link was copied, for two seconds. */
   { names: ["data-copied"], on: "Share" },
   /** Download is fetching a file from another origin. */
@@ -261,6 +284,7 @@ export const internal: readonly string[] = [
   "--fluidbox-controls-reveal-delay",
   "--fluidbox-thumbnails-hide",
   "--fluidbox-flight-height",
+  "--fluidbox-glyph",
   "--fluidbox-flight-item-height",
   "--fluidbox-flight-left",
   "--fluidbox-flight-top",

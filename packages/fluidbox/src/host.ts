@@ -1,4 +1,5 @@
 import type { Fluidbox, FluidboxItem, FluidboxReason, FluidboxTarget } from "./public-api";
+import type { FluidboxLabels } from "./labels";
 import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
 
 /**
@@ -26,6 +27,10 @@ export interface FluidboxHost {
   takeOver(value: string): Promise<boolean>;
   /** The link Share shares for an item, or undefined. */
   shareLink(item: FluidboxItem): string | undefined;
+  /** Load the slide on show again if it failed. False when it hadn't. */
+  retry(): Promise<boolean>;
+  /** The labels the viewer uses now. */
+  readonly labels: FluidboxLabels;
   /** Drop the viewer and close at once, keeping the bindings, as a binding's unmount does. */
   unload(): void;
 }

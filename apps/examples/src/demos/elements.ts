@@ -1,4 +1,5 @@
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { photoSrc, photoThumb, photos, type Photo } from "../photos";
 
 const image = (photo: Photo, src: string) => {

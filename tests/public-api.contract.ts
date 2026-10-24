@@ -49,7 +49,6 @@ import {
   createTrigger,
   bindTrigger,
   defaultLabels,
-  fluidboxControlIcon,
   fluidboxControls,
   createSlots,
   fluidboxEventTypes,
@@ -504,7 +503,7 @@ const label: string = itemLabel(note);
 const close: Promise<boolean> = fluidboxControls.close.run(stand);
 const disabled: boolean = fluidboxControls.next.disabled(stand.state);
 void fluidboxControls.zoomIn.run(stand);
-void [label, close, disabled, fluidboxControlIcon.paths, defaultLabels.viewer, fluidboxEventTypes];
+void [label, close, disabled, defaultLabels.viewer, fluidboxEventTypes];
 const latestOptions: FluidboxOptions<Photo> = latestFindTrigger(
   { items: photos } as FluidboxOptions<Photo>,
   () => ({ findTrigger, revealTrigger }),

@@ -277,7 +277,7 @@ for (const framework of frameworks) {
         .poll(inPlace, { message: "the slide on show is the current one" })
         .toBeLessThan(2);
       const next = dialog(page).locator("[data-fluidbox-next]");
-      await expect(next).toHaveAttribute("aria-label", "التالي");
+      await expect(next).toHaveAccessibleName("التالي");
       const [nextBox, slidesBox] = await Promise.all([next.boundingBox(), slides.boundingBox()]);
       expect(nextBox!.x + nextBox!.width / 2).toBeLessThan(slidesBox!.x + slidesBox!.width / 2);
       await page.keyboard.press("ArrowRight");

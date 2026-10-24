@@ -2,6 +2,7 @@ import { mountSite } from "../src/site";
 import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/thumbnails";
 import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 import type {
   Fluidbox,
   FluidboxCustomItemBase,

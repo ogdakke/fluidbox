@@ -15,10 +15,14 @@ Import the package CSS first, then yours:
 
 ```ts
 import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/thumbnails.css"; // with thumbnails
+import "@ogdakke/fluidbox/baseline.css"; // optional: the default look
 import "./gallery-theme.css";
 ```
 
-The package wraps the viewer's rules in `:where([data-fluidbox-viewer], [data-fluidbox-flight])`, which adds nothing to their specificity. A later rule on the same part overrides the default:
+`styles.css`, `thumbnails.css` and `sheet.css` hold what makes the viewer work: layout, the strip, flights, zoom, hidden states and reduced motion. On its own, the viewer has a `Canvas` backdrop and plain text buttons. [`baseline.css`](#baselinecss) adds the default look.
+
+The rules sit in two cascade layers, `fluidbox` and then `fluidbox-baseline`, and each file starts by naming both. A rule of yours outside any layer beats both, whatever its selector. The package also wraps the viewer's rules in `:where([data-fluidbox-viewer], [data-fluidbox-flight])`, which adds nothing to their specificity. Either way, a rule on the same part overrides the default:
 
 ```css
 [data-fluidbox-close] {
@@ -37,6 +41,16 @@ The package declares the thumbnails' and the sheet's variables on the dialog wit
 }
 ```
 
+### Your own layers
+
+The first `@layer` statement a page loads fixes the order of the layers it names. If your CSS has layers, as Tailwind's does, name them all once, before any stylesheet loads. Put resets before the package's layers, or a reset such as `* { padding: 0 }` overrides the viewer's layout. Put your components and utilities after them:
+
+```css
+@layer theme, base, fluidbox, fluidbox-baseline, components, utilities;
+```
+
+The package's few `!important` declarations, which hide a thumbnail during a flight and keep `[hidden]` controls hidden, win over yours in any layer.
+
 ## The viewer layer
 
 While it is open, the viewer is one element, `[data-fluidbox-viewer]`, at the end of `<body>`. It is not inside your component, so it doesn't inherit your component's styles or CSS variables. Inside it:
@@ -53,9 +67,35 @@ Opened from inside a modal `<dialog>`, as a quick view's, the overlay goes insid
 
 The container is `position: absolute` at the page's scroll position. Don't make it `fixed` or `sticky`, because iOS Safari colours its bars from a fixed or sticky layer at the screen's edge.
 
+## baseline.css
+
+`@ogdakke/fluidbox/baseline.css` is the default look: the round controls and where they sit, the focus rings, cursors, fades, the placeholder colour, the error message, the thumbnails' corners and current bar, the sheet's corners, shadow and handle, and the media add-ons' Play button and cursors. One file covers the viewer, the thumbnails and the sheet. Its rules are in the `fluidbox-baseline` layer and in `:where()`, so any rule of yours wins. To own the look, leave it out, or copy it and change it.
+
+Every transition in it sits inside `@media (prefers-reduced-motion: no-preference)`. Do the same with yours. A transition in a later layer, or outside any, overrides the package's own reduced-motion rule.
+
+Don't put a `transition` or `!important` on the backdrop's `opacity`. The runtime reads and animates it.
+
+### Glyphs
+
+A control you give no content shows its label as text, such as "Close", and gets `data-fluidbox-default`. The text is its accessible name. `baseline.css` draws a glyph over such a control and clips the text, so the name stays. Controls holding your own icon don't have the attribute, and the baseline leaves them alone.
+
+Each glyph is a token, a `url()` of an SVG whose shape masks the control's text colour. Set one to change a glyph:
+
+```css
+:root {
+  --fluidbox-icon-close: url("/icons/close.svg");
+}
+```
+
+The tokens are `--fluidbox-icon-close`, `-previous`, `-next`, `-zoom-in`, `-zoom-out`, `-zoom-reset`, `-enter-fullscreen`, `-exit-fullscreen`, `-download`, `-share`, `-play-slideshow`, `-pause-slideshow`, `-retry` and `-embed-play`. Retry and the counter keep their text.
+
+`data-fluidbox-glyphs="off"` on an ancestor, such as `<html>`, shows the text labels instead. So does a forced-colours mode, where a masked glyph would vanish.
+
+The default glyphs are `data:` URLs, which a Content Security Policy governs through `img-src`. Under `default-src 'self'`, set every token to a file on your own origin, or turn the glyphs off.
+
 ## Theme
 
-When the viewer opens, it reads the trigger's computed styles and copies every `--fluidbox-*` property onto the overlay. Set them on `:root`, on a section, or on one trigger, and the viewer uses what that trigger inherits:
+When the viewer opens, it reads the trigger's computed styles and copies every `--fluidbox-*` property onto the overlay. Set them on `:root`, on a section, or on one trigger, and the viewer uses what that trigger inherits. These tokens are read by `baseline.css`:
 
 <!-- css: theme -->
 
@@ -72,7 +112,7 @@ When the viewer opens, it reads the trigger's computed styles and copies every `
 
 `--fluidbox-backdrop-background` defaults to `--fluidbox-background`. `--fluidbox-backdrop-filter` is `none` by default. Pair a blur with a see-through background.
 
-Focus rings are 2px of `--fluidbox-focus-color`, which defaults to the text colour. On the controls a 2px edge of `--fluidbox-focus-contrast`, black by default, sits inside the ring, so a white ring still shows over a bright photo. In forced colours, as Windows' contrast themes, the controls get a border and focus rings take the system's `Highlight`; with `prefers-contrast: more`, a disabled Previous or Next fades only to 0.6.
+With `baseline.css`, focus rings are 2px of `--fluidbox-focus-color`, which defaults to the text colour. On the controls a 2px edge of `--fluidbox-focus-contrast`, black by default, sits inside the ring, so a white ring still shows over a bright photo. In forced colours, as Windows' contrast themes, the controls get a border and focus rings take the system's `Highlight`; with `prefers-contrast: more`, a disabled Previous or Next fades only to 0.6.
 
 ## State attributes
 
@@ -94,12 +134,12 @@ The trigger of the open item gets `data-fluidbox-status="open"` and `data-open`.
 
 ## Controls
 
-The default controls are buttons marked `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`, each holding an SVG marked `data-fluidbox-icon`. Close sits in the top-right corner. With more than one item, Previous and Next sit at the middle of each side. All three keep 16 pixels inside the stage. A disabled Previous or Next fades to `--fluidbox-gallery-control-opacity: 0.35`.
+The default controls are buttons marked `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`, each showing its label as text. With `baseline.css`, Close sits in the top-right corner, and with more than one item Previous and Next sit at the middle of each side, each with its glyph. Full screen, Download, Share and the counter, when `controls` lists them, run from the top-left corner. All of them keep 16 pixels inside the stage. A disabled Previous or Next fades to `--fluidbox-gallery-control-opacity: 0.35`. Right to left, the sides swap.
 
 You choose which controls exist:
 
 - **Plain JavaScript.** You get all three unless you pass `viewer`. Then you keep Close until your content has its own `data-fluidbox-close` button, and `controls: true`, or a list such as `controls: ["previous", "next"]`, keeps more next to your own content.
-- **Frameworks.** Put the `Controls` part, or `Previous`, `Next` and `Close`, in the `Viewer` part. Without them there is only the default Close. Each renders the default icon and label when it is empty, or your children.
+- **Frameworks.** Put the `Controls` part, or `Previous`, `Next` and `Close`, in the `Viewer` part. Without them there is only the default Close. Each renders its label as text when it is empty, or your children.
 - **Custom elements.** The gallery adds all three. A `<template slot="viewer">` replaces them, apart from Close while the template has none of its own. Put `<fluidbox-controls>` in it to keep them. Any button marked `data-fluidbox-close`, `-previous` or `-next` in the viewer runs that command, in every API.
 
 The button names come from the `close`, `previous` and `next` [labels](./api.md#labels).
@@ -141,16 +181,16 @@ While an item is open, its thumbnail image on the page gets `data-fluidbox-thumb
 
 ## Reduced motion
 
-With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights, moves between slides without smooth scrolling, zooms and moves the sheet without animation, and its controls and thumbnails appear without fading. You don't need to set anything. Do the same for your own chrome:
+With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights, moves between slides without smooth scrolling, zooms and moves the sheet without animation, and its controls and thumbnails appear without fading. You don't need to set anything. Give your own chrome its transitions only when motion is welcome, as `baseline.css` does:
 
 ```css
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: no-preference) {
   .caption {
-    transition: none;
+    transition: opacity 180ms linear;
   }
 }
 ```
 
 ## Triggers
 
-`<fluidbox-item>` triggers get a reset: no border, background or padding, `display: block`, `cursor: zoom-in`. The package wraps the reset in `:where()`, so your classes win. The framework triggers render a plain `<button type="button">` with no styles, or decorate your own element, and `fluidbox.bind()` leaves your element's styles alone.
+`<fluidbox-item>` triggers get a reset: no border, background or padding, `display: block`, and `cursor: zoom-in` from `baseline.css`. The package wraps the reset in `:where()`, so your classes win. The framework triggers render a plain `<button type="button">` with no styles, or decorate your own element, and `fluidbox.bind()` leaves your element's styles alone.

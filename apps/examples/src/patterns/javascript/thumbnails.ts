@@ -2,6 +2,7 @@
 import { createFluidbox, itemLabel, type FluidboxOptions } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/thumbnails";
 import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { photos } from "../shared";
 
 function gallery(root: HTMLElement, thumbnails: FluidboxOptions["thumbnails"]) {

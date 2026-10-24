@@ -31,10 +31,14 @@ const targets = {
   edge: major(140),
   firefox: major(142),
 };
-for (const name of ["styles.css", "thumbnails.css", "sheet.css"]) {
+// Each stylesheet opens by naming both layers, so whichever loads first fixes
+// their order. The minifier drops a statement no rule in the file needs, so it
+// goes back on.
+const layers = "@layer fluidbox,fluidbox-baseline;";
+for (const name of ["styles.css", "thumbnails.css", "sheet.css", "baseline.css"]) {
   const path = resolve(core, "dist", name);
   const { code } = transform({ filename: name, code: await readFile(path), minify: true, targets });
-  await writeFile(path, code);
+  await writeFile(path, layers + code.toString().replace(/^@layer fluidbox;/, ""));
 }
 await Promise.all(
   bindings.map((name) => run(["bun", "run", "build"], resolve(root, "packages", name))),

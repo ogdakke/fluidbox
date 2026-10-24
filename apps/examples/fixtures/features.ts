@@ -10,6 +10,7 @@ import {
 } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/thumbnails";
 import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
 import "./features.css";
 
@@ -70,6 +71,18 @@ const options = (): FluidboxOptions => ({
     },
   },
   thumbnails: params.has("thumbnails"),
+  ...(params.has("icons")
+    ? {
+        icons: {
+          close: () => {
+            const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            icon.setAttribute("aria-hidden", "true");
+            icon.dataset.test = "close-icon";
+            return icon;
+          },
+        },
+      }
+    : {}),
   ...(params.has("noshare") ? {} : { shareUrl: (item) => `/features.html#${item.id}` }),
   dismiss: {
     drag: !params.has("nodrag"),
@@ -104,6 +117,10 @@ function grid(selector: string, box: Fluidbox) {
 }
 
 grid("#features", fluidbox);
+// Controls of the page's own, kept usable while the viewer is open.
+fluidbox.bindControl(document.querySelector("#page-counter")!, "counter");
+fluidbox.bindControl(document.querySelector("#page-next")!, "next");
+fluidbox.bindControl(document.querySelector("#page-retry")!, "retry");
 grid("#quick-grid", modal);
 const quick = document.querySelector<HTMLDialogElement>("#quick")!;
 document.querySelector("#quick-view")!.addEventListener("click", () => quick.showModal());

@@ -87,8 +87,6 @@ const modelStyles = `
   width: 100%;
   height: 100%;
   touch-action: none;
-  background: transparent;
-  --poster-color: transparent;
 }
 :where([data-fluidbox-model]:not([data-fluidbox-model-ready]) > model-viewer) {
   opacity: 0;

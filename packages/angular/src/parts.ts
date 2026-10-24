@@ -33,7 +33,6 @@ import type {
 import {
   type FluidboxIconControlName,
   createTrigger,
-  fluidboxControlIcon,
   fluidboxControls,
   targetKeys,
   type FluidboxTriggerPreview,
@@ -335,8 +334,6 @@ export class FluidboxSheetStopDirective {
   @Input({ required: true, transform: numberAttribute }) fluidboxSheetStop!: number;
 }
 
-const SVG = "http://www.w3.org/2000/svg";
-
 /** Shared behaviour of the close, previous and next buttons. */
 @Directive({
   standalone: true,
@@ -374,69 +371,61 @@ export abstract class FluidboxControlDirective implements OnInit, AfterContentIn
   // Content bindings and control flow have rendered by now, so bound text counts.
   ngAfterContentInit(): void {
     const element = this.#element.nativeElement;
-    if (!isEmpty(element)) return;
-    if (!element.hasAttribute("aria-label")) {
-      const label = fluidboxControls[this.control].label(this.#root.resolvedLabels());
-      this.#renderer.setAttribute(element, "aria-label", label);
+    const label = fluidboxControls[this.control].label(this.#root.resolvedLabels());
+    if (!isEmpty(element)) {
+      // Content such as an icon: the label names it.
+      if (!element.hasAttribute("aria-label"))
+        this.#renderer.setAttribute(element, "aria-label", label);
+      return;
     }
-    this.#renderer.appendChild(element, this.#icon());
+    // Empty, it shows its label as text, which names it.
+    this.#renderer.setAttribute(element, "data-fluidbox-default", "");
+    this.#renderer.appendChild(element, this.#renderer.createText(label));
   }
 
   ngOnDestroy(): void {
     this.#unlisten?.();
   }
-
-  #icon(): SVGSVGElement {
-    const renderer = this.#renderer;
-    const svg = renderer.createElement("svg", SVG) as SVGSVGElement;
-    for (const [name, value] of Object.entries(fluidboxControlIcon.attributes))
-      renderer.setAttribute(svg, name, value);
-    renderer.setAttribute(svg, "data-fluidbox-icon", "");
-    const path = renderer.createElement("path", SVG) as SVGPathElement;
-    renderer.setAttribute(path, "d", fluidboxControlIcon.paths[this.control]);
-    renderer.appendChild(svg, path);
-    return svg;
-  }
 }
 
-/** No element children and no text, so the control gets the default icon. */
+/** No element children and no text, so the control shows its label. */
 function isEmpty(element: Element): boolean {
   return ![...element.childNodes].some(
     (node) => node.nodeType === 1 || (node.nodeType === 3 && node.textContent?.trim()),
   );
 }
 
-/** Closes the viewer. Shows the default icon and label when empty. */
+/** Closes the viewer. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxClose]", standalone: true })
 export class FluidboxCloseDirective extends FluidboxControlDirective {
   protected readonly control = "close";
 }
 
-/** Goes to the previous item. Shows the default icon and label when empty. */
+/** Goes to the previous item. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxPrevious]", standalone: true })
 export class FluidboxPreviousDirective extends FluidboxControlDirective {
   protected readonly control = "previous";
 }
 
-/** Goes to the next item. Shows the default icon and label when empty. */
+/** Goes to the next item. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxNext]", standalone: true })
 export class FluidboxNextDirective extends FluidboxControlDirective {
   protected readonly control = "next";
 }
 
-/** Zooms the image in by 1.5. Shows the default icon and label when empty. */
+/** Zooms the image in by 1.5. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxZoomIn]", standalone: true })
 export class FluidboxZoomInDirective extends FluidboxControlDirective {
   protected readonly control = "zoomIn";
 }
 
-/** Zooms the image out by 1.5. Shows the default icon and label when empty. */
+/** Zooms the image out by 1.5. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxZoomOut]", standalone: true })
 export class FluidboxZoomOutDirective extends FluidboxControlDirective {
   protected readonly control = "zoomOut";
 }
 
-/** Zooms the image back out to fit. Shows the default icon and label when empty. */
+/** Zooms the image back out to fit. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxZoomReset]", standalone: true })
 export class FluidboxZoomResetDirective extends FluidboxControlDirective {
   protected readonly control = "zoomReset";

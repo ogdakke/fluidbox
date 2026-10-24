@@ -58,7 +58,6 @@ import {
   type FluidboxIconControlName,
   createSlots,
   createTrigger,
-  fluidboxControlIcon,
   fluidboxControls,
   fluidboxEventTypes,
   latestFindTrigger,
@@ -728,25 +727,21 @@ function control(name: FluidboxIconControlName, displayName: string) {
               disabled: definition.disabled(state.value),
               [definition.attribute]: "",
               "data-fluidbox-managed": "",
-              "aria-label": children ? undefined : definition.label(labels.value),
+              // Without content it shows its label as text, which names it.
+              "data-fluidbox-default": children ? undefined : "",
+              "aria-label": children ? definition.label(labels.value) : undefined,
             },
             attrs,
             { onClick: run },
           ),
-          children ?? [controlIcon(name)],
+          children ?? definition.label(labels.value),
         );
       };
     },
   });
 }
 
-function controlIcon(name: FluidboxIconControlName): VNode {
-  return h("svg", { ...fluidboxControlIcon.attributes, "data-fluidbox-icon": "" }, [
-    h("path", { d: fluidboxControlIcon.paths[name] }),
-  ]);
-}
-
-/** Closes the viewer. With no content, it shows the default icon and label. */
+/** Closes the viewer. With no content, it shows its label. */
 const Close = control("close", "FluidboxClose");
 /** Moves to the previous item. */
 const Previous = control("previous", "FluidboxPrevious");

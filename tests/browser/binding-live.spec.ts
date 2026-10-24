@@ -137,18 +137,18 @@ for (const framework of frameworks) {
       await load(page, framework);
       const dialog = await openViewer(page);
       const close = page.locator("[data-fluidbox-close]");
-      await expect(close).toHaveAttribute("aria-label", "Close");
+      await expect(close).toHaveAccessibleName("Close");
 
       await page.evaluate(() =>
         window.__live.setLabels({ close: "Sulje", previous: "Edellinen", next: "Seuraava" }),
       );
-      await expect(close).toHaveAttribute("aria-label", "Sulje");
-      await expect(page.locator("[data-fluidbox-next]")).toHaveAttribute("aria-label", "Seuraava");
+      await expect(close).toHaveAccessibleName("Sulje");
+      await expect(page.locator("[data-fluidbox-next]")).toHaveAccessibleName("Seuraava");
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
       expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);
 
       await page.evaluate(() => window.__live.setLabels(undefined));
-      await expect(close).toHaveAttribute("aria-label", "Close");
+      await expect(close).toHaveAccessibleName("Close");
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
       expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);
 
@@ -235,7 +235,7 @@ for (const framework of frameworks) {
 
       // New labels redraw the layer, and name the strip anew.
       await page.evaluate(() => window.__live.setLabels({ close: "Sulje", thumbnails: "Kuvat" }));
-      await expect(dialog.locator("[data-fluidbox-close]")).toHaveAttribute("aria-label", "Sulje");
+      await expect(dialog.locator("[data-fluidbox-close]")).toHaveAccessibleName("Sulje");
       await expect(dialog.locator("[data-fluidbox-thumbnails]")).toHaveAttribute(
         "aria-label",
         "Kuvat",

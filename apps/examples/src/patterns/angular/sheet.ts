@@ -7,6 +7,7 @@ import {
   type FluidboxImageItem,
 } from "@ogdakke/fluidbox/angular";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { photos } from "../shared";
 
 @Component({

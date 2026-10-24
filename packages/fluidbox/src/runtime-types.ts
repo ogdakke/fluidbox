@@ -25,7 +25,7 @@ export type { FluidboxRevealContext, FluidboxStatus } from "./public-api";
 import type {
   Fluidbox,
   FluidboxControlName,
-  FluidboxMediaErrorKind,
+  FluidboxMediaErrorEvent,
   FluidboxRevealContext,
   FluidboxState,
   FluidboxViewerRenderer,
@@ -97,6 +97,7 @@ export interface FluidboxViewerLayer {
   readonly controls: readonly FluidboxControlName[];
   readonly viewer?: FluidboxViewerRenderer<any>;
   readonly labels: FluidboxLabels;
+  readonly icons?: Partial<Record<FluidboxControlName, () => Node>>;
 }
 
 export type FluidboxThumbnailOverlayBehavior = "host" | "travel" | "frame";
@@ -203,7 +204,7 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   /** The viewer became the document's fullscreen element, or stopped being it. */
   fullscreenChanged?(on: boolean): void;
   /** A slide's media failed, or a zoom image did. */
-  mediaError?(index: number, kind: FluidboxMediaErrorKind, cause: unknown): void;
+  mediaError?(event: FluidboxMediaErrorEvent<any>): void;
 }
 
 /** What may close the viewer, and what a vertical wheel does. */

@@ -5,8 +5,6 @@ import type {
   FluidboxItems,
   FluidboxTarget,
 } from "./public-api";
-import { checkItemData } from "./item-data";
-import { fillsStage } from "./fit-size";
 import { checkItemUrls } from "./media-url";
 import type { FluidboxSource } from "./runtime-types";
 
@@ -137,6 +135,25 @@ export function createItemList<TItem extends FluidboxItem>(
       return -1;
     },
   });
+}
+
+/** What an item's `data` names may be: lower case, digits and single dashes. */
+const dataName = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
+/** Throw when an item's `data` names an attribute the viewer can't set, or one it owns. */
+export function checkItemData(item: FluidboxItem, id: string) {
+  for (const [name, value] of Object.entries(item.data ?? {})) {
+    if (!dataName.test(name) || name.startsWith("fluidbox-") || typeof value !== "string") {
+      throw new TypeError(
+        `Fluidbox item ${id} has data "${name}", which needs a lower-case name of letters, digits and single dashes, not starting "fluidbox-", and a string value.`,
+      );
+    }
+  }
+}
+
+/** Whether an item's media box is the whole stage: `fit: "fill"`, which images ignore. */
+export function fillsStage(item: FluidboxItem): boolean {
+  return item.fit === "fill" && item.type !== "image";
 }
 
 /**

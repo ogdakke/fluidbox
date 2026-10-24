@@ -46,8 +46,13 @@ describe("fluidboxStaticViewer", () => {
       value: "photo-0",
       href: (value) => (value === null ? "/photos" : `/photos/${value}`),
     })!;
-    expect(linked).toContain('<a data-fluidbox-next aria-label="Next" href="/photos/photo-1">');
-    expect(linked).toContain('<a data-fluidbox-close aria-label="Close" href="/photos">');
+    // Each shows its label as text, as the viewer's own controls do.
+    expect(linked).toContain(
+      '<a data-fluidbox-next data-fluidbox-default href="/photos/photo-1">Next</a>',
+    );
+    expect(linked).toContain(
+      '<a data-fluidbox-close data-fluidbox-default href="/photos">Close</a>',
+    );
     expect(linked).toMatch(/<button data-fluidbox-previous [^>]*disabled inert>/);
 
     const plain = fluidboxStaticViewer({ items, value: "photo-1" })!;

@@ -650,7 +650,8 @@ export type FluidboxControlName =
   | "counter"
   | "fullscreen"
   | "download"
-  | "share";
+  | "share"
+  | "retry";
 
 /**
  * When the viewer's code loads. `"intent"` loads it when a mouse rests on a
@@ -698,6 +699,11 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    * @default true without a `viewer`, else false
    */
   readonly controls?: boolean | readonly FluidboxControlName[];
+  /**
+   * Your icons for the default controls, which otherwise show their labels as
+   * text. Each call returns a new Node; the label then names the control.
+   */
+  readonly icons?: Partial<Record<FluidboxControlName, () => Node>>;
   /**
    * A thumbnail strip. Needs `import "@ogdakke/fluidbox/thumbnails"` and its
    * stylesheet. Without the import, it throws an Error that names it.
@@ -755,6 +761,7 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
     | "zoom"
     | "loop"
     | "controls"
+    | "icons"
     | "viewer"
     | "thumbnails"
     | "sheet"
@@ -922,6 +929,17 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
     element: HTMLElement,
     value: FluidboxTriggerValue<TItem>,
     options?: FluidboxOverlayOptions<TItem>,
+  ): () => void;
+  /**
+   * Make your own element a control, in the viewer or anywhere on the page: it
+   * runs the command on click, gets the control's data attribute, its
+   * `aria-label` unless it has a name of its own, `disabled` and `hidden` from
+   * the state, and for Full screen the label that matches it. Returns its cleanup.
+   */
+  bindControl(
+    element: HTMLElement,
+    name: FluidboxControlName,
+    options?: { readonly signal?: AbortSignal },
   ): () => void;
   /**
    * Call `listener` after every state change, not on every animation frame.

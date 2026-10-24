@@ -15,6 +15,7 @@ import {
 } from "react-aria-components";
 import { Avatar, Badge, Icon, compact, type IconName, type Person } from "./social-ui";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import "./safari-chrome.css";
 import "./social.css";
 

@@ -41,7 +41,6 @@ import {
   createSlots,
   createTrigger,
   defaultLabels,
-  fluidboxControlIcon,
   fluidboxControls,
   idOf,
   latestFindTrigger,
@@ -526,14 +525,13 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
 const reactNames: Record<string, string> = {
   srcset: "srcSet",
   fetchpriority: "fetchPriority",
-  "stroke-width": "strokeWidth",
-  "stroke-linecap": "strokeLinecap",
-  "stroke-linejoin": "strokeLinejoin",
 };
 /** Boolean attributes React takes as `true`. */
 const reactFlags = new Set(["disabled", "inert", "hidden"]);
 
-function staticElement({ tag, attributes, children }: FluidboxStaticNode): ReactElement {
+function staticElement(each: FluidboxStaticNode | string): ReactElement | string {
+  if (typeof each === "string") return each;
+  const { tag, attributes, children } = each;
   const props: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(attributes)) {
     props[reactNames[name] ?? name] = reactFlags.has(name) || value;
@@ -713,8 +711,10 @@ function action(name: FluidboxIconControlName) {
         disabled: attributes.disabled ?? disabled,
         [control.attribute]: "",
         "data-fluidbox-managed": "",
+        // Without children it shows its label as text, which names it.
+        "data-fluidbox-default": children == null ? "" : undefined,
         "aria-label":
-          attributes["aria-label"] ?? (children == null ? control.label(labels) : undefined),
+          attributes["aria-label"] ?? (children == null ? undefined : control.label(labels)),
         onClick(event: ReactMouseEvent<HTMLButtonElement>) {
           onClick?.(event);
           if (event.defaultPrevented) return;
@@ -723,23 +723,9 @@ function action(name: FluidboxIconControlName) {
           void control.run(fluidbox, event);
         },
       },
-      children ?? defaultIcon(name),
+      children ?? control.label(labels),
     );
   });
-}
-
-function defaultIcon(name: FluidboxIconControlName) {
-  const {
-    "stroke-width": strokeWidth,
-    "stroke-linecap": strokeLinecap,
-    "stroke-linejoin": strokeLinejoin,
-    ...attributes
-  } = fluidboxControlIcon.attributes;
-  return createElement(
-    "svg",
-    { ...attributes, strokeWidth, strokeLinecap, strokeLinejoin, "data-fluidbox-icon": "" },
-    createElement("path", { d: fluidboxControlIcon.paths[name] }),
-  );
 }
 
 const Close = action("close");

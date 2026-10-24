@@ -15,12 +15,27 @@ fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible,
   outline-color: var(--fb-line-strong);
 }
 
+fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible {
+  outline-width: 1px;
+}
+
+/* The baseline turns the sheet's browser ring off; the site's ring comes back. */
+[data-fluidbox-viewer] [data-fluidbox-sheet]:focus-visible {
+  outline: 1px solid var(--fb-fg);
+  outline-offset: 2px;
+}
+
 :where([data-fluidbox-viewer])
   :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]) {
   border: 1px solid var(--fb-line-strong);
   border-radius: 0;
   background: var(--fb-bg);
   color: var(--fb-fg);
+}
+
+/* Not on focus: the baseline's ring has a dark edge there. */
+:where([data-fluidbox-viewer])
+  :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]):not(:focus-visible) {
   box-shadow: none;
 }
 

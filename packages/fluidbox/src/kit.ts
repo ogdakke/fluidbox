@@ -2,7 +2,6 @@
  * The binding kit: what the framework bindings build their parts from. Each
  * binding uses only this and the plain API, never the custom elements.
  */
-import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS } from "./control-icons";
 import { hostOf } from "./host";
 import { idOf, indexIn, itemLabel, targetKey, targetKeys } from "./items";
 import { defaultLabels, resolveLabels } from "./labels";
@@ -27,12 +26,6 @@ export {
   type FluidboxTriggerPreview,
 } from "./trigger";
 export { idOf, itemLabel, targetKey, targetKeys };
-
-/** The default control icons, as attributes and a path, for frameworks that build their own SVG. */
-export const fluidboxControlIcon = {
-  attributes: CONTROL_ICON_ATTRIBUTES,
-  paths: CONTROL_ICON_PATHS,
-} as const;
 
 /** The fluidbox events, for bindings that forward them as props, emits or outputs. */
 export { fluidboxEventTypes };

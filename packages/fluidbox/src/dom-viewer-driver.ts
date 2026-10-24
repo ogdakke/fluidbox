@@ -1,5 +1,6 @@
 import { controlSelector, drawViewerLayer } from "./viewer-layer";
 import { idOf } from "./items";
+import { FluidboxMediaErrorEvent } from "./public-api";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
@@ -446,12 +447,18 @@ export class DomViewerDriver<
   #onFullscreenChange = () => {
     const on = this.#isFullscreen();
     if (!on) this.#raiseAgain();
+    this.#portal.overlay.toggleAttribute("data-fullscreen", on);
     this.#controller?.fullscreenChanged?.(on);
   };
 
   /** The controls marked `name` in the viewer, default or your own. */
   #controlsNamed(name: string) {
     return this.#portal.dialog.querySelectorAll<HTMLElement>(`[data-fluidbox-${name}]`);
+  }
+
+  /** Load the slide on show again if it failed. False when it hadn't. */
+  retry() {
+    return this.#strip?.retry() ?? false;
   }
 
   /** Save the item's file; a move or a close stops a fetch under way. */
@@ -713,8 +720,12 @@ export class DomViewerDriver<
       this.#zoom.release();
     };
     this.#strip.onZoomableChange = () => this.#controller?.zoomableChanged?.();
-    this.#strip.onMediaError = (index, kind, cause) =>
-      this.#controller?.mediaError?.(index, kind, cause);
+    this.#strip.onMediaError = (index, kind, cause) => {
+      const item = source.getItem(index);
+      this.#controller?.mediaError?.(
+        new FluidboxMediaErrorEvent("mediaerror", { value: idOf(item), index, item, kind, cause }),
+      );
+    };
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
   }

@@ -241,36 +241,20 @@ function pause(frame: HTMLIFrameElement, provider: FluidboxEmbedProvider) {
 /** What `createEmbedRenderer` takes. */
 export interface FluidboxEmbedRendererOptions {
   /**
-   * The play button's accessible name.
+   * The play button's text, which is also its name.
    * @default (item) => `Play ${item.title}`
    */
   readonly label?: (item: FluidboxEmbedItem) => string;
 }
 
+// Over the poster, which is absolute too, and centred. Its look is in baseline.css.
 const embedStyles = `
 :where([data-fluidbox-embed] > [data-fluidbox-embed-play]) {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  place-items: center;
-  width: 68px;
-  height: 48px;
-  margin: -24px 0 0 -34px;
-  padding: 0;
-  border: 0;
-  border-radius: 12px;
-  background: rgb(0 0 0 / 0.7);
-  color: white;
-  cursor: pointer;
-}
-:where([data-fluidbox-embed] > [data-fluidbox-embed-play]:is(:hover, :focus-visible)) {
-  background: rgb(0 0 0 / 0.9);
-}
-:where([data-fluidbox-embed] > [data-fluidbox-embed-play] > svg) {
-  width: 24px;
-  height: 24px;
-  fill: currentColor;
+  inset: 0;
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
 }
 :where([data-fluidbox-embed] > iframe) {
   position: absolute;
@@ -306,14 +290,9 @@ export function createEmbedRenderer(
     const play = ownerDocument.createElement("button");
     play.type = "button";
     play.dataset.fluidboxEmbedPlay = "";
-    play.setAttribute("aria-label", options.label?.(item) ?? `Play ${item.title}`);
-    const icon = ownerDocument.createElementNS("http://www.w3.org/2000/svg", "svg");
-    icon.setAttribute("viewBox", "0 0 24 24");
-    icon.setAttribute("aria-hidden", "true");
-    const path = ownerDocument.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", "M8 5.5v13l10.5-6.5z");
-    icon.append(path);
-    play.append(icon);
+    // No content, so its label is its text and its name; baseline.css draws a glyph over it.
+    play.dataset.fluidboxDefault = "";
+    play.textContent = options.label?.(item) ?? `Play ${item.title}`;
     box.append(play);
     target.append(box);
     let frame: HTMLIFrameElement | undefined;

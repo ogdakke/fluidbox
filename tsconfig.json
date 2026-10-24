@@ -24,6 +24,7 @@
       "@ogdakke/fluidbox/spin": ["./packages/fluidbox/src/spin.ts"],
       "@ogdakke/fluidbox/styles.css": ["./packages/fluidbox/src/styles.css.d.ts"],
       "@ogdakke/fluidbox/sheet.css": ["./packages/fluidbox/src/styles.css.d.ts"],
+      "@ogdakke/fluidbox/baseline.css": ["./packages/fluidbox/src/styles.css.d.ts"],
       "@ogdakke/fluidbox/react": ["./packages/react/src/index.ts"],
       "@ogdakke/fluidbox/solid": ["./packages/solid/src/index.ts"],
       "@ogdakke/fluidbox/vue": ["./packages/vue/src/index.ts"],
