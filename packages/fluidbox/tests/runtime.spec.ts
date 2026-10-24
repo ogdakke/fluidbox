@@ -626,7 +626,7 @@ describe("zoom", () => {
     await fluidbox.zoomIn();
     await fluidbox.zoomTo(9);
     await fluidbox.zoomOut();
-    await fluidbox.resetZoom();
+    await fluidbox.zoomReset();
 
     expect(driver.zooms.map(({ scale }) => scale)).toEqual([2, 3, 3, 2, 1]);
     expect(driver.zooms[0]).toMatchObject({ reason: "api", origin: { x: 10, y: 20 } });

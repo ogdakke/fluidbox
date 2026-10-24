@@ -6,7 +6,7 @@ import "./site.css";
 
 mountSite("fixtures", {
   fixture:
-    "Harness · query flags: count, virtual, shadow, no-filmstrip, iframe, iframes, pictures, viewer-template, loading, loop, rtl",
+    "Harness · query flags: count, virtual, shadow, no-thumbnails, iframe, iframes, pictures, viewer-template, preload, loop, rtl",
 });
 
 const root = document.querySelector<HTMLElement>("#fixture")!;
@@ -16,7 +16,7 @@ const count = Math.min(
   Math.max(1, Number(params.get("count")) || 3),
 );
 const shadow = params.has("shadow");
-const filmstrip = !params.has("no-filmstrip");
+const thumbnails = !params.has("no-thumbnails");
 const target = shadow ? root.attachShadow({ mode: "open" }) : root;
 if (shadow) {
   const style = document.createElement("style");
@@ -65,7 +65,7 @@ if (params.has("virtual")) {
   }
   renderWindow(0);
   Object.assign(window, { __renderVirtualWindow: renderWindow });
-  if (filmstrip) gallery.append(document.createElement("fluidbox-filmstrip"));
+  if (thumbnails) gallery.append(document.createElement("fluidbox-thumbnails"));
 } else {
   const gallery = document.createElement("fluidbox-gallery");
   if (params.has("viewer-template")) {
@@ -75,8 +75,8 @@ if (params.has("virtual")) {
     gallery.append(viewer);
   }
   gallery.setAttribute("aria-label", "Test gallery");
-  const loading = params.get("loading");
-  if (loading) gallery.setAttribute("loading", loading);
+  const preload = params.get("preload");
+  if (preload) gallery.setAttribute("preload", preload);
   if (params.has("loop")) gallery.setAttribute("loop", "");
   if (params.has("rtl")) root.dir = "rtl";
   for (let index = 0; index < count; index++) {
@@ -108,7 +108,7 @@ if (params.has("virtual")) {
     lightbox.append(template);
     gallery.append(lightbox);
   }
-  if (filmstrip) gallery.append(document.createElement("fluidbox-filmstrip"));
+  if (thumbnails) gallery.append(document.createElement("fluidbox-thumbnails"));
   target.append(gallery);
 }
 (document.documentElement as HTMLElement).dataset.fixtureReady = "";

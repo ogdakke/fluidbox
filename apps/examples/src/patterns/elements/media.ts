@@ -6,7 +6,7 @@ import { modelViewerUrl, productMedia } from "../shared";
 
 export function media(root: HTMLElement) {
   const gallery = root.querySelector("fluidbox-gallery")!;
-  // Items from JS; the buttons marked data-fluidbox-item-id open them.
+  // Items from JS; the buttons marked data-fluidbox-value open them.
   gallery.items = productMedia;
   // The items' `render` names these: "embed", "spin" and "model".
   gallery.renderers = {

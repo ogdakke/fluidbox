@@ -1,12 +1,12 @@
 // #region example
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 
-export function filmstrip(root: HTMLElement) {
+export function thumbnails(root: HTMLElement) {
   // Your own thumbnails. The selected button has data-fluidbox-selected.
-  const strip = root.querySelector(".numbered-strip")!.querySelector("fluidbox-filmstrip")!;
+  const strip = root.querySelector(".numbered-strip")!.querySelector("fluidbox-thumbnails")!;
   strip.render = ({ index, target }) => {
     const thumb = document.createElement("span");
-    thumb.className = "pattern-filmstrip-thumb";
+    thumb.className = "pattern-thumbnails-thumb";
     thumb.dataset.test = "thumb";
     thumb.textContent = String(index + 1);
     target.append(thumb);

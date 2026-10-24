@@ -34,11 +34,6 @@ export { fluidboxEventTypes };
 export { latestFindTrigger } from "./origins";
 
 /**
- * Drop a fluidbox's viewer and close it at once, keeping its bindings, as a
- * binding's unmount does. The next press or open makes a new viewer, so a
- * StrictMode remount keeps working.
- */
-/**
  * Hold a slide's commit while a framework renders it: call it in the slide's
  * renderer, and call what it returns once the content is in the box. An open
  * waits for the commit before it reads the box (at most its three seconds).
@@ -51,6 +46,11 @@ export function holdSlideCommit(slide: FluidboxSlide<any>): () => void {
   return hold ? hold() : () => {};
 }
 
+/**
+ * Drop a fluidbox's viewer and close it at once, keeping its bindings, as a
+ * binding's unmount does. The next press or open makes a new viewer, so a
+ * StrictMode remount keeps working.
+ */
 export function unloadFluidbox(fluidbox: Fluidbox<any>) {
   hostOf(fluidbox).unload();
 }
@@ -122,11 +122,11 @@ export interface FluidboxSlot<TItem extends FluidboxItem = FluidboxItem> {
    * so the viewer emptying the container never pulls nodes from under it.
    */
   readonly target: HTMLElement;
-  /** The element the viewer gave the renderer: a sheet's section, a filmstrip button. */
+  /** The element the viewer gave the renderer: a sheet's section, a thumbnail button. */
   readonly container: HTMLElement;
 }
 
-/** A renderer for the sheet or the filmstrip that lists its targets for a framework to fill. */
+/** A renderer for the sheet or the thumbnails that lists its targets for a framework to fill. */
 export interface FluidboxSlots<TItem extends FluidboxItem = FluidboxItem> {
   readonly render: FluidboxRenderer<TItem>;
   /** The targets on show, in index order. */

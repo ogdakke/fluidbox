@@ -11,7 +11,7 @@ const stop = ref(0);
 </script>
 
 <template>
-  <Fluidbox.Root :items="photos" @sheetchange="stop = $event.stop">
+  <Fluidbox.Root :items="photos" @sheetchange="stop = $event.snap">
     <div class="pattern-grid">
       <Fluidbox.Trigger
         v-for="photo in photos"

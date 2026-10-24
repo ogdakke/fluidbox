@@ -50,7 +50,7 @@ function renderWindow(start: number) {
     caption.textContent = `Item ${index + 1}`;
     button.append(image, caption);
     button.addEventListener("click", () => gallery.open(index));
-    gallery.insertBefore(button, gallery.querySelector("fluidbox-filmstrip"));
+    gallery.insertBefore(button, gallery.querySelector("fluidbox-thumbnails"));
     origins.set(String(index), button);
   }
 }

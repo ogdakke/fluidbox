@@ -68,7 +68,7 @@ interface FluidboxItemList<TItem> {
 - `indexOf(id)` returns the index of an id, or `-1`. Without it, the viewer finds an id by calling `get` for each index in turn.
 - Don't change a list the viewer holds.
 
-The viewer asks for items only as it needs them: the slides near the current one, and the filmstrip thumbnails in view. The viewer checks only arrays for duplicate ids, so a lazy list has to keep its own ids unique. Render triggers for the items you show, such as the rows of a virtual list. The viewer can still open, and swipe through, every item.
+The viewer asks for items only as it needs them: the slides near the current one, and the thumbnails in view. The viewer checks only arrays for duplicate ids, so a lazy list has to keep its own ids unique. Render triggers for the items you show, such as the rows of a virtual list. The viewer can still open, and swipe through, every item.
 
 ### Replacing the items
 
@@ -84,16 +84,9 @@ Items equal to the current ones change nothing: an array whose items match the c
 
 ## Origins
 
-An origin is where an item lives on the page, `FluidboxOrigin<TItem>`:
+An origin is where an item lives on the page: the trigger that opens it, the visual the flight starts and ends on, and optionally a thumbnail already loaded on the page, shown while the full media loads. Focus returns to the trigger when the viewer closes.
 
-| Field             | Type                                   | What it does                                                                               |
-| ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `trigger`         | `HTMLElement`                          | The element that opens the item. Focus returns here when the viewer closes.                |
-| `visual`          | `HTMLElement`                          | The box the flight starts and ends on. The flight copies its size, crop and corner radius. |
-| `thumbnail`       | `HTMLImageElement`                     | Optional. An image already loaded on the page, shown while the full media loads.           |
-| `onPreviewChange` | `(item: TItem, index: number) => void` | Optional. Called before the closing flight measures the origin, with the item it lands on. |
-
-You rarely build one by hand. Every trigger (`fluidbox.bind`, the framework `Trigger` parts, the `[slot="trigger"]` child of `<fluidbox-item>`) makes its element the origin of its items while it is bound.
+You never build one by hand. Every trigger (`fluidbox.bind`, the framework `Trigger` parts, the `[slot="trigger"]` child of `<fluidbox-item>`) makes its element the origin of its items while it is bound, and `findTrigger` below finds the rest.
 
 ### Which element the flight uses
 
@@ -122,71 +115,50 @@ The closing flight needs an origin that is in the document and visible inside th
 
 ### Several items, one origin
 
-One element can stand for several items, such as an album cover with a "+4" badge. The trigger opens its own item, and `returns` lists the other items that may close back onto it. Set it as `returns` in `fluidbox.bind`, on the framework triggers (`fluidboxReturns` in Angular), or as `returns="b c"` on a `<fluidbox-item>`. `returns` may hold the trigger's own item too, so a whole album works as is. The origin's `onPreviewChange` runs before the closing flight measures it, so the cover can show the item it lands on:
+One element can stand for several items, such as an album cover with a "+4" badge. Give the trigger a list as its value: the first item opens, and every one may close back onto it. Pass the list to `fluidbox.bind`, or as `data-fluidbox-value="a b c"` in a `<fluidbox-gallery>` with `items`. The bind option `onPreviewChange` runs before the closing flight measures the trigger, so the cover can show the item it lands on:
 
 ```ts
-fluidbox.bind(cover, "dune", {
-  returns: ["canyon", "coast"],
+fluidbox.bind(cover, ["dune", "canyon", "coast"], {
   onPreviewChange(item) {
     coverImage.src = item.thumbnail?.src ?? coverImage.src;
   },
 });
 ```
 
-An origin bound for one id wins over one bound for several. Both win over the adapter below. [One trigger for an album](./patterns/overlay.md) shows a cover whose image follows the selection.
+A trigger bound for one id wins over one bound for several. Both win over `findTrigger` below. [One trigger for an album](./patterns/overlay.md) shows a cover whose image follows the selection.
 
 ## The origin adapter
 
-Triggers cover items that have a bound element. For the rest, as in a virtualized grid that recycles its rows, give the viewer an `origins` adapter, `FluidboxOriginAdapter`:
-
-```ts
-interface FluidboxOriginAdapter<TItem extends FluidboxItem = FluidboxItem> {
-  getOrigin(id: string): FluidboxOrigin<TItem> | null;
-  revealOrigin?(
-    id: string,
-    index: number,
-    context: { signal: AbortSignal; phase: "open" | "selection" },
-  ): void | Promise<void>;
-}
-```
-
-The viewer calls `getOrigin` whenever it needs the origin of an item no trigger is bound to. Return `null` when the item isn't on the page. A virtualizer may reuse a node for another item, so look the element up by id on each call instead of caching it.
+Triggers cover items that have a bound element. For the rest, as in a virtualized grid that recycles its rows, give the viewer `findTrigger(item, index)`. It returns the item's trigger, or `null` when the item isn't on the page, and the viewer finds the visual and thumbnail inside it as it does for a bound trigger. A virtualizer may reuse a node for another item, so look the element up on each call instead of caching it.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
 
 const fluidbox = createFluidbox({
   items: library,
-  origins: {
-    getOrigin(id) {
-      const button = grid.querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`);
-      const image = button?.querySelector("img");
-      return button && image ? { trigger: button, visual: image, thumbnail: image } : null;
-    },
-  },
+  findTrigger: (item) => grid.querySelector<HTMLElement>(`[data-id="${CSS.escape(item.id!)}"]`),
 });
 ```
 
-The framework roots take the same object as an `origins` prop, and `<fluidbox-gallery>` as its `origins` property. They read the newest one on each call, so changing it doesn't rebuild the viewer.
+The framework roots take the same functions as `findTrigger` and `revealTrigger` props, and `<fluidbox-gallery>` as properties. They read the newest ones on each call, so changing them doesn't rebuild the viewer.
 
 ### Reveal on close
 
-The viewer brings the current item's origin into view, so the closing flight has somewhere to land. It does this after the viewer opens, each time the selection settles, and when it closes on an item it hasn't revealed yet.
+The viewer brings the current item's trigger into view, so the closing flight has somewhere to land. It does this after the viewer opens, each time the selection settles, and when it closes on an item it hasn't revealed yet.
 
-Without `revealOrigin`, the viewer scrolls the item's origin into view, to the nearest edge, in every scrolling ancestor. That origin is the item's bound trigger, or the one `getOrigin` returns. In a horizontal scroller the strip follows the viewer, so the flight lands on the right thumbnail.
+Without `revealTrigger`, the viewer scrolls the item's trigger into view, to the nearest edge, in every scrolling ancestor. That trigger is the bound one, or the one `findTrigger` returns. In a horizontal scroller the strip follows the viewer, so the flight lands on the right thumbnail.
 
-With `revealOrigin`, you do the scrolling. Scroll a virtual list to the item's row so its trigger mounts:
+With `revealTrigger(item, index, { signal, phase })`, you do the scrolling. Scroll a virtual list to the item's row so its trigger mounts:
 
 ```ts
-import type { FluidboxOriginAdapter } from "@ogdakke/fluidbox";
-
-const origins: FluidboxOriginAdapter = {
-  getOrigin,
-  async revealOrigin(id, index, { signal }) {
+const fluidbox = createFluidbox({
+  items: library,
+  findTrigger,
+  async revealTrigger(item, index, { signal }) {
     virtualizer.scrollToIndex(index, { align: "auto" });
-    await mounted(id, signal);
+    await mounted(item.id!, signal);
   },
-};
+});
 ```
 
 - `phase` is `"open"` after an opening and `"selection"` after a move.
@@ -196,7 +168,7 @@ const origins: FluidboxOriginAdapter = {
 
 ## Custom elements
 
-A `<fluidbox-gallery>` builds its items from its `<fluidbox-item>` children. For an array or a lazy list made in JavaScript, set `gallery.items` instead. Mark any element inside the gallery with `data-fluidbox-item-id` to make it a trigger for that item:
+A `<fluidbox-gallery>` builds its items from its `<fluidbox-item>` children. For an array or a lazy list made in JavaScript, set `gallery.items` instead. Mark any element inside the gallery with `data-fluidbox-value` to make it a trigger for that item:
 
 ```ts
 import "@ogdakke/fluidbox/elements";
@@ -209,7 +181,7 @@ for (let index = 0; index < 12; index++) {
   const item = library.get(index);
   const button = document.createElement("button");
   button.type = "button";
-  button.dataset.fluidboxItemId = item.id!;
+  button.dataset.fluidboxValue = item.id!;
   button.append(Object.assign(new Image(), { src: item.thumbnail!.src, alt: "" }));
   gallery.append(button);
 }

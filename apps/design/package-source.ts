@@ -17,8 +17,8 @@ export function packageSource(command: "build" | "serve"): Alias[] {
   return [
     { find: "@ogdakke/fluidbox/styles.css", replacement: core("styles.css") },
     { find: "@ogdakke/fluidbox/sheet.css", replacement: core("sheet.css") },
-    { find: "@ogdakke/fluidbox/filmstrip.css", replacement: core("filmstrip.css") },
-    { find: "@ogdakke/fluidbox/filmstrip", replacement: core("filmstrip-entry.ts") },
+    { find: "@ogdakke/fluidbox/thumbnails.css", replacement: core("thumbnails.css") },
+    { find: "@ogdakke/fluidbox/thumbnails", replacement: core("thumbnails-entry.ts") },
     { find: "@ogdakke/fluidbox/sheet", replacement: core("sheet-entry.ts") },
     { find: "@ogdakke/fluidbox/kit", replacement: core("kit.ts") },
     { find: "@ogdakke/fluidbox/hover-zoom", replacement: core("hover-zoom.ts") },

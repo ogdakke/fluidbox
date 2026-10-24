@@ -38,7 +38,7 @@ function Live({ ready }: { ready: (controls: LiveControls) => void }) {
         ),
       ),
     }),
-    h(Fluidbox.Filmstrip),
+    h(Fluidbox.Thumbnails),
     viewer &&
       h(
         Fluidbox.Viewer,

@@ -256,7 +256,7 @@ test("an empty box opens and closes with a fade, not a flight", async ({ page })
   await expect(page.locator(dialog)).toHaveCount(0);
 });
 
-const overlay = "[data-fluidbox-overlay]";
+const overlay = "[data-fluidbox-viewer]";
 
 /** Hold a request until the returned function lets it through. */
 async function hold(page: Page, url: string) {
@@ -344,7 +344,7 @@ test.describe("an open waits for its slide", () => {
       () =>
         new Promise<string>((resolve) => {
           const { gate } = window.slidesFixture;
-          const overlay = document.querySelector("[data-fluidbox-overlay]")!;
+          const overlay = document.querySelector("[data-fluidbox-viewer]")!;
           // A second promise before the flight still holds it.
           let second!: () => void;
           gate.wait!(new Promise<void>((open) => (second = open)));

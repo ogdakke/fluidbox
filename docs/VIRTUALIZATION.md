@@ -1,6 +1,6 @@
 # Virtualized host integrations
 
-Fluidbox owns the open viewer's slide window and filmstrip. The application owns its thumbnail grid and chooses its virtualizer. A host may use TanStack Virtual or another library without making it a Fluidbox runtime dependency.
+Fluidbox owns the open viewer's slide window and thumbnails. The application owns its thumbnail grid and chooses its virtualizer. A host may use TanStack Virtual or another library without making it a Fluidbox runtime dependency.
 
 The first external-library pilot is `/photo-library.html` on the main playground server, using [TanStack Virtual's React adapter](https://tanstack.com/virtual/latest/docs/framework/react/react-virtual). It defaults to 10,000 items; `?count=100000` selects the stress dataset. The lockfile pins the tested TanStack dependency, and `tests/browser/photo-library.spec.ts` records the integration scenarios. A second independent implementation, such as [React Virtuoso Grid](https://virtuoso.dev/react-virtuoso/), is planned before making a broad compatibility claim. Listing a library here is not certification of every version or layout mode.
 
@@ -8,7 +8,7 @@ The first external-library pilot is `/photo-library.html` on the main playground
 
 Open the “Photo library” link from the playground, or use `/photo-library.html` on the same local/Portless origin. The host is React with TanStack Virtual; the rest of the playground remains vanilla JavaScript.
 
-The example has date sections, responsive fixed-height virtual rows, three-row overscan, and lazy thumbnails. Its controls jump the host grid, open an item by number, reveal the last viewed item after close, and enable/disable the filmstrip for the next opening. The item list stays stable while the grid mounts and unmounts thumbnails.
+The example has date sections, responsive fixed-height virtual rows, three-row overscan, and lazy thumbnails. Its controls jump the host grid, open an item by number, reveal the last viewed item after close, and enable/disable the thumbnails for the next opening. The item list stays stable while the grid mounts and unmounts thumbnails.
 
 Assets are repeated local SVG illustrations with landscape, portrait, and square dimensions. This is a deterministic geometry/lifecycle fixture, not photographic decode or transfer evidence. A varied-photo dataset and resource measurements remain separate benchmark work.
 
@@ -60,7 +60,7 @@ Use the virtualizer's stable item-key API and the framework's own mounting/ref l
 
 Opening the lightbox must not replace the host grid or reset its scroll position. The modal keeps background interaction inert. To test recycling while open, change the host's virtual window programmatically rather than disabling modal isolation.
 
-The photo-library example follows the selected item in the background, including distant filmstrip navigation. The runtime calls `revealOrigin` after capturing the opening pose and when navigation settles. The application uses its virtualizer's scrolling API and may resolve its promise when the matching origin is mounted. A newer selection aborts previous work immediately, even before that selection settles. `setItems`, close, and teardown also abort it. Host code must honor the signal; the runtime cannot undo arbitrary work performed by a callback.
+The photo-library example follows the selected item in the background, including distant thumbnails navigation. The runtime calls `revealOrigin` after capturing the opening pose and when navigation settles. The application uses its virtualizer's scrolling API and may resolve its promise when the matching origin is mounted. A newer selection aborts previous work immediately, even before that selection settles. `setItems`, close, and teardown also abort it. Host code must honor the signal; the runtime cannot undo arbitrary work performed by a callback.
 
 Without a custom hook, the viewer scrolls a mounted matching origin into view through its native scroll ancestors. A virtualized host needs the hook to mount an absent origin. Before closing, the runtime resolves the current origin again instead of retaining its pre-scroll rectangle. A node clipped outside the viewport or a scroll container cannot supply a useful close target.
 
@@ -78,7 +78,7 @@ Run these against actual virtualizer implementations and public Fluidbox APIs:
 | Navigate past the host's mounted range          | Correct viewer selection without mounting the full host collection                                                  |
 | Programmatically move the host range while open | Origins unregister; closing never targets a node now representing another item                                      |
 | Close with selected origin initially absent     | Proactive reveal mounts matching target when possible; close never waits and otherwise falls back with usable focus |
-| Distant filmstrip selection                     | Host virtualizer follows selection and registers the matching origin; stale reveal work cannot move it back         |
+| Distant thumbnails selection                    | Host virtualizer follows selection and registers the matching origin; stale reveal work cannot move it back         |
 | Change responsive column count                  | Visible range remains valid, item IDs still match registrations, layout stays bounded                               |
 | Jump near either end at 10k and 100k items      | Correct range/selection without blank end-of-track states or total-DOM growth proportional to count                 |
 | Repeat open/navigate/close                      | Host and viewer DOM return to expected bounds; no orphan viewer layer or persistent inert state                     |

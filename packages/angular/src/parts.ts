@@ -329,7 +329,7 @@ export class FluidboxViewerDirective implements OnInit, OnDestroy {
 @Directive({
   selector: "button[fluidboxSheetStop]",
   standalone: true,
-  host: { "[attr.data-fluidbox-sheet-stop]": "fluidboxSheetStop", type: "button" },
+  host: { "[attr.data-fluidbox-sheet-snap]": "fluidboxSheetStop", type: "button" },
 })
 export class FluidboxSheetStopDirective {
   @Input({ required: true, transform: numberAttribute }) fluidboxSheetStop!: number;

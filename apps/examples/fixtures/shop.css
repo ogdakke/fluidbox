@@ -708,24 +708,24 @@
 @media (min-width: 900px) {
   /* No side insets: those narrow the slide strip, and the slides should
      cross the whole window. The bottom inset is the band the arrows sit in.
-     The filmstrip runs as a column down the left, over the slides. */
+     The thumbnails runs as a column down the left, over the slides. */
   [data-fluidbox-dialog]:has(.shop-viewer) {
     --fluidbox-stage-top: 32px;
     --fluidbox-stage-bottom: 80px;
     --fluidbox-slide-gap: 48px;
-    --fluidbox-filmstrip-axis: y;
-    --fluidbox-filmstrip-item-size: 56px;
-    --fluidbox-filmstrip-gap: 10px;
-    --fluidbox-filmstrip-item-radius: 2px;
+    --fluidbox-thumbnails-axis: y;
+    --fluidbox-thumbnails-item-size: 56px;
+    --fluidbox-thumbnails-gap: 10px;
+    --fluidbox-thumbnails-item-radius: 2px;
   }
   /* Thumbnails as on the page: a hairline, and a ring on the one on show. */
-  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-filmstrip-item] {
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-thumbnails-item] {
     border: 1px solid var(--fb-line);
     outline: 1px solid transparent;
     outline-offset: 2px;
     margin: 4px;
   }
-  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-filmstrip-item][aria-selected="true"] {
+  [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-thumbnails-item][aria-selected="true"] {
     outline-color: var(--fb-fg);
   }
   [data-fluidbox-dialog]:has(.shop-viewer) [data-fluidbox-frame] {

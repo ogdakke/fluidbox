@@ -36,11 +36,11 @@ fluidbox.update({
 
 ## Events
 
-<!-- api: FluidboxEventMap, FluidboxToggleEvent, FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxReason, FluidboxToggleState -->
+<!-- api: FluidboxEventMap, FluidboxValueChangeEvent, FluidboxValueChangeDetails, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxReason -->
 
 ## Items
 
-<!-- api: FluidboxItem, FluidboxItemBase, FluidboxImageItem, FluidboxVideoItem, FluidboxIframeItem, FluidboxCustomItem, FluidboxThumbnail, FluidboxPictureSource, idOf, itemLabel -->
+<!-- api: FluidboxItem, FluidboxItemBase, FluidboxImageItem, FluidboxVideoItem, FluidboxIframeItem, FluidboxCustomItemBase, FluidboxItemTypes, FluidboxThumbnail, FluidboxPictureSource, idOf, itemLabel -->
 
 ## Lists
 
@@ -48,11 +48,11 @@ fluidbox.update({
 
 ## Renderers
 
-<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlideRenderer, FluidboxSlideRenderContext, FluidboxViewerRenderer, FluidboxViewerContext -->
+<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlides, FluidboxSlideRenderer, FluidboxSlide, FluidboxViewerRenderer, FluidboxViewerContext -->
 
-## Origins
+## Triggers
 
-<!-- api: FluidboxOrigin, FluidboxOriginAdapter, FluidboxRevealContext -->
+<!-- api: FluidboxTriggerValue, FluidboxBindOptions, FluidboxOverlayOptions, FluidboxRevealContext -->
 
 ## Labels
 
@@ -74,7 +74,7 @@ createFluidbox({
 
 ## Add-ons
 
-<!-- api: FluidboxFilmstripOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->
+<!-- api: FluidboxThumbnailsOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->
 
 ### Hover zoom
 

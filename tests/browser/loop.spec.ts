@@ -57,9 +57,9 @@ for (const direction of ["ltr", "rtl"] as const) {
       await expect(dialog(page)).toHaveCount(0);
     });
 
-    test("the filmstrip goes round too", async ({ page }) => {
+    test("the thumbnails goes round too", async ({ page }) => {
       await openFirst(page, query);
-      const selected = dialog(page).locator("[data-fluidbox-filmstrip-item][aria-selected=true]");
+      const selected = dialog(page).locator("[data-fluidbox-thumbnails-item][aria-selected=true]");
       await expect(selected).toHaveAttribute("data-index", "0");
       await selected.focus();
       await page.keyboard.press(back);

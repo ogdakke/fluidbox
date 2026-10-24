@@ -8,7 +8,7 @@ const entrypoints = [
   "solid",
   "vue",
   "angular",
-  "filmstrip",
+  "thumbnails",
   "sheet",
   "kit",
   "hover-zoom",
@@ -24,7 +24,7 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   solid: ["solid-js"],
   vue: ["vue"],
   angular: ["@angular/core"],
-  filmstrip: [],
+  thumbnails: [],
   sheet: [],
   kit: [],
   "hover-zoom": [],
@@ -44,7 +44,7 @@ const initialGzipLimits: Record<Entry, number> = {
   solid: 12_800,
   vue: 13_500,
   angular: 13_950,
-  filmstrip: 3_700,
+  thumbnails: 3_700,
   sheet: 7_300,
   kit: 1_700,
   // The hover zoom add-on, loaded by pages that magnify their photos on hover.
@@ -60,13 +60,13 @@ const cssGzipLimit = 3_650;
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 37_300,
-  // The gallery loads the filmstrip and sheet entries when it holds their elements.
+  // The gallery loads the thumbnails and sheet entries when it holds their elements.
   elements: 40_700,
   react: 42_600,
   solid: 40_450,
   vue: 41_200,
   angular: 41_650,
-  filmstrip: 3_700,
+  thumbnails: 3_700,
   sheet: 7_300,
   kit: 1_700,
   "hover-zoom": 1_500,
@@ -81,7 +81,7 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   solid: 44_000,
   vue: 44_750,
   angular: 45_200,
-  filmstrip: 5_100,
+  thumbnails: 5_100,
   sheet: 8_600,
   kit: 5_250,
   // It needs no stylesheet; the base one counts, as for the kit.
@@ -100,9 +100,9 @@ if (
 }
 const jsonPath = jsonIndex === -1 ? null : process.argv[jsonIndex + 1];
 const css = sizeOf(await readFile("packages/fluidbox/dist/styles.css"));
-// The sheet and the filmstrip ship their own stylesheets on top of the base one.
+// The sheet and the thumbnails ship their own stylesheets on top of the base one.
 const sheetCss = sizeOf(await readFile("packages/fluidbox/dist/sheet.css"));
-const filmstripCss = sizeOf(await readFile("packages/fluidbox/dist/filmstrip.css"));
+const thumbnailsCss = sizeOf(await readFile("packages/fluidbox/dist/thumbnails.css"));
 const tsdownInfo = JSON.parse(await readFile("node_modules/tsdown/package.json", "utf8")) as {
   version: string;
 };
@@ -139,7 +139,7 @@ let failed = false;
 for (const name of entrypoints) {
   const { initialJs, activationJs, chunks, externals, unresolved, initialCode, activationCode } =
     await measureEntry(name);
-  const entryCss = name === "sheet" ? sheetCss : name === "filmstrip" ? filmstripCss : css;
+  const entryCss = name === "sheet" ? sheetCss : name === "thumbnails" ? thumbnailsCss : css;
   const activationWithCss = {
     rawBytes: activationJs.rawBytes + entryCss.rawBytes,
     gzipBytes: activationJs.gzipBytes + entryCss.gzipBytes,
@@ -152,7 +152,7 @@ for (const name of entrypoints) {
   // Add-ons cost nothing until used: no core entry may carry their code, only
   // load it lazily for a viewer that turns them on.
   const carriesExtension =
-    name !== "filmstrip" && name !== "sheet" && /fluidboxSheetHost/.test(activationCode);
+    name !== "thumbnails" && name !== "sheet" && /fluidboxSheetHost/.test(activationCode);
   const errors = [
     unresolved.size && `unresolved runtime externals: ${[...unresolved].join(", ")}`,
     forbidden.length && `unexpected framework imports: ${forbidden.join(", ")}`,

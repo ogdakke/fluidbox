@@ -85,7 +85,7 @@ test("a viewer template replaces the default controls but Close", async ({ page 
 });
 
 test("viewer selectors stay isolated and honor stylesheet order", async ({ page }) => {
-  await page.goto("/harness.html?no-filmstrip");
+  await page.goto("/harness.html?no-thumbnails");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   await page.evaluate(() => {
     const lookalike = document.createElement("div");
@@ -108,7 +108,7 @@ test("viewer selectors stay isolated and honor stylesheet order", async ({ page 
   );
 
   await page.locator("fluidbox-item").first().click();
-  const overlay = page.locator("[data-fluidbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-viewer]");
   const close = overlay.locator("[data-fluidbox-close]").first();
   await expect(overlay).toHaveCSS("position", "absolute");
   await expect(overlay.locator("[data-fluidbox-container]")).toHaveCSS("position", "absolute");
@@ -126,7 +126,7 @@ test("viewer selectors stay isolated and honor stylesheet order", async ({ page 
 });
 
 test("backdrop covers the document while the viewer stays in the viewport", async ({ page }) => {
-  await page.goto("/harness.html?no-filmstrip");
+  await page.goto("/harness.html?no-thumbnails");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   await page.evaluate(() => {
     const before = document.createElement("div");
@@ -137,7 +137,7 @@ test("backdrop covers the document while the viewer stays in the viewport", asyn
     document.body.append(after);
   });
   await page.locator("fluidbox-item").first().click();
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
     "data-fluidbox-status",
     "open",
   );
@@ -264,19 +264,19 @@ test("gallery controls reveal with the backdrop and arrow selection does not fad
   expect(opacityAnimations).toEqual([]);
 });
 
-test("filmstrip selects a distant item", async ({ page }) => {
+test("thumbnails selects a distant item", async ({ page }) => {
   await page.goto("/harness.html?count=30");
   await page.locator("fluidbox-item").first().click();
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
-  await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((scroller: HTMLElement) => {
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCSS("pointer-events", "auto");
+  await page.locator("[data-fluidbox-thumbnails-scroll]").evaluate((scroller: HTMLElement) => {
     const size = parseFloat(
-      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-thumbnails-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
     scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
     scroller.scrollTo({ left: 20 * (size + gap), behavior: "instant" });
   });
-  await page.locator('[data-fluidbox-filmstrip-item][data-index="20"]').click();
+  await page.locator('[data-fluidbox-thumbnails-item][data-index="20"]').click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 21 of 30",
@@ -311,22 +311,22 @@ test("settled gallery frame matches its visual baseline", async ({ page }) => {
   });
 });
 
-test("filmstrip DOM stays bounded while scrolling a large gallery", async ({ page }) => {
+test("thumbnails DOM stays bounded while scrolling a large gallery", async ({ page }) => {
   await page.goto("/harness.html?count=1000");
   await page.locator("fluidbox-item").first().click();
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
-  const buttons = page.locator("[data-fluidbox-filmstrip-item]");
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCSS("pointer-events", "auto");
+  const buttons = page.locator("[data-fluidbox-thumbnails-item]");
   expect(await buttons.count()).toBeLessThan(100);
   expect(await page.locator("[data-fluidbox-slide]").count()).toBeLessThan(40);
-  await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((scroller: HTMLElement) => {
+  await page.locator("[data-fluidbox-thumbnails-scroll]").evaluate((scroller: HTMLElement) => {
     const size = parseFloat(
-      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-thumbnails-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
     scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
     scroller.scrollTo({ left: 900 * (size + gap), behavior: "instant" });
   });
-  const target = page.locator('[data-fluidbox-filmstrip-item][data-index="900"]');
+  const target = page.locator('[data-fluidbox-thumbnails-item][data-index="900"]');
   await expect(target).toBeVisible();
   await target.click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
@@ -375,7 +375,7 @@ test("indexed source survives host thumbnail recycling", async ({ page }) => {
     "Item 9002 of 10000",
   );
   expect(await page.locator("[data-fluidbox-slide]").count()).toBeLessThan(40);
-  expect(await page.locator("[data-fluidbox-filmstrip-item]").count()).toBeLessThan(100);
+  expect(await page.locator("[data-fluidbox-thumbnails-item]").count()).toBeLessThan(100);
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
   await expect(page.locator("fluidbox-gallery")).toBeFocused();
@@ -393,7 +393,7 @@ test("100k indexed items retain a bounded viewer DOM", async ({ page }) => {
     "Item 99991 of 100000",
   );
   expect(await page.locator("[data-fluidbox-slide]").count()).toBeLessThan(40);
-  expect(await page.locator("[data-fluidbox-filmstrip-item]").count()).toBeLessThan(100);
+  expect(await page.locator("[data-fluidbox-thumbnails-item]").count()).toBeLessThan(100);
   expect(await page.locator("*").count()).toBeLessThan(600);
 });
 
@@ -407,16 +407,16 @@ test("iframe content survives slide window eviction", async ({ page }) => {
   );
   const frame = page.frameLocator('[data-fluidbox-slide][aria-hidden="false"] iframe');
   await expect(frame.getByRole("button", { name: "Inside iframe" })).toBeVisible();
-  await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((scroller: HTMLElement) => {
+  await page.locator("[data-fluidbox-thumbnails-scroll]").evaluate((scroller: HTMLElement) => {
     const size = parseFloat(
-      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-thumbnails-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
     scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
     scroller.scrollTo({ left: 35 * (size + gap), behavior: "instant" });
   });
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
-  await page.locator('[data-fluidbox-filmstrip-item][data-index="35"]').click();
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCSS("pointer-events", "auto");
+  await page.locator('[data-fluidbox-thumbnails-item][data-index="35"]').click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 36 of 40",
@@ -431,10 +431,10 @@ test("custom iframe media mounts only near the active slide", async ({ page }) =
   await page.locator("fluidbox-item").first().click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"] iframe')).toHaveCount(1);
   await expect.poll(() => page.locator("[data-fluidbox-slide] iframe").count()).toBeLessThan(4);
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
-  await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((scroller: HTMLElement) => {
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCSS("pointer-events", "auto");
+  await page.locator("[data-fluidbox-thumbnails-scroll]").evaluate((scroller: HTMLElement) => {
     const size = parseFloat(
-      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+      getComputedStyle(scroller.parentElement!).getPropertyValue("--fluidbox-thumbnails-item-size"),
     );
     const gap = parseFloat(getComputedStyle(scroller).columnGap);
     scroller.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaX: size + gap }));
@@ -466,21 +466,23 @@ test("indexed source works inside a shadow root", async ({ page }) => {
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
 });
 
-test("filmstrip keeps focus on a retained item while its window moves", async ({ page }) => {
+test("thumbnails keeps focus on a retained item while its window moves", async ({ page }) => {
   await page.goto("/harness.html?count=1000");
   await page.locator("fluidbox-item").first().click();
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
-  const scroller = page.locator("[data-fluidbox-filmstrip-scroll]");
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCSS("pointer-events", "auto");
+  const scroller = page.locator("[data-fluidbox-thumbnails-scroll]");
   const scrollToIndex = (index: number) =>
     scroller.evaluate((element: HTMLElement, target: number) => {
       const size = parseFloat(
-        getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+        getComputedStyle(element.parentElement!).getPropertyValue(
+          "--fluidbox-thumbnails-item-size",
+        ),
       );
       const gap = parseFloat(getComputedStyle(element).columnGap);
       element.scrollTo({ left: target * (size + gap), behavior: "instant" });
     }, index);
   await scrollToIndex(10);
-  const retained = page.locator('[data-fluidbox-filmstrip-item][data-index="10"]');
+  const retained = page.locator('[data-fluidbox-thumbnails-item][data-index="10"]');
   await expect(retained).toBeVisible();
   await retained.focus();
   await scrollToIndex(20);
@@ -523,7 +525,7 @@ test("gallery options change on the open viewer without a rebuild", async ({ pag
   await page.goto("/harness.html");
   await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
   await page.locator("fluidbox-item").first().click();
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
     "data-fluidbox-status",
     "open",
   );
@@ -542,7 +544,7 @@ test("gallery options change on the open viewer without a rebuild", async ({ pag
     return {
       status: gallery.state.status,
       same: gallery.fluidbox === (window as unknown as { __fluidbox: unknown }).__fluidbox,
-      overlays: document.querySelectorAll("[data-fluidbox-overlay]").length,
+      overlays: document.querySelectorAll("[data-fluidbox-viewer]").length,
     };
   });
   expect(result).toEqual({ status: "open", same: true, overlays: 1 });

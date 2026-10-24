@@ -2,11 +2,11 @@
 import { Component } from "@angular/core";
 import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { photos } from "../shared";
 
 @Component({
-  selector: "pattern-filmstrip",
+  selector: "pattern-thumbnails",
   standalone: true,
   imports: [FluidboxModule],
   template: `
@@ -16,7 +16,7 @@ import { photos } from "../shared";
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }
-      <ng-container fluidboxFilmstrip />
+      <ng-container fluidboxThumbnails />
     </div>
     <div fluidboxRoot [items]="photos" class="pattern-grid">
       @for (photo of photos; track photo.id) {
@@ -25,13 +25,13 @@ import { photos } from "../shared";
         </button>
       }
       <!-- Your own thumbnails. The selected button has data-fluidbox-selected. -->
-      <ng-template fluidboxFilmstrip let-index="index">
-        <span class="pattern-filmstrip-thumb" data-test="thumb">{{ index + 1 }}</span>
+      <ng-template fluidboxThumbnails let-index="index">
+        <span class="pattern-thumbnails-thumb" data-test="thumb">{{ index + 1 }}</span>
       </ng-template>
     </div>
   `,
 })
-export class Filmstrip {
+export class Thumbnails {
   readonly photos = photos;
   readonly label = itemLabel;
 }

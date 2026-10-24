@@ -1,11 +1,11 @@
 // #region example
 import { createFluidbox, itemLabel, type FluidboxOptions } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { photos } from "../shared";
 
-function gallery(root: HTMLElement, filmstrip: FluidboxOptions["filmstrip"]) {
-  const fluidbox = createFluidbox({ items: photos, filmstrip });
+function gallery(root: HTMLElement, thumbnails: FluidboxOptions["thumbnails"]) {
+  const fluidbox = createFluidbox({ items: photos, thumbnails });
   const grid = document.createElement("div");
   grid.className = "pattern-grid";
   photos.forEach((photo, index) => {
@@ -24,13 +24,13 @@ function gallery(root: HTMLElement, filmstrip: FluidboxOptions["filmstrip"]) {
   };
 }
 
-export function mountFilmstrip(root: HTMLElement) {
+export function mountThumbnails(root: HTMLElement) {
   const standard = gallery(root, true);
   // Your own thumbnails. The selected button has data-fluidbox-selected.
   const custom = gallery(root, {
     render({ index, target }) {
       const thumb = document.createElement("span");
-      thumb.className = "pattern-filmstrip-thumb";
+      thumb.className = "pattern-thumbnails-thumb";
       thumb.dataset.test = "thumb";
       thumb.textContent = String(index + 1);
       target.append(thumb);

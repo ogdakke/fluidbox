@@ -4,7 +4,7 @@ import { zoomPhotos } from "../shared";
 export function zoom(root: HTMLElement) {
   const gallery = root.querySelector("fluidbox-gallery")!;
   const content = root.querySelector<HTMLTemplateElement>(":scope > template")!;
-  // Items from JS, for their srcset and zoom.src; the buttons marked data-fluidbox-item-id open them.
+  // Items from JS, for their srcset and zoom.src; the buttons marked data-fluidbox-value open them.
   gallery.items = zoomPhotos;
   gallery.viewer = ({ target, fluidbox }) => {
     target.append(content.content.cloneNode(true));

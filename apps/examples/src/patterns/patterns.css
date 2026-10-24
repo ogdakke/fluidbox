@@ -127,7 +127,7 @@
   font: 600 clamp(18px, 3vw, 32px) / 1.2 var(--fb-font-sans);
 }
 
-.pattern-filmstrip-thumb {
+.pattern-thumbnails-thumb {
   display: grid;
   place-items: center;
   width: 100%;
@@ -137,7 +137,7 @@
   font: 600 14px var(--fb-font-mono);
 }
 
-[data-fluidbox-selected] > .pattern-filmstrip-thumb {
+[data-fluidbox-selected] > .pattern-thumbnails-thumb {
   color: #111;
   background: white;
 }

@@ -21,7 +21,7 @@ export { artSrc, sceneById, scenes };
 const art = (prefix: string, ids: string[]) =>
   ids.map((id) => artItem(sceneById(id), `${prefix}-${id}`));
 
-/** 1 basic, 5 programmatic, 6 zoom (zoom off), 7 filmstrip, 8 sheet, 9 headless, 10 rtl. */
+/** 1 basic, 5 programmatic, 6 zoom (zoom off), 7 thumbnails, 8 sheet, 9 headless, 10 rtl. */
 export const photos: FluidboxImageItem[] = art("photo", ["aurora", "ridge", "fjord", "lagoon"]);
 
 /** 2 overlay: an album behind one trigger. */
@@ -201,8 +201,8 @@ export const arabic: Partial<FluidboxLabels> = {
   position: (index, count) =>
     `العنصر ${arabicNumber.format(index + 1)} من ${arabicNumber.format(count)}`,
   slides: "عناصر المعرض",
-  filmstrip: "شريط الصور المصغّرة",
-  filmstripList: "اختر عنصرًا من المعرض",
+  thumbnails: "شريط الصور المصغّرة",
+  thumbnailsList: "اختر عنصرًا من المعرض",
   zoomed: "صورة مكبّرة",
   sheet: "التفاصيل",
   error: "تعذّر تحميل الوسائط.",
@@ -216,7 +216,7 @@ export type PatternName =
   | "renderers"
   | "programmatic"
   | "zoom"
-  | "filmstrip"
+  | "thumbnails"
   | "sheet"
   | "headless"
   | "rtl"
@@ -231,7 +231,7 @@ export const patternNames: readonly PatternName[] = [
   "renderers",
   "programmatic",
   "zoom",
-  "filmstrip",
+  "thumbnails",
   "sheet",
   "headless",
   "rtl",

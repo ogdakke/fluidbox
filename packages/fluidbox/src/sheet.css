@@ -45,14 +45,14 @@
 }
 
 /* A committed scroll dismiss hands touches straight back to the page. */
-:where([data-fluidbox-overlay][data-sheet-dismissed]),
-:where([data-fluidbox-overlay][data-sheet-dismissed]) * {
+:where([data-fluidbox-viewer][data-sheet-dismissed]),
+:where([data-fluidbox-viewer][data-sheet-dismissed]) * {
   pointer-events: none !important;
 }
 /* :where() keeps these at zero specificity, so a rule of yours on
    [data-fluidbox-dialog] wins in any order. */
 :where(
-  :is([data-fluidbox-overlay], [data-fluidbox-flight])
+  :is([data-fluidbox-viewer], [data-fluidbox-flight])
     [data-fluidbox-dialog][data-fluidbox-sheet-host]
 ) {
   /** `0` turns the sheet off, as for wide screens with a sidebar instead. The runtime reads it. */
@@ -96,7 +96,7 @@
 
 /* Reaches under the browser's bars at both ends, as the zoom viewport does: a
    scroller clips to its box, and the sheet should paint under the toolbar. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-scroller] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-scroller] {
   position: absolute;
   inset: calc(-1 * var(--fluidbox-sheet-reach, 0px)) 0;
   overflow-x: hidden;
@@ -106,11 +106,11 @@
   scrollbar-width: none;
   touch-action: pan-x pan-y;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-sheet-scroller]::-webkit-scrollbar {
   display: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-sheet-off]
   [data-fluidbox-sheet-scroller] {
   overflow: hidden;
@@ -118,16 +118,16 @@
 }
 /* As tall as the sheet rises before it meets the photo; the sheet's slot
    overlaps it, so the stage's sticky box ends there. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-push] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-push] {
   height: var(--fluidbox-sheet-push, 0px);
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-space] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-space] {
   height: calc(var(--fluidbox-sheet-reach, 0px) + var(--fluidbox-sheet-dismiss-distance, 0px));
 }
 /* Holds still while the sheet rises. Sticky moves it in the same frame as the
    scroll; a scroll-driven translate that cancels the scroll lands a frame late
    in Chrome and WebKit, so the photo rode along with a fast swipe. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
   position: sticky;
   top: var(--fluidbox-sheet-reach, 0px);
   /* Holds the strip's bleed under the bars in, instead of collapsing it through. */
@@ -138,7 +138,7 @@
 }
 /* The dialog's and the strip's own touch-action would keep vertical swipes
    from the scroller. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   :is(
     [data-fluidbox-dialog][data-fluidbox-sheet-host],
     [data-fluidbox-sheet-stage] [data-fluidbox-slides]
@@ -146,12 +146,12 @@
   touch-action: pan-x pan-y;
 }
 /* The strip only scrolls sideways; a vertical swipe on it chains on to the scroller. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-sheet-stage]
   [data-fluidbox-slides] {
   overscroll-behavior-y: auto;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-snap] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-mark] {
   position: absolute;
   left: 0;
   width: 1px;
@@ -159,10 +159,10 @@
   scroll-snap-align: start;
   pointer-events: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-snap][data-rest] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-mark][data-rest] {
   scroll-snap-stop: always;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-slot] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-slot] {
   position: relative;
   z-index: 7;
   display: flex;
@@ -174,7 +174,7 @@
   pointer-events: none;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet] {
   position: relative;
   box-sizing: border-box;
   display: flex;
@@ -207,20 +207,20 @@
    its content scrolls, and at the top of the content a pull down carries on
    into the sheet. Mark the part that scrolls with data-fluidbox-sheet-scroll,
    or the whole sheet scrolls. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-scroll] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-scroll] {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   overscroll-behavior-y: auto;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-sheet-expanded]
   :is([data-fluidbox-sheet-scroll], [data-fluidbox-sheet]:not(:has([data-fluidbox-sheet-scroll]))) {
   overflow-y: auto;
 }
 
 /* A grab handle; add one as the sheet's first child. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-handle] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-handle] {
   flex: none;
   display: block;
   width: 36px;
@@ -239,7 +239,7 @@
  * How much the photo fades between the first stop and the top one. `0` keeps it.
  * @input --fluidbox-sheet-fade
  */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host]
   :is([data-fluidbox-previous], [data-fluidbox-next]) {
   opacity: calc(1 - var(--fluidbox-sheet-progress) * 2 - var(--fluidbox-sheet-dismiss) * 3);
@@ -249,14 +249,14 @@
    sheet in the same frame as the photo. Without anchors, they centre in the
    room above the sheet. */
 @supports (anchor-name: --fluidbox-sheet-stage) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
     [data-fluidbox-dialog][data-fluidbox-sheet-host] {
     anchor-scope: --fluidbox-sheet-stage;
   }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
     anchor-name: --fluidbox-sheet-stage;
   }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
     [data-fluidbox-dialog][data-fluidbox-sheet-host][data-gallery]
     :is([data-fluidbox-previous], [data-fluidbox-next]) {
     position-anchor: --fluidbox-sheet-stage;
@@ -267,23 +267,23 @@
   }
 }
 @supports not (anchor-name: --fluidbox-sheet-stage) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
     [data-fluidbox-dialog][data-fluidbox-sheet-host]
     :is([data-fluidbox-previous], [data-fluidbox-next]) {
     translate: 0 calc(max(0px, var(--fluidbox-sheet-visible)) / -2 + var(--fluidbox-sheet-peek) / 2);
   }
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-sheet-raised]
   :is([data-fluidbox-previous], [data-fluidbox-next]) {
   pointer-events: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host]
   [data-fluidbox-slide] {
   opacity: calc(1 - var(--fluidbox-sheet-expand) * var(--fluidbox-sheet-fade, 1));
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host]
   [data-fluidbox-close] {
   opacity: calc(1 - var(--fluidbox-sheet-dismiss) * 3);
@@ -292,12 +292,12 @@
    the sheet, and a tap above it lowers it. Zoom waits for the sheet to go
    down; the zoom buttons work regardless. The zoom viewport sits beside the
    dialog, so this asks the overlay. */
-:where([data-fluidbox-overlay]:has([data-fluidbox-dialog][data-sheet-raised]))
+:where([data-fluidbox-viewer]:has([data-fluidbox-dialog][data-sheet-raised]))
   :is([data-fluidbox-zoom-viewport], [data-fluidbox-zoom-viewport] *) {
   pointer-events: none !important;
 }
 /* A dismiss fades the controls at once, as without a sheet. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-fluidbox-sheet-host][data-dismissing]
   :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
   opacity: 0;

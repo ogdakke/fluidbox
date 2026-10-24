@@ -19,7 +19,7 @@ export const mount: MountLive = async (root) => {
         ${content(first!)}
       </fluidbox-item>
       ${rest.map((item) => `<fluidbox-item item-id="${item.id}">${content(item)}</fluidbox-item>`).join("")}
-      <fluidbox-filmstrip></fluidbox-filmstrip>
+      <fluidbox-thumbnails></fluidbox-thumbnails>
     </fluidbox-gallery>`;
   const gallery = root.querySelector("fluidbox-gallery")!;
   await gallery.whenReady();

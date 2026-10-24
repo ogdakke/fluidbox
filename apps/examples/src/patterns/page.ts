@@ -40,7 +40,7 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
     title: "Zoom",
     note: "Zoom controls, a zoom readout, and a sharper image as the zoom grows. Or zoom off.",
   },
-  filmstrip: { title: "Filmstrip", note: "The default strip, and one with your own thumbnails." },
+  thumbnails: { title: "Thumbnails", note: "The default strip, and one with your own thumbnails." },
   sheet: {
     title: "Sheet",
     note: "A panel under the photo with snap points, stop buttons and a text field.",

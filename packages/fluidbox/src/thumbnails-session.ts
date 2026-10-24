@@ -1,5 +1,5 @@
-import { FilmstripRuntime, type FilmstripLayout } from "./filmstrip-runtime";
-import { filmstripThumbnailSources, loadFilmstripThumbnail } from "./filmstrip-thumbnail";
+import { ThumbnailsRuntime, type ThumbnailsLayout } from "./thumbnails-runtime";
+import { thumbnailsThumbnailSources, loadThumbnailsThumbnail } from "./thumbnails-thumbnail";
 import type {
   SessionController,
   FluidboxDispose,
@@ -8,7 +8,7 @@ import type {
 } from "./runtime-types";
 import type { FluidboxLabels } from "./labels";
 
-export interface FluidboxFilmstripItemContext<TItem extends FluidboxItem = FluidboxItem> {
+export interface FluidboxThumbnailsItemContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
   readonly index: number;
   /** The thumbnail button. Fill it with your own markup. */
@@ -17,14 +17,14 @@ export interface FluidboxFilmstripItemContext<TItem extends FluidboxItem = Fluid
   readonly signal: AbortSignal;
 }
 
-export interface FilmstripSessionOptions<TItem extends FluidboxItem = FluidboxItem> {
+export interface ThumbnailsSessionOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Replaces the default thumbnail image. */
-  readonly renderItem?: (context: FluidboxFilmstripItemContext<TItem>) => void | FluidboxDispose;
-  readonly labels: Pick<FluidboxLabels, "filmstrip" | "filmstripList" | "position">;
+  readonly renderItem?: (context: FluidboxThumbnailsItemContext<TItem>) => void | FluidboxDispose;
+  readonly labels: Pick<FluidboxLabels, "thumbnails" | "thumbnailsList" | "position">;
 }
 
-/** Plain DOM filmstrip, used by the filmstrip() add-on for every binding and the custom elements. */
-export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
+/** Plain DOM thumbnails, used by the thumbnails() add-on for every binding and the custom elements. */
+export class ThumbnailsSession<TItem extends FluidboxItem = FluidboxItem> {
   readonly dock: HTMLDivElement;
   readonly element: HTMLDivElement;
   readonly scroller: HTMLDivElement;
@@ -32,10 +32,10 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   readonly #source: FluidboxSource<TItem>;
   readonly #visible = new Map<number, HTMLButtonElement>();
   readonly #requests = new Map<number, AbortController>();
-  readonly #runtime: FilmstripRuntime;
+  readonly #runtime: ThumbnailsRuntime;
   readonly #disposers = new Map<number, FluidboxDispose>();
-  readonly #renderItem: FilmstripSessionOptions<TItem>["renderItem"];
-  readonly #labels: FilmstripSessionOptions<TItem>["labels"];
+  readonly #renderItem: ThumbnailsSessionOptions<TItem>["renderItem"];
+  readonly #labels: ThumbnailsSessionOptions<TItem>["labels"];
   #first = -1;
   #last = -1;
   #index: number;
@@ -47,7 +47,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     source: FluidboxSource<TItem>,
     controller: SessionController<TItem>,
     index: number,
-    options: FilmstripSessionOptions<TItem>,
+    options: ThumbnailsSessionOptions<TItem>,
   ) {
     this.#source = source;
     this.#renderItem = options.renderItem;
@@ -57,23 +57,23 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     this.element = ownerDocument.createElement("div");
     this.scroller = ownerDocument.createElement("div");
     this.track = ownerDocument.createElement("div");
-    this.dock.dataset.fluidboxFilmstripDock = "";
+    this.dock.dataset.fluidboxThumbnailsDock = "";
     // It reveals and hides with the viewer's layer, as your content does.
     this.dock.dataset.fluidboxChrome = "";
-    this.element.dataset.fluidboxFilmstrip = "";
+    this.element.dataset.fluidboxThumbnails = "";
     // Its touches, wheel and keys scrub the strip, not the viewer.
     this.element.dataset.fluidboxOwnsInput = "";
     this.element.setAttribute("role", "group");
-    this.element.setAttribute("aria-label", options.labels.filmstrip);
-    this.scroller.dataset.fluidboxFilmstripScroll = "";
+    this.element.setAttribute("aria-label", options.labels.thumbnails);
+    this.scroller.dataset.fluidboxThumbnailsScroll = "";
     this.scroller.setAttribute("role", "listbox");
     this.scroller.setAttribute("aria-orientation", "horizontal");
-    this.scroller.setAttribute("aria-label", options.labels.filmstripList);
-    this.track.dataset.fluidboxFilmstripTrack = "";
+    this.scroller.setAttribute("aria-label", options.labels.thumbnailsList);
+    this.track.dataset.fluidboxThumbnailsTrack = "";
     this.scroller.append(this.track);
     this.element.append(this.scroller);
     this.dock.append(this.element);
-    this.#runtime = new FilmstripRuntime({
+    this.#runtime = new ThumbnailsRuntime({
       element: this.element,
       scroller: this.scroller,
       count: source.count,
@@ -91,7 +91,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     });
   }
 
-  #applyWindow(center: number, layout: FilmstripLayout, force: boolean) {
+  #applyWindow(center: number, layout: ThumbnailsLayout, force: boolean) {
     force ||= layout.step !== this.#step || layout.vertical !== this.#vertical;
     this.#step = layout.step;
     this.#vertical = layout.vertical;
@@ -115,7 +115,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
     const item = this.#source.getItem(index);
     const button = this.element.ownerDocument.createElement("button");
     button.type = "button";
-    button.dataset.fluidboxFilmstripItem = "";
+    button.dataset.fluidboxThumbnailsItem = "";
     button.dataset.index = String(index);
     button.setAttribute("role", "option");
     // An item without a name, as a decorative photo, is named by its place.
@@ -134,14 +134,14 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
       if (dispose) this.#disposers.set(index, dispose);
     } else {
       const image = this.element.ownerDocument.createElement("img");
-      const sources = filmstripThumbnailSources(item);
+      const sources = thumbnailsThumbnailSources(item);
       // The smallest candidate: a thumbnail's plain src can be its largest, as
       // with Next's getImageProps, and an src starts downloading as it is set.
       image.src = sources[0] ?? "";
       image.alt = "";
       image.draggable = false;
-      image.dataset.fluidboxFilmstripThumbnail = "";
-      if (sources.length) void loadFilmstripThumbnail(image, sources, request.signal);
+      image.dataset.fluidboxThumbnailsThumbnail = "";
+      if (sources.length) void loadThumbnailsThumbnail(image, sources, request.signal);
       button.append(image);
     }
     button.addEventListener("click", () => this.#runtime.choose(index, false));
@@ -184,6 +184,7 @@ export class FilmstripSession<TItem extends FluidboxItem = FluidboxItem> {
   #paintButton(button: HTMLButtonElement, selected: boolean) {
     button.setAttribute("aria-selected", String(selected));
     button.toggleAttribute("data-fluidbox-selected", selected);
+    button.toggleAttribute("data-active", selected);
     button.tabIndex = selected ? 0 : -1;
   }
 

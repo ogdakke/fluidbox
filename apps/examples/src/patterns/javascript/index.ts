@@ -1,7 +1,7 @@
 import type { MountPattern } from "../page";
 import type { PatternName } from "../shared";
 import { mountBasic } from "./basic";
-import { mountFilmstrip } from "./filmstrip";
+import { mountThumbnails } from "./thumbnails";
 import { mountRtl } from "./rtl";
 import { mountUrl } from "./url";
 import { mountHeadless } from "./headless";
@@ -21,7 +21,7 @@ export const patterns: Record<PatternName, MountPattern> = {
   renderers: mountRenderers,
   programmatic: mountProgrammatic,
   zoom: mountZoom,
-  filmstrip: mountFilmstrip,
+  thumbnails: mountThumbnails,
   rtl: mountRtl,
   url: mountUrl,
   sheet: mountSheet,

@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { arabic, photos } from "../shared";
 </script>
 
@@ -21,7 +21,7 @@ import { arabic, photos } from "../shared";
           <img :src="photo.src" :alt="itemLabel(photo)" />
         </Fluidbox.Trigger>
       </div>
-      <Fluidbox.Filmstrip />
+      <Fluidbox.Thumbnails />
     </Fluidbox.Root>
   </div>
 </template>

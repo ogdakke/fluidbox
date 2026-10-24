@@ -440,12 +440,12 @@ test.describe("semantics", () => {
     await expect(dialog(page).locator("[data-fluidbox-close]")).toBeVisible();
   });
 
-  test("a filmstrip thumbnail without alt text is named by its place, and the selected one is marked by shape", async ({
+  test("a thumbnail without alt text is named by its place, and the selected one is marked by shape", async ({
     page,
   }) => {
-    await load(page, "?filmstrip&unnamed");
+    await load(page, "?thumbnails&unnamed");
     await page.evaluate(() => (window as any).a11yFluidbox.open(1));
-    const thumbnails = page.locator("[data-fluidbox-filmstrip-item]");
+    const thumbnails = page.locator("[data-fluidbox-thumbnails-item]");
     await expect(thumbnails.nth(1)).toHaveAttribute("aria-label", "Item 2 of 4");
     await expect(thumbnails.nth(0)).toHaveAttribute("aria-label", "Red study");
     const bar = (index: number) =>

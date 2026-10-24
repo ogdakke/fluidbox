@@ -35,10 +35,10 @@ describe("a fluidbox before its viewer", () => {
   });
 
   it("turns add-ons on without their entries' imports", async () => {
-    const fluidbox = createFluidbox({ items, filmstrip: true });
+    const fluidbox = createFluidbox({ items, thumbnails: true });
     expect(() => fluidbox.update({ sheet: true })).not.toThrow();
     // The fluidbox loads them itself; wait for the same modules.
-    await Promise.all([import("../src/filmstrip-entry"), import("../src/sheet-entry")]);
+    await Promise.all([import("../src/thumbnails-entry"), import("../src/sheet-entry")]);
     fluidbox.destroy();
   });
 

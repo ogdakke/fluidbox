@@ -61,7 +61,7 @@ test.describe("zoom API", () => {
     await expect(page.locator(dialog)).toHaveAttribute("data-zoomed", "");
   });
 
-  test("zoomIn, zoomOut and resetZoom step by 1.5 and stop at the bounds", async ({ page }) => {
+  test("zoomIn, zoomOut and zoomReset step by 1.5 and stop at the bounds", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openOn(page, "ladder");
     const scales = await page.evaluate(async () => {
@@ -73,7 +73,7 @@ test.describe("zoom API", () => {
       }
       await viewer.zoomOut();
       scales.push(viewer.state.zoom!.scale);
-      await viewer.resetZoom();
+      await viewer.zoomReset();
       scales.push(viewer.state.zoom!.scale);
       await viewer.zoomTo(99);
       scales.push(viewer.state.zoom!.scale);
@@ -230,7 +230,7 @@ test.describe("zoom accessibility", () => {
     // Focus can rest on it and stays in the dialog.
     await viewport.focus();
     await expect(viewport).toBeFocused();
-    await page.evaluate(() => window.zoomViewer.resetZoom());
+    await page.evaluate(() => window.zoomViewer.zoomReset());
     await expect(page.locator("[data-fluidbox-announcer]")).toHaveText("Zoom 100%");
     await expect(page.locator(`${dialog}`)).toBeFocused();
   });
@@ -391,7 +391,7 @@ test.describe("a sharper image as it zooms", () => {
     ).toEqual(scroll);
     expect(requests.filter((search) => search === "?w=4320")).toHaveLength(1);
     // Zoomed back out, it keeps the sharper image at the same size.
-    await page.evaluate(() => window.zoomViewer.resetZoom());
+    await page.evaluate(() => window.zoomViewer.zoomReset());
     const fitted = await box(page);
     expect(fitted[2]).toBeCloseTo(before[2]! / 2.5, 0);
     expect(await source()).toContain("?w=4320");

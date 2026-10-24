@@ -1,6 +1,6 @@
 import { mountSite } from "../src/site";
 import { createFluidbox } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/thumbnails";
 import type {
   Fluidbox,
   FluidboxCustomItemBase,
@@ -113,12 +113,12 @@ const secondaryViewer: Fluidbox<DemoItem> = createFluidbox({
   findTrigger,
   slides,
 });
-// The filmstrip is an option: its code loads only with the side-effect import.
-const filmstripViewer: Fluidbox<DemoItem> = createFluidbox({
+// The thumbnails is an option: its code loads only with the side-effect import.
+const thumbnailsViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
   findTrigger,
   slides,
-  filmstrip: true,
+  thumbnails: true,
 });
 const protectedViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
@@ -138,14 +138,14 @@ declare global {
     headlessViewer: typeof viewer;
     headlessSecondaryViewer: typeof secondaryViewer;
     headlessProtectedViewer: typeof protectedViewer;
-    headlessFilmstripViewer: typeof filmstripViewer;
+    headlessThumbnailsViewer: typeof thumbnailsViewer;
     loadSheet: () => Promise<unknown>;
   }
 }
 
 window.headlessViewer = viewer;
 window.headlessSecondaryViewer = secondaryViewer;
-window.headlessFilmstripViewer = filmstripViewer;
+window.headlessThumbnailsViewer = thumbnailsViewer;
 window.headlessProtectedViewer = protectedViewer;
 // The sheet add-on loads on demand, so the other headless tests run without it.
 window.loadSheet = () =>

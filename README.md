@@ -31,7 +31,7 @@ Add a gallery to the page:
       </picture>
     </template>
   </fluidbox-item>
-  <fluidbox-filmstrip></fluidbox-filmstrip>
+  <fluidbox-thumbnails></fluidbox-thumbnails>
 </fluidbox-gallery>
 ```
 
@@ -62,7 +62,7 @@ Items are plain objects whose fields are the attributes of the element the viewe
 
 ## Frameworks
 
-The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue` and `/angular`. The framework packages are optional peers, so install `@ogdakke/fluidbox` alongside the one your app already uses. Every binding has the same parts (`Root`, `Trigger`, `Viewer`, `Controls`, `Filmstrip`, `Sheet`, ...) and the same patterns. See the [patterns](apps/docs/content/patterns/index.md).
+The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue` and `/angular`. The framework packages are optional peers, so install `@ogdakke/fluidbox` alongside the one your app already uses. Every binding has the same parts (`Root`, `Trigger`, `Viewer`, `Controls`, `Thumbnails`, `Sheet`, ...) and the same patterns. See the [patterns](apps/docs/content/patterns/index.md).
 
 The package root is safe to import on the server. `@ogdakke/fluidbox/elements` defines the elements on import, so it is browser only. In a server-rendered app, `await import("@ogdakke/fluidbox/elements")` after hydration.
 

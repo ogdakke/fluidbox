@@ -26,7 +26,7 @@ createFluidbox({
 });
 ```
 
-`position(index, count)` names each slide, and a filmstrip thumbnail whose item has no name. `announcement(name, index, count)` is what the viewer says as it moves, with the item's alt text or title as `name`; as it opens, the dialog's name already says that, so `name` is `""` there. `index` counts from 0. Because it's a function, you can format the numbers for the language with `Intl.NumberFormat`:
+`position(index, count)` names each slide, and a thumbnail whose item has no name. `announcement(name, index, count)` is what the viewer says as it moves, with the item's alt text or title as `name`; as it opens, the dialog's name already says that, so `name` is `""` there. `index` counts from 0. Because it's a function, you can format the numbers for the language with `Intl.NumberFormat`:
 
 ```ts
 const number = new Intl.NumberFormat("ar-u-nu-arab");
@@ -98,7 +98,7 @@ Right to left, these flip:
 - ArrowLeft goes to the next item, and ArrowRight to the previous one.
 - A swipe or trackpad scroll to the left goes forward. The slides are a native scroller, so this comes from the browser.
 - Next sits on the left, Previous on the right, and their arrows point the other way. Close moves to the top-left corner.
-- The filmstrip starts on the right, and its arrow keys follow. A vertical filmstrip sits on the right.
+- The thumbnails starts on the right, and its arrow keys follow. A vertical thumbnails sits on the right.
 
 These stay the same:
 

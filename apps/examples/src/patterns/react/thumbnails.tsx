@@ -1,10 +1,10 @@
 // #region example
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { photos } from "../shared";
 
-function Thumbnails() {
+function Grid() {
   return (
     <div className="pattern-grid">
       {photos.map((photo) => (
@@ -21,24 +21,24 @@ function Thumbnails() {
   );
 }
 
-export function Filmstrip() {
+export function Thumbnails() {
   return (
     <>
       <Fluidbox.Root items={photos}>
-        <Thumbnails />
-        {/* Being there turns the filmstrip on. */}
-        <Fluidbox.Filmstrip />
+        <Grid />
+        {/* Being there turns the thumbnails on. */}
+        <Fluidbox.Thumbnails />
       </Fluidbox.Root>
       <Fluidbox.Root items={photos}>
-        <Thumbnails />
+        <Grid />
         {/* Your own thumbnails. The selected button has data-fluidbox-selected. */}
-        <Fluidbox.Filmstrip>
+        <Fluidbox.Thumbnails>
           {({ index }) => (
-            <span className="pattern-filmstrip-thumb" data-test="thumb">
+            <span className="pattern-thumbnails-thumb" data-test="thumb">
               {index + 1}
             </span>
           )}
-        </Fluidbox.Filmstrip>
+        </Fluidbox.Thumbnails>
       </Fluidbox.Root>
     </>
   );

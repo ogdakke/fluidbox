@@ -20,7 +20,7 @@ import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. The filmstrip and the sheet are add-ons, covered in [Add-ons](#add-ons).
+Import `@ogdakke/fluidbox/styles.css` once in your app. The thumbnails and the sheet are add-ons, covered in [Add-ons](#add-ons).
 
 ## A gallery
 
@@ -63,44 +63,45 @@ The viewer has Previous, Next and Close buttons until you draw your own with `vi
 
 Returns a `Fluidbox`. Only `items` is required.
 
-| Option      | Type                                                     | Default                                   | What it does                                                                                                                                                                                                                         |
-| ----------- | -------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `items`     | `readonly TItem[] \| FluidboxItemList<TItem>`            |                                           | The items: an array, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                                                                                                                     |
-| `controls`  | `boolean \| readonly FluidboxControlName[]`              | `true` without `viewer`, else `["close"]` | The default Previous, Next and Close buttons, or some of them, with `zoomIn`, `zoomOut` and `zoomReset` on request. With a `viewer`, Close steps aside while your content has its own. See [Zoom](./patterns/zoom.md#zoom-controls). |
-| `viewer`    | `({ target, fluidbox, signal }) => void \| (() => void)` |                                           | Draw your own controls and captions into the viewer. See [Viewer content](#viewer-content).                                                                                                                                          |
-| `renderers` | `Record<string, FluidboxSlideRenderer<TItem>>`           | `{}`                                      | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                                                                                                            |
-| `zoom`      | `false \| { step?: number; max?: number }`               | `{ step: 2, max: 4 }`                     | `step` is the scale of a click or double-tap; `max` the largest scale. `false` turns zoom off. See [Zoom](./patterns/zoom.md).                                                                                                       |
-| `loop`      | `boolean`                                                | `false`                                   | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops. `update` changes it live.                                                                                              |
-| `labels`    | `Partial<FluidboxLabels>`                                | English                                   | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                                                                                                                |
-| `filmstrip` | `boolean \| { render? }`                                 | `false`                                   | A thumbnail strip. Loads its entry; needs `filmstrip.css`.                                                                                                                                                                           |
-| `sheet`     | `boolean \| { snapPoints?, dismiss?, render? }`          | `false`                                   | A panel over the photo. Loads its entry; needs `sheet.css`.                                                                                                                                                                          |
-| `origins`   | `FluidboxOriginAdapter<TItem>`                           |                                           | Finds the triggers of items you never bound, as in a virtualized grid. See [The origin adapter](./items-and-origins.md#the-origin-adapter).                                                                                          |
-| `loading`   | `"hover" \| "press" \| "eager"`                          | `"hover"`                                 | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                                                                                                     |
+| Option          | Type                                                        | Default                                   | What it does                                                                                                                                                                                                                         |
+| --------------- | ----------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `items`         | `readonly TItem[] \| FluidboxItemList<TItem>`               |                                           | The items: an array, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                                                                                                                     |
+| `controls`      | `boolean \| readonly FluidboxControlName[]`                 | `true` without `viewer`, else `["close"]` | The default Previous, Next and Close buttons, or some of them, with `zoomIn`, `zoomOut` and `zoomReset` on request. With a `viewer`, Close steps aside while your content has its own. See [Zoom](./patterns/zoom.md#zoom-controls). |
+| `viewer`        | `({ target, fluidbox, signal }) => void \| (() => void)`    |                                           | Draw your own controls and captions into the viewer. See [Viewer content](#viewer-content).                                                                                                                                          |
+| `renderers`     | `Record<string, FluidboxSlideRenderer<TItem>>`              | `{}`                                      | Draw `custom` items, by the name in their `render`. See [Media types](./media.md#custom).                                                                                                                                            |
+| `zoom`          | `false \| { step?: number; max?: number }`                  | `{ step: 2, max: 4 }`                     | `step` is the scale of a click or double-tap; `max` the largest scale. `false` turns zoom off. See [Zoom](./patterns/zoom.md).                                                                                                       |
+| `loop`          | `boolean`                                                   | `false`                                   | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops. `update` changes it live.                                                                                             |
+| `labels`        | `Partial<FluidboxLabels>`                                   | English                                   | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                                                                                                                |
+| `thumbnails`    | `boolean \| { render? }`                                    | `false`                                   | A thumbnail strip. Loads its entry; needs `thumbnails.css`.                                                                                                                                                                          |
+| `sheet`         | `boolean \| { snapPoints?, dismiss?, render? }`             | `false`                                   | A panel over the photo. Loads its entry; needs `sheet.css`.                                                                                                                                                                          |
+| `findTrigger`   | `(item, index) => Element \| null`                          |                                           | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter).                                                                                     |
+| `revealTrigger` | `(item, index, { signal, phase }) => void \| Promise<void>` |                                           | Brings an item's trigger into view before the viewer flies back to it.                                                                                                                                                               |
+| `preload`       | `"intent" \| "press" \| "eager"`                            | `"intent"`                                | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                                                                                                     |
 
-To change `labels`, `zoom`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading`, call `update`. The open viewer stays open. To change the items, call `setItems`. The fluidbox looks up `renderers` by name each time a custom slide mounts, and reads `origins` on each use.
+To change `labels`, `zoom`, `controls`, `viewer`, `thumbnails`, `sheet` or `preload`, call `update`. The open viewer stays open. To change the items, call `setItems`. The fluidbox looks up `renderers` by name each time a custom slide mounts, and reads `origins` on each use.
 
 ## The fluidbox
 
-| Member                                   | Returns                   | What it does                                                                                                           |
-| ---------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `state`                                  | `FluidboxState<TItem>`    | The current state, a frozen snapshot. See [State](#state).                                                             |
-| `items`                                  | `FluidboxItemList<TItem>` | The items the viewer reads, as a list: the ones it was made with, or the last `setItems`.                              |
-| `open(target?, options?)`                | `Promise<boolean>`        | Opens the viewer on an item, or moves to it while open. Without a target: the current item, else the first.            |
-| `close(options?)`                        | `Promise<boolean>`        | Closes the viewer.                                                                                                     |
-| `next(options?)`                         | `Promise<boolean>`        | Moves to the next item while open.                                                                                     |
-| `previous(options?)`                     | `Promise<boolean>`        | Moves to the previous item while open.                                                                                 |
-| `update(options)`                        | `void`                    | Changes `labels`, `zoom`, `loop`, `controls`, `viewer`, `filmstrip`, `sheet` or `loading` live. See [update](#update). |
-| `zoomTo(scale, options?)`                | `Promise<boolean>`        | Zooms the image on show to `scale`, between 1 and the zoom's `max`. See [Zoom](./patterns/zoom.md).                    |
-| `zoomIn(options?)`, `zoomOut(options?)`  | `Promise<boolean>`        | Zooms in or out by 1.5.                                                                                                |
-| `resetZoom(options?)`                    | `Promise<boolean>`        | Zooms back out to fit.                                                                                                 |
-| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there. Equal items change nothing.            |
-| `preload(target)`                        | `() => void`              | Starts loading an item a press is likely to open, while the viewer is closed. Call the result to let go.               |
-| `load()`                                 | `Promise<boolean>`        | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                        |
-| `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                                 |
-| `bindOverlay(element, target, options?)` | `() => void`              | Makes an element on a trigger a thumbnail overlay. See [Thumbnail overlays](#thumbnail-overlays).                      |
-| `subscribe(listener)`                    | `() => void`              | Calls `listener(state)` after every state change.                                                                      |
-| `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                              |
-| `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.                   |
+| Member                                   | Returns                   | What it does                                                                                                            |
+| ---------------------------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `state`                                  | `FluidboxState<TItem>`    | The current state, a frozen snapshot. See [State](#state).                                                              |
+| `items`                                  | `FluidboxItemList<TItem>` | The items the viewer reads, as a list: the ones it was made with, or the last `setItems`.                               |
+| `open(target?, options?)`                | `Promise<boolean>`        | Opens the viewer on an item, or moves to it while open. Without a target: the current item, else the first.             |
+| `close(options?)`                        | `Promise<boolean>`        | Closes the viewer.                                                                                                      |
+| `next(options?)`                         | `Promise<boolean>`        | Moves to the next item while open.                                                                                      |
+| `previous(options?)`                     | `Promise<boolean>`        | Moves to the previous item while open.                                                                                  |
+| `update(options)`                        | `void`                    | Changes `labels`, `zoom`, `loop`, `controls`, `viewer`, `thumbnails`, `sheet` or `preload` live. See [update](#update). |
+| `zoomTo(scale, options?)`                | `Promise<boolean>`        | Zooms the image on show to `scale`, between 1 and the zoom's `max`. See [Zoom](./patterns/zoom.md).                     |
+| `zoomIn(options?)`, `zoomOut(options?)`  | `Promise<boolean>`        | Zooms in or out by 1.5.                                                                                                 |
+| `zoomReset(options?)`                    | `Promise<boolean>`        | Zooms back out to fit.                                                                                                  |
+| `setItems(items)`                        | `Promise<boolean>`        | Replaces the items. An open viewer stays on the same id when it is still there. Equal items change nothing.             |
+| `preload(target)`                        | `() => void`              | Starts loading an item a press is likely to open, while the viewer is closed. Call the result to let go.                |
+| `load()`                                 | `Promise<boolean>`        | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                         |
+| `bind(element, target, options?)`        | `() => void`              | Makes an element a trigger. See [Triggers](#triggers).                                                                  |
+| `bindOverlay(element, target, options?)` | `() => void`              | Makes an element on a trigger a thumbnail overlay. See [Thumbnail overlays](#thumbnail-overlays).                       |
+| `subscribe(listener)`                    | `() => void`              | Calls `listener(state)` after every state change.                                                                       |
+| `sheet`                                  | `FluidboxSheet \| null`   | The sheet, when the `sheet` option is on.                                                                               |
+| `destroy()`                              | `void`                    | Closes at once, removes the viewer, and releases every `bind` and `bindOverlay`. Safe to call twice.                    |
 
 A target is an item, its index or its id. The fluidbox matches an item object by its id, so a copy of it works too. The fluidbox is an `EventTarget`, with the events listed below.
 
@@ -116,7 +117,7 @@ coarse.addEventListener("change", () => {
 fluidbox.update({ labels: { close: "Sulje", previous: "Edellinen", next: "Seuraava" } });
 ```
 
-Labels and zoom apply in place. A change of `controls`, `viewer` or the labels draws the viewer's layer again, and a change of `filmstrip` or `sheet` mounts that add-on again. `update` compares options objects member by member and functions by identity, so pass the same `viewer` and `render` functions from one call to the next.
+Labels and zoom apply in place. A change of `controls`, `viewer` or the labels draws the viewer's layer again, and a change of `thumbnails` or `sheet` mounts that add-on again. `update` compares options objects member by member and functions by identity, so pass the same `viewer` and `render` functions from one call to the next.
 
 ### Commands
 
@@ -147,15 +148,13 @@ interface FluidboxState<TItem> {
 
 Listen with `addEventListener`. The events are typed, so `event.reason` and `event.item` need no casts:
 
-| Event              | Class                     | Fields                           | When                                                                                    |
-| ------------------ | ------------------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
-| `beforetoggle`     | `FluidboxToggleEvent`     | `oldState`, `newState`, `reason` | Before the viewer opens or closes. Cancelable: `preventDefault()` keeps it as it is.    |
-| `toggle`           | `FluidboxToggleEvent`     | `oldState`, `newState`, `reason` | The opening or closing motion starts.                                                   |
-| `beforeitemchange` | `FluidboxItemChangeEvent` | `id`, `index`, `item`, `reason`  | Before the open viewer moves to another item. Cancelable: `preventDefault()` stays put. |
-| `itemchange`       | `FluidboxItemChangeEvent` | `id`, `index`, `item`, `reason`  | The viewer moves to an item, including the one it opens on.                             |
-| `settle`           | `FluidboxItemChangeEvent` | `id`, `index`, `item`, `reason`  | The viewer comes to rest on an item.                                                    |
-| `sheetchange`      | `FluidboxSheetEvent`      | `stop`, `reason`                 | The sheet comes to rest at another stop.                                                |
-| `zoomchange`       | `FluidboxZoomEvent`       | `scale`, `reason`                | The image on show comes to rest at another zoom.                                        |
+| Event                 | Class                      | Fields                                                   | When                                                                          |
+| --------------------- | -------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `beforevaluechange`   | `FluidboxValueChangeEvent` | `value`, `previousValue`, `action`, `reason`, `cancel()` | Before every open, move and close. `cancel()` or `preventDefault()` stops it. |
+| `valuechange`         | `FluidboxValueChangeEvent` | the same                                                 | The viewer opens, moves or closes; the motion starts.                         |
+| `valuechangecomplete` | `FluidboxValueChangeEvent` | the same                                                 | The motion settled: the flight landed, a move came to rest, a close finished. |
+| `sheetchange`         | `FluidboxSheetEvent`       | `stop`, `reason`                                         | The sheet comes to rest at another stop.                                      |
+| `zoomchange`          | `FluidboxZoomEvent`        | `scale`, `reason`                                        | The image on show comes to rest at another zoom.                              |
 
 `oldState` and `newState` are `"open"` or `"closed"`, as on a popover's toggle events. `reason`, a `FluidboxReason`, says what asked:
 
@@ -285,24 +284,24 @@ The viewer is a modal dialog. As it opens, focus moves into it before the openin
 | `+`, `-` and `0`      | Zoom in, out and back.                                          |
 | Escape                | Closes the viewer, or lowers a raised sheet.                    |
 
-Keys belong to what has focus. With a field, a link, a button of your own, a `<video>`, or a widget that moves with the arrow keys (a slider, a radio group, a menu, tabs, a listbox, a grid) focused, only Escape reaches the viewer, and only if the content doesn't handle it first: the viewer listens on the document after your content, and leaves a key that was `preventDefault()`ed, or that a dialog, popover, menu or open combobox in the content takes. Arrow keys with Alt, Ctrl, Meta or Shift aren't the viewer's. Content marked `data-fluidbox-owns-input` keeps its keys and gestures, as the filmstrip does.
+Keys belong to what has focus. With a field, a link, a button of your own, a `<video>`, or a widget that moves with the arrow keys (a slider, a radio group, a menu, tabs, a listbox, a grid) focused, only Escape reaches the viewer, and only if the content doesn't handle it first: the viewer listens on the document after your content, and leaves a key that was `preventDefault()`ed, or that a dialog, popover, menu or open combobox in the content takes. Arrow keys with Alt, Ctrl, Meta or Shift aren't the viewer's. Content marked `data-fluidbox-owns-input` keeps its keys and gestures, as the thumbnails does.
 
 The viewer announces the item it moves to, as "Blue study, 2 of 4", through a polite live region. Change the wording with the `announcement` [label](./api.md#labels).
 
 ## Add-ons
 
-The filmstrip and the sheet have their own entries. Turn one on with its option and the fluidbox loads its entry; import the entry to bundle it up front:
+The thumbnails and the sheet have their own entries. Turn one on with its option and the fluidbox loads its entry; import the entry to bundle it up front:
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/thumbnails.css";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
 
 const fluidbox = createFluidbox({
   items: photos,
-  filmstrip: true,
+  thumbnails: true,
   sheet: {
     snapPoints: ["40%", "90%"],
     render({ item, target }) {
@@ -312,7 +311,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-An open waits for an entry that is still loading. [Filmstrip and sheet](./filmstrip-and-sheet.md) has every option.
+An open waits for an entry that is still loading. [Thumbnails and sheet](./thumbnails-and-sheet.md) has every option.
 
 ## Patterns
 
@@ -324,8 +323,8 @@ An open waits for an entry that is still loading. [Filmstrip and sheet](./filmst
 | [Custom content](./patterns/renderers.md)          | `renderers: { note: ({ target }) => {} }` and `render: "note"` on the item.           |
 | [Programmatic control](./patterns/programmatic.md) | `open(2)`, `subscribe`, and `beforeitemchange` with `preventDefault()`.               |
 | [Zoom](./patterns/zoom.md)                         | `zoom: { step, max }` or `zoom: false`.                                               |
-| [Filmstrip](./patterns/filmstrip.md)               | `filmstrip: true`, or `filmstrip: { render }`.                                        |
-| [Sheet](./patterns/sheet.md)                       | `sheet: { snapPoints, render }`, `fluidbox.sheet.set(stop)` and `sheetchange`.        |
+| [Thumbnails](./patterns/thumbnails.md)             | `thumbnails: true`, or `thumbnails: { render }`.                                      |
+| [Sheet](./patterns/sheet.md)                       | `sheet: { snapPoints, render }`, `fluidbox.sheet.setSnap(snap)` and `sheetchange`.    |
 | [Headless controls](./patterns/headless.md)        | A `viewer` renderer that builds your buttons and subscribes to the state.             |
 | [Right to left](./patterns/rtl.md)                 | A `dir="rtl"` ancestor of the triggers, and the `labels` option.                      |
 | [Photo in the address](./patterns/url.md)          | `open()` and `close()` from `?photo=`, and `toggle` and `itemchange` writing it back. |

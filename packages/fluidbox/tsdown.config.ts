@@ -4,7 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     elements: "src/elements.ts",
-    filmstrip: "src/filmstrip-entry.ts",
+    thumbnails: "src/thumbnails-entry.ts",
     sheet: "src/sheet-entry.ts",
     kit: "src/kit.ts",
     "hover-zoom": "src/hover-zoom.ts",
@@ -26,8 +26,8 @@ export default defineConfig({
     { from: "src/styles.css.d.ts", to: "dist", rename: "styles.css.d.ts" },
     { from: "src/sheet.css", to: "dist", rename: "sheet.css" },
     { from: "src/styles.css.d.ts", to: "dist", rename: "sheet.css.d.ts" },
-    { from: "src/filmstrip.css", to: "dist", rename: "filmstrip.css" },
-    { from: "src/styles.css.d.ts", to: "dist", rename: "filmstrip.css.d.ts" },
+    { from: "src/thumbnails.css", to: "dist", rename: "thumbnails.css" },
+    { from: "src/styles.css.d.ts", to: "dist", rename: "thumbnails.css.d.ts" },
   ],
   // publint and attw run in scripts/build.ts once the framework bindings are copied in.
 });

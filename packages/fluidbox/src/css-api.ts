@@ -21,30 +21,30 @@ export const publishedValues: readonly CssName[] = [
   /** `1` at the thumbnail, `0` fully open. A registered `<number>`. */
   {
     names: ["--fluidbox-closed"],
-    on: "Thumbnail overlays, travelling copies, transition layers",
+    on: "Trigger overlays, travelling copies, transition layers",
   },
   /** `0` to `1` during a drag to dismiss; at most `0.6` for a wheel. */
-  { names: ["--fluidbox-dismiss-progress"], on: "Overlay" },
+  { names: ["--fluidbox-dismiss-progress"], on: "Viewer" },
   /** The drag's offset in pixels. */
-  { names: ["--fluidbox-drag-x", "--fluidbox-drag-y"], on: "Overlay" },
+  { names: ["--fluidbox-drag-x", "--fluidbox-drag-y"], on: "Viewer" },
   /** The current media's drawn size, without flight or zoom. */
   { names: ["--fluidbox-media-width", "--fluidbox-media-height"], on: "Dialog" },
   /** The window's inner height in pixels. */
-  { names: ["--fluidbox-height"], on: "Overlay" },
+  { names: ["--fluidbox-height"], on: "Viewer" },
   /** The page's scroll position, where the container sits. */
-  { names: ["--fluidbox-scroll-top"], on: "Overlay" },
-  /** The stage's height: `--fluidbox-height` less the stage insets and the filmstrip space. */
+  { names: ["--fluidbox-scroll-top"], on: "Viewer" },
+  /** The stage's height: `--fluidbox-height` less the stage insets and the thumbnails space. */
   { names: ["--fluidbox-content-height"], on: "Dialog" },
   /** Pixels of the sheet showing. */
-  { names: ["--fluidbox-sheet-visible"], on: "Overlay" },
+  { names: ["--fluidbox-sheet-visible"], on: "Viewer" },
   /** `0` at rest to `1` at the first stop. */
-  { names: ["--fluidbox-sheet-progress"], on: "Overlay" },
+  { names: ["--fluidbox-sheet-progress"], on: "Viewer" },
   /** `0` at the first stop to `1` at the top stop. */
-  { names: ["--fluidbox-sheet-expand"], on: "Overlay" },
+  { names: ["--fluidbox-sheet-expand"], on: "Viewer" },
   /** `1` with the photo scrolled away to `0` at rest, with `dismiss: "scroll"`. */
-  { names: ["--fluidbox-sheet-dismiss"], on: "Overlay" },
+  { names: ["--fluidbox-sheet-dismiss"], on: "Viewer" },
   /** Pixels the software keyboard covers, while a sheet field has focus. */
-  { names: ["--fluidbox-sheet-keyboard"], on: "Overlay" },
+  { names: ["--fluidbox-sheet-keyboard"], on: "Viewer" },
   /** The media's zoom scale, `1` at fit. Set from the first zoom until the slide unloads. */
   { names: ["--fluidbox-zoom-scale"], on: "Media box" },
 ];
@@ -52,9 +52,9 @@ export const publishedValues: readonly CssName[] = [
 /** The elements of the viewer, and the attributes that mark your own. */
 export const parts: readonly CssName[] = [
   /** The viewer's root, at the end of `<body>` while open. */
-  { names: ["data-fluidbox-overlay"] },
+  { names: ["data-fluidbox-viewer"] },
   /**
-   * On the overlay's copy a server renders when the page starts open. It sits
+   * On the viewer's copy a server renders when the page starts open. It sits
    * absolute at the top of the page until the viewer takes over, then hides.
    */
   { names: ["data-fluidbox-static"] },
@@ -95,7 +95,7 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-announcer"] },
   /** The viewer's layer, where your controls and captions go. */
   { names: ["data-fluidbox-portal"] },
-  /** Beside the viewer's layer. The filmstrip goes here, so the layer holds only your content. It takes no box. */
+  /** Beside the viewer's layer. The thumbnails goes here, so the layer holds only your content. It takes no box. */
   { names: ["data-fluidbox-addons"] },
   /** The controls. On a button of yours in the viewer, it runs that command. */
   { names: ["data-fluidbox-close", "data-fluidbox-previous", "data-fluidbox-next"] },
@@ -111,7 +111,7 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-chrome"] },
   /**
    * Content that keeps its own touches, pinches, wheel and arrow keys, as the
-   * filmstrip, the sheet, a spin and a 3D model do. The viewer doesn't swipe,
+   * thumbnails, the sheet, a spin and a 3D model do. The viewer doesn't swipe,
    * dismiss, zoom or step from them. Mark your own scrubbers and sliders with
    * it, and give them the `touch-action` they need.
    */
@@ -128,14 +128,14 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-exempt"] },
   /** The scroller a zoomed image pans in. `data-grabbing` while dragged. */
   { names: ["data-fluidbox-zoom-viewport"] },
-  /** The filmstrip's box, in `[data-fluidbox-addons]`. Place it with your own CSS. */
-  { names: ["data-fluidbox-filmstrip-dock"] },
-  /** The filmstrip. */
-  { names: ["data-fluidbox-filmstrip"] },
+  /** The thumbnails' box, in `[data-fluidbox-addons]`. Place it with your own CSS. */
+  { names: ["data-fluidbox-thumbnails-dock"] },
+  /** The thumbnails. */
+  { names: ["data-fluidbox-thumbnails"] },
   /** Its scroller, `role="listbox"`. */
-  { names: ["data-fluidbox-filmstrip-scroll"] },
+  { names: ["data-fluidbox-thumbnails-scroll"] },
   /** A thumbnail button, `role="option"`, with `data-index`. */
-  { names: ["data-fluidbox-filmstrip-item"] },
+  { names: ["data-fluidbox-thumbnails-item"] },
   /** A flight layer at the end of `<body>`, during opening and closing. */
   { names: ["data-fluidbox-flight"] },
   /** A travelling overlay's copy, in the flight. */
@@ -154,8 +154,12 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-trigger-overlay"] },
   /** The still copy of a `frame` overlay the page shows in the thumbnail while a flight starts. */
   { names: ["data-fluidbox-ghost"] },
-  /** In a `<fluidbox-gallery>` with `items` set, makes the element a trigger of the item with that id. */
-  { names: ["data-fluidbox-item-id"] },
+  /**
+   * In a `<fluidbox-gallery>` with `items` set, makes the element a trigger of
+   * the item with that id, or of the ids separated by spaces: the first opens,
+   * and every one closes back onto it.
+   */
+  { names: ["data-fluidbox-value"] },
   /** A media add-on's box in a custom slide: a video's, a spin's or a model's. */
   { names: ["data-fluidbox-media-addon"] },
   /** A media add-on's poster layers: `thumbnail`, then the sharper `poster` over it. */
@@ -185,23 +189,23 @@ export const sheetParts: readonly CssName[] = [
   /** The part that scrolls once the sheet is at its top stop. Without one, the whole sheet does. */
   { names: ["data-fluidbox-sheet-scroll"] },
   /** A button that moves the sheet to the stop in its value. */
-  { names: ["data-fluidbox-sheet-stop"] },
+  { names: ["data-fluidbox-sheet-snap"] },
 ];
 
 /** Attributes the runtime toggles as the viewer changes. */
 export const states: readonly CssName[] = [
   /** `closed`, `opening`, `open` or `closing`. */
-  { names: ["data-fluidbox-status"], on: "Overlay, dialog" },
+  { names: ["data-fluidbox-status"], on: "Viewer, dialog" },
   /** Not closed, or closed. */
-  { names: ["data-open", "data-closed"], on: "Overlay, dialog" },
+  { names: ["data-open", "data-closed"], on: "Viewer, dialog" },
   /** Opening. */
-  { names: ["data-starting-style", "data-opening"], on: "Overlay, dialog" },
+  { names: ["data-starting-style", "data-opening"], on: "Viewer, dialog" },
   /** Closing. */
-  { names: ["data-ending-style"], on: "Overlay, dialog" },
+  { names: ["data-ending-style"], on: "Viewer, dialog" },
   /** A drag to dismiss is under way. */
-  { names: ["data-dragging"], on: "Overlay, dialog" },
+  { names: ["data-dragging"], on: "Viewer, dialog" },
   /** Closing, or a drag to dismiss is under way. */
-  { names: ["data-dismissing"], on: "Overlay, dialog" },
+  { names: ["data-dismissing"], on: "Viewer, dialog" },
   /** An image is zoomed. */
   { names: ["data-zoomed"], on: "Dialog" },
   /** Zoom is on: a mouse click zooms an image, and the cursor says so. */
@@ -217,9 +221,9 @@ export const states: readonly CssName[] = [
   /** The sheet peeks at rest; the sheet is turned off. */
   { names: ["data-sheet-peeking", "data-sheet-off"], on: "Dialog" },
   /** The sheet's `dismiss` option. */
-  { names: ["data-sheet-dismiss"], on: "Overlay" },
+  { names: ["data-sheet-dismiss"], on: "Viewer" },
   /** A scroll dismiss is committed. */
-  { names: ["data-sheet-dismissed"], on: "Overlay" },
+  { names: ["data-sheet-dismissed"], on: "Viewer" },
   /** The trigger's item is open. */
   {
     names: ["data-fluidbox-status", "data-open", "data-closed"],
@@ -228,9 +232,11 @@ export const states: readonly CssName[] = [
   /** Its item is open, so it is hidden. */
   { names: ["data-fluidbox-thumbnail-hidden"], on: "The trigger's image" },
   /** `idle`, `opening`, `open`, `dragging` or `closing`. */
-  { names: ["data-fluidbox-phase"], on: "Thumbnail overlays" },
+  { names: ["data-fluidbox-phase"], on: "Trigger overlays" },
   /** The current item. */
-  { names: ["aria-selected", "data-fluidbox-selected"], on: "Filmstrip items" },
+  { names: ["aria-selected", "data-fluidbox-selected"], on: "Thumbnails items" },
+  /** The slide on show, and the thumbnail of its item. */
+  { names: ["data-active"], on: "Slides, thumbnails items" },
   /** The poster is still decoding, and hidden. */
   { names: ["data-fluidbox-media-pending"], on: "A media add-on's poster" },
   /** Play was pressed; the player has loaded over the poster. */
@@ -245,7 +251,7 @@ export const states: readonly CssName[] = [
 export const internal: readonly string[] = [
   "--fluidbox-chrome-reach",
   "--fluidbox-controls-reveal-delay",
-  "--fluidbox-filmstrip-hide",
+  "--fluidbox-thumbnails-hide",
   "--fluidbox-flight-height",
   "--fluidbox-flight-item-height",
   "--fluidbox-flight-left",
@@ -300,8 +306,8 @@ export const internal: readonly string[] = [
   "data-fluidbox-server-viewer",
   "data-fluidbox-controls-revealing",
   "data-fluidbox-drawn",
-  "data-fluidbox-filmstrip-thumbnail",
-  "data-fluidbox-filmstrip-track",
+  "data-fluidbox-thumbnails-thumbnail",
+  "data-fluidbox-thumbnails-track",
   "data-fluidbox-flight-source-hidden",
   "data-fluidbox-frozen",
   "data-fluidbox-headless",
@@ -312,12 +318,11 @@ export const internal: readonly string[] = [
   "data-fluidbox-media-ready",
   "data-fluidbox-picture",
   "data-fluidbox-prepared",
-  "data-fluidbox-returns",
   "data-fluidbox-sheet-hold",
   "data-fluidbox-sheet-host",
   "data-fluidbox-sheet-overlay",
   "data-fluidbox-sheet-push",
-  "data-fluidbox-sheet-snap",
+  "data-fluidbox-sheet-mark",
   "data-fluidbox-sheet-space",
   "data-fluidbox-thumbnail-crossfade",
   "data-fluidbox-thumbnail-kept",

@@ -36,7 +36,7 @@ props or parameters; the spec finds things by position or by the shared class na
 `.pattern-card` (rich card), `.pattern-scroller` (horizontal scroller), `.pattern-toolbar`
 (row of buttons and status text), `.pattern-log` (event log list), `.pattern-sheet` (sheet
 content), `.pattern-caption` (headless caption bar), `.pattern-note` (custom renderer content),
-`.pattern-filmstrip-thumb` (custom filmstrip thumbnail), `.pattern-sheet-toggle` (the sheet
+`.pattern-thumbnails-thumb` (custom thumbnail), `.pattern-sheet-toggle` (the sheet
 pattern's button in the viewer), `.pattern-zoom-level` (the zoom pattern's readout in the viewer),
 `.pattern-product` (the hover pattern's product photo button).
 
@@ -89,13 +89,13 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    `data-zoomed`, `300%`; Escape twice; open trigger 5 (zoom off), double-click → no
    `data-zoomed`. At 1280 × 720 and a pixel ratio of 1 (desktop projects), the image on show
    has `currentSrc` `/photos/1015-1280.webp`, and after Zoom in `/photos/1015.webp`.
-7. **filmstrip** — two galleries of `photos`, in this order: the first with the default
-   filmstrip (the example imports `@ogdakke/fluidbox/filmstrip.css`, the strip's stylesheet), the second with your own thumbnails (`filmstrip: { render }`, or the framework's
-   Filmstrip part with a child) holding
-   `<span class="pattern-filmstrip-thumb" data-test="thumb">N</span>` (N = index + 1). The
+7. **thumbnails** — two galleries of `photos`, in this order: the first with the default
+   thumbnails (the example imports `@ogdakke/fluidbox/thumbnails.css`, the strip's stylesheet), the second with your own thumbnails (`thumbnails: { render }`, or the framework's
+   Thumbnails part with a child) holding
+   `<span class="pattern-thumbnails-thumb" data-test="thumb">N</span>` (N = index + 1). The
    strip marks the selected thumbnail button `data-fluidbox-selected`, which patterns.css styles,
    so the thumbnails track nothing themselves. Test: trigger 1 → dialog has
-   `[data-fluidbox-filmstrip]`; trigger 5 → 4 `[data-test="thumb"]` in the dialog, the first one's
+   `[data-fluidbox-thumbnails]`; trigger 5 → 4 `[data-test="thumb"]` in the dialog, the first one's
    button is selected; ArrowRight → the second one's is and the first one's is not.
 8. **sheet** — a gallery of `photos` with the sheet on and `snapPoints: ["40%", "90%"]`. The example
    imports `@ogdakke/fluidbox/sheet.css` (the sheet needs its stylesheet). The sheet is the
@@ -104,10 +104,10 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    its attributes on) or on a `<div>` inside it. The content shows the active item's title in
    `[data-test="sheet-title"]`, the current stop in `output[data-test="stop"]` (from the
    `sheetchange` event or the framework sheet hook), a
-   `button[data-test="expand"]` that moves the sheet to stop 2 (`sheet.set(2)` or a sheet-stop
+   `button[data-test="expand"]` that moves the sheet to stop 2 (`sheet.setSnap(2)` or a sheet-stop
    button), and an `input[data-test="field"]`.
    Outside the sheet, in the viewer's portal (at stop 0 the sheet is out of sight), a
-   `button.pattern-sheet-toggle[data-fluidbox-sheet-stop="1"][data-test="peek"]` that raises it.
+   `button.pattern-sheet-toggle[data-fluidbox-sheet-snap="1"][data-test="peek"]` that raises it.
    Test: open → stop `0`; click peek → stop `1`; click expand → stop `2`; type in the field (keys
    stay in the field: ArrowRight does not change the slide).
 9. **headless** — a gallery of `photos` with no default controls: custom portal content in a
@@ -116,13 +116,13 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    own `button[data-test="prev"]`, `button[data-test="next"]`, `button[data-test="close"]` that
    call `close()`, `previous()` and `next()`. Test: open trigger 1 → counter `1 / 4`; click next → `2 / 4`; click
    close → dialog gone.
-10. **rtl** — a gallery of `photos` with the default filmstrip inside `<div dir="rtl" lang="ar">`,
+10. **rtl** — a gallery of `photos` with the default thumbnails inside `<div dir="rtl" lang="ar">`,
     with `labels` set to `arabic` from shared.ts (a property on the gallery for elements). One
     `button.pattern-thumb[data-test="trigger"]` per photo. Test: open trigger 1 → the overlay has
     `dir="rtl"` and `lang="ar"`, the slide is `"العنصر ١ من ٤"`; ArrowLeft → `"العنصر ٢ من ٤"` with that
     slide on show; `[data-fluidbox-next]` is labelled `"التالي"` and sits left of centre; ArrowRight →
     back to 1; Next → 2; a horizontal wheel to the left (or ArrowLeft on touch devices) → 3; the
-    selected filmstrip thumbnail is `data-index="2"` and the first thumbnail is right of the
+    selected thumbnail is `data-index="2"` and the first thumbnail is right of the
     second; Escape returns focus to trigger 3.
 11. **url** — a gallery of `photos` whose open photo lives in the address as `?photo=N` (N =
     index + 1). Frameworks pass `open` and `index` from their own state and update it from the

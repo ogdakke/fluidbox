@@ -23,7 +23,7 @@ The viewer's layout and default look are in one stylesheet. Import it once, in a
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-The filmstrip and sheet add-ons have their own stylesheets, `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`. Import each only if you use that add-on.
+The thumbnails and sheet add-ons have their own stylesheets, `@ogdakke/fluidbox/thumbnails.css` and `@ogdakke/fluidbox/sheet.css`. Import each only if you use that add-on.
 
 ## Describe your items
 
@@ -65,7 +65,7 @@ The examples import `photos` from a local `./data` module, described in [the exa
 | Custom elements  | `@ogdakke/fluidbox/elements` | none                                |
 | Plain JavaScript | `@ogdakke/fluidbox`          | none                                |
 
-Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Filmstrip` and `Sheet` turn those add-ons on by being there. `useFluidbox()` (`injectFluidbox()` in Angular) reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md). [Next.js](./nextjs.md) covers the React binding with server components and `next/image`.
+Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Thumbnails` and `Sheet` turn those add-ons on by being there. `useFluidbox()` (`injectFluidbox()` in Angular) reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md). [Next.js](./nextjs.md) covers the React binding with server components and `next/image`.
 
 - **Custom elements.** `<fluidbox-gallery>` with `<fluidbox-item>` children. See [Custom elements](./custom-elements.md).
 - **Plain JavaScript.** `createFluidbox()`, and `fluidbox.bind()` for each trigger. See [JavaScript](./javascript.md).
@@ -74,13 +74,13 @@ Every binding has the same parts with the same names: `Root` holds the items and
 
 The page loads the triggers, the items and the viewer's state. The viewer itself, with its gestures, transitions and slides, is a chunk of its own. By default it loads when a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus, so it has usually arrived by the time the click does. An open loads it if it hasn't.
 
-The `loading` option picks the moment:
+The `preload` option picks the moment:
 
-| `loading`           | The viewer's code loads                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| `"hover"` (default) | When a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus. |
-| `"press"`           | When a trigger is pressed. Nothing loads for a pointer that only passes over.                |
-| `"eager"`           | Once the page is idle, whether or not anyone opens a viewer.                                 |
+| `preload`            | The viewer's code loads                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| `"intent"` (default) | When a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus. |
+| `"press"`            | When a trigger is pressed. Nothing loads for a pointer that only passes over.                |
+| `"eager"`            | Once the page is idle, whether or not anyone opens a viewer.                                 |
 
 For a signal of your own, call `load()`. A route that's about to show the gallery, or a menu that leads to it, can start the download early:
 
@@ -88,20 +88,20 @@ For a signal of your own, call `load()`. A route that's about to show the galler
 menu.addEventListener("toggle", () => void fluidbox.load(), { once: true });
 ```
 
-`load()` resolves `true` once the code has loaded and `false` if it failed, as when offline. A failed load tries again on the next call or open. The bindings take `loading` on Root and put `load` next to the commands, and `<fluidbox-gallery>` has a `loading` attribute and a `load()` method.
+`load()` resolves `true` once the code has loaded and `false` if it failed, as when offline. A failed load tries again on the next call or open. The bindings take `preload` on Root and put `load` next to the commands, and `<fluidbox-gallery>` has a `loading` attribute and a `load()` method.
 
 ## Add-ons
 
-The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. Turn one on, with an option, a framework part or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child, and the fluidbox loads its entry. An open waits for it. To bundle an entry up front, import it once in the browser bundle:
+The thumbnails and the sheet are add-ons with their own entries, so their code loads only when you use them. Turn one on, with an option, a framework part or a `<fluidbox-thumbnails>` or `<fluidbox-sheet>` child, and the fluidbox loads its entry. An open waits for it. To bundle an entry up front, import it once in the browser bundle:
 
 ```ts
-import "@ogdakke/fluidbox/filmstrip";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/thumbnails.css";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
 ```
 
-Each needs its stylesheet, `filmstrip.css` or `sheet.css`, whichever way you turn it on. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
+Each needs its stylesheet, `thumbnails.css` or `sheet.css`, whichever way you turn it on. See [Thumbnails and sheet](./thumbnails-and-sheet.md).
 
 ## A link as the trigger
 

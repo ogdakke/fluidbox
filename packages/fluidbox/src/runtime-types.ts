@@ -133,7 +133,7 @@ export interface FluidboxExtensionContext<TItem extends FluidboxItem = FluidboxI
   readonly dialog: HTMLElement;
   /**
    * Beside the viewer's layer, for what floats over the slides, as a
-   * filmstrip. A redraw of the layer never touches it. Mark what goes in it
+   * thumbnails. A redraw of the layer never touches it. Mark what goes in it
    * data-fluidbox-chrome to reveal and hide with the layer.
    */
   readonly layer: HTMLElement;
@@ -178,7 +178,7 @@ export interface FluidboxExtensionInstance<TItem extends FluidboxItem = Fluidbox
   destroy(): void;
 }
 
-/** A feature that plugs into the viewer, such as filmstrip() or sheet(). Each comes from its own entry, so it costs nothing until imported. */
+/** A feature that plugs into the viewer, such as thumbnails() or sheet(). Each comes from its own entry, so it costs nothing until imported. */
 export interface FluidboxExtension<TItem extends FluidboxItem = FluidboxItem> {
   mount(context: FluidboxExtensionContext<TItem>): FluidboxExtensionInstance<TItem>;
 }

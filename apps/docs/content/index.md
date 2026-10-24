@@ -23,7 +23,7 @@ It ships as one package, `@ogdakke/fluidbox`. One runtime does the gestures, fli
 | Plain HTML, any server template | [Custom elements](./custom-elements.md) | `@ogdakke/fluidbox/elements` |
 | Plain JavaScript or TypeScript  | [JavaScript](./javascript.md)           | `@ogdakke/fluidbox`          |
 
-Every entry point uses the same items, the same stylesheet (`@ogdakke/fluidbox/styles.css`) and the same optional add-ons: `@ogdakke/fluidbox/filmstrip` and `@ogdakke/fluidbox/sheet`.
+Every entry point uses the same items, the same stylesheet (`@ogdakke/fluidbox/styles.css`) and the same optional add-ons: `@ogdakke/fluidbox/thumbnails` and `@ogdakke/fluidbox/sheet`.
 
 ## Concepts
 
@@ -35,7 +35,7 @@ Every entry point uses the same items, the same stylesheet (`@ogdakke/fluidbox/s
 
 ## Patterns
 
-The [pattern pages](./patterns/index.md) show nine common setups, each live and in every framework: a [gallery](./patterns/basic.md), [one trigger for an album](./patterns/overlay.md), [rich origins](./patterns/origins.md), [custom content](./patterns/renderers.md), [programmatic control](./patterns/programmatic.md), [zoom](./patterns/zoom.md), a [filmstrip](./patterns/filmstrip.md), a [sheet](./patterns/sheet.md) and [headless controls](./patterns/headless.md).
+The [pattern pages](./patterns/index.md) show nine common setups, each live and in every framework: a [gallery](./patterns/basic.md), [one trigger for an album](./patterns/overlay.md), [rich origins](./patterns/origins.md), [custom content](./patterns/renderers.md), [programmatic control](./patterns/programmatic.md), [zoom](./patterns/zoom.md), a [thumbnails](./patterns/thumbnails.md), a [sheet](./patterns/sheet.md) and [headless controls](./patterns/headless.md).
 
 ## Next
 

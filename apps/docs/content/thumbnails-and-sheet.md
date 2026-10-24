@@ -1,25 +1,25 @@
 ---
-title: Filmstrip and sheet
+title: Thumbnails and sheet
 section: Guides
 order: 6
-description: The two optional add-ons, the filmstrip and the sheet, with their imports, every option, sheet stops, the sheetchange event, data-fluidbox-sheet-stop buttons, and sheet.css.
+description: The two optional add-ons, the thumbnails and the sheet, with their imports, every option, sheet stops, the sheetchange event, data-fluidbox-sheet-snap buttons, and sheet.css.
 ---
 
-# Filmstrip and sheet
+# Thumbnails and sheet
 
-Both are optional add-ons with their own entries, so their code loads only when you use them. Turn one on with the `filmstrip` and `sheet` options of `createFluidbox`, the `Filmstrip` and `Sheet` parts in each framework, or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
+Both are optional add-ons with their own entries, so their code loads only when you use them. Turn one on with the `thumbnails` and `sheet` options of `createFluidbox`, the `Thumbnails` and `Sheet` parts in each framework, or a `<fluidbox-thumbnails>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/thumbnails";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/styles.css";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import "@ogdakke/fluidbox/sheet.css";
 
 const fluidbox = createFluidbox({
   items: photos,
-  filmstrip: true,
+  thumbnails: true,
   sheet: {
     render({ item, target }) {
       target.textContent = item.id ?? "";
@@ -30,23 +30,23 @@ const fluidbox = createFluidbox({
 
 The fluidbox loads an add-on's entry the first time you turn it on, and an open waits for it. Import the entry yourself, as above, to have it in the page's bundle from the start instead. The entries are safe to import on the server.
 
-## Filmstrip
+## Thumbnails
 
-The filmstrip is a strip of thumbnails for a gallery of more than one item. A tap moves to that item, a drag or a wheel scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its styles are in `@ogdakke/fluidbox/filmstrip.css`.
+The thumbnails is a strip of thumbnails for a gallery of more than one item. A tap moves to that item, a drag or a wheel scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its styles are in `@ogdakke/fluidbox/thumbnails.css`.
 
-The strip is viewer content like your own. It mounts beside the viewer's layer, in `[data-fluidbox-addons]`, so a redraw of the layer, or a viewer renderer that clears its `target`, leaves it be. It reveals and dismisses with the layer, as `data-fluidbox-chrome`, and floats over the slides. `filmstrip.css` runs it along the bottom and keeps the photo above it by `--fluidbox-filmstrip-space`. Your CSS on `[data-fluidbox-filmstrip-dock]` puts it anywhere else, over the photo or beside it. Set `--fluidbox-filmstrip-space: 0px` when the photo should run under it.
+The strip is viewer content like your own. It mounts beside the viewer's layer, in `[data-fluidbox-addons]`, so a redraw of the layer, or a viewer renderer that clears its `target`, leaves it be. It reveals and dismisses with the layer, as `data-fluidbox-chrome`, and floats over the slides. `thumbnails.css` runs it along the bottom and keeps the photo above it by `--fluidbox-thumbnails-space`. Your CSS on `[data-fluidbox-thumbnails-dock]` puts it anywhere else, over the photo or beside it. Set `--fluidbox-thumbnails-space: 0px` when the photo should run under it.
 
-`--fluidbox-filmstrip-axis: y` on the dialog runs it as a column, down the left unless you move it. The add-on reads the axis from CSS, so a media query can turn a phone's row into a wide screen's column. Its listbox carries `aria-orientation`, and a wheel turned either way scrolls it along.
+`--fluidbox-thumbnails-axis: y` on the dialog runs it as a column, down the left unless you move it. The add-on reads the axis from CSS, so a media query can turn a phone's row into a wide screen's column. Its listbox carries `aria-orientation`, and a wheel turned either way scrolls it along.
 
 ```css
 @media (min-width: 900px) {
   [data-fluidbox-dialog] {
-    --fluidbox-filmstrip-axis: y;
+    --fluidbox-thumbnails-axis: y;
   }
 }
 ```
 
-`filmstrip: true` draws each item's thumbnail. An object, `FluidboxFilmstripOptions`, changes that:
+`thumbnails: true` draws each item's thumbnail. An object, `FluidboxThumbnailsOptions`, changes that:
 
 | Option   | Type                      | What it does                                                      |
 | -------- | ------------------------- | ----------------------------------------------------------------- |
@@ -56,11 +56,11 @@ The strip is viewer content like your own. It mounts beside the viewer's layer, 
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
+import "@ogdakke/fluidbox/thumbnails";
 
 const fluidbox = createFluidbox({
   items: photos,
-  filmstrip: {
+  thumbnails: {
     render({ index, target }) {
       target.textContent = String(index + 1);
     },
@@ -68,13 +68,13 @@ const fluidbox = createFluidbox({
 });
 ```
 
-Each button is a `role="option"` in a listbox named by the `filmstripList` [label](./api.md#labels). It has `data-fluidbox-filmstrip-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name, or its place from the `position` label when it has neither. The selected thumbnail is fully opaque and has a bar along its foot, a border, so it shows in forced colours too. With a thumbnail focused, the arrow keys along the strip step through the items, Home and End go to the ends, and focus follows the selection. The strip carries `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
+Each button is a `role="option"` in a listbox named by the `thumbnailsList` [label](./api.md#labels). It has `data-fluidbox-thumbnails-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name, or its place from the `position` label when it has neither. The selected thumbnail is fully opaque and has a bar along its foot, a border, so it shows in forced colours too. With a thumbnail focused, the arrow keys along the strip step through the items, Home and End go to the ends, and focus follows the selection. The strip carries `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
 
-`render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Filmstrip` parts render through it. Put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
+`render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Thumbnails` parts render through it. Put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
 
-<!-- pattern: filmstrip -->
+<!-- pattern: thumbnails -->
 
-On custom elements, a `<fluidbox-filmstrip>` child adds the strip. Set its `render` property to fill the buttons yourself.
+On custom elements, a `<fluidbox-thumbnails>` child adds the strip. Set its `render` property to fill the buttons yourself.
 
 ## Sheet
 
@@ -135,10 +135,10 @@ Below the top stop, a swipe anywhere on the sheet moves the sheet. At the top st
 
 ### Stop buttons
 
-Any element in the viewer with `data-fluidbox-sheet-stop="N"` moves the sheet to stop `N` when clicked, such as a "Details" button in the viewer's layer or a reply count. Clicked again at that stop, it lowers the sheet to `0`. This works in every entry point, as plain markup. The runtime keeps `aria-expanded` on every stop button, and moves focus into the sheet once it settles at a raised stop. When the sheet goes out of sight, it becomes `inert`, and focus inside it goes back to the button or the dialog.
+Any element in the viewer with `data-fluidbox-sheet-snap="N"` moves the sheet to stop `N` when clicked, such as a "Details" button in the viewer's layer or a reply count. Clicked again at that stop, it lowers the sheet to `0`. This works in every entry point, as plain markup. The runtime keeps `aria-expanded` on every stop button, and moves focus into the sheet once it settles at a raised stop. When the sheet goes out of sight, it becomes `inert`, and focus inside it goes back to the button or the dialog.
 
 ```html
-<button type="button" data-fluidbox-sheet-stop="1">Details</button>
+<button type="button" data-fluidbox-sheet-snap="1">Details</button>
 ```
 
 With the sheet raised, Escape and a tap above the sheet lower it instead of closing the viewer. Keys typed in the sheet's fields stay there, so the arrow keys don't change the slide. A tap in a field focuses it without the page panning, and the sheet makes room for the software keyboard. Zoom works only with the sheet at rest.

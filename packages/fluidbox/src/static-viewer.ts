@@ -11,8 +11,8 @@ export interface FluidboxStaticViewerOptions<TItem extends FluidboxItem = Fluidb
   readonly value: string;
   readonly labels?: FluidboxLabels;
   readonly loop?: boolean;
-  /** Leave room for the filmstrip, which appears once the viewer takes over. */
-  readonly filmstrip?: boolean;
+  /** Leave room for the thumbnails, which appears once the viewer takes over. */
+  readonly thumbnails?: boolean;
   /** Leave room for a sheet's peek, as the viewer does once it takes over. */
   readonly sheet?: boolean;
   /** Draw Previous, Next and Close. Off when you draw your own viewer, as the viewer does. */
@@ -83,7 +83,7 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   value,
   labels = defaultLabels,
   loop = false,
-  filmstrip = false,
+  thumbnails = false,
   sheet = false,
   controls: showControls = true,
   dir,
@@ -159,16 +159,16 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   const controls = showControls
     ? [control("previous", step(-1)), control("next", step(1)), control("close", null)]
     : [];
-  // An empty stand-in that keeps the filmstrip's room. Its orientation is what
+  // An empty stand-in that keeps the thumbnails' room. Its orientation is what
   // the stylesheet keys the room on; it is hidden, having nothing to offer yet.
-  const strip = filmstrip
+  const strip = thumbnails
     ? node(
         "div",
-        { "data-fluidbox-filmstrip-dock": "", "data-fluidbox-chrome": "", "aria-hidden": "true" },
+        { "data-fluidbox-thumbnails-dock": "", "data-fluidbox-chrome": "", "aria-hidden": "true" },
         node(
           "div",
-          { "data-fluidbox-filmstrip": "" },
-          node("div", { "data-fluidbox-filmstrip-scroll": "", "aria-orientation": "horizontal" }),
+          { "data-fluidbox-thumbnails": "" },
+          node("div", { "data-fluidbox-thumbnails-scroll": "", "aria-orientation": "horizontal" }),
         ),
       )
     : null;
@@ -177,7 +177,7 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   // takes over, so the copy is a labelled region of the page.
   return node(
     "div",
-    { "data-fluidbox-overlay": "", "data-fluidbox-static": "", dir },
+    { "data-fluidbox-viewer": "", "data-fluidbox-static": "", dir },
     node("div", { "data-fluidbox-backdrop": "" }),
     node(
       "div",
@@ -204,6 +204,7 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
               role: "group",
               "aria-label": position,
               "aria-hidden": "false",
+              "data-active": "",
             },
             node(
               "div",

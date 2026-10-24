@@ -34,8 +34,8 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       item.append(trigger, content);
       gallery.append(item);
     }
-    if (root.hasAttribute("data-filmstrip"))
-      gallery.append(document.createElement("fluidbox-filmstrip"));
+    if (root.hasAttribute("data-thumbnails"))
+      gallery.append(document.createElement("fluidbox-thumbnails"));
     root.replaceChildren(gallery);
   },
 };

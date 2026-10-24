@@ -12,7 +12,7 @@ The check builds one small consumer per public entry with tsdown as minified bro
 | Solid          |        12,723 B |           40,379 B |                 43,944 B |
 | Vue            |        13,443 B |           41,138 B |                 44,703 B |
 | Angular        |        13,898 B |           41,578 B |                 45,143 B |
-| Filmstrip      |         3,644 B |            3,644 B |                  5,016 B |
+| Thumbnails     |         3,644 B |            3,644 B |                  5,016 B |
 | Sheet          |         7,249 B |            7,249 B |                  8,559 B |
 | Kit            |         1,635 B |            1,635 B |                  5,200 B |
 | Hover zoom     |         1,456 B |            1,456 B |                  5,021 B |

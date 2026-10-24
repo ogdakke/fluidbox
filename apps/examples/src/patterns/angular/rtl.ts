@@ -2,7 +2,7 @@
 import { Component } from "@angular/core";
 import { itemLabel } from "@ogdakke/fluidbox";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { arabic, photos } from "../shared";
 
 @Component({
@@ -18,7 +18,7 @@ import { arabic, photos } from "../shared";
             <img [src]="photo.src" [alt]="label(photo)" />
           </button>
         }
-        <ng-container fluidboxFilmstrip />
+        <ng-container fluidboxThumbnails />
       </div>
     </div>
   `,

@@ -24,7 +24,7 @@ The first gallery zooms to 3× on a double-click and stops at 6×. Its viewer ha
 await fluidbox.zoomTo(2, { origin: { x: event.clientX, y: event.clientY } });
 await fluidbox.zoomIn(); // × 1.5
 await fluidbox.zoomOut(); // ÷ 1.5
-await fluidbox.resetZoom(); // back to fit
+await fluidbox.zoomReset(); // back to fit
 ```
 
 | Command                   | What it does                                                                                                                  |
@@ -32,7 +32,7 @@ await fluidbox.resetZoom(); // back to fit
 | `zoomTo(scale, options?)` | Zooms the image on show to `scale`, kept between 1 and `max`. A scale that isn't a finite number rejects with a `RangeError`. |
 | `zoomIn(options?)`        | Zooms in by 1.5, up to `max`.                                                                                                 |
 | `zoomOut(options?)`       | Zooms out by 1.5, down to fit.                                                                                                |
-| `resetZoom(options?)`     | Zooms back out to fit.                                                                                                        |
+| `zoomReset(options?)`     | Zooms back out to fit.                                                                                                        |
 
 `options` is `FluidboxZoomCommandOptions`: `{ signal?, origin? }`. `origin` is the point in the window, in CSS pixels, that stays where it is as the image grows, as under a pinch; without it, the zoom grows from the middle of the stage. Each command resolves `true` once the zoom has come to rest, and `false` when there is no image to zoom (the viewer is closed, on a video or a custom item, or zoom is off), when another zoom took over, or when its signal aborted. With reduced motion, the zoom jumps.
 

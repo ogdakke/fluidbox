@@ -2,7 +2,7 @@ import { createApp, type Component } from "vue";
 import type { MountPattern } from "../page";
 import type { PatternName } from "../shared";
 import Basic from "./Basic.vue";
-import Filmstrip from "./Filmstrip.vue";
+import Thumbnails from "./Thumbnails.vue";
 import Headless from "./Headless.vue";
 import Hover from "./Hover.vue";
 import Media from "./Media.vue";
@@ -30,7 +30,7 @@ export const patterns: Record<PatternName, MountPattern> = {
   renderers: mount(Renderers),
   programmatic: mount(Programmatic),
   zoom: mount(Zoom),
-  filmstrip: mount(Filmstrip),
+  thumbnails: mount(Thumbnails),
   rtl: mount(Rtl),
   url: mount(Url),
   sheet: mount(Sheet),

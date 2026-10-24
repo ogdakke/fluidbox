@@ -61,21 +61,21 @@ test.describe("shop fixture, wide screen", () => {
     await expect.poll(() => shownSlide(page)).toBe(5);
   });
 
-  test("the filmstrip column moves the viewer, and the close lands on that card", async ({
+  test("the thumbnails column moves the viewer, and the close lands on that card", async ({
     page,
   }) => {
     await load(page);
     await page.locator(".shop-slide").first().click();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
-    const strip = page.locator("[data-fluidbox-filmstrip-scroll]");
+    const strip = page.locator("[data-fluidbox-thumbnails-scroll]");
     await expect(strip).toHaveAttribute("aria-orientation", "vertical");
     const box = (await strip.boundingBox())!;
     expect(box.x).toBeLessThan(40);
     expect(box.height).toBeGreaterThan(box.width * 4);
     await expect(page.locator(".shop-dots")).toBeHidden();
-    await page.locator('[data-fluidbox-filmstrip-item][data-index="3"]').click();
+    await page.locator('[data-fluidbox-thumbnails-item][data-index="3"]').click();
     await expect(
-      page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
+      page.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]'),
     ).toHaveAttribute("data-index", "3");
     await page.keyboard.press("Escape");
     await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
@@ -94,7 +94,7 @@ test.describe("shop fixture, wide screen", () => {
           .querySelector("[data-fluidbox-dialog]")
           ?.getAttribute("data-fluidbox-status");
         const orientation = document
-          .querySelector("[data-fluidbox-filmstrip-scroll]")
+          .querySelector("[data-fluidbox-thumbnails-scroll]")
           ?.getAttribute("aria-orientation");
         if (status === "opening") seen.push(orientation ?? "none");
       }).observe(document.body, { subtree: true, attributes: true, childList: true });
@@ -112,8 +112,8 @@ test.describe("shop fixture, wide screen", () => {
     await load(page);
     await page.locator(".shop-slide").first().click();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
-    const strip = page.locator("[data-fluidbox-filmstrip-scroll]");
-    const selected = page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]');
+    const strip = page.locator("[data-fluidbox-thumbnails-scroll]");
+    const selected = page.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]');
     await expect(selected).toHaveAttribute("data-index", "0");
     const box = (await strip.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -141,7 +141,7 @@ test.describe("shop fixture, phone", () => {
     await load(page);
     await page.locator(".shop-slide").first().tap();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
-    await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCount(0);
     const dots = page.locator(".shop-dot");
     await expect(dots).toHaveCount(10);
     const sizes = () => dots.evaluateAll((all) => all.map((dot) => dot.getAttribute("data-size")));

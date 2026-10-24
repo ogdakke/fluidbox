@@ -33,7 +33,7 @@ export const mount: MountLive = (root) => {
                 ],
               },
             ),
-            h(Fluidbox.Filmstrip),
+            h(Fluidbox.Thumbnails),
             viewer.value
               ? h(Fluidbox.Viewer, null, {
                   default: () =>

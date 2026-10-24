@@ -11,18 +11,18 @@
     "./src/elements.ts",
     "./src/item.ts",
     "./src/gallery.ts",
-    "./src/filmstrip.ts",
-    "./src/filmstrip-entry.ts",
+    "./src/thumbnails.ts",
+    "./src/thumbnails-entry.ts",
     "./src/sheet-entry.ts",
     "./src/styles.css",
     "./src/sheet.css",
-    "./src/filmstrip.css",
+    "./src/thumbnails.css",
     "./dist/elements.js",
-    "./dist/filmstrip.js",
+    "./dist/thumbnails.js",
     "./dist/sheet.js",
     "./dist/styles.css",
     "./dist/sheet.css",
-    "./dist/filmstrip.css"
+    "./dist/thumbnails.css"
   ],
   "exports": {
     ".": {
@@ -49,9 +49,9 @@
       "types": "./dist/angular/index.d.ts",
       "import": "./dist/angular/index.js"
     },
-    "./filmstrip": {
-      "types": "./dist/filmstrip.d.ts",
-      "import": "./dist/filmstrip.js"
+    "./thumbnails": {
+      "types": "./dist/thumbnails.d.ts",
+      "import": "./dist/thumbnails.js"
     },
     "./sheet": {
       "types": "./dist/sheet.d.ts",
@@ -85,9 +85,9 @@
       "types": "./dist/sheet.css.d.ts",
       "default": "./dist/sheet.css"
     },
-    "./filmstrip.css": {
-      "types": "./dist/filmstrip.css.d.ts",
-      "default": "./dist/filmstrip.css"
+    "./thumbnails.css": {
+      "types": "./dist/thumbnails.css.d.ts",
+      "default": "./dist/thumbnails.css"
     }
   },
   "scripts": {

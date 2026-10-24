@@ -14,7 +14,7 @@ function appendResource(
   if (!target.includes(resource.src)) target.push(resource.src);
 }
 
-export function filmstripThumbnailSources(item: FluidboxItem): readonly string[] {
+export function thumbnailsThumbnailSources(item: FluidboxItem): readonly string[] {
   const sources: string[] = [];
   appendResource(sources, item.thumbnail);
   if (item.type === "image") appendResource(sources, item);
@@ -22,7 +22,7 @@ export function filmstripThumbnailSources(item: FluidboxItem): readonly string[]
   return sources;
 }
 
-export async function loadFilmstripThumbnail(
+export async function loadThumbnailsThumbnail(
   target: HTMLImageElement,
   sources: readonly string[],
   signal: AbortSignal,

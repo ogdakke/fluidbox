@@ -15,7 +15,7 @@ const items = [photo(0), photo(1), photo(2)];
 
 describe("fluidboxStaticViewer", () => {
   it("has no inline styles, so a strict style-src renders it", () => {
-    const html = fluidboxStaticViewer({ items, value: "photo-1", filmstrip: true })!;
+    const html = fluidboxStaticViewer({ items, value: "photo-1", thumbnails: true })!;
     expect(html).not.toMatch(/\sstyle=/);
     expect(html).not.toMatch(/<script|\son[a-z]+=/i);
   });
@@ -47,17 +47,17 @@ describe("fluidboxStaticViewer", () => {
     expect(plain.match(/<button [^>]* inert>/g)).toHaveLength(3);
   });
 
-  it("hides the filmstrip's empty stand-in, with no listbox", () => {
-    const html = fluidboxStaticViewer({ items, value: "photo-0", filmstrip: true })!;
+  it("hides the thumbnails' empty stand-in, with no listbox", () => {
+    const html = fluidboxStaticViewer({ items, value: "photo-0", thumbnails: true })!;
     expect(html).not.toContain('role="listbox"');
-    expect(html).toContain('data-fluidbox-filmstrip-dock data-fluidbox-chrome aria-hidden="true"');
+    expect(html).toContain('data-fluidbox-thumbnails-dock data-fluidbox-chrome aria-hidden="true"');
     expect(html).toContain('aria-orientation="horizontal"');
   });
 
   it("gives the same copy as elements, and none for other items", () => {
     const root = fluidboxStaticViewerNodes({ items, value: "photo-0" })!;
     expect(root.tag).toBe("div");
-    expect(root.attributes).toEqual({ "data-fluidbox-overlay": "", "data-fluidbox-static": "" });
+    expect(root.attributes).toEqual({ "data-fluidbox-viewer": "", "data-fluidbox-static": "" });
     expect(
       fluidboxStaticViewerNodes({
         items: [

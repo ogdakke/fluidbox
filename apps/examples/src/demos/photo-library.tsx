@@ -112,7 +112,7 @@ export function PhotoLibrary({
   >(null);
   const [columns, setColumns] = useState(() => columnsFor(window.innerWidth));
   const [requestedNumber, setRequestedNumber] = useState("1");
-  const [showFilmstrip, setShowFilmstrip] = useState(true);
+  const [showThumbnails, setShowThumbnails] = useState(true);
   const [lastViewed, setLastViewed] = useState<number | null>(null);
   const pendingResizeAnchor = useRef<number | null>(null);
   const { rows, photoToRow } = useMemo(() => makeRows(count, columns), [count, columns]);
@@ -249,7 +249,7 @@ export function PhotoLibrary({
       onValueChangeComplete={onSettle}
     >
       <OpenBridge openRef={openRef} />
-      {showFilmstrip && <Fluidbox.Filmstrip />}
+      {showThumbnails && <Fluidbox.Thumbnails />}
       <main
         className={embedded ? "library-page library-page--embedded" : "library-page"}
         data-library-count={count}
@@ -299,10 +299,10 @@ export function PhotoLibrary({
             <label className="library-checkbox">
               <input
                 type="checkbox"
-                checked={showFilmstrip}
-                onChange={(event) => setShowFilmstrip(event.target.checked)}
+                checked={showThumbnails}
+                onChange={(event) => setShowThumbnails(event.target.checked)}
               />
-              Show filmstrip on next open
+              Show thumbnails on next open
             </label>
             <a
               className="fb-button fb-button--small"

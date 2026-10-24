@@ -5,7 +5,7 @@ export interface FluidboxLabels {
   readonly close: string;
   readonly previous: string;
   readonly next: string;
-  /** A slide's name, and a filmstrip thumbnail's when its item has no name. */
+  /** A slide's name, and a thumbnail's when its item has no name. */
   readonly position: (index: number, count: number) => string;
   /**
    * What the viewer announces as it moves to an item, with the item's alt text
@@ -18,9 +18,11 @@ export interface FluidboxLabels {
   readonly carousel: string;
   /** What each slide is, to a screen reader. */
   readonly slide: string;
-  readonly filmstrip: string;
-  /** The filmstrip's list of thumbnails. */
-  readonly filmstripList: string;
+  readonly thumbnails: string;
+  /** The thumbnails' list of thumbnails. */
+  readonly thumbnailsList: string;
+  /** The counter's text. It is hidden from screen readers, which hear `position`. */
+  readonly counter: (index: number, count: number) => string;
   /** The scroller of a zoomed image. */
   readonly zoomed: string;
   /** The zoom-in control. */
@@ -51,8 +53,9 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   slides: "Gallery items",
   carousel: "carousel",
   slide: "slide",
-  filmstrip: "Gallery filmstrip",
-  filmstripList: "Choose a gallery item",
+  thumbnails: "Gallery thumbnails",
+  thumbnailsList: "Choose a gallery item",
+  counter: (index: number, count: number) => `${index + 1} / ${count}`,
   zoomed: "Zoomed image",
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",

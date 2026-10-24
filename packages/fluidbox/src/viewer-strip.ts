@@ -598,6 +598,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #present(slide: ViewerSlide | undefined, shown: boolean) {
     if (!slide) return;
     slide.element.setAttribute("aria-hidden", String(!shown));
+    slide.element.toggleAttribute("data-active", shown);
     slide.element.inert = !shown;
   }
 

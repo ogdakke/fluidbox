@@ -27,19 +27,19 @@ export function mountSheet(root: HTMLElement) {
         target.querySelector("h3")!.textContent = itemLabel(item);
         target
           .querySelector('[data-action="expand"]')!
-          .addEventListener("click", () => sheet.set(2));
+          .addEventListener("click", () => sheet.setSnap(2));
         const stop = target.querySelector<HTMLOutputElement>('output[name="stop"]')!;
-        stop.value = String(sheet.stop);
-        fluidbox.addEventListener("sheetchange", (event) => (stop.value = String(event.stop)), {
+        stop.value = String(sheet.snap);
+        fluidbox.addEventListener("sheetchange", (event) => (stop.value = String(event.snap)), {
           signal,
         });
       },
     },
-    // A button marked data-fluidbox-sheet-stop moves the sheet to that stop.
+    // A button marked data-fluidbox-sheet-snap moves the sheet to that stop.
     viewer({ target }) {
       target.insertAdjacentHTML(
         "beforeend",
-        `<button type="button" class="pattern-sheet-toggle" data-fluidbox-sheet-stop="1" data-test="peek">Details</button>`,
+        `<button type="button" class="pattern-sheet-toggle" data-fluidbox-sheet-snap="1" data-test="peek">Details</button>`,
       );
     },
   });

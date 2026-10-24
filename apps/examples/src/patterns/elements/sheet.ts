@@ -11,8 +11,8 @@ export function sheet(root: HTMLElement) {
     target.append(content.content.cloneNode(true));
     target.querySelector("h3")!.textContent = itemLabel(item);
     const stop = target.querySelector<HTMLOutputElement>('output[name="stop"]')!;
-    stop.value = String(gallery.sheet!.stop);
-    gallery.addEventListener("sheetchange", (event) => (stop.value = String(event.stop)), {
+    stop.value = String(gallery.sheet!.snap);
+    gallery.addEventListener("sheetchange", (event) => (stop.value = String(event.snap)), {
       signal,
     });
   };

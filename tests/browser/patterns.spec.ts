@@ -200,12 +200,12 @@ for (const framework of frameworks) {
       });
     });
 
-    test("filmstrip", async ({ page }) => {
+    test("thumbnails", async ({ page }) => {
       // Two galleries of four: the default strip, then custom thumbnails.
-      const triggers = pattern(page, "filmstrip").locator('[data-test="trigger"]');
+      const triggers = pattern(page, "thumbnails").locator('[data-test="trigger"]');
       await expect(triggers).toHaveCount(8);
       await open(page, triggers.nth(0), "Item 1 of 4");
-      await expect(dialog(page).locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
+      await expect(dialog(page).locator("[data-fluidbox-thumbnails]")).toHaveCount(1);
       await close(page);
       await open(page, triggers.nth(4), "Item 1 of 4");
       const thumbs = dialog(page).locator('[data-test="thumb"]');
@@ -259,7 +259,7 @@ for (const framework of frameworks) {
       const triggers = root.locator('[data-test="trigger"]');
       await expect(triggers).toHaveCount(4);
       await open(page, triggers.nth(0), "العنصر ١ من ٤");
-      const overlay = page.locator("[data-fluidbox-overlay]");
+      const overlay = page.locator("[data-fluidbox-viewer]");
       await expect(overlay).toHaveAttribute("dir", "rtl");
       await expect(overlay).toHaveAttribute("lang", "ar");
       const slides = page.locator("[data-fluidbox-slides]");
@@ -293,10 +293,10 @@ for (const framework of frameworks) {
         await page.keyboard.press("ArrowLeft");
         await expectSlide(page, "العنصر ٣ من ٤");
       }
-      const selected = dialog(page).locator("[data-fluidbox-filmstrip-item][aria-selected=true]");
+      const selected = dialog(page).locator("[data-fluidbox-thumbnails-item][aria-selected=true]");
       await expect(selected).toHaveAttribute("data-index", "2");
-      // The filmstrip runs right to left too: the first thumbnail is on the right.
-      const thumbs = dialog(page).locator("[data-fluidbox-filmstrip-item]");
+      // The thumbnails runs right to left too: the first thumbnail is on the right.
+      const thumbs = dialog(page).locator("[data-fluidbox-thumbnails-item]");
       const [first, second] = await Promise.all([
         thumbs.nth(0).boundingBox(),
         thumbs.nth(1).boundingBox(),

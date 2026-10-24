@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ page }) => {
+test("explicit and keyboard selection reclaim an unsettled thumbnails", async ({ page }) => {
   await page.goto("/harness.html?virtual&count=1000");
   const gallery = page.locator("fluidbox-gallery");
   await gallery.evaluate((element: HTMLElement & { open(target: number): Promise<boolean> }) =>
@@ -12,11 +12,11 @@ test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ 
   );
   const handoff = await gallery.evaluate(
     (element: HTMLElement & { open(target: number): Promise<boolean> }) => {
-      const scroller = document.querySelector<HTMLElement>("[data-fluidbox-filmstrip-scroll]")!;
+      const scroller = document.querySelector<HTMLElement>("[data-fluidbox-thumbnails-scroll]")!;
       const style = getComputedStyle(scroller);
-      const filmstrip = scroller.closest<HTMLElement>("[data-fluidbox-filmstrip]")!;
+      const thumbnails = scroller.closest<HTMLElement>("[data-fluidbox-thumbnails]")!;
       const size = Number.parseFloat(
-        getComputedStyle(filmstrip).getPropertyValue("--fluidbox-filmstrip-item-size"),
+        getComputedStyle(thumbnails).getPropertyValue("--fluidbox-thumbnails-item-size"),
       );
       const step = size + Number.parseFloat(style.columnGap);
       const selectedLabel = () =>
@@ -43,7 +43,7 @@ test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ 
     "aria-label",
     "Item 12 of 1000",
   );
-  // Filmstrip's native settle timer is 160ms; the new selection must survive it.
+  // Thumbnails' native settle timer is 160ms; the new selection must survive it.
   await page.waitForTimeout(220);
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
@@ -52,7 +52,7 @@ test("explicit and keyboard selection reclaim an unsettled filmstrip", async ({ 
 });
 
 test("a mounted indexed origin follows selection inside its scroll container", async ({ page }) => {
-  await page.goto("/harness.html?virtual&count=1000&no-filmstrip");
+  await page.goto("/harness.html?virtual&count=1000&no-thumbnails");
   await page.evaluate(() => {
     const gallery = document.querySelector("fluidbox-gallery")!;
     const scroller = document.createElement("div");
@@ -102,7 +102,7 @@ test("a mounted indexed origin follows selection inside its scroll container", a
 });
 
 test("stale async reveals abort on rapid selection and close never waits", async ({ page }) => {
-  await page.goto("/harness.html?virtual&count=1000&no-filmstrip");
+  await page.goto("/harness.html?virtual&count=1000&no-thumbnails");
   await page.evaluate(() => {
     const gallery = document.querySelector<
       HTMLElement & {
@@ -202,7 +202,7 @@ test("stale async reveals abort on rapid selection and close never waits", async
 });
 
 test("item replacement and disconnect abort pending origin reveals", async ({ page }) => {
-  await page.goto("/harness.html?virtual&count=2&no-filmstrip");
+  await page.goto("/harness.html?virtual&count=2&no-thumbnails");
   const events = await page.evaluate(async () => {
     const gallery = document.querySelector<
       HTMLElement & {
@@ -270,7 +270,7 @@ test("one-item indexed source handles reveal failures without leaking its sessio
 }) => {
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
-  await page.goto("/harness.html?virtual&count=1&no-filmstrip");
+  await page.goto("/harness.html?virtual&count=1&no-thumbnails");
   const gallery = page.locator("fluidbox-gallery");
   await gallery.evaluate((element: HTMLElement & { revealTrigger: unknown }) => {
     element.revealTrigger = () => Promise.reject(new Error("intentional reveal failure"));

@@ -49,7 +49,7 @@
   --fluidbox-color: var(--fb-fg);
   --fluidbox-control-background: var(--fb-surface-2);
   --fluidbox-focus-color: var(--fb-fg);
-  --fluidbox-filmstrip-item-radius: 2px;
+  --fluidbox-thumbnails-item-radius: 2px;
 }
 
 @media (prefers-color-scheme: dark) {

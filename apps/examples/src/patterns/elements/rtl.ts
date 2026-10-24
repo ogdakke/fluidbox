@@ -1,5 +1,5 @@
 // #region example
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { arabic } from "../shared";
 
 export function rtl(root: HTMLElement) {

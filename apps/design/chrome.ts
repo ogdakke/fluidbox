@@ -1,6 +1,6 @@
 // Package CSS first so the shared overrides in index.css win on equal specificity.
 import "@ogdakke/fluidbox/styles.css";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import "./index.css";
 import { mountCopyButtons } from "./copy";
 import { uiIcon } from "./icons";

@@ -1,7 +1,7 @@
 // #region example
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { arabic, photos } from "../shared";
 
 export function Rtl() {
@@ -21,7 +21,7 @@ export function Rtl() {
             </Fluidbox.Trigger>
           ))}
         </div>
-        <Fluidbox.Filmstrip />
+        <Fluidbox.Thumbnails />
       </Fluidbox.Root>
     </div>
   );

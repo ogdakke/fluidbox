@@ -10,7 +10,7 @@ documentation is in `apps/docs/content` ([API reference](../apps/docs/content/ap
   `sizes`, `poster`, `referrerPolicy`), and the events follow a popover's (`beforetoggle`,
   `toggle`, `oldState`, `newState`).
 - One word per idea: **item**, **trigger**, **viewer** (the body-level layer), **controls**,
-  **filmstrip**, **sheet**, **thumbnail overlay**.
+  **thumbnails**, **sheet**, **thumbnail overlay**.
 - The same shape in every entry point: plain JavaScript, the custom elements and the four
   framework bindings support the same nine patterns (`apps/examples/src/patterns/CONTRACT.md`).
 
@@ -20,7 +20,7 @@ documentation is in `apps/docs/content` ([API reference](../apps/docs/content/ap
 | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `@ogdakke/fluidbox`             | `createFluidbox`, `FluidboxToggleEvent`, `FluidboxChangeEvent` and the types. No side effects, no browser globals on import. |
 | `@ogdakke/fluidbox/elements`    | Defines the custom elements on import. Browser only. The only entry that registers elements.                                 |
-| `@ogdakke/fluidbox/filmstrip`   | Registers the filmstrip add-on on import. Exports its types only. SSR-safe.                                                  |
+| `@ogdakke/fluidbox/thumbnails`  | Registers the thumbnails add-on on import. Exports its types only. SSR-safe.                                                 |
 | `@ogdakke/fluidbox/sheet`       | Registers the sheet add-on on import. Exports its types only. SSR-safe. Styles in `sheet.css`.                               |
 | `@ogdakke/fluidbox/hover-zoom`  | `hoverZoom` and its options: magnifies a photo on the page under a resting mouse. No side effects. SSR-safe.                 |
 | `@ogdakke/fluidbox/kit`         | The binding kit for framework bindings. Not needed by app code.                                                              |
@@ -30,7 +30,7 @@ documentation is in `apps/docs/content` ([API reference](../apps/docs/content/ap
 | `@ogdakke/fluidbox/<framework>` | `react`, `solid`, `vue`, `angular`: built on the plain API and the kit only, never the custom elements.                      |
 
 Add-ons register into one registry per page (`Symbol.for`), however many copies a bundler makes.
-Turning `filmstrip` or `sheet` on without its import throws an `Error` that names the import.
+Turning `thumbnails` or `sheet` on without its import throws an `Error` that names the import.
 
 ## Items and lists
 
@@ -57,7 +57,7 @@ and remakes only the rest. Bindings pass their `items` straight through.
 ## The fluidbox
 
 `createFluidbox(options)` returns a `Fluidbox`, an `EventTarget` with `state`, `items`, `sheet`,
-`filmstrip`, `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `resetZoom`, `setItems`, `preload`, `bind`, `bindOverlay`,
+`thumbnails`, `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `zoomReset`, `setItems`, `preload`, `bind`, `bindOverlay`,
 `subscribe` and `destroy`.
 
 - A target is an index or an id. `open(target?)` opens, or moves while open; without a target it
@@ -93,7 +93,7 @@ CSS variables.
 | `sheetchange`      | `FluidboxSheetEvent`  | no         | The sheet comes to rest at another stop.           |
 | `zoomchange`       | `FluidboxZoomEvent`   | no         | The image on show comes to rest at another zoom.   |
 
-Every event has a `reason`: `api`, `trigger`, `keyboard`, `pointer`, `wheel`, `filmstrip` or
+Every event has a `reason`: `api`, `trigger`, `keyboard`, `pointer`, `wheel`, `thumbnails` or
 `items`. The before-events run synchronously for every command, whatever its source; a prevented
 command resolves `false`. `<fluidbox-gallery>` re-dispatches the same events, non-bubbling; the
 framework bindings expose them as event props, emits or outputs.
@@ -114,7 +114,7 @@ default control or the strip of slides. An element marked `data-fluidbox-descrip
 dialog becomes its `aria-describedby`.
 
 One renderer type, `({ item, index, target, signal }) => void | (() => void)`, draws everything an
-application owns inside the viewer: custom slides, filmstrip thumbnails, the sheet and travelling
+application owns inside the viewer: custom slides, thumbnails, the sheet and travelling
 overlays. The runtime calls the returned disposer, then empties `target`; framework bindings use
 their own portal or teleport mechanism and the runtime never reparents a framework-owned node.
 Custom content outside the bounded slide window is disposed and may mount again as a new instance.
@@ -135,7 +135,7 @@ frame rather than in the flight, as embedded media items do.
 ## Labels
 
 Every string the viewer shows or announces is in `FluidboxLabels` (`viewer`, `close`, `previous`,
-`next`, `position`, `announcement`, `slides`, `carousel`, `slide`, `filmstrip`, `filmstripList`,
+`next`, `position`, `announcement`, `slides`, `carousel`, `slide`, `thumbnails`, `thumbnailsList`,
 `zoomed`, `zoomIn`, `zoomOut`, `zoomReset`, `zoomLevel`, `sheet`, `error`, `retry`, …), with English
 defaults, overridden through `labels`.
 

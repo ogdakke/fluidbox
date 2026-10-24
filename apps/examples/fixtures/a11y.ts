@@ -1,7 +1,7 @@
 import { mountSite } from "../src/site";
 import { createFluidbox } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/thumbnails.css";
 import type {
   Fluidbox,
   FluidboxCustomItemBase,
@@ -17,7 +17,7 @@ declare module "@ogdakke/fluidbox" {
 }
 
 mountSite("fixtures", {
-  fixture: "Accessibility · query flags: filmstrip, unnamed, viewer, broken",
+  fixture: "Accessibility · query flags: thumbnails, unnamed, viewer, broken",
 });
 
 const params = new URLSearchParams(location.search);
@@ -118,8 +118,8 @@ const viewer = params.has("viewer")
 const fluidbox: Fluidbox = createFluidbox({
   items,
   slides,
-  loading: "eager",
-  filmstrip: params.has("filmstrip"),
+  preload: "eager",
+  thumbnails: params.has("thumbnails"),
   ...(params.has("zoom")
     ? { controls: ["previous", "next", "close", "zoomIn", "zoomOut", "zoomReset"] as const }
     : {}),

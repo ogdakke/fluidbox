@@ -34,12 +34,12 @@ import {
   createFluidbox,
   type Fluidbox as FluidboxInstance,
   type FluidboxControlName,
-  type FluidboxFilmstripOptions,
+  type FluidboxThumbnailsOptions,
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
   type FluidboxLabels,
-  type FluidboxLoading,
+  type FluidboxPreload,
   type FluidboxOptions,
   type FluidboxRenderer,
   type FluidboxSlide,
@@ -97,7 +97,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
-  FluidboxLoading,
+  FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -157,7 +157,7 @@ function useMounts() {
   };
 }
 
-/** The kit's slots for a sheet or a filmstrip, as a list this component renders at once. */
+/** The kit's slots for a sheet or the thumbnails, as a list this component renders at once. */
 function useRuntimeSlots(onChange?: (slots: readonly FluidboxSlot<AnyItem>[]) => void) {
   const patch = usePatch();
   const runtime = createSlots<AnyItem>();
@@ -182,8 +182,8 @@ function useRuntimeSlots(onChange?: (slots: readonly FluidboxSlot<AnyItem>[]) =>
   };
 }
 
-interface FilmstripPart {
-  readonly options: () => true | FluidboxFilmstripOptions<AnyItem>;
+interface ThumbnailsPart {
+  readonly options: () => true | FluidboxThumbnailsOptions<AnyItem>;
 }
 
 interface SheetPart {
@@ -193,7 +193,7 @@ interface SheetPart {
 /** The parts that turn viewer features on, as they are rendered inside Root. */
 interface Features {
   viewers: number;
-  filmstrip: FilmstripPart | null;
+  thumbnails: ThumbnailsPart | null;
   sheet: SheetPart | null;
 }
 
@@ -251,7 +251,7 @@ function same(a: unknown, b: unknown): boolean {
   );
 }
 
-const settingKeys = ["labels", "zoom", "loop", "viewer", "filmstrip", "sheet", "loading"] as const;
+const settingKeys = ["labels", "zoom", "loop", "viewer", "thumbnails", "sheet", "preload"] as const;
 type Settings = {
   -readonly [K in (typeof settingKeys)[number]]: FluidboxUpdateOptions<AnyItem>[K];
 };
@@ -278,8 +278,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly findTrigger?: FluidboxOptions<TItem>["findTrigger"];
   /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
   readonly revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
-  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
-  readonly loading?: FluidboxLoading;
+  /** When the viewer's code loads: on `"intent"` (the default), on `"press"`, or `"eager"`ly. */
+  readonly preload?: FluidboxPreload;
 }
 
 type RootEmits<TItem extends FluidboxItem> = {
@@ -312,7 +312,7 @@ const Root = defineComponent(
       return Array.isArray(value) ? value.map((item: TItem) => toRaw(item)) : toRaw(value);
     });
     const viewerTarget = shallowRef<HTMLElement | null>(null);
-    const features = shallowReactive<Features>({ viewers: 0, filmstrip: null, sheet: null });
+    const features = shallowReactive<Features>({ viewers: 0, thumbnails: null, sheet: null });
     const mounts = useMounts();
     const labels = computed(() => resolveLabels(props.labels));
 
@@ -356,9 +356,9 @@ const Root = defineComponent(
         // Without a Viewer part, the viewer has the default controls.
         viewer:
           features.viewers > 0 ? (viewer as unknown as FluidboxViewerRenderer<AnyItem>) : undefined,
-        filmstrip: features.filmstrip?.options(),
+        thumbnails: features.thumbnails?.options(),
         sheet: features.sheet?.options(),
-        loading: props.loading,
+        preload: props.preload,
       };
     };
 
@@ -382,7 +382,7 @@ const Root = defineComponent(
       state.value = fluidbox.state;
       if (fluidbox.items !== list.value) list.value = fluidbox.items;
       // A sheet that loads or goes changes the stop too.
-      sheetStop.value = fluidbox.sheet?.stop ?? 0;
+      sheetStop.value = fluidbox.sheet?.snap ?? 0;
     });
     // The fluidbox ignores items equal to its own, as an inline `:items="[product]"`.
     watch(items, (next) => void fluidbox.setItems(next));
@@ -395,7 +395,7 @@ const Root = defineComponent(
         { signal: events.signal },
       );
     }
-    fluidbox.addEventListener("sheetchange", (event) => (sheetStop.value = event.stop), {
+    fluidbox.addEventListener("sheetchange", (event) => (sheetStop.value = event.snap), {
       signal: events.signal,
     });
     watchOpenIndex(
@@ -471,7 +471,7 @@ const Root = defineComponent(
       zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
       zoomIn: (options) => fluidbox.zoomIn(options),
       zoomOut: (options) => fluidbox.zoomOut(options),
-      resetZoom: (options) => fluidbox.resetZoom(options),
+      zoomReset: (options) => fluidbox.zoomReset(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
       load: () => fluidbox.load(),
@@ -480,7 +480,7 @@ const Root = defineComponent(
       get stop() {
         return sheetStop.value;
       },
-      set: (stop, options) => fluidbox.sheet?.set(stop, options),
+      set: (stop, options) => fluidbox.sheet?.setSnap(stop, options),
     };
 
     provide(RootKey, {
@@ -507,7 +507,7 @@ const Root = defineComponent(
       "renderers",
       "findTrigger",
       "revealTrigger",
-      "loading",
+      "preload",
     ],
     emits: [...fluidboxEventTypes, "update:open", "update:index"],
   },
@@ -786,24 +786,24 @@ const Controls = defineComponent({
 });
 
 /**
- * Turns the filmstrip on. With a default slot, it fills each thumbnail button,
+ * Turns the thumbnails on. With a default slot, it fills each thumbnail button,
  * getting `{ item, index }`; the selected button has `data-fluidbox-selected`.
  */
-const Filmstrip = defineComponent({
-  name: "FluidboxFilmstrip",
+const Thumbnails = defineComponent({
+  name: "FluidboxThumbnails",
   slots: Object as SlotsType<{
     default?: (thumbnail: FluidboxItemContext) => VNode[];
   }>,
   setup(_, { slots }) {
-    const { features } = useRootContext("Filmstrip");
+    const { features } = useRootContext("Thumbnails");
     const strip = useRuntimeSlots();
     const custom = !!slots.default;
-    const part: FilmstripPart = {
+    const part: ThumbnailsPart = {
       options: () => (custom ? { render: strip.render } : true),
     };
-    features.filmstrip = part;
+    features.thumbnails = part;
     onBeforeUnmount(() => {
-      if (features.filmstrip === part) features.filmstrip = null;
+      if (features.thumbnails === part) features.thumbnails = null;
     });
     return () => strip.teleport(({ item, index }) => slots.default?.({ item, index }));
   },
@@ -924,7 +924,7 @@ const SheetStop = defineComponent({
     return () =>
       h(
         "button",
-        { type: "button", "data-fluidbox-sheet-stop": String(props.stop) },
+        { type: "button", "data-fluidbox-sheet-snap": String(props.stop) },
         slots.default?.(),
       );
   },
@@ -963,7 +963,7 @@ export const Fluidbox = {
   ZoomIn,
   ZoomOut,
   ZoomReset,
-  Filmstrip,
+  Thumbnails,
   Sheet,
   SheetStop,
   ThumbnailOverlay,

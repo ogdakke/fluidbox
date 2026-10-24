@@ -23,7 +23,7 @@ import {
   type Fluidbox as FluidboxHandle,
   type FluidboxEventMap,
   type FluidboxControlName,
-  type FluidboxFilmstripOptions,
+  type FluidboxThumbnailsOptions,
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
@@ -56,7 +56,7 @@ import type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxControlsProps,
-  FluidboxFilmstripProps,
+  FluidboxThumbnailsProps,
   FluidboxFrameLayerProps,
   FluidboxRootProps,
   FluidboxSheetApi,
@@ -72,7 +72,7 @@ export type {
   FluidboxActionProps,
   FluidboxApi,
   FluidboxControlsProps,
-  FluidboxFilmstripProps,
+  FluidboxThumbnailsProps,
   FluidboxFrameLayerProps,
   FluidboxRootProps,
   FluidboxSheetApi,
@@ -96,7 +96,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
-  FluidboxLoading,
+  FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -113,8 +113,8 @@ export type {
   FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 
-interface FilmstripRegistration {
-  readonly option: true | FluidboxFilmstripOptions<any>;
+interface ThumbnailsRegistration {
+  readonly option: true | FluidboxThumbnailsOptions<any>;
 }
 
 interface SheetRegistration {
@@ -130,7 +130,7 @@ interface FluidboxContextValue {
   readonly viewerTarget: Accessor<HTMLElement | null>;
   readonly viewers: Accessor<number>;
   addViewer(): () => void;
-  setFilmstrip(registration: FilmstripRegistration): () => void;
+  setThumbnails(registration: ThumbnailsRegistration): () => void;
   setSheet(registration: SheetRegistration): () => void;
 }
 
@@ -153,7 +153,7 @@ function useFluidboxContext(): FluidboxContextValue {
 /**
  * Render content straight into a runtime target, under an owner so its context
  * reaches the content. Unlike solid-js/web's Portal it adds no wrapper element,
- * which the runtime's targets and filmstrip buttons expect. Each mount keeps
+ * which the runtime's targets and thumbnails buttons expect. Each mount keeps
  * between its own markers, so several can share a target and leave alone.
  */
 function mountInto(
@@ -224,7 +224,7 @@ const eventProps = {
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.Element {
   const [viewerTarget, setViewerTarget] = createSignal<HTMLElement | null>(null);
   const [viewers, setViewers] = createSignal(0);
-  const [filmstrip, setFilmstrip] = registry<FilmstripRegistration>();
+  const [thumbnails, setThumbnails] = registry<ThumbnailsRegistration>();
   const [sheet, setSheet] = registry<SheetRegistration>();
   const labels = createMemo(() => resolveLabels(props.labels));
 
@@ -266,7 +266,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
         labels: untrack(() => props.labels),
         zoom: untrack(zoom),
         loop: untrack(() => props.loop),
-        loading: untrack(() => props.loading),
+        preload: untrack(() => props.preload),
         // Renderers resolve by key when an item renders, so the newest render
         // function is used without rebuilding the viewer.
         slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
@@ -354,17 +354,17 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   );
   createEffect(
     on(
-      () => props.loading,
-      (next) => fluidbox.update({ loading: next }),
+      () => props.preload,
+      (next) => fluidbox.update({ preload: next }),
       { defer: true },
     ),
   );
   // Each part's render functions stay the same while it is mounted, so the
   // viewer only remounts an add-on when its options really change. Not
   // deferred: the parts register as Root's children render, before this runs.
-  const filmstripOption = createMemo(() => filmstrip()?.option ?? false);
+  const thumbnailsOption = createMemo(() => thumbnails()?.option ?? false);
   const sheetOption = createMemo(() => sheet()?.option ?? false);
-  createEffect(() => fluidbox.update({ filmstrip: filmstripOption(), sheet: sheetOption() }));
+  createEffect(() => fluidbox.update({ thumbnails: thumbnailsOption(), sheet: sheetOption() }));
 
   createRenderEffect(
     on(
@@ -385,7 +385,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
       setViewers((count) => count + 1);
       return () => setViewers((count) => count - 1);
     },
-    setFilmstrip,
+    setThumbnails,
     setSheet,
   };
 
@@ -617,17 +617,19 @@ function Controls(props: FluidboxControlsProps = {}): JSX.Element {
 }
 
 /**
- * Turns the filmstrip on. With a child function, it renders each thumbnail;
+ * Turns the thumbnails on. With a child function, it renders each thumbnail;
  * the selected button has `data-fluidbox-selected`.
  */
-function Filmstrip<TItem extends FluidboxItem>(props: FluidboxFilmstripProps<TItem>): JSX.Element {
+function Thumbnails<TItem extends FluidboxItem>(
+  props: FluidboxThumbnailsProps<TItem>,
+): JSX.Element {
   const context = useFluidboxContext();
   const owner = getOwner();
   const custom = typeof untrack(() => props.children) === "function";
   // Renders straight into each button; the newest children are read as it does.
   const render: FluidboxRenderer<TItem> = ({ item, index, target }) =>
     mountInto(target, () => props.children?.({ item, index }), owner);
-  onCleanup(context.setFilmstrip({ option: custom ? { render } : true }));
+  onCleanup(context.setThumbnails({ option: custom ? { render } : true }));
   return null;
 }
 
@@ -670,7 +672,7 @@ function SheetStop(props: FluidboxSheetStopProps): JSX.Element {
   return createComponent(
     Dynamic,
     mergeProps({ component: "button", type: "button" }, attributes, {
-      get "data-fluidbox-sheet-stop"() {
+      get "data-fluidbox-sheet-snap"() {
         return String(local.stop);
       },
     }) as never,
@@ -802,7 +804,7 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
     zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
     zoomIn: (options) => fluidbox.zoomIn(options),
     zoomOut: (options) => fluidbox.zoomOut(options),
-    resetZoom: (options) => fluidbox.resetZoom(options),
+    zoomReset: (options) => fluidbox.zoomReset(options),
     setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
     preload: (target) => fluidbox.preload(target),
     load: () => fluidbox.load(),
@@ -817,14 +819,14 @@ export function useFluidboxSheet(): FluidboxSheetApi {
   // A sheet that loads or goes changes the stop too.
   createEffect(() => {
     context.state();
-    setStop(fluidbox.sheet?.stop ?? 0);
+    setStop(fluidbox.sheet?.snap ?? 0);
   });
-  const listener = (event: FluidboxSheetEvent) => setStop(event.stop);
+  const listener = (event: FluidboxSheetEvent) => setStop(event.snap);
   fluidbox.addEventListener("sheetchange", listener);
   onCleanup(() => fluidbox.removeEventListener("sheetchange", listener));
   return {
     stop,
-    set: (next, options) => fluidbox.sheet?.set(next, options),
+    set: (next, options) => fluidbox.sheet?.setSnap(next, options),
   };
 }
 
@@ -839,7 +841,7 @@ export const Fluidbox: FluidboxSolidParts = {
   ZoomIn,
   ZoomOut,
   ZoomReset,
-  Filmstrip,
+  Thumbnails,
   Sheet,
   SheetStop,
   ThumbnailOverlay,

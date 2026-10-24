@@ -28,7 +28,7 @@ export type FluidboxVueRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxVueRenderContext<TItem>,
 ) => VNodeChild;
 
-/** What the Sheet and Filmstrip slots get: the item they draw and its index. */
+/** What the Sheet and Thumbnails slots get: the item they draw and its index. */
 export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
   readonly index: number;
@@ -48,7 +48,7 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   /** Zoom out by 1.5. */
   zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
   /** Zoom back out to fit. */
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;

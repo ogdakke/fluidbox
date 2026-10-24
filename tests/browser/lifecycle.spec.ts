@@ -25,7 +25,7 @@ async function setup(page: Page, reducedMotion = false) {
 function leftovers(page: Page) {
   return page.evaluate(() => ({
     inert: [...document.querySelectorAll("[inert]")].map((node) => node.tagName),
-    overlays: document.querySelectorAll("[data-fluidbox-overlay]").length,
+    overlays: document.querySelectorAll("[data-fluidbox-viewer]").length,
     flights: document.querySelectorAll("[data-fluidbox-flight]").length,
   }));
 }
@@ -219,7 +219,7 @@ for (const reducedMotion of [false, true]) {
           const settled = `${status} ${fluidbox.state.index}, viewer ${dialog ? dialog.getAttribute("data-fluidbox-status") : "gone"}`;
           const consistent =
             status === "closed"
-              ? !document.querySelector("[data-fluidbox-overlay]")
+              ? !document.querySelector("[data-fluidbox-viewer]")
               : status === "open" && dialog?.getAttribute("data-fluidbox-status") === "open";
           const final = random() < 0.5 ? "close" : "destroy";
           log.push(final);
@@ -236,7 +236,7 @@ for (const reducedMotion of [false, true]) {
             closed,
             finalStatus: fluidbox.state.status,
             inert: document.querySelectorAll("[inert]").length,
-            overlays: document.querySelectorAll("[data-fluidbox-overlay]").length,
+            overlays: document.querySelectorAll("[data-fluidbox-viewer]").length,
             flights: document.querySelectorAll("[data-fluidbox-flight]").length,
           };
         },

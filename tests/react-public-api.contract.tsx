@@ -54,7 +54,7 @@ function ContractExample(): ReactElement {
         void details.item?.credit;
       }}
       onValueChangeComplete={(value, details) => void [value?.length, details.action]}
-      onSheetChange={(event: FluidboxSheetEvent) => void event.stop}
+      onSheetChange={(event: FluidboxSheetEvent) => void event.snap}
     >
       <Fluidbox.Trigger item={items[0]!} asChild>
         <button type="button">
@@ -65,9 +65,9 @@ function ContractExample(): ReactElement {
       <Fluidbox.Trigger item={1}>
         <img src="/thumb-two.jpg" alt="Two" />
       </Fluidbox.Trigger>
-      <Fluidbox.Filmstrip<Photo>>
+      <Fluidbox.Thumbnails<Photo>>
         {({ item, index }) => <img src={item.src} alt={`${item.credit} ${index}`} />}
-      </Fluidbox.Filmstrip>
+      </Fluidbox.Thumbnails>
       <Fluidbox.Sheet<Photo> snapPoints={["40%", "content"]} dismiss="scroll" className="details">
         {({ item, index }) => (
           <>
@@ -125,9 +125,9 @@ const staticSheet = (
 );
 void staticSheet;
 
-// @ts-expect-error the filmstrip is a part, not a Root prop
-const filmstripProp = <Fluidbox.Root items={items} filmstrip />;
-void filmstripProp;
+// @ts-expect-error the thumbnails is a part, not a Root prop
+const thumbnailsProp = <Fluidbox.Root items={items} thumbnails />;
+void thumbnailsProp;
 
 // @ts-expect-error the sheet is a part, not a Root prop
 const sheetProp = <Fluidbox.Root items={items} sheet />;

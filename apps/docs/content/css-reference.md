@@ -2,14 +2,14 @@
 title: CSS reference
 section: Reference
 order: 2
-description: Every CSS custom property, part selector and state attribute fluidbox exposes in styles.css, filmstrip.css and sheet.css, read from the stylesheets and the runtime, with defaults and where each is set or read.
+description: Every CSS custom property, part selector and state attribute fluidbox exposes in styles.css, thumbnails.css and sheet.css, read from the stylesheets and the runtime, with defaults and where each is set or read.
 ---
 
 # CSS reference
 
-The custom properties, parts and state attributes of `@ogdakke/fluidbox/styles.css`, `filmstrip.css` and `sheet.css`, read from the stylesheets and the runtime. [Styling](./styling.md) explains how to use them. The stylesheets use other `--fluidbox-*` properties and data attributes internally; anything not listed here can change without notice.
+The custom properties, parts and state attributes of `@ogdakke/fluidbox/styles.css`, `thumbnails.css` and `sheet.css`, read from the stylesheets and the runtime. [Styling](./styling.md) explains how to use them. The stylesheets use other `--fluidbox-*` properties and data attributes internally; anything not listed here can change without notice.
 
-`styles.css` wraps the viewer's rules in `:where([data-fluidbox-overlay], [data-fluidbox-flight])`, so a rule of yours on the same part wins when it comes later. The filmstrip's and the sheet's defaults, declared on the dialog, sit wholly inside `:where()`, so `[data-fluidbox-dialog] { … }` overrides them in any order. When the viewer opens, it copies every `--fluidbox-*` property on the trigger onto the overlay as inline styles. So you can set most inputs on `:root`, on the trigger or an ancestor of it, or on `[data-fluidbox-overlay]`; set the ones declared on the dialog on `[data-fluidbox-dialog]`.
+`styles.css` wraps the viewer's rules in `:where([data-fluidbox-viewer], [data-fluidbox-flight])`, so a rule of yours on the same part wins when it comes later. The thumbnails' and the sheet's defaults, declared on the dialog, sit wholly inside `:where()`, so `[data-fluidbox-dialog] { … }` overrides them in any order. When the viewer opens, it copies every `--fluidbox-*` property on the trigger onto the overlay as inline styles. So you can set most inputs on `:root`, on the trigger or an ancestor of it, or on `[data-fluidbox-viewer]`; set the ones declared on the dialog on `[data-fluidbox-dialog]`.
 
 ## Theme variables
 
@@ -51,4 +51,4 @@ The sheet values follow the scroll on the compositor and inherit to everything i
 
 ## Events
 
-The sheet's stop changes arrive as the `sheetchange` event on the fluidbox and on `<fluidbox-gallery>`, not on an element in the viewer. See [Filmstrip and sheet](./filmstrip-and-sheet.md#the-sheet-handle).
+The sheet's stop changes arrive as the `sheetchange` event on the fluidbox and on `<fluidbox-gallery>`, not on an element in the viewer. See [Thumbnails and sheet](./thumbnails-and-sheet.md#the-sheet-handle).

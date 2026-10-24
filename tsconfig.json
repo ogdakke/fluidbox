@@ -15,7 +15,7 @@
     "paths": {
       "@ogdakke/fluidbox": ["./packages/fluidbox/src/index.ts"],
       "@ogdakke/fluidbox/elements": ["./packages/fluidbox/src/elements.ts"],
-      "@ogdakke/fluidbox/filmstrip": ["./packages/fluidbox/src/filmstrip-entry.ts"],
+      "@ogdakke/fluidbox/thumbnails": ["./packages/fluidbox/src/thumbnails-entry.ts"],
       "@ogdakke/fluidbox/sheet": ["./packages/fluidbox/src/sheet-entry.ts"],
       "@ogdakke/fluidbox/kit": ["./packages/fluidbox/src/kit.ts"],
       "@ogdakke/fluidbox/hover-zoom": ["./packages/fluidbox/src/hover-zoom.ts"],

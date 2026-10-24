@@ -35,7 +35,7 @@ export type FluidboxReactRenderer<TItem extends FluidboxItem = FluidboxItem> = (
   context: FluidboxReactRenderContext<TItem>,
 ) => ReactNode;
 
-/** What the Sheet's and the Filmstrip's render functions get: the item they draw. */
+/** What the Sheet's and the Thumbnails' render functions get: the item they draw. */
 export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
   readonly index: number;
@@ -73,8 +73,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly findTrigger?: FluidboxOptions<TItem>["findTrigger"];
   /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
   readonly revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
-  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
-  readonly loading?: FluidboxOptions<TItem>["loading"];
+  /** When the viewer's code loads: on `"intent"` (the default), on `"press"`, or `"eager"`ly. */
+  readonly preload?: FluidboxOptions<TItem>["preload"];
   /**
    * Before every open, move and close, from any input, with the value the
    * viewer goes to: an id, or null for a close. `details.cancel()` stops it.
@@ -120,7 +120,7 @@ export interface FluidboxControlsProps {
   readonly zoom?: boolean;
 }
 
-export interface FluidboxFilmstripProps<TItem extends FluidboxItem = FluidboxItem> {
+export interface FluidboxThumbnailsProps<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Renders one thumbnail into its button. Leave it out for the default
    * thumbnails. The selected button has `data-fluidbox-selected`.
@@ -164,7 +164,7 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   /** Zoom out by 1.5. */
   readonly zoomOut: (options?: FluidboxZoomCommandOptions) => Promise<boolean>;
   /** Zoom back out to fit. */
-  readonly resetZoom: (options?: Pick<FluidboxZoomCommandOptions, "signal">) => Promise<boolean>;
+  readonly zoomReset: (options?: Pick<FluidboxZoomCommandOptions, "signal">) => Promise<boolean>;
   readonly setItems: (items: FluidboxItems<TItem>) => Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   readonly preload: (target: FluidboxTarget<TItem>) => () => void;

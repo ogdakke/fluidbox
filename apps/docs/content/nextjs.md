@@ -17,13 +17,13 @@ pnpm add @ogdakke/fluidbox
 
 ## The stylesheets
 
-Import them once, in the root layout. A server component can import CSS. The filmstrip and the sheet each need their own stylesheet on top of the base one.
+Import them once, in the root layout. A server component can import CSS. The thumbnails and the sheet each need their own stylesheet on top of the base one.
 
 ```tsx
 // app/layout.tsx
 import "@ogdakke/fluidbox/styles.css";
-// Only with <Fluidbox.Filmstrip />:
-import "@ogdakke/fluidbox/filmstrip.css";
+// Only with <Fluidbox.Thumbnails />:
+import "@ogdakke/fluidbox/thumbnails.css";
 // Only with <Fluidbox.Sheet>:
 import "@ogdakke/fluidbox/sheet.css";
 ```
@@ -63,7 +63,7 @@ export type Photo = (typeof photos)[number];
 
 - The viewer gets the full srcset, the thumbnail and Next's blur as the `placeholder`. The blur paints the moment a slide appears, under the thumbnail and the full image.
 - `thumb` keeps the grid's props for the triggers to render, so the grid's `sizes` lives in one place. The viewer sees that the trigger already shows the thumbnail and flies the image the page has decoded.
-- On a 1200 px screen the viewer loads the 1200w file, and the filmstrip takes the thumbnail's smallest candidate. `src` is the largest width, which only browsers without `srcset` load.
+- On a 1200 px screen the viewer loads the 1200w file, and the thumbnails takes the thumbnail's smallest candidate. `src` is the largest width, which only browsers without `srcset` load.
 - A static import gives Next the width, the height and the blur. For a remote file, pass `width`, `height` and a `blurDataURL` of your own.
 - `slug` and `thumb` are [fields of your own](./media.md#fields-of-your-own). The viewer hands them back in every state and callback.
 
@@ -88,7 +88,7 @@ export function Gallery({ photos }: { photos: Photo[] }) {
           </Fluidbox.Trigger>
         ))}
       </div>
-      <Fluidbox.Filmstrip />
+      <Fluidbox.Thumbnails />
     </Fluidbox.Root>
   );
 }
@@ -117,7 +117,7 @@ The same `Gallery` works in `pages/`. Import the stylesheets in `pages/_app.tsx`
 ```tsx
 // pages/_app.tsx
 import "@ogdakke/fluidbox/styles.css";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import "@ogdakke/fluidbox/sheet.css";
 import type { AppProps } from "next/app";
 

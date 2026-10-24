@@ -348,7 +348,7 @@ main.fb-shell {
   font-size: 13.5px;
   cursor: pointer;
   pointer-events: auto;
-  /* Gives way as the sheet comes in, as the filmstrip does. */
+  /* Gives way as the sheet comes in, as the thumbnails does. */
   opacity: calc(1 - var(--fluidbox-sheet-progress, 0) * 3 - var(--fluidbox-sheet-dismiss, 0) * 3);
 }
 
@@ -356,8 +356,8 @@ main.fb-shell {
   pointer-events: none;
 }
 
-[data-fluidbox-dialog]:has([data-fluidbox-filmstrip]) .info-toggle {
-  bottom: calc(var(--fluidbox-filmstrip-space) + 4px);
+[data-fluidbox-dialog]:has([data-fluidbox-thumbnails]) .info-toggle {
+  bottom: calc(var(--fluidbox-thumbnails-space) + 4px);
 }
 
 /* A floating sheet: the runtime's sheet is a clear frame and the card inside

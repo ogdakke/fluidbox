@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import { photos } from "../shared";
 </script>
 
@@ -19,7 +19,7 @@ import { photos } from "../shared";
         <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
-    <Fluidbox.Filmstrip />
+    <Fluidbox.Thumbnails />
   </Fluidbox.Root>
 
   <Fluidbox.Root :items="photos">
@@ -35,9 +35,9 @@ import { photos } from "../shared";
       </Fluidbox.Trigger>
     </div>
     <!-- Your own thumbnails. The selected button has data-fluidbox-selected. -->
-    <Fluidbox.Filmstrip v-slot="{ index }">
-      <span class="pattern-filmstrip-thumb" data-test="thumb">{{ index + 1 }}</span>
-    </Fluidbox.Filmstrip>
+    <Fluidbox.Thumbnails v-slot="{ index }">
+      <span class="pattern-thumbnails-thumb" data-test="thumb">{{ index + 1 }}</span>
+    </Fluidbox.Thumbnails>
   </Fluidbox.Root>
 </template>
 <!-- #endregion example -->

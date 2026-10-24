@@ -33,8 +33,8 @@ import {
 } from "@ogdakke/fluidbox";
 import type * as Root from "@ogdakke/fluidbox";
 import type * as SheetEntry from "@ogdakke/fluidbox/sheet";
-import type * as FilmstripEntry from "@ogdakke/fluidbox/filmstrip";
-import type { FluidboxFilmstripOptions } from "@ogdakke/fluidbox/filmstrip";
+import type * as ThumbnailsEntry from "@ogdakke/fluidbox/thumbnails";
+import type { FluidboxThumbnailsOptions } from "@ogdakke/fluidbox/thumbnails";
 import type { FluidboxSheetOptions, FluidboxSheetSnapPoint } from "@ogdakke/fluidbox/sheet";
 import {
   renderEmbed,
@@ -62,7 +62,7 @@ import {
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import type {
-  FluidboxFilmstripElement,
+  FluidboxThumbnailsElement,
   FluidboxGalleryElement,
   FluidboxItemElement,
   FluidboxPreviewChangeEvent,
@@ -205,7 +205,7 @@ const fluidbox = createFluidbox({
   slides: { default: note2 },
   viewer,
   controls: ["close"],
-  filmstrip: { render: ({ item, target }) => void (target.title = item.credit) },
+  thumbnails: { render: ({ item, target }) => void (target.title = item.credit) },
   sheet: { snapPoints: ["40%", 600, "content"], dismiss: "scroll", render: () => {} },
   findTrigger,
   revealTrigger,
@@ -217,20 +217,20 @@ assert<Equal<typeof fluidbox.state.status, FluidboxStatus>>();
 assert<Equal<FluidboxStatus, "closed" | "opening" | "open" | "closing">>();
 assert<Equal<FluidboxTarget<Photo>, number | string | Photo>>();
 assert<Equal<typeof fluidbox.sheet, FluidboxSheet | null>>();
-// @ts-expect-error the filmstrip has no handle
-void fluidbox.filmstrip;
+// @ts-expect-error the thumbnails has no handle
+void fluidbox.thumbnails;
 assert<Equal<ReturnType<typeof fluidbox.open>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.close>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.setItems>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.load>, Promise<boolean>>>();
-assert<Equal<Root.FluidboxLoading, "hover" | "press" | "eager">>();
+assert<Equal<Root.FluidboxPreload, "intent" | "press" | "eager">>();
 assert<Equal<FluidboxReason, "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items">>();
 // A scrub is a kind of move, not a source of one.
 void fluidbox.open(1, { scrub: true });
 
-createFluidbox({ items: lazy, controls: true, filmstrip: true, sheet: true, zoom: false });
-createFluidbox({ items: photos, loading: "eager" });
-fluidbox.update({ loading: "press" });
+createFluidbox({ items: lazy, controls: true, thumbnails: true, sheet: true, zoom: false });
+createFluidbox({ items: photos, preload: "eager" });
+fluidbox.update({ preload: "press" });
 // @ts-expect-error hover, press or eager
 createFluidbox({ items: photos, loading: "lazy" });
 // @ts-expect-error items, not a source
@@ -274,7 +274,7 @@ createFluidbox<Photo>({ items: photos, slides: { video: note2 } });
 // @ts-expect-error drawImage draws image items
 createFluidbox({ items: photos, slides: { note: (slide) => void slide.drawImage(video) } });
 // Other renderers don't get it.
-// @ts-expect-error a filmstrip thumbnail is never on show as a slide
+// @ts-expect-error a thumbnail is never on show as a slide
 const thumbnailActive: FluidboxRenderer = ({ active }) => void active;
 void thumbnailActive;
 // The media add-ons' items and renderers go into any gallery.
@@ -322,7 +322,7 @@ void fluidbox.open(0, { reason: "trigger" });
 void fluidbox.zoomTo(2.5, { origin: { x: 120, y: 80 }, signal: new AbortController().signal });
 void fluidbox.zoomIn().then((zoomed: boolean) => zoomed);
 void fluidbox.zoomOut({ origin: { x: 0, y: 0 } });
-void fluidbox.resetZoom();
+void fluidbox.zoomReset();
 // @ts-expect-error the origin is a point, not a keyword
 void fluidbox.zoomTo(2, { origin: "center" });
 const zoomState: FluidboxZoomState | null = fluidbox.state.zoom;
@@ -389,7 +389,7 @@ fluidbox.addEventListener("valuechangecomplete", (event) => void event.item?.cre
 fluidbox.addEventListener("toggle", (event: FluidboxValueChangeEvent<Photo>) => void event);
 fluidbox.addEventListener("sheetchange", (event) => {
   assert<Equal<typeof event, FluidboxSheetEvent>>();
-  void [event.stop, event.reason];
+  void [event.snap, event.reason];
 });
 const change = new FluidboxValueChangeEvent("valuechange", {
   value: "one",
@@ -400,7 +400,7 @@ const change = new FluidboxValueChangeEvent("valuechange", {
   reason: "api",
 });
 const sheetChange = new FluidboxSheetEvent("sheetchange", {
-  stop: 1,
+  snap: 1,
   reason: "pointer",
 });
 const zoomChange = new FluidboxZoomEvent("zoomchange", { scale: 2, reason: "wheel" });
@@ -408,17 +408,17 @@ void [change, sheetChange, zoomChange];
 
 const update: FluidboxUpdateOptions<Photo> = { labels: { close: "Sulje" }, zoom: undefined };
 fluidbox.update(update);
-fluidbox.update({ controls: ["close"], filmstrip: true, sheet: { snapPoints: ["50%"] } });
+fluidbox.update({ controls: ["close"], thumbnails: true, sheet: { snapPoints: ["50%"] } });
 const id: string = idOf(photo);
 const name: string = rootItemLabel(photo);
 void [id, name];
 
 const sheet = fluidbox.sheet;
 if (sheet) {
-  sheet.set(1, { animate: false });
-  const stop: number = sheet.stop;
-  void stop;
-  // @ts-expect-error the sheet's stop changes arrive as sheetchange events
+  sheet.setSnap(1, { animate: false });
+  const snap: number = sheet.snap;
+  void snap;
+  // @ts-expect-error the sheet's snap changes arrive as sheetchange events
   sheet.subscribe(() => {});
 }
 fluidbox.destroy();
@@ -444,15 +444,15 @@ assert<
 
 // Add-on entries register on import and export types only.
 assert<Equal<keyof typeof SheetEntry, never>>();
-assert<Equal<keyof typeof FilmstripEntry, never>>();
+assert<Equal<keyof typeof ThumbnailsEntry, never>>();
 const snap: FluidboxSheetSnapPoint[] = [120, "50%", "content"];
 const sheetOptions: FluidboxSheetOptions<Photo> = { snapPoints: snap, dismiss: "none" };
-const filmstripOptions: FluidboxFilmstripOptions<Photo> = {
+const thumbnailsOptions: FluidboxThumbnailsOptions<Photo> = {
   render: ({ item, target }) => void (target.title = item.credit),
 };
-// @ts-expect-error the filmstrip renders; frameworks fill slots through the kit
-void ({ slots: true } satisfies FluidboxFilmstripOptions);
-void [sheetOptions, filmstripOptions];
+// @ts-expect-error the thumbnails renders; frameworks fill slots through the kit
+void ({ slots: true } satisfies FluidboxThumbnailsOptions);
+void [sheetOptions, thumbnailsOptions];
 
 // The binding kit.
 
@@ -507,7 +507,7 @@ gallery.preload(photo)();
 void gallery.load().then((loaded: boolean) => loaded);
 gallery.loading = "press";
 void gallery.setItems(photos).then((applied: boolean) => applied);
-gallery.addEventListener("sheetchange", (event) => void event.stop);
+gallery.addEventListener("sheetchange", (event) => void event.snap);
 gallery.addEventListener("valuechange", (event) => {
   const reason: FluidboxReason = event.reason;
   void [reason, event.item];
@@ -521,7 +521,7 @@ void gallery.previous();
 void gallery.zoomTo(2).then((zoomed: boolean) => zoomed);
 void gallery.zoomIn();
 void gallery.zoomOut();
-void gallery.resetZoom();
+void gallery.zoomReset();
 gallery.addEventListener("zoomchange", (event) => void event.scale);
 void gallery.close();
 void gallery.whenReady().then((ready: Fluidbox) => ready.state);
@@ -536,7 +536,7 @@ void [item.itemId, item.returns, item.trigger];
 item.addEventListener("fluidbox-preview-change", (event: FluidboxPreviewChangeEvent) => {
   void [event.detail.id, event.detail.item];
 });
-const strip: FluidboxFilmstripElement = document.createElement("fluidbox-filmstrip");
+const strip: FluidboxThumbnailsElement = document.createElement("fluidbox-thumbnails");
 strip.render = ({ target, index }) => void (target.textContent = String(index));
 const sheetElement: FluidboxSheetElement = document.createElement("fluidbox-sheet");
 sheetElement.render = ({ target }) => {

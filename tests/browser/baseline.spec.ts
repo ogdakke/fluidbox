@@ -77,7 +77,7 @@ test("current gallery motion and appearance", async ({ page, browserName }, test
   );
   await page.waitForTimeout(350);
   await page.screenshot({ path: resolve(folder, "next.png"), animations: "disabled" });
-  await page.locator('[data-fluidbox-filmstrip-item][data-index="20"]').click();
+  await page.locator('[data-fluidbox-thumbnails-item][data-index="20"]').click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 21 of 30",
@@ -124,7 +124,7 @@ test("current gallery motion and appearance", async ({ page, browserName }, test
         browser: testInfo.project.name,
         browserVersion: page.context().browser()?.version(),
         viewport: page.viewportSize(),
-        scenario: "30 DOM-backed images; open, next, filmstrip item 21, close",
+        scenario: "30 DOM-backed images; open, next, thumbnails item 21, close",
         openMs: Math.round(openMs),
         frameCount: gaps.length,
         p95FrameGapMs: sorted[Math.floor(sorted.length * 0.95)] ?? null,
@@ -168,7 +168,7 @@ test("current large gallery allocation", async ({ page }, testInfo) => {
   const allocation = await page.evaluate(() => ({
     sourceElements: document.querySelectorAll("fluidbox-item").length,
     slides: document.querySelectorAll("[data-fluidbox-slide]").length,
-    filmstripButtons: document.querySelectorAll("[data-fluidbox-filmstrip-item]").length,
+    thumbnailsButtons: document.querySelectorAll("[data-fluidbox-thumbnails-item]").length,
     domNodes: document.querySelectorAll("*").length,
   }));
   await writeFile(
@@ -260,8 +260,8 @@ test("timecoded transition diagnostic", async ({ page }, testInfo) => {
   await setPhase("next");
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(450);
-  await setPhase("filmstrip-21");
-  await page.locator('[data-fluidbox-filmstrip-item][data-index="20"]').click();
+  await setPhase("thumbnails-21");
+  await page.locator('[data-fluidbox-thumbnails-item][data-index="20"]').click();
   await page.waitForTimeout(350);
   await setPhase("closing");
   await page.keyboard.press("Escape");
@@ -398,7 +398,7 @@ test("indexed source timing and frame capture", async ({ page, browserName }, te
   await page.waitForTimeout(400);
   const openedNodes = await page.locator("*").count();
   const slides = await page.locator("[data-fluidbox-slide]").count();
-  const thumbnails = await page.locator("[data-fluidbox-filmstrip-item]").count();
+  const thumbnails = await page.locator("[data-fluidbox-thumbnails-item]").count();
   await page.keyboard.press("ArrowRight");
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",

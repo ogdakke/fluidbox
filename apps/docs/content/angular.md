@@ -20,7 +20,7 @@ import { FluidboxModule, injectFluidbox, injectFluidboxSheet } from "@ogdakke/fl
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Add `@ogdakke/fluidbox/styles.css` once, either as an import or in the `styles` array of `angular.json`. Put `FluidboxModule` in a component's `imports` to get every part, or import the directives you use one by one. The filmstrip and sheet parts load their add-ons the first time a root uses them, so there is nothing else to import for them except their stylesheets, `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`.
+Add `@ogdakke/fluidbox/styles.css` once, either as an import or in the `styles` array of `angular.json`. Put `FluidboxModule` in a component's `imports` to get every part, or import the directives you use one by one. The thumbnails and sheet parts load their add-ons the first time a root uses them, so there is nothing else to import for them except their stylesheets, `@ogdakke/fluidbox/thumbnails.css` and `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 
@@ -82,7 +82,7 @@ Without a `fluidboxViewer` template, the viewer has the default Previous, Next a
 | `[fluidboxControls]`                                                             | `FluidboxControlsComponent`                                                         | The default Previous, Next and Close buttons, for a `fluidboxViewer` template. `zoom` adds the zoom group. |
 | `button[fluidboxZoomIn]`, `button[fluidboxZoomOut]`, `button[fluidboxZoomReset]` | `FluidboxZoomInDirective`, `FluidboxZoomOutDirective`, `FluidboxZoomResetDirective` | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                                      |
 | `button[fluidboxPrevious]`, `button[fluidboxNext]`, `button[fluidboxClose]`      | `FluidboxPreviousDirective`, `FluidboxNextDirective`, `FluidboxCloseDirective`      | Run the command, with the default icon and label, and disable themselves when they can't.                  |
-| `[fluidboxFilmstrip]`                                                            | `FluidboxFilmstripDirective`                                                        | Turns on the filmstrip; on an `ng-template`, the template fills each thumbnail.                            |
+| `[fluidboxThumbnails]`                                                           | `FluidboxThumbnailsDirective`                                                       | Turns on the thumbnails; on an `ng-template`, the template fills each thumbnail.                           |
 | `ng-template[fluidboxSheet]`                                                     | `FluidboxSheetDirective`                                                            | Turns on the sheet and fills it for the active item.                                                       |
 | `button[fluidboxSheetStop]`                                                      | `FluidboxSheetStopDirective`                                                        | Moves the sheet to a stop when clicked.                                                                    |
 
@@ -92,29 +92,27 @@ Without a `fluidboxViewer` template, the viewer has the default Previous, Next a
 
 Exported as `fluidbox`: `<div fluidboxRoot #fb="fluidbox">`.
 
-| Input       | Type                                           | Default               | Purpose                                                                                                                              |
-| ----------- | ---------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `items`     | `readonly TItem[] \| FluidboxItemList<TItem>`  | `[]`                  | The gallery's items, or a list read on demand (see [Items and origins](./items-and-origins.md)).                                     |
-| `open`      | `boolean`                                      |                       | Whether the viewer is open, for `[(open)]`. It opens on `index` and closes as this changes. Leave it out to let the triggers own it. |
-| `index`     | `number`                                       |                       | The item the viewer shows, for `[(index)]`. An index out of range is ignored.                                                        |
-| `labels`    | `Partial<FluidboxLabels>`                      | English               | Your strings for the viewer and the control parts.                                                                                   |
-| `zoom`      | `false \| { step?: number; max?: number }`     | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                             |
-| `loop`      | `boolean`                                      | `false`               | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                        |
-| `renderers` | `Record<string, TemplateRef \| Type<unknown>>` | `{}`                  | Draw `custom` items, by the name in their `render`: a template or a component. See below.                                            |
-| `origins`   | `FluidboxOriginAdapter<TItem>`                 | triggers              | Finds origins for items without a mounted trigger, and `revealOrigin` scrolls one into view.                                         |
-| `loading`   | `"hover" \| "press" \| "eager"`                | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                     |
+| Input           | Type                                                        | Default               | Purpose                                                                                                                                          |
+| --------------- | ----------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `items`         | `readonly TItem[] \| FluidboxItemList<TItem>`               | `[]`                  | The gallery's items, or a list read on demand (see [Items and origins](./items-and-origins.md)).                                                 |
+| `open`          | `boolean`                                                   |                       | Whether the viewer is open, for `[(open)]`. It opens on `index` and closes as this changes. Leave it out to let the triggers own it.             |
+| `index`         | `number`                                                    |                       | The item the viewer shows, for `[(index)]`. An index out of range is ignored.                                                                    |
+| `labels`        | `Partial<FluidboxLabels>`                                   | English               | Your strings for the viewer and the control parts.                                                                                               |
+| `zoom`          | `false \| { step?: number; max?: number }`                  | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                                         |
+| `loop`          | `boolean`                                                   | `false`               | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                   |
+| `renderers`     | `Record<string, TemplateRef \| Type<unknown>>`              | `{}`                  | Draw `custom` items, by the name in their `render`: a template or a component. See below.                                                        |
+| `findTrigger`   | `(item, index) => Element \| null`                          |                       | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter). |
+| `revealTrigger` | `(item, index, { signal, phase }) => void \| Promise<void>` |                       | Brings an item's trigger into view before the viewer flies back to it.                                                                           |
+| `preload`       | `"intent" \| "press" \| "eager"`                            | `"intent"`            | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                 |
 
-| Output               | Payload                          | When                                                                                    |
-| -------------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
-| `(beforeToggle)`     | `FluidboxToggleEvent`            | Before the viewer opens or closes. `$event.preventDefault()` keeps it as it is.         |
-| `(toggle)`           | `FluidboxToggleEvent`            | The opening or closing motion starts.                                                   |
-| `(beforeItemChange)` | `FluidboxItemChangeEvent<TItem>` | Before the open viewer moves to another item. `$event.preventDefault()` keeps it still. |
-| `(itemChange)`       | `FluidboxItemChangeEvent<TItem>` | The viewer moves to an item, including the one it opens on.                             |
-| `(settle)`           | `FluidboxItemChangeEvent<TItem>` | The viewer comes to rest on an item.                                                    |
-| `(sheetChange)`      | `FluidboxSheetEvent`             | The sheet comes to rest at another stop: `$event.stop` and `$event.reason`.             |
-| `(zoomChange)`       | `FluidboxZoomEvent`              | The image on show comes to rest at another zoom: `$event.scale` and `$event.reason`.    |
-| `(openChange)`       | `boolean`                        | The viewer opens or closes, from any input. Half of `[(open)]`.                         |
-| `(indexChange)`      | `number`                         | The viewer moves to another item, opening included. Half of `[(index)]`.                |
+| Output                  | Payload                           | When                                                                                 |
+| ----------------------- | --------------------------------- | ------------------------------------------------------------------------------------ |
+| `(beforeValueChange)`   | `FluidboxValueChangeEvent<TItem>` | Before every open, move and close. `$event.cancel()` stops it.                       |
+| `(valueChangeComplete)` | `FluidboxValueChangeEvent<TItem>` | The motion of a value change settled.                                                |
+| `(sheetChange)`         | `FluidboxSheetEvent`              | The sheet comes to rest at another stop: `$event.snap` and `$event.reason`.          |
+| `(zoomChange)`          | `FluidboxZoomEvent`               | The image on show comes to rest at another zoom: `$event.scale` and `$event.reason`. |
+| `(openChange)`          | `boolean`                         | The viewer opens or closes, from any input. Half of `[(open)]`.                      |
+| `(indexChange)`         | `number`                          | The viewer moves to another item, opening included. Half of `[(index)]`.             |
 
 The events are the plain API's. See [Events](./javascript.md#events) for their fields and reasons.
 
@@ -123,7 +121,7 @@ The events are the plain API's. See [Events](./javascript.md#events) for their f
 | `state`                                                 | `Signal<FluidboxState<TItem>>` | `status`, `id`, `index`, `item`, `count`, `hasPrevious` and `hasNext`.                                                                                        |
 | `open(target?, options?)`                               | `Promise<boolean>`             | Opens an item, by the item, its index or its id, or moves to it while open. Resolves `false` when prevented. A command before the viewer exists waits for it. |
 | `close()`, `next()`, `previous()`                       | `Promise<boolean>`             | The other commands. Each takes `{ signal }` too.                                                                                                              |
-| `zoomTo(scale)`, `zoomIn()`, `zoomOut()`, `resetZoom()` | `Promise<boolean>`             | Zoom the image on show. See [Zoom](./patterns/zoom.md).                                                                                                       |
+| `zoomTo(scale)`, `zoomIn()`, `zoomOut()`, `zoomReset()` | `Promise<boolean>`             | Zoom the image on show. See [Zoom](./patterns/zoom.md).                                                                                                       |
 | `setItems(items)`                                       | `Promise<boolean>`             | Replaces the items, as a new `[items]` does.                                                                                                                  |
 | `preload(target)`                                       | `() => void`                   | Starts loading an item a press is likely to open. Call the result to let go.                                                                                  |
 | `load()`                                                | `Promise<boolean>`             | Loads the viewer's code now. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                               |
@@ -202,9 +200,9 @@ A `(click)` on the same button runs first; `$event.preventDefault()` stops the c
 </ng-template>
 ```
 
-### `fluidboxFilmstrip`
+### `fluidboxThumbnails`
 
-No inputs. `<ng-container fluidboxFilmstrip />` turns on the strip with its default thumbnails. On an `ng-template`, the template fills each thumbnail button, with the context `let-item let-index="index"`. The strip marks the selected button `data-fluidbox-selected`, so your thumbnail tracks nothing itself.
+No inputs. `<ng-container fluidboxThumbnails />` turns on the strip with its default thumbnails. On an `ng-template`, the template fills each thumbnail button, with the context `let-item let-index="index"`. The strip marks the selected button `data-fluidbox-selected`, so your thumbnail tracks nothing itself.
 
 ### `fluidboxSheet` and `fluidboxSheetStop`
 
@@ -213,15 +211,15 @@ No inputs. `<ng-container fluidboxFilmstrip />` turns on the strip with its defa
 | `snapPoints` | `readonly FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
 | `dismiss`    | `"flight" \| "scroll" \| "none"`    | `"flight"`           | What a swipe down on the photo does with the sheet down. |
 
-The template renders into the sheet, the viewer's `<section data-fluidbox-sheet>` named by `labels.sheet`, for the active item, with the context `let-item let-index="index"` (`FluidboxItemContext`). It renders again when the item changes. `(sheetChange)` on the root, and the `stop` signal of `injectFluidboxSheet()`, follow its stop. `<button fluidboxSheetStop="1">`, in the viewer or in the sheet, moves the sheet to stop 1, and back to 0 when it is there. An `ng-template` has no attributes to pass on, so style the sheet through `[data-fluidbox-sheet]`, or put your class on an element in the template. [Filmstrip and sheet](./filmstrip-and-sheet.md) has the details of both add-ons.
+The template renders into the sheet, the viewer's `<section data-fluidbox-sheet>` named by `labels.sheet`, for the active item, with the context `let-item let-index="index"` (`FluidboxItemContext`). It renders again when the item changes. `(sheetChange)` on the root, and the `stop` signal of `injectFluidboxSheet()`, follow its stop. `<button fluidboxSheetStop="1">`, in the viewer or in the sheet, moves the sheet to stop 1, and back to 0 when it is there. An `ng-template` has no attributes to pass on, so style the sheet through `[data-fluidbox-sheet]`, or put your class on an element in the template. [Thumbnails and sheet](./thumbnails-and-sheet.md) has the details of both add-ons.
 
 ## Inject functions
 
-Call them in an injection context (a field initializer or constructor) of a component inside the root's element, including the viewer, renderer, filmstrip and sheet templates.
+Call them in an injection context (a field initializer or constructor) of a component inside the root's element, including the viewer, renderer, thumbnails and sheet templates.
 
 | Function                 | Returns                      | Purpose                                                                                                                                                    |
 | ------------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `injectFluidbox()`       | `Signal<FluidboxApi<TItem>>` | The state of the root above, with `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `resetZoom`, `setItems`, `preload` and `load` on it. |
+| `injectFluidbox()`       | `Signal<FluidboxApi<TItem>>` | The state of the root above, with `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `zoomReset`, `setItems`, `preload` and `load` on it. |
 | `injectFluidbox(select)` | `Signal<T>`                  | What `select` picks from it, such as `({ index }) => index`.                                                                                               |
 | `injectFluidboxSheet()`  | `FluidboxSheetApi`           | `{ stop, set }`: the stop the sheet rests at, as a signal that follows `sheetchange`, and `set(stop)` to move it.                                          |
 
@@ -247,7 +245,7 @@ export class Counter {
 
 ### Types
 
-The entry exports `FluidboxApi`, `FluidboxSheetApi`, `FluidboxItemContext` (the `{ item, index }` context of the sheet, filmstrip and renderer templates), `FluidboxContent` and `FluidboxTriggerPreview`, and re-exports the item, state and event types and classes of `@ogdakke/fluidbox`. `TItem` comes from `[items]` on the root and from the inputs of each part; pass it to `injectFluidbox<Photo>()` for your own item type.
+The entry exports `FluidboxApi`, `FluidboxSheetApi`, `FluidboxItemContext` (the `{ item, index }` context of the sheet, thumbnails and renderer templates), `FluidboxContent` and `FluidboxTriggerPreview`, and re-exports the item, state and event types and classes of `@ogdakke/fluidbox`. `TItem` comes from `[items]` on the root and from the inputs of each part; pass it to `injectFluidbox<Photo>()` for your own item type.
 
 ## Patterns
 
@@ -259,7 +257,7 @@ The entry exports `FluidboxApi`, `FluidboxSheetApi`, `FluidboxItemContext` (the 
 | [Custom content](./patterns/renderers.md)          | `[renderers]="{ note: Note }"` with your component.                                                                                                        |
 | [Programmatic control](./patterns/programmatic.md) | `#fb="fluidbox"`, `fb.open(2)`, `fb.state()`, and `(beforeItemChange)` with `$event.preventDefault()`.                                                     |
 | [Zoom](./patterns/zoom.md)                         | `[zoom]="{ step: 3, max: 6 }"` or `[zoom]="false"`.                                                                                                        |
-| [Filmstrip](./patterns/filmstrip.md)               | `<ng-container fluidboxFilmstrip />`, or `<ng-template fluidboxFilmstrip let-index="index">`.                                                              |
+| [Thumbnails](./patterns/thumbnails.md)             | `<ng-container fluidboxThumbnails />`, or `<ng-template fluidboxThumbnails let-index="index">`.                                                            |
 | [Sheet](./patterns/sheet.md)                       | `<ng-template fluidboxSheet [snapPoints]>`, `injectFluidboxSheet()` and `fluidboxSheetStop`.                                                               |
 | [Headless controls](./patterns/headless.md)        | Your own component in `fluidboxViewer`, using `injectFluidbox()`.                                                                                          |
 | [Right to left](./patterns/rtl.md)                 | `[labels]` on the root, inside a `dir="rtl"` element.                                                                                                      |
@@ -267,13 +265,13 @@ The entry exports `FluidboxApi`, `FluidboxSheetApi`, `FluidboxItemContext` (the 
 
 ## Angular notes
 
-**When the viewer exists.** The root makes the viewer once, right after the first change detection pass, once every part inside has rendered. With a filmstrip or sheet, it also waits for that add-on to load. It lives as long as the root. Commands made before then wait for it and run once it exists.
+**When the viewer exists.** The root makes the viewer once, right after the first change detection pass, once every part inside has rendered. With thumbnails or sheet, it also waits for that add-on to load. It lives as long as the root. Commands made before then wait for it and run once it exists.
 
-**Options apply in place.** The root passes new `labels` or `zoom` to the viewer through `fluidbox.update()`, so an open viewer stays open. The same goes for a `fluidboxViewer`, `fluidboxFilmstrip` or `fluidboxSheet` that comes, goes or changes its inputs. Each part hands over a renderer that stays the same for its life, so only what changed is drawn again. The root reads `origins`, `renderers` and the outputs when it uses them. New `items` go through `setItems`, and an open viewer stays on the same item id if the new list still has it.
+**Options apply in place.** The root passes new `labels` or `zoom` to the viewer through `fluidbox.update()`, so an open viewer stays open. The same goes for a `fluidboxViewer`, `fluidboxThumbnails` or `fluidboxSheet` that comes, goes or changes its inputs. Each part hands over a renderer that stays the same for its life, so only what changed is drawn again. The root reads `origins`, `renderers` and the outputs when it uses them. New `items` go through `setItems`, and an open viewer stays on the same item id if the new list still has it.
 
 **Change detection.** The viewer listens to pointer and key events outside the Angular zone, so gestures and animation never trigger change detection. Outputs, state updates and template mounts come back into the zone. `state`, `preview` and the inject functions are signals, so `OnPush` components and zoneless apps update without extra work.
 
-**DI reaches custom content.** Viewer, filmstrip and sheet templates render as embedded views where they are declared, and renderers as views of the root, so their components inject from the surrounding tree, as the [Custom content](./patterns/renderers.md) example does with a theme token.
+**DI reaches custom content.** Viewer, thumbnails and sheet templates render as embedded views where they are declared, and renderers as views of the root, so their components inject from the surrounding tree, as the [Custom content](./patterns/renderers.md) example does with a theme token.
 
 **Stopping an open.** The trigger adds its listeners after the template's own, so a `(click)` on the same element runs first and `$event.preventDefault()` stops the open. Prevented in `(pointerdown)`, it only skips loading the item early.
 

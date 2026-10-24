@@ -1,21 +1,21 @@
-export interface FilmstripLayout {
+export interface ThumbnailsLayout {
   readonly size: number;
   readonly step: number;
   readonly visibleCount: number;
-  /** The strip runs as a column, from --fluidbox-filmstrip-axis: y. */
+  /** The strip runs as a column, from --fluidbox-thumbnails-axis: y. */
   readonly vertical: boolean;
 }
 
 /** The input that moved the strip. */
-export type FilmstripInput = "pointer" | "wheel" | "keyboard";
+export type ThumbnailsInput = "pointer" | "wheel" | "keyboard";
 
-interface FilmstripRuntimeOptions {
+interface ThumbnailsRuntimeOptions {
   readonly element: HTMLElement;
   readonly scroller: HTMLElement;
   readonly count: number;
   readonly index: number;
-  readonly onSelect: (index: number, settled: boolean, input: FilmstripInput) => void;
-  readonly onWindowChange: (center: number, layout: FilmstripLayout, force: boolean) => void;
+  readonly onSelect: (index: number, settled: boolean, input: ThumbnailsInput) => void;
+  readonly onWindowChange: (center: number, layout: ThumbnailsLayout, force: boolean) => void;
   /** The axis changed: mark the scroller, so its CSS lays it out that way. */
   readonly onAxisChange: (vertical: boolean) => void;
   readonly deferActivation?: boolean;
@@ -25,14 +25,14 @@ interface FilmstripRuntimeOptions {
 
 type ScrollMode = "idle" | "user";
 
-/** Native filmstrip scroll ownership shared by framework renderers. */
-export class FilmstripRuntime {
+/** Native thumbnails scroll ownership shared by framework renderers. */
+export class ThumbnailsRuntime {
   readonly #element: HTMLElement;
   readonly #scroller: HTMLElement;
   readonly #count: number;
-  readonly #onSelect: FilmstripRuntimeOptions["onSelect"];
-  readonly #onWindowChange: FilmstripRuntimeOptions["onWindowChange"];
-  readonly #onAxisChange: FilmstripRuntimeOptions["onAxisChange"];
+  readonly #onSelect: ThumbnailsRuntimeOptions["onSelect"];
+  readonly #onWindowChange: ThumbnailsRuntimeOptions["onWindowChange"];
+  readonly #onAxisChange: ThumbnailsRuntimeOptions["onAxisChange"];
   readonly #loops: () => boolean;
   readonly #controller = new AbortController();
   readonly #observer: ResizeObserver;
@@ -44,7 +44,7 @@ export class FilmstripRuntime {
   #vertical = false;
   /** -1 for a right-to-left row, where `scrollLeft` counts down from 0. */
   #sign = 1;
-  #input: FilmstripInput = "pointer";
+  #input: ThumbnailsInput = "pointer";
   #mode: ScrollMode = "idle";
   #touching = false;
   #userScrolled = false;
@@ -58,7 +58,7 @@ export class FilmstripRuntime {
   #settleFrame = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(options: FilmstripRuntimeOptions) {
+  constructor(options: ThumbnailsRuntimeOptions) {
     this.#element = options.element;
     this.#scroller = options.scroller;
     this.#count = options.count;
@@ -131,7 +131,7 @@ export class FilmstripRuntime {
     return true;
   }
 
-  choose(index: number, settled = true, input: FilmstripInput = "pointer") {
+  choose(index: number, settled = true, input: ThumbnailsInput = "pointer") {
     this.#index = index;
     this.#publishWindow(index);
     this.#center(index);
@@ -206,7 +206,7 @@ export class FilmstripRuntime {
   #readGeometry() {
     const elementStyle = getComputedStyle(this.#element);
     // Read from CSS, so a media query can turn the strip into a column.
-    const vertical = elementStyle.getPropertyValue("--fluidbox-filmstrip-axis").trim() === "y";
+    const vertical = elementStyle.getPropertyValue("--fluidbox-thumbnails-axis").trim() === "y";
     if (vertical !== this.#vertical) {
       this.#vertical = vertical;
       this.#onAxisChange(vertical);
@@ -214,7 +214,7 @@ export class FilmstripRuntime {
     const scrollerStyle = getComputedStyle(this.#scroller);
     this.#sign = !vertical && scrollerStyle.direction === "rtl" ? -1 : 1;
     this.#viewportWidth = this.#extent;
-    this.#size = parseFloat(elementStyle.getPropertyValue("--fluidbox-filmstrip-item-size")) || 52;
+    this.#size = parseFloat(elementStyle.getPropertyValue("--fluidbox-thumbnails-item-size")) || 52;
     const gap = vertical ? scrollerStyle.rowGap : scrollerStyle.columnGap;
     this.#step = this.#size + (parseFloat(gap) || 0);
     this.#padding =

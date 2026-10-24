@@ -4,7 +4,7 @@
  *
  * Hooks: `[data-test=trigger]` the cover, `[data-test=count]` the overlay,
  * `[data-test=layer]` its frame layer, `[data-test=custom-viewer]` the custom
- * viewer content while the viewer part is mounted. Every one has a filmstrip,
+ * viewer content while the viewer part is mounted. Every one has thumbnails,
  * which a redraw of the viewer's layer must leave in place.
  */
 import type { FluidboxLabels } from "@ogdakke/fluidbox";

@@ -41,7 +41,7 @@ export function createViewerPortal(ownerDocument: Document, label: string): View
   dialog.setAttribute("aria-label", label);
   const backdrop = part("div", "backdrop");
   const container = part("div", "container", dialog);
-  const overlay = part("div", "overlay", backdrop, container);
+  const overlay = part("div", "viewer", backdrop, container);
   return { overlay, container, backdrop, dialog, frame, media, status, portalTarget, addons };
 }
 
@@ -77,7 +77,7 @@ export function mountViewerPortal(overlay: HTMLElement) {
 
 /** Show a layer the viewer adds to the body, as a flight, above a viewer in the top layer. */
 export function raiseWithViewer(layer: HTMLElement) {
-  raise(layer, !!layer.ownerDocument.querySelector("[data-fluidbox-overlay][popover]"));
+  raise(layer, !!layer.ownerDocument.querySelector("[data-fluidbox-viewer][popover]"));
 }
 
 function raise(element: HTMLElement, topLayer: boolean) {

@@ -11,7 +11,7 @@ import {
 import type { FluidboxItem, FluidboxSlide } from "@ogdakke/fluidbox";
 
 /**
- * What the sheet's and the filmstrip's templates get: `{ item, index }`, with
+ * What the sheet's and the thumbnails' templates get: `{ item, index }`, with
  * the item also as `$implicit`, so `let-item let-index="index"`.
  */
 export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {

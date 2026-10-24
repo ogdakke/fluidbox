@@ -6,7 +6,7 @@ for (const subpath of [
   "/solid",
   "/vue",
   "/angular",
-  "/filmstrip",
+  "/thumbnails",
   "/sheet",
   "/kit",
   "/hover-zoom",

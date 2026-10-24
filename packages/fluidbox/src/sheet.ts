@@ -99,10 +99,10 @@ export function createSheet(
   };
   return {
     handle: {
-      get stop() {
+      get snap() {
         return stop;
       },
-      set(next, setOptions) {
+      setSnap(next, setOptions) {
         instance?.set(next, setOptions?.animate ?? true, "api");
       },
     },
@@ -187,7 +187,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   ) {
     this.#context = context;
     this.#dialog = context.dialog;
-    this.#overlay = this.#dialog.closest<HTMLElement>("[data-fluidbox-overlay]") ?? this.#dialog;
+    this.#overlay = this.#dialog.closest<HTMLElement>("[data-fluidbox-viewer]") ?? this.#dialog;
     this.#source = context.source;
     this.#options = options;
     this.#dismiss = options.dismiss ?? "flight";
@@ -666,12 +666,12 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   };
 
   #placeMarkers(offsets: number[]) {
-    const markers = [...this.#scroller.querySelectorAll<HTMLElement>("[data-fluidbox-sheet-snap]")];
+    const markers = [...this.#scroller.querySelectorAll<HTMLElement>("[data-fluidbox-sheet-mark]")];
     for (const [index, offset] of offsets.entries()) {
       let marker = markers[index];
       if (!marker) {
         marker = this.#dialog.ownerDocument.createElement("div");
-        marker.dataset.fluidboxSheetSnap = "";
+        marker.dataset.fluidboxSheetMark = "";
         this.#scroller.append(marker);
       }
       marker.style.top = `${offset}px`;
@@ -968,7 +968,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   }
 
   #syncTriggers(stop = this.#stop) {
-    for (const trigger of this.#dialog.querySelectorAll("[data-fluidbox-sheet-stop]")) {
+    for (const trigger of this.#dialog.querySelectorAll("[data-fluidbox-sheet-snap]")) {
       trigger.setAttribute("aria-expanded", String(stop > 0));
     }
   }
@@ -1102,9 +1102,9 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
 
   #onClick = (event: MouseEvent) => {
     const target = event.target instanceof Element ? event.target : null;
-    const trigger = target?.closest<HTMLElement>("[data-fluidbox-sheet-stop]");
+    const trigger = target?.closest<HTMLElement>("[data-fluidbox-sheet-snap]");
     if (trigger && this.#dialog.contains(trigger)) {
-      const stop = Number(trigger.dataset.fluidboxSheetStop);
+      const stop = Number(trigger.dataset.fluidboxSheetSnap);
       if (!Number.isInteger(stop)) return;
       event.preventDefault();
       event.stopPropagation();

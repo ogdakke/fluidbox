@@ -7,7 +7,7 @@ description: The fluidbox custom elements, with every element, attribute, proper
 
 # Custom elements
 
-`@ogdakke/fluidbox/elements` registers `<fluidbox-gallery>`, `<fluidbox-item>`, `<fluidbox-filmstrip>` and `<fluidbox-sheet>`. You write the gallery as markup. The gallery reads it into items and owns one fluidbox for them. The elements need no framework, and work inside any framework that renders plain HTML.
+`@ogdakke/fluidbox/elements` registers `<fluidbox-gallery>`, `<fluidbox-item>`, `<fluidbox-thumbnails>` and `<fluidbox-sheet>`. You write the gallery as markup. The gallery reads it into items and owns one fluidbox for them. The elements need no framework, and work inside any framework that renders plain HTML.
 
 ## Install
 
@@ -55,13 +55,13 @@ The gallery adds Previous, Next and Close buttons to the viewer unless you give 
 
 ## Elements
 
-| Element                | Class                      | Role                                                                                                                               |
-| ---------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `<fluidbox-gallery>`   | `FluidboxGalleryElement`   | Owns one fluidbox for its `<fluidbox-item>` children, or for the `items` you set.                                                  |
-| `<fluidbox-item>`      | `FluidboxItemElement`      | One item: its trigger and its content. A direct child of the gallery.                                                              |
-| `<fluidbox-filmstrip>` | `FluidboxFilmstripElement` | Hidden. As a direct child of the gallery, it turns the filmstrip on.                                                               |
-| `<fluidbox-sheet>`     | `FluidboxSheetElement`     | Hidden. As a direct child of the gallery, it turns the sheet on and holds its content.                                             |
-| `<fluidbox-controls>`  | `zoom`                     | Inside `<template slot="viewer">`, stands for the default Previous, Next and Close buttons, and with `zoom` the zoom controls too. |
+| Element                 | Class                       | Role                                                                                                                               |
+| ----------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `<fluidbox-gallery>`    | `FluidboxGalleryElement`    | Owns one fluidbox for its `<fluidbox-item>` children, or for the `items` you set.                                                  |
+| `<fluidbox-item>`       | `FluidboxItemElement`       | One item: its trigger and its content. A direct child of the gallery.                                                              |
+| `<fluidbox-thumbnails>` | `FluidboxThumbnailsElement` | Hidden. As a direct child of the gallery, it turns the thumbnails on.                                                              |
+| `<fluidbox-sheet>`      | `FluidboxSheetElement`      | Hidden. As a direct child of the gallery, it turns the sheet on and holds its content.                                             |
+| `<fluidbox-controls>`   | `zoom`                      | Inside `<template slot="viewer">`, stands for the default Previous, Next and Close buttons, and with `zoom` the zoom controls too. |
 
 `@ogdakke/fluidbox/elements` exports the four classes. Importing it adds the tags to `HTMLElementTagNameMap`, so `querySelector("fluidbox-gallery")` is typed, and `fluidbox-preview-change` to `HTMLElementEventMap`.
 
@@ -105,29 +105,30 @@ The gallery reads the boolean attributes of a `<video>` as HTML does, so an attr
 
 ## `<fluidbox-gallery>`
 
-| Attribute   | What it does                                                                                                                                                                    |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nozoom`    | Turns zoom off.                                                                                                                                                                 |
-| `zoom-step` | The scale of a click or double-tap zoom. Default `2`.                                                                                                                           |
-| `zoom-max`  | The largest zoom scale. Default `4`.                                                                                                                                            |
-| `loop`      | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                                                                   |
-| `loading`   | When the viewer's code loads: `hover` (the default), `press` or `eager`. The `loading` property reflects it. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
-| `open`      | Opens the viewer on `index` as it is added, and closes it as it is removed. Leave it off to let the triggers own the viewer.                                                    |
-| `index`     | The item the viewer shows while `open` is set, as an index. Changing it moves the open viewer. An index out of range is ignored.                                                |
+| Attribute   | What it does                                                                                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nozoom`    | Turns zoom off.                                                                                                                                                                  |
+| `zoom-step` | The scale of a click or double-tap zoom. Default `2`.                                                                                                                            |
+| `zoom-max`  | The largest zoom scale. Default `4`.                                                                                                                                             |
+| `loop`      | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                                                   |
+| `preload`   | When the viewer's code loads: `intent` (the default), `press` or `eager`. The `loading` property reflects it. See [Loading the viewer](./getting-started.md#loading-the-viewer). |
+| `open`      | Opens the viewer on `index` as it is added, and closes it as it is removed. Leave it off to let the triggers own the viewer.                                                     |
+| `index`     | The item the viewer shows while `open` is set, as an index. Changing it moves the open viewer. An index out of range is ignored.                                                 |
 
 The properties are the [`createFluidbox` options](./javascript.md#createfluidboxoptions) the markup can't say, and the [fluidbox's](./javascript.md#the-fluidbox) state and handles:
 
-| Property    | Type                                    | What it is                                                                                                                         |
-| ----------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `items`     | `FluidboxItems \| null`                 | Items to use instead of the `<fluidbox-item>` children: an array or a lazy list (see [Items and origins](./items-and-origins.md)). |
-| `renderers` | `Record<string, FluidboxRenderer>`      | Draw `custom` items of `items`, by the name in their `render`. Read when a slide mounts.                                           |
-| `viewer`    | `FluidboxViewerRenderer \| undefined`   | Your own viewer content. Wins over `<template slot="viewer">` and the default controls.                                            |
-| `origins`   | `FluidboxOriginAdapter \| undefined`    | Origins for items with no trigger in the gallery, and `revealOrigin` to scroll one into view.                                      |
-| `zoom`      | `false \| { step?, max? } \| undefined` | Zoom options, or `false`. Wins over `nozoom` and the zoom attributes.                                                              |
-| `labels`    | `Partial<FluidboxLabels> \| undefined`  | Your strings for the viewer. See [Labels](./api.md#labels).                                                                        |
-| `state`     | `FluidboxState`                         | The viewer's state, or a closed state before the gallery is ready.                                                                 |
-| `sheet`     | `FluidboxSheet \| null`                 | The sheet, while a `<fluidbox-sheet>` turns it on.                                                                                 |
-| `fluidbox`  | `Fluidbox \| null`                      | The fluidbox behind the gallery, or `null` before it is ready.                                                                     |
+| Property        | Type                                                             | What it is                                                                                                                         |
+| --------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `items`         | `FluidboxItems \| null`                                          | Items to use instead of the `<fluidbox-item>` children: an array or a lazy list (see [Items and origins](./items-and-origins.md)). |
+| `renderers`     | `Record<string, FluidboxRenderer>`                               | Draw `custom` items of `items`, by the name in their `render`. Read when a slide mounts.                                           |
+| `viewer`        | `FluidboxViewerRenderer \| undefined`                            | Your own viewer content. Wins over `<template slot="viewer">` and the default controls.                                            |
+| `findTrigger`   | `((item, index) => Element \| null) \| undefined`                | Finds the trigger of an item with no trigger in the gallery.                                                                       |
+| `revealTrigger` | `((item, index, context) => void \| Promise<void>) \| undefined` | Brings an item's trigger into view.                                                                                                |
+| `zoom`          | `false \| { step?, max? } \| undefined`                          | Zoom options, or `false`. Wins over `nozoom` and the zoom attributes.                                                              |
+| `labels`        | `Partial<FluidboxLabels> \| undefined`                           | Your strings for the viewer. See [Labels](./api.md#labels).                                                                        |
+| `state`         | `FluidboxState`                                                  | The viewer's state, or a closed state before the gallery is ready.                                                                 |
+| `sheet`         | `FluidboxSheet \| null`                                          | The sheet, while a `<fluidbox-sheet>` turns it on.                                                                                 |
+| `fluidbox`      | `Fluidbox \| null`                                               | The fluidbox behind the gallery, or `null` before it is ready.                                                                     |
 
 | Method                                                            | Returns             | What it does                                                                           |
 | ----------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------- |
@@ -135,7 +136,7 @@ The properties are the [`createFluidbox` options](./javascript.md#createfluidbox
 | `close(options?)`                                                 | `Promise<boolean>`  | Closes the viewer.                                                                     |
 | `next(options?)`                                                  | `Promise<boolean>`  | Next item.                                                                             |
 | `previous(options?)`                                              | `Promise<boolean>`  | Previous item.                                                                         |
-| `zoomTo(scale, options?)`, `zoomIn()`, `zoomOut()`, `resetZoom()` | `Promise<boolean>`  | Zoom the image on show. See [Zoom](./patterns/zoom.md).                                |
+| `zoomTo(scale, options?)`, `zoomIn()`, `zoomOut()`, `zoomReset()` | `Promise<boolean>`  | Zoom the image on show. See [Zoom](./patterns/zoom.md).                                |
 | `setItems(items)`                                                 | `Promise<boolean>`  | Replaces the items, as the `items` property does, and resolves once they apply.        |
 | `preload(target)`                                                 | `() => void`        | Starts loading an item a press is likely to open. Call the result to let go.           |
 | `load()`                                                          | `Promise<boolean>`  | Loads the viewer's code now, once the gallery has read its items.                      |
@@ -155,7 +156,7 @@ gallery.subscribe((state) => console.log(state.status, state.index));
 await gallery.open("fjord");
 ```
 
-The listeners are typed through the gallery's event map. `@ogdakke/fluidbox` exports the event classes, `FluidboxItemChangeEvent`, `FluidboxSheetEvent` and `FluidboxToggleEvent`.
+The listeners are typed through the gallery's event map. `@ogdakke/fluidbox` exports the event classes, `FluidboxValueChangeEvent`, `FluidboxSheetEvent` and `FluidboxZoomEvent`.
 
 ## Markers
 
@@ -164,9 +165,9 @@ The listeners are typed through the gallery's event map. `@ogdakke/fluidbox` exp
 | `data-fluidbox-origin`                                                | an element inside a trigger               | The flight starts and ends on this element instead of the trigger's image.                                                        |
 | `data-fluidbox-thumbnail-overlay`                                     | an element inside a trigger               | A thumbnail overlay, one per trigger. It stays on the page and gets `--fluidbox-closed`. `="travel"` makes it fly with the photo. |
 | `data-fluidbox-frame-layer`                                           | a travelling overlay, or an element in it | Moves into the flying frame for the flight and scales with it, as a scrim does.                                                   |
-| `data-fluidbox-item-id="id"`                                          | any element in a gallery with `items` set | Makes the element a trigger for that item.                                                                                        |
+| `data-fluidbox-value="id"`                                            | any element in a gallery with `items` set | Makes the element a trigger for that item.                                                                                        |
 | `data-fluidbox-close`, `data-fluidbox-previous`, `data-fluidbox-next` | a button in the viewer content            | Runs that command, with the default control styling. Previous and Next are disabled at the ends, Close while closed.              |
-| `data-fluidbox-sheet-stop="N"`                                        | a button in the viewer                    | Moves the sheet to stop `N`.                                                                                                      |
+| `data-fluidbox-sheet-snap="N"`                                        | a button in the viewer                    | Moves the sheet to stop `N`.                                                                                                      |
 
 Each trigger also gets `data-fluidbox-trigger` and `aria-haspopup="dialog"`. Make the `slot="trigger"` element a `<button>` or an `<a href>` ([A link as the trigger](./getting-started.md#a-link-as-the-trigger)); any other element needs its own `role` and `tabindex`, and warns in development without them. The trigger's default styles use `:where()`, so your own classes win.
 
@@ -183,24 +184,24 @@ The gallery fills the viewer's layer with the first of these that exists:
   <!-- items -->
   <template slot="viewer">
     <fluidbox-controls></fluidbox-controls>
-    <button type="button" data-fluidbox-sheet-stop="1">Details</button>
+    <button type="button" data-fluidbox-sheet-snap="1">Details</button>
   </template>
 </fluidbox-gallery>
 ```
 
-## Filmstrip and sheet
+## Thumbnails and sheet
 
-A `<fluidbox-filmstrip>` child turns the filmstrip on, and a `<fluidbox-sheet>` child the sheet. The gallery loads their add-on code itself, so you don't import `@ogdakke/fluidbox/filmstrip` or `/sheet`. Each still needs its stylesheet, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
+A `<fluidbox-thumbnails>` child turns the thumbnails on, and a `<fluidbox-sheet>` child the sheet. The gallery loads their add-on code itself, so you don't import `@ogdakke/fluidbox/thumbnails` or `/sheet`. Each still needs its stylesheet, `@ogdakke/fluidbox/thumbnails.css` or `@ogdakke/fluidbox/sheet.css`.
 
 | `<fluidbox-sheet>` attribute | What it does                                                                           |
 | ---------------------------- | -------------------------------------------------------------------------------------- |
 | `snap-points`                | The stops above rest, lowest first: `"40% 90%"`, pixels such as `"240"`, or `content`. |
-| `dismiss`                    | `flight`, `scroll` or `none`. See [Stops](./filmstrip-and-sheet.md#stops).             |
+| `dismiss`                    | `flight`, `scroll` or `none`. See [Stops](./thumbnails-and-sheet.md#stops).            |
 
-The sheet shows the active item's `<template slot="sheet">`, else the `<template>` inside `<fluidbox-sheet>`. Set the sheet element's `render` property to draw it yourself, and the filmstrip element's `render` to fill each thumbnail button. Both are [renderers](./media.md#custom) that get `{ item, index, target, signal }`.
+The sheet shows the active item's `<template slot="sheet">`, else the `<template>` inside `<fluidbox-sheet>`. Set the sheet element's `render` property to draw it yourself, and the thumbnails element's `render` to fill each thumbnail button. Both are [renderers](./media.md#custom) that get `{ item, index, target, signal }`.
 
 ```ts
-const strip = document.querySelector("fluidbox-filmstrip")!;
+const strip = document.querySelector("fluidbox-thumbnails")!;
 strip.render = ({ index, target }) => {
   target.textContent = String(index + 1);
 };
@@ -216,8 +217,8 @@ strip.render = ({ index, target }) => {
 | [Custom content](./patterns/renderers.md)          | Any element in the content template, or `gallery.items` with `gallery.renderers`.                                |
 | [Programmatic control](./patterns/programmatic.md) | `gallery.open(2)`, `gallery.subscribe()`, and `beforeitemchange` with `preventDefault()`.                        |
 | [Zoom](./patterns/zoom.md)                         | `zoom-step`, `zoom-max` and `nozoom`, or the `zoom` property.                                                    |
-| [Filmstrip](./patterns/filmstrip.md)               | A `<fluidbox-filmstrip>` child, with a `render` of your own.                                                     |
-| [Sheet](./patterns/sheet.md)                       | A `<fluidbox-sheet snap-points>` child, and a `data-fluidbox-sheet-stop` button in `<template slot="viewer">`.   |
+| [Thumbnails](./patterns/thumbnails.md)             | A `<fluidbox-thumbnails>` child, with a `render` of your own.                                                    |
+| [Sheet](./patterns/sheet.md)                       | A `<fluidbox-sheet snap-points>` child, and a `data-fluidbox-sheet-snap` button in `<template slot="viewer">`.   |
 | [Headless controls](./patterns/headless.md)        | `gallery.viewer`, or `<template slot="viewer">`.                                                                 |
 | [Right to left](./patterns/rtl.md)                 | A `dir="rtl"` ancestor, and the `labels` property.                                                               |
 | [Photo in the address](./patterns/url.md)          | The `open` and `index` attributes, set from `?photo=` and from `toggle` and `itemchange`.                        |
@@ -226,7 +227,7 @@ strip.render = ({ index, target }) => {
 
 **Markup changes are picked up.** The gallery watches its children. Adding or removing items, or changing an item's `item-id`, `returns`, `placeholder`, `aria-label` or `slot`, re-reads the items on the next microtask. An open viewer stays on the same item id if it is still there. The content inside a trigger is yours. Swapping its picture, as an album cover does, changes nothing in the gallery. The gallery reads the trigger's thumbnail when it reads the item, and reads a `<template slot="content">` when it re-reads the items.
 
-**Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step`, `zoom-max` or `loading`, adding or removing a `<fluidbox-filmstrip>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
+**Options change live.** Setting `viewer`, `zoom` or `labels`, changing `nozoom`, `zoom-step`, `zoom-max` or `preload`, adding or removing a `<fluidbox-thumbnails>` or `<fluidbox-sheet>`, and changing the sheet's attributes or either element's `render` update the viewer through [`update`](./javascript.md#update), without closing it. The gallery keeps one fluidbox for as long as it is connected.
 
 **Focus.** After a close whose trigger is gone, the gallery focuses itself, so focus doesn't fall to the page. For that it sets `tabindex="-1"` on itself, unless it already has one.
 

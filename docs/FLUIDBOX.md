@@ -28,7 +28,7 @@ Every `<fluidbox-item>` requires a stable `item-id`, one trigger, and one inert 
       </picture>
     </template>
   </fluidbox-item>
-  <fluidbox-filmstrip></fluidbox-filmstrip>
+  <fluidbox-thumbnails></fluidbox-thumbnails>
 </fluidbox-gallery>
 ```
 
@@ -40,14 +40,14 @@ slides during a swipe. The full image only covers it after decoding.
 
 ## Parts
 
-The main viewer parts have data selectors. The runtime does not generate class names. The body-level overlay and flight layer are separate from `fluidbox-item`, so selectors for open viewer parts should start at `[data-fluidbox-overlay]` or `[data-fluidbox-flight]`, not at the host element.
+The main viewer parts have data selectors. The runtime does not generate class names. The body-level overlay and flight layer are separate from `fluidbox-item`, so selectors for open viewer parts should start at `[data-fluidbox-viewer]` or `[data-fluidbox-flight]`, not at the host element.
 
 | Selector                             | Part                                             |
 | ------------------------------------ | ------------------------------------------------ |
 | `[data-fluidbox-trigger]`            | Element that opens the lightbox                  |
 | `[data-fluidbox-preview]`            | Optional preview box used for handoff geometry   |
 | `[data-fluidbox-target]`             | Preferred handoff target inside a custom preview |
-| `[data-fluidbox-overlay]`            | Body-level portal root                           |
+| `[data-fluidbox-viewer]`             | Body-level portal root                           |
 | `[data-fluidbox-container]`          | Gesture and layout container                     |
 | `[data-fluidbox-backdrop]`           | Modal backdrop                                   |
 | `[data-fluidbox-dialog]`             | Accessible dialog                                |
@@ -59,9 +59,9 @@ The main viewer parts have data selectors. The runtime does not generate class n
 | `[data-fluidbox-content]`            | Arbitrary standalone content wrapper             |
 | `[data-fluidbox-item-content]`       | Arbitrary gallery item                           |
 | `[data-fluidbox-close]`              | Close control                                    |
-| `[data-fluidbox-filmstrip]`          | Filmstrip root                                   |
-| `[data-fluidbox-filmstrip-scroll]`   | Filmstrip scroller                               |
-| `[data-fluidbox-filmstrip-item]`     | Filmstrip option                                 |
+| `[data-fluidbox-thumbnails]`         | Thumbnails root                                  |
+| `[data-fluidbox-thumbnails-scroll]`  | Thumbnails scroller                              |
+| `[data-fluidbox-thumbnails-item]`    | Thumbnails option                                |
 | `[data-fluidbox-transition-layer]`   | Authored content that travels with an item       |
 | `[data-fluidbox-transition-content]` | Portalled transition content plane               |
 
@@ -70,7 +70,7 @@ The runtime also marks zoom, error, status, thumbnail, and preview-proxy element
 For a plain image lightbox, the image itself supplies the handoff geometry. A custom trigger can
 mark its visual box with `data-fluidbox-preview`. If that box contains a more precise transition
 target, mark the nested element with `data-fluidbox-target`; it takes precedence over the preview
-box. `data-fluidbox-thumbnail` remains the optional image source for loading and filmstrip artwork.
+box. `data-fluidbox-thumbnail` remains the optional image source for loading and thumbnails artwork.
 
 An indexed gallery assigns a canonical `FluidboxSource` to `gallery.source` and a `FluidboxOriginAdapter` to `gallery.origins`. Mark a mounted trigger's visible clipped box with `data-fluidbox-origin`. The descendant image remains the media preview even when a wrapper supplies geometry and corner radius. A virtualized host can implement `revealOrigin(id, index, { signal, reason })`. Viewer motion never waits for it, and the runtime aborts stale reveals on selection, close, source replacement, and teardown.
 
@@ -86,13 +86,13 @@ Use `hide-close-button` on `<fluidbox-gallery>` to omit its default close contro
 
 ## State
 
-The lightbox root, overlay, and dialog expose `data-fluidbox-state="closed|opening|open|closing"`. They also expose presence-based `[data-open]`, `[data-closed]`, `[data-starting-style]`, and `[data-ending-style]` hooks. The dialog adds state such as `[data-dragging]`, `[data-dismissing]`, `[data-zoomed]`, `[data-fluidbox-gallery]`, and `[data-filmstrip]`.
+The lightbox root, overlay, and dialog expose `data-fluidbox-state="closed|opening|open|closing"`. They also expose presence-based `[data-open]`, `[data-closed]`, `[data-starting-style]`, and `[data-ending-style]` hooks. The dialog adds state such as `[data-dragging]`, `[data-dismissing]`, `[data-zoomed]`, `[data-fluidbox-gallery]`, and `[data-thumbnails]`.
 
-Transition layers expose `data-fluidbox-phase="preview|opening|open|dragging|closing"`. Gallery slides use `aria-hidden`, and filmstrip items use `aria-selected`, so CSS does not need private implementation state.
+Transition layers expose `data-fluidbox-phase="preview|opening|open|dragging|closing"`. Gallery slides use `aria-hidden`, and thumbnails items use `aria-selected`, so CSS does not need private implementation state.
 
 ## Customize the viewer
 
-Import the package CSS first, then put your overrides in a later stylesheet. The package roots its viewer rules at `[data-fluidbox-overlay]` or `[data-fluidbox-flight]`. Descendant rules use a zero-specificity `:where(...)` root, so a later rule with the same part selector can override a default without extra selector weight.
+Import the package CSS first, then put your overrides in a later stylesheet. The package roots its viewer rules at `[data-fluidbox-viewer]` or `[data-fluidbox-flight]`. Descendant rules use a zero-specificity `:where(...)` root, so a later rule with the same part selector can override a default without extra selector weight.
 
 ```css
 /* The runtime copies these six computed values onto the body-level overlay. */
@@ -107,11 +107,11 @@ fluidbox-item {
 }
 
 /* Other portal values must inherit from :root or be set on the portal. */
-[data-fluidbox-overlay] {
-  --fluidbox-filmstrip-dock-background: #171717cc;
+[data-fluidbox-viewer] {
+  --fluidbox-thumbnails-dock-background: #171717cc;
 }
 
-[data-fluidbox-overlay] [data-fluidbox-close] {
+[data-fluidbox-viewer] [data-fluidbox-close] {
   width: 40px;
   height: 40px;
 }
@@ -119,7 +119,7 @@ fluidbox-item {
 
 The runtime reads the computed `--background`, `--color`, `--accent`, `--primary`, `--border`, and `--radius` from the opening `fluidbox-item` and copies them to the overlay's inline style. These are the host's theme inputs, including values it inherits from its ancestors. The overlay's backdrop and controls use the copied values. Other variables on `fluidbox-item` do not inherit into the body-level portal. Set those on `:root` or the portal root if the open viewer needs them.
 
-`--layer-fluidbox` and `--layer-fluidbox-flight` set the overlay and flight stacking levels. `--fluidbox-preview-width`, `--fluidbox-preview-height`, and `--fluidbox-preview-aspect` affect the closed preview. The filmstrip reads `--fluidbox-filmstrip-dock-background`, `--fluidbox-filmstrip-zoom-duration`, and `--fluidbox-filmstrip-zoom-travel`.
+`--layer-fluidbox` and `--layer-fluidbox-flight` set the overlay and flight stacking levels. `--fluidbox-preview-width`, `--fluidbox-preview-height`, and `--fluidbox-preview-aspect` affect the closed preview. The thumbnails reads `--fluidbox-thumbnails-dock-background`, `--fluidbox-thumbnails-zoom-duration`, and `--fluidbox-thumbnails-zoom-travel`.
 
 State selectors such as `[data-fluidbox-state="open"]`, `[data-zoomed]`, and `[aria-selected="true"]` can refine those rules. The package selectors keep their original specificity where the overlay or flight root itself is styled. Source order resolves equal-specificity rules, so load your overrides after the package CSS.
 
@@ -142,7 +142,7 @@ JavaScript writes measurements and motion state as custom properties. A custom s
 Transform properties describe the engine's pose, but their inline values do not necessarily change on every animation frame. Web Animations can interpolate transforms directly. For a continuous authored effect during dragging, read the overlay's gesture values on an overlay descendant:
 
 ```css
-[data-fluidbox-overlay] [data-fluidbox-close] {
+[data-fluidbox-viewer] [data-fluidbox-close] {
   rotate: calc(var(--fluidbox-dismiss-progress, 0) * 30deg);
 }
 ```

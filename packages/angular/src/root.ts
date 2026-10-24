@@ -62,7 +62,7 @@ export interface FluidboxApi<
   /** Zoom out by 1.5. */
   zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
   /** Zoom back out to fit. */
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
@@ -84,8 +84,8 @@ export interface FluidboxViewerPart<TItem extends FluidboxItem = FluidboxItem> {
   readonly render: FluidboxViewerRenderer<TItem>;
 }
 
-/** A `fluidboxFilmstrip`, as the root sees it. */
-export interface FluidboxFilmstripPart<TItem extends FluidboxItem = FluidboxItem> {
+/** A `fluidboxThumbnails`, as the root sees it. */
+export interface FluidboxThumbnailsPart<TItem extends FluidboxItem = FluidboxItem> {
   /** Draws each thumbnail, or null for the default ones. Stable for the part's life. */
   readonly render: FluidboxRenderer<TItem> | null;
 }
@@ -100,7 +100,7 @@ export interface FluidboxSheetPart<TItem extends FluidboxItem = FluidboxItem> {
 
 interface Parts<TItem extends FluidboxItem> {
   viewer: FluidboxViewerPart<TItem> | null;
-  filmstrip: FluidboxFilmstripPart<TItem> | null;
+  thumbnails: FluidboxThumbnailsPart<TItem> | null;
   sheet: FluidboxSheetPart<TItem> | null;
 }
 
@@ -114,7 +114,7 @@ const zoomOption = (zoom: FluidboxOptions["zoom"]) =>
  *
  * The fluidbox is made with the root and touches nothing until a viewer is
  * pressed or opened. New labels or zoom, and a `fluidboxViewer`,
- * `fluidboxFilmstrip` or `fluidboxSheet` coming, going or changing its inputs,
+ * `fluidboxThumbnails` or `fluidboxSheet` coming, going or changing its inputs,
  * apply to it in place, open or not.
  */
 @Directive({ selector: "[fluidboxRoot]", exportAs: "fluidbox", standalone: true })
@@ -142,8 +142,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   @Input() findTrigger?: FluidboxOptions<TItem>["findTrigger"];
   /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
   @Input() revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
-  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
-  @Input() loading?: FluidboxOptions["loading"];
+  /** When the viewer's code loads: on `"intent"` (the default), on `"press"`, or `"eager"`ly. */
+  @Input("preload") preloadMode?: FluidboxOptions["preload"];
 
   /**
    * Before every open, move and close, from any input. `$event.preventDefault()`
@@ -207,10 +207,10 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   /** The sheet's stop and command, as `injectFluidboxSheet()` gives them. */
   readonly sheet: FluidboxSheetApi = {
     stop: this.#stop.asReadonly(),
-    set: (stop, options) => this.fluidbox.sheet?.set(stop, options),
+    set: (stop, options) => this.fluidbox.sheet?.setSnap(stop, options),
   };
 
-  readonly #parts: Parts<TItem> = { viewer: null, filmstrip: null, sheet: null };
+  readonly #parts: Parts<TItem> = { viewer: null, thumbnails: null, sheet: null };
   #scheduled = false;
   #destroyed = false;
   readonly #sync = createOpenIndexSync(this.fluidbox);
@@ -226,7 +226,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       zoomTo: (scale: number, options?: FluidboxZoomCommandOptions) => this.zoomTo(scale, options),
       zoomIn: (options?: FluidboxZoomCommandOptions) => this.zoomIn(options),
       zoomOut: (options?: FluidboxZoomCommandOptions) => this.zoomOut(options),
-      resetZoom: (options?: Pick<FluidboxZoomCommandOptions, "signal">) => this.resetZoom(options),
+      zoomReset: (options?: Pick<FluidboxZoomCommandOptions, "signal">) => this.zoomReset(options),
       setItems: (items: FluidboxItems<TItem>) => fluidbox.setItems(items),
       preload: (target: FluidboxTarget<TItem>) => this.preload(target),
       load: () => this.load(),
@@ -239,7 +239,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       }),
     );
     fluidbox.addEventListener("sheetchange", (event) =>
-      this.#zone.run(() => this.#stop.set(event.stop)),
+      this.#zone.run(() => this.#stop.set(event.snap)),
     );
     const outputs = {
       beforevaluechange: this.beforeValueChange,
@@ -268,7 +268,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     }
     if (changes["zoom"]) this.#update({ zoom: zoomOption(this.zoom) });
     if (changes["loop"]) this.#update({ loop: this.loop });
-    if (changes["loading"]) this.#update({ loading: this.loading });
+    if (changes["preloadMode"]) this.#update({ preload: this.preloadMode });
     // Your open and index win whenever they change, once the triggers inside
     // have registered, so an open flies from the item's own.
     if ((changes["open"] || changes["index"]) && this.#browser) {
@@ -317,8 +317,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     return this.#zone.runOutsideAngular(() => this.fluidbox.zoomOut(options));
   }
 
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
-    return this.#zone.runOutsideAngular(() => this.fluidbox.resetZoom(options));
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
+    return this.#zone.runOutsideAngular(() => this.fluidbox.zoomReset(options));
   }
 
   setItems(items: FluidboxItems<TItem>): Promise<boolean> {
@@ -340,7 +340,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     return this.fluidbox.subscribe(() => listener());
   }
 
-  /** @internal For parts: plug a viewer, filmstrip or sheet into the viewer. */
+  /** @internal For parts: plug a viewer, thumbnails or sheet into the viewer. */
   connect<K extends keyof Parts<TItem>>(kind: K, part: NonNullable<Parts<TItem>[K]>): () => void {
     this.#parts[kind] = part;
     this.schedule();
@@ -358,11 +358,15 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     queueMicrotask(() => {
       this.#scheduled = false;
       if (this.#destroyed) return;
-      const { viewer, filmstrip, sheet } = this.#parts;
+      const { viewer, thumbnails, sheet } = this.#parts;
       // Unchanged parts compare equal, so the viewer redraws only what changed.
       this.#update({
         viewer: viewer?.render,
-        filmstrip: filmstrip ? (filmstrip.render ? { render: filmstrip.render } : true) : undefined,
+        thumbnails: thumbnails
+          ? thumbnails.render
+            ? { render: thumbnails.render }
+            : true
+          : undefined,
         sheet: sheet
           ? { snapPoints: sheet.snapPoints, dismiss: sheet.dismiss, render: sheet.render }
           : undefined,
@@ -371,7 +375,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 
   /**
-   * An update can load the filmstrip or sheet, and the viewer's listeners
+   * An update can load the thumbnails or sheet, and the viewer's listeners
    * stay outside the zone. Callbacks come back in through zone.run.
    */
   #update(options: FluidboxUpdateOptions<TItem>): void {

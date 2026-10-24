@@ -366,7 +366,7 @@ export class DomViewerDriver<
       : undefined;
   }
 
-  /** Replace the extensions, as when the filmstrip or the sheet is turned on, off or changed. */
+  /** Replace the extensions, as when the thumbnails or the sheet is turned on, off or changed. */
   setExtensions(extensions: readonly (FluidboxExtension<TItem> | undefined)[]) {
     this.#extensionLifetime?.abort();
     for (const extension of this.#extensions) extension.destroy();

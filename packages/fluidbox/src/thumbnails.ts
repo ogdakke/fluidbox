@@ -1,10 +1,10 @@
 import type { FluidboxRenderer } from "./public-api";
 
 /**
- * Turns on the filmstrip of its parent `<fluidbox-gallery>`. Set `render` to
+ * Turns on the thumbnails of its parent `<fluidbox-gallery>`. Set `render` to
  * fill each thumbnail button yourself.
  */
-export class FluidboxFilmstripElement extends HTMLElement {
+export class FluidboxThumbnailsElement extends HTMLElement {
   #render: FluidboxRenderer<any> | undefined;
 
   connectedCallback() {
@@ -52,12 +52,12 @@ export class FluidboxSheetElement extends HTMLElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    "fluidbox-filmstrip": FluidboxFilmstripElement;
+    "fluidbox-thumbnails": FluidboxThumbnailsElement;
     "fluidbox-sheet": FluidboxSheetElement;
   }
 }
 
-if (!customElements.get("fluidbox-filmstrip"))
-  customElements.define("fluidbox-filmstrip", FluidboxFilmstripElement);
+if (!customElements.get("fluidbox-thumbnails"))
+  customElements.define("fluidbox-thumbnails", FluidboxThumbnailsElement);
 if (!customElements.get("fluidbox-sheet"))
   customElements.define("fluidbox-sheet", FluidboxSheetElement);

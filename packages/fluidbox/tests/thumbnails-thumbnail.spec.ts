@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { filmstripThumbnailSources, loadFilmstripThumbnail } from "../src/filmstrip-thumbnail";
+import { thumbnailsThumbnailSources, loadThumbnailsThumbnail } from "../src/thumbnails-thumbnail";
 
-describe("filmstrip thumbnail sources", () => {
+describe("thumbnail sources", () => {
   it("tries the smallest thumbnail candidates before progressively larger fallbacks", () => {
     expect(
-      filmstripThumbnailSources({
+      thumbnailsThumbnailSources({
         type: "image",
         thumbnail: { src: "/thumb.jpg", srcset: "/thumb-320.jpg 320w, /thumb-160.jpg 160w" },
         src: "/full.jpg",
@@ -18,7 +18,7 @@ describe("filmstrip thumbnail sources", () => {
 
   it("uses a video poster and removes duplicate requests", () => {
     expect(
-      filmstripThumbnailSources({
+      thumbnailsThumbnailSources({
         type: "video",
         thumbnail: { src: "/poster.jpg" },
         src: "/video.mp4",
@@ -46,7 +46,7 @@ describe("filmstrip thumbnail sources", () => {
       ownerDocument: { defaultView: { Image: TestImage } },
     } as unknown as HTMLImageElement;
 
-    await loadFilmstripThumbnail(
+    await loadThumbnailsThumbnail(
       target,
       ["/missing.jpg", "/fallback.jpg"],
       new AbortController().signal,
@@ -69,7 +69,7 @@ describe("filmstrip thumbnail sources", () => {
       ownerDocument: { defaultView: { Image: TestImage } },
     } as unknown as HTMLImageElement;
     const controller = new AbortController();
-    const loading = loadFilmstripThumbnail(target, ["/full.jpg"], controller.signal);
+    const loading = loadThumbnailsThumbnail(target, ["/full.jpg"], controller.signal);
 
     controller.abort();
     finishDecode?.();

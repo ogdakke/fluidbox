@@ -4,7 +4,7 @@ import { render } from "solid-js/web";
 import type { MountPattern } from "../page";
 import type { PatternName } from "../shared";
 import { Basic } from "./basic";
-import { Filmstrip } from "./filmstrip";
+import { Thumbnails } from "./thumbnails";
 import { Rtl } from "./rtl";
 import { Url } from "./url";
 import { Headless } from "./headless";
@@ -29,7 +29,7 @@ export const patterns: Record<PatternName, MountPattern> = {
   renderers: mount(Renderers),
   programmatic: mount(Programmatic),
   zoom: mount(Zoom),
-  filmstrip: mount(Filmstrip),
+  thumbnails: mount(Thumbnails),
   rtl: mount(Rtl),
   url: mount(Url),
   sheet: mount(Sheet),

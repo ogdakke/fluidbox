@@ -56,7 +56,7 @@ export function mountElements(gallery: HTMLElement): void {
   }
 }
 
-const persisted = ["sheet", "dismiss", "photo", "backdrop", "zoom", "filmstrip", "radius"];
+const persisted = ["sheet", "dismiss", "photo", "backdrop", "zoom", "thumbnails", "radius"];
 
 /** A form field's value as the URL keeps it: a checkbox is "on" or "off". */
 function read(form: HTMLFormElement, name: string) {
@@ -113,13 +113,13 @@ export function mountControls(gallery: HTMLElement, form: HTMLFormElement): void
   const photo = field<HTMLSelectElement>("photo");
   const radiusValue = field<HTMLOutputElement>("radiusValue");
 
-  const filmstrip = document.createElement("fluidbox-filmstrip");
+  const thumbnails = document.createElement("fluidbox-thumbnails");
   const sheet = document.createElement("fluidbox-sheet");
   sheet.setAttribute("snap-points", "content");
   const viewer = document.createElement("template");
   viewer.setAttribute("slot", "viewer");
   viewer.innerHTML = `<fluidbox-controls></fluidbox-controls>
-    <button type="button" class="info-toggle" data-fluidbox-sheet-stop="1">Info</button>`;
+    <button type="button" class="info-toggle" data-fluidbox-sheet-snap="1">Info</button>`;
 
   // Adding or removing an add-on rebuilds the viewer, so only touch the ones that changed.
   const toggle = (child: Element, on: boolean) => {
@@ -136,7 +136,7 @@ export function mountControls(gallery: HTMLElement, form: HTMLFormElement): void
       sheet.setAttribute("dismiss", dismiss.value);
     toggle(sheet, sheetOn);
     toggle(viewer, sheetOn);
-    toggle(filmstrip, field<HTMLInputElement>("filmstrip").checked);
+    toggle(thumbnails, field<HTMLInputElement>("thumbnails").checked);
 
     const zoom = value("zoom");
     gallery.toggleAttribute("nozoom", zoom === "off");

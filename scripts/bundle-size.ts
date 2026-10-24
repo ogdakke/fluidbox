@@ -21,11 +21,11 @@ export const peerFor = (specifier: string): (typeof frameworkPeers)[number] | un
 
 /**
  * A chunk that loads only for a viewer that uses it: the sheet's or the
- * filmstrip's entry, or the thumbnail overlays' runtime.
+ * thumbnails' entry, or the thumbnail overlays' runtime.
  */
 const isAddon = (chunk: { facadeModuleId?: string | null } | undefined) =>
   !!chunk?.facadeModuleId &&
-  /[/\\](sheet|filmstrip|thumbnail-overlay-runtime)(-entry)?\.[jt]s$/.test(chunk.facadeModuleId);
+  /[/\\](sheet|thumbnails|thumbnail-overlay-runtime)(-entry)?\.[jt]s$/.test(chunk.facadeModuleId);
 
 /**
  * Build `tests/bundle/<name>.ts` as a consumer would and walk its chunk graph. Initial is what

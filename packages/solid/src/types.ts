@@ -4,7 +4,7 @@ import type {
   FluidboxItem,
   FluidboxItems,
   FluidboxLabels,
-  FluidboxLoading,
+  FluidboxPreload,
   FluidboxOptions,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -64,8 +64,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly findTrigger?: FluidboxOptions<TItem>["findTrigger"];
   /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
   readonly revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
-  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
-  readonly loading?: FluidboxLoading;
+  /** When the viewer's code loads: on `"intent"` (the default), on `"press"`, or `"eager"`ly. */
+  readonly preload?: FluidboxPreload;
   /**
    * Before every open, move and close, from any input, with the value the
    * viewer goes to: an id, or null for a close. `details.cancel()` stops it.
@@ -134,7 +134,7 @@ export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> 
   readonly index: number;
 }
 
-export interface FluidboxFilmstripProps<TItem extends FluidboxItem = FluidboxItem> {
+export interface FluidboxThumbnailsProps<TItem extends FluidboxItem = FluidboxItem> {
   /** Renders one thumbnail into its button. Without it, the strip shows the default images. */
   readonly children?: (thumb: FluidboxItemContext<TItem>) => JSX.Element;
 }
@@ -173,7 +173,7 @@ export interface FluidboxApi<
   /** Zoom out by 1.5. */
   zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
   /** Zoom back out to fit. */
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
@@ -199,7 +199,7 @@ export interface FluidboxSolidParts {
   ZoomIn: (props: FluidboxActionProps) => JSX.Element;
   ZoomOut: (props: FluidboxActionProps) => JSX.Element;
   ZoomReset: (props: FluidboxActionProps) => JSX.Element;
-  Filmstrip: <TItem extends FluidboxItem>(props: FluidboxFilmstripProps<TItem>) => JSX.Element;
+  Thumbnails: <TItem extends FluidboxItem>(props: FluidboxThumbnailsProps<TItem>) => JSX.Element;
   Sheet: <TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>) => JSX.Element;
   SheetStop: (props: FluidboxSheetStopProps) => JSX.Element;
   ThumbnailOverlay: (props: FluidboxThumbnailOverlayProps) => JSX.Element;

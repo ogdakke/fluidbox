@@ -1,27 +1,27 @@
 import type { Addon } from "./addons";
-import { FilmstripSession, type FilmstripSessionOptions } from "./filmstrip-session";
-import type { FluidboxFilmstripOptions, FluidboxItem as PublicItem } from "./public-api";
+import { ThumbnailsSession, type ThumbnailsSessionOptions } from "./thumbnails-session";
+import type { FluidboxThumbnailsOptions, FluidboxItem as PublicItem } from "./public-api";
 import type { FluidboxItem, FluidboxSource } from "./runtime-types";
 
-export type { FluidboxFilmstripOptions } from "./public-api";
+export type { FluidboxThumbnailsOptions } from "./public-api";
 
 /**
  * A scrubbable thumbnail strip, for more than one item. It mounts in the
  * viewer's layer like your own content, and its CSS places it.
  */
-export function createFilmstrip(options: FluidboxFilmstripOptions<PublicItem>): Addon<null> {
-  const renderItem: FilmstripSessionOptions<FluidboxItem>["renderItem"] = options.render;
+export function createThumbnails(options: FluidboxThumbnailsOptions<PublicItem>): Addon<null> {
+  const renderItem: ThumbnailsSessionOptions<FluidboxItem>["renderItem"] = options.render;
   return {
     handle: null,
     extension: {
       mount({ dialog, layer, controller, source, labels }) {
         let current: FluidboxSource<FluidboxItem> = source;
-        let session: FilmstripSession<FluidboxItem> | undefined;
+        let session: ThumbnailsSession<FluidboxItem> | undefined;
         const build = () => {
           session?.destroy();
           session = undefined;
           if (current.count < 2) return;
-          session = new FilmstripSession(
+          session = new ThumbnailsSession(
             dialog.ownerDocument,
             current,
             controller,

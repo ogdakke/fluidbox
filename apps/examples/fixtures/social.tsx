@@ -350,7 +350,7 @@ function XViewer() {
                 icon="reply"
                 value={active.stats.replies}
                 label="Show replies"
-                data-fluidbox-sheet-stop="1"
+                data-fluidbox-sheet-snap="1"
               />
               <Count icon="repost" value={active.stats.reposts} label="Reposts" />
               <Count icon="like" value={active.stats.likes} label="Likes" />
@@ -443,7 +443,7 @@ function IgActions({ post }: { post: Post }) {
     <>
       <div className="ig-actions">
         <Count icon="like" label="Like" />
-        <Count icon="comment" label="Comment" data-fluidbox-sheet-stop="2" />
+        <Count icon="comment" label="Comment" data-fluidbox-sheet-snap="2" />
         <Count icon="send" label="Share" />
         <Count icon="bookmark" label="Save" />
       </div>
@@ -728,7 +728,7 @@ function App() {
             <strong>X's phone viewer: fixed.</strong> The sheet entry (@ogdakke/fluidbox/sheet)
             raises any data-fluidbox-sheet element over the photo and fits the photo into the room
             above it. Swiping up on the photo raises it instead of dismissing; a reply count marked
-            data-fluidbox-sheet-stop opens it; Escape, a tap above it or the close button lower it.
+            data-fluidbox-sheet-snap opens it; Escape, a tap above it or the close button lower it.
           </li>
           <li>
             <strong>Insets must exist before the opening: open.</strong> The opening flight measures

@@ -12,7 +12,7 @@ source, origin, renderer, and controller contracts used by framework bindings.
 | Read an indexed source without mounting every thumbnail                     | `FluidboxSource`, `arraySource()`, and `ViewerStrip` | Migrated                                                                                                                                                                            |
 | Validate an indexed open and select an item in an existing session          | `ViewerSession.open()` and `goTo()`                  | Migrated                                                                                                                                                                            |
 | Keep stable item identity across source changes                             | `ViewerSession.setSource()`                          | Migrated and covered by command tests                                                                                                                                               |
-| Reveal the settled thumbnail in its scroll container                        | `FluidboxOriginAdapter.revealOrigin()`               | Migrated. Filmstrip previews defer reveal until final touch/scroll settlement; reveal is abortable and never delays close.                                                          |
+| Reveal the settled thumbnail in its scroll container                        | `FluidboxOriginAdapter.revealOrigin()`               | Migrated. Thumbnails previews defer reveal until final touch/scroll settlement; reveal is abortable and never delays close.                                                         |
 | Focus the gallery when a virtualizer has removed the selected trigger       | `DomViewerDriver` focus-host fallback                | Migrated when the original trigger had a connected focusable ancestor. Originless opens have no caller-selected fallback.                                                           |
 | Redirect and warm a hidden teaser tile through `data-fluidbox-preview-more` | Host origin/overlay adapter                          | Partial. The engine does not encode a gallery layout convention, and no direct example yet recreates the old proxy source, picture hiding, alt update, warming, and reset behavior. |
 
@@ -34,23 +34,23 @@ a second gallery engine.
 | Move DOM-authored custom content into a slide and restore it on eviction                   | Renderer mount/dispose contract                                      | Replaced with explicit ownership. DOM renderers may move DOM; framework renderers retain ownership of descendants. |
 | Pause outgoing video and preserve native media interaction                                 | `ViewerStrip` and `DomViewerDriver` native-interaction routing       | Migrated; physical mobile fullscreen checks remain a release gate                                                  |
 
-The direct runtime treats filmstrip selection as an immediate preview scrub. It does not animate a
-second full-image transition while the filmstrip continues under native momentum.
+The direct runtime treats thumbnails selection as an immediate preview scrub. It does not animate a
+second full-image transition while the thumbnails continues under native momentum.
 
-## Filmstrip
+## Thumbnails
 
-| Old responsibility                                                               | Headless owner                                            | Status                                                                                                                            |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Render a bounded thumbnail window based on viewport width                        | `FilmstripRuntime` layout callback and framework renderer | Migrated for React                                                                                                                |
-| Keep native touch and trackpad momentum                                          | `FilmstripRuntime`                                        | Migrated. Automation covers held-touch settlement and native scrolling; physical touch and trackpad momentum remain manual gates. |
-| Distinguish commanded centering from user scrolling                              | `FilmstripRuntime`                                        | Migrated                                                                                                                          |
-| Select the centered item while scrolling and settle after `scrollend` or timeout | `FilmstripRuntime` and internal settled command           | Migrated, including a final settle when the centered index is unchanged                                                           |
-| Abort thumbnail loads when an item leaves the window                             | `filmstrip-thumbnail.ts` and React item cleanup           | Migrated                                                                                                                          |
-| Derive `/media/*-160w.webp` by filename convention                               | Source metadata                                           | Intentionally removed. Applications declare thumbnail candidates; the runtime does not rewrite arbitrary URLs.                    |
+| Old responsibility                                                               | Headless owner                                             | Status                                                                                                                            |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Render a bounded thumbnail window based on viewport width                        | `ThumbnailsRuntime` layout callback and framework renderer | Migrated for React                                                                                                                |
+| Keep native touch and trackpad momentum                                          | `ThumbnailsRuntime`                                        | Migrated. Automation covers held-touch settlement and native scrolling; physical touch and trackpad momentum remain manual gates. |
+| Distinguish commanded centering from user scrolling                              | `ThumbnailsRuntime`                                        | Migrated                                                                                                                          |
+| Select the centered item while scrolling and settle after `scrollend` or timeout | `ThumbnailsRuntime` and internal settled command           | Migrated, including a final settle when the centered index is unchanged                                                           |
+| Abort thumbnail loads when an item leaves the window                             | `thumbnails-thumbnail.ts` and React item cleanup           | Migrated                                                                                                                          |
+| Derive `/media/*-160w.webp` by filename convention                               | Source metadata                                            | Intentionally removed. Applications declare thumbnail candidates; the runtime does not rewrite arbitrary URLs.                    |
 
 React and the custom-element adapter render items into the window reported by
-`FilmstripRuntime`; touch, wheel, commanded centering, resize, provisional selection, and settlement
-live in one runtime. `FilmstripSession` retains only element DOM, thumbnail loading, and selection
+`ThumbnailsRuntime`; touch, wheel, commanded centering, resize, provisional selection, and settlement
+live in one runtime. `ThumbnailsSession` retains only element DOM, thumbnail loading, and selection
 painting.
 
 ## Viewer lifecycle and portal
@@ -64,7 +64,7 @@ painting.
 | Prebuild and measure opening on primary pointerdown, then cancel on pointer cancellation         | `FluidboxController.prepare()` and trigger bindings                                 | Migrated. Preparation keeps state/background ownership unchanged, pauses the opening animations, and is disposable. |
 | Reverse an unfinished open or close from the painted pose                                        | `DomViewerDriver` plus `image-transition-motion.ts`                                 | Migrated with timestamped geometry coverage                                                                         |
 | Copy theme variables from the scoped trigger into the body portal                                | `DomViewerDriver.#applyTheme()`                                                     | Migrated for all `--fluidbox-*` inputs and legacy aliases                                                           |
-| Keep filmstrip controls hidden until the opening backdrop is ready                               | `DomViewerDriver.#waitForFilmstripReveal()`                                         | Migrated                                                                                                            |
+| Keep thumbnails controls hidden until the opening backdrop is ready                              | `DomViewerDriver.#waitForThumbnailsReveal()`                                        | Migrated                                                                                                            |
 | Keep video action controls hidden until their delayed reveal animation finishes                  | `ThumbnailOverlayRuntime`                                                           | Migrated for traveling overlay renderers; opening settlement waits for the application control reveal.              |
 | Publish trigger state and `aria-expanded`                                                        | `DomViewerDriver.#setActiveTrigger()`                                               | Migrated                                                                                                            |
 | Restore focus, thumbnail visibility, inert state, animations, observers, renderers, and requests | `ViewerSession.destroy()`, `DomViewerDriver.destroy()`, and `ViewerStrip.destroy()` | Migrated with teardown coverage                                                                                     |
@@ -114,7 +114,7 @@ crop, radius, and decoration behavior.
 ## Adapter boundary
 
 Custom-element files contain declarative adaptation, element registration, portal controls, and
-filmstrip DOM. Gesture, zoom, transition, source selection, origin reveal, and portal behavior stay
+thumbnails DOM. Gesture, zoom, transition, source selection, origin reveal, and portal behavior stay
 in the runtime. New interaction behavior belongs in the runtime first.
 
 The dedicated `headless.html`, photo-library, and React examples use `createFluidbox()` directly.

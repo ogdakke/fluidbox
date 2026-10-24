@@ -1,6 +1,6 @@
 /** The Angular binding: standalone `fluidbox*` directives and `FluidboxModule`. */
 import { NgModule } from "@angular/core";
-import { FluidboxFilmstripDirective } from "./filmstrip.js";
+import { FluidboxThumbnailsDirective } from "./thumbnails.js";
 import {
   FluidboxCloseDirective,
   FluidboxControlsComponent,
@@ -18,7 +18,7 @@ import {
 import { FluidboxRootDirective } from "./root.js";
 import { FluidboxSheetDirective } from "./sheet.js";
 
-export { FluidboxFilmstripDirective } from "./filmstrip.js";
+export { FluidboxThumbnailsDirective } from "./thumbnails.js";
 export type { FluidboxContent, FluidboxItemContext } from "./mount.js";
 export {
   FluidboxCloseDirective,
@@ -57,7 +57,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
-  FluidboxLoading,
+  FluidboxPreload,
   FluidboxReason,
   FluidboxSheetSnapPoint,
   FluidboxState,
@@ -85,13 +85,13 @@ const parts = [
   FluidboxZoomInDirective,
   FluidboxZoomOutDirective,
   FluidboxZoomResetDirective,
-  FluidboxFilmstripDirective,
+  FluidboxThumbnailsDirective,
   FluidboxSheetDirective,
   FluidboxSheetStopDirective,
 ];
 
 /**
- * Every fluidbox part, for NgModule apps and quick starts. The filmstrip and
+ * Every fluidbox part, for NgModule apps and quick starts. The thumbnails and
  * sheet runtimes load on demand, the first time a root uses them.
  */
 @NgModule({ imports: parts, exports: parts })

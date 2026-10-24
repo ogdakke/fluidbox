@@ -31,7 +31,7 @@ const targets = {
   edge: major(140),
   firefox: major(142),
 };
-for (const name of ["styles.css", "filmstrip.css", "sheet.css"]) {
+for (const name of ["styles.css", "thumbnails.css", "sheet.css"]) {
   const path = resolve(core, "dist", name);
   const { code } = transform({ filename: name, code: await readFile(path), minify: true, targets });
   await writeFile(path, code);

@@ -17,7 +17,7 @@ Each pattern is a small, complete example. Pick your framework in any tab, and e
 | [Custom content](./renderers.md)          | Your own component, an iframe and a video                     |
 | [Programmatic control](./programmatic.md) | Open from code, read state, log events, veto navigation       |
 | [Zoom](./zoom.md)                         | Zoom controls and readout, a sharper image, or zoom off       |
-| [Filmstrip](./filmstrip.md)               | The default strip, and your own thumbnails                    |
+| [Thumbnails](./thumbnails.md)             | The default strip, and your own thumbnails                    |
 | [Sheet](./sheet.md)                       | A panel under the photo with snap points                      |
 | [Headless controls](./headless.md)        | Your own caption bar and buttons                              |
 | [Right to left](./rtl.md)                 | An Arabic gallery: the viewer reads right to left             |
@@ -44,7 +44,7 @@ const image = (
   height: number,
 ): FluidboxImageItem => ({ id, type: "img", src, alt, width, height });
 
-/** Gallery, programmatic control, zoom off, filmstrip, sheet, headless controls and right to left. */
+/** Gallery, programmatic control, zoom off, thumbnails, sheet, headless controls and right to left. */
 export const photos: FluidboxImageItem[] = [
   image("photo-aurora", "/art/aurora.svg", "Aurora over the tundra", 1100, 1650),
   image("photo-ridge", "/art/ridge.svg", "Night ridge", 1200, 1500),
@@ -213,8 +213,8 @@ export const arabic: Partial<FluidboxLabels> = {
   position: (index, count) =>
     `العنصر ${arabicNumber.format(index + 1)} من ${arabicNumber.format(count)}`,
   slides: "عناصر المعرض",
-  filmstrip: "شريط الصور المصغّرة",
-  filmstripList: "اختر عنصرًا من المعرض",
+  thumbnails: "شريط الصور المصغّرة",
+  thumbnailsList: "اختر عنصرًا من المعرض",
   zoomed: "صورة مكبّرة",
   sheet: "التفاصيل",
   error: "تعذّر تحميل الوسائط.",

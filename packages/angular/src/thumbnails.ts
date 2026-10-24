@@ -17,15 +17,15 @@ import { injectRoot } from "./root.js";
  * button. The strip marks the selected button `data-fluidbox-selected`.
  *
  * ```html
- * <ng-container fluidboxFilmstrip />
- * <ng-template fluidboxFilmstrip let-item let-index="index">{{ index + 1 }}</ng-template>
+ * <ng-container fluidboxThumbnails />
+ * <ng-template fluidboxThumbnails let-item let-index="index">{{ index + 1 }}</ng-template>
  * ```
  */
-@Directive({ selector: "[fluidboxFilmstrip]", standalone: true })
-export class FluidboxFilmstripDirective<TItem extends FluidboxItem = FluidboxItem>
+@Directive({ selector: "[fluidboxThumbnails]", standalone: true })
+export class FluidboxThumbnailsDirective<TItem extends FluidboxItem = FluidboxItem>
   implements OnInit, OnDestroy
 {
-  readonly #root = injectRoot<TItem>("fluidboxFilmstrip");
+  readonly #root = injectRoot<TItem>("fluidboxThumbnails");
   readonly #template = inject<TemplateRef<FluidboxItemContext<TItem>>>(TemplateRef, {
     optional: true,
   });
@@ -34,7 +34,7 @@ export class FluidboxFilmstripDirective<TItem extends FluidboxItem = FluidboxIte
   #disconnect: (() => void) | undefined;
 
   static ngTemplateContextGuard<TItem extends FluidboxItem>(
-    _directive: FluidboxFilmstripDirective<TItem>,
+    _directive: FluidboxThumbnailsDirective<TItem>,
     _context: unknown,
   ): _context is FluidboxItemContext<TItem> {
     return true;
@@ -42,7 +42,7 @@ export class FluidboxFilmstripDirective<TItem extends FluidboxItem = FluidboxIte
 
   ngOnInit(): void {
     const template = this.#template;
-    this.#disconnect = this.#root.connect("filmstrip", {
+    this.#disconnect = this.#root.connect("thumbnails", {
       render: template
         ? ({ item, index, target }) =>
             mountContent(this.#zone, this.#container, template, item, index, target)

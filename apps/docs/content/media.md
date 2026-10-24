@@ -27,7 +27,7 @@ Every type can also have:
 | --------- | ------------------------- | ------------------------------------------------------------ |
 | `type`    | `"img"`                   | Required.                                                    |
 | `src`     | `string`                  | Required. The full image.                                    |
-| `alt`     | `string`                  | Required. Alt text. Also the filmstrip button's label.       |
+| `alt`     | `string`                  | Required. Alt text. Also the thumbnails button's label.      |
 | `width`   | `number`                  | Required. Intrinsic width.                                   |
 | `height`  | `number`                  | Required. Intrinsic height.                                  |
 | `srcset`  | `string`                  | The `<img>`'s `srcset`.                                      |
@@ -68,7 +68,7 @@ Only images zoom. The viewer loads the full image for the current slide and the 
 | ------------- | -------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `type`        | `"video"`                        |              | Required.                                                                                                                                 |
 | `src`         | `string`                         |              | Required. The video file: an http(s), relative or `blob:` URL.                                                                            |
-| `title`       | `string`                         |              | Required. The video's accessible name, and the filmstrip button's.                                                                        |
+| `title`       | `string`                         |              | Required. The video's accessible name, and the thumbnails button's.                                                                       |
 | `width`       | `number`                         |              | Required. Intrinsic width.                                                                                                                |
 | `height`      | `number`                         |              | Required. Intrinsic height.                                                                                                               |
 | `poster`      | `string`                         |              | The poster frame's URL, with the same schemes as `src`.                                                                                   |
@@ -141,7 +141,7 @@ which YouTube, Vimeo and map embeds need, and which stops the embedded page navi
 
 ## Custom
 
-`FluidboxCustomItem` names a renderer that draws your own content into the slide:
+`FluidboxCustomItemBase` names a renderer that draws your own content into the slide:
 
 | Field    | Type       | What it does                                           |
 | -------- | ---------- | ------------------------------------------------------ |
@@ -174,7 +174,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-The same renderer shape fills filmstrip thumbnails, the sheet and travelling overlays. The framework roots take `renderers` as framework components, keyed the same way, and they keep your app's context. When a binding needs a wrapper, as React does, the wrapper has `data-fluidbox-mount` and `display: contents`, so your component's element still sizes to the slide as plain content does. An item whose renderer is missing throws a `TypeError` when its slide loads.
+The same renderer shape fills thumbnails, the sheet and travelling overlays. The framework roots take `renderers` as framework components, keyed the same way, and they keep your app's context. When a binding needs a wrapper, as React does, the wrapper has `data-fluidbox-mount` and `display: contents`, so your component's element still sizes to the slide as plain content does. An item whose renderer is missing throws a `TypeError` when its slide loads.
 
 A custom slide mounts when it comes within one slide of the current one, and its cleanup runs when it moves further away. Keep state you need in your app, not in the mounted nodes. Clicks on buttons, links and fields inside custom content never count as zoom taps.
 
@@ -190,12 +190,12 @@ A custom slide's renderer also gets `active`, whether its slide is the one on sh
 
 | Field         | Used for                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------- |
-| `thumbnail`   | The filmstrip, the iframe still, and the picture shown while the full image loads.                  |
+| `thumbnail`   | The thumbnails, the iframe still, and the picture shown while the full image loads.                 |
 | `placeholder` | Image items only. Painted at once behind the slide, such as a blurred 32-pixel image or a data URI. |
 
 While an image opens, the slide paints, from the bottom up: the `placeholder`, then the trigger's image or the `thumbnail`, then the full image once it has decoded. The frame's background, `--fluidbox-image-placeholder-background`, shows when there is none of them.
 
-The filmstrip tries the `thumbnail`, then the full image or the video's poster, the smallest `srcset` candidate of each first. The slide and the iframe still show the thumbnail with its `srcset` and `sizes`, so the browser picks the candidate that fits.
+The thumbnails tries the `thumbnail`, then the full image or the video's poster, the smallest `srcset` candidate of each first. The slide and the iframe still show the thumbnail with its `srcset` and `sizes`, so the browser picks the candidate that fits.
 
 ## Items from `<img>` props
 

@@ -18,7 +18,7 @@ import "@ogdakke/fluidbox/styles.css";
 import "./gallery-theme.css";
 ```
 
-The package wraps the viewer's rules in `:where([data-fluidbox-overlay], [data-fluidbox-flight])`, which adds nothing to their specificity. A later rule on the same part overrides the default:
+The package wraps the viewer's rules in `:where([data-fluidbox-viewer], [data-fluidbox-flight])`, which adds nothing to their specificity. A later rule on the same part overrides the default:
 
 ```css
 [data-fluidbox-close] {
@@ -28,20 +28,20 @@ The package wraps the viewer's rules in `:where([data-fluidbox-overlay], [data-f
 }
 ```
 
-The package declares the filmstrip's and the sheet's variables on the dialog with no weight at all, so set them on `[data-fluidbox-dialog]`:
+The package declares the thumbnails' and the sheet's variables on the dialog with no weight at all, so set them on `[data-fluidbox-dialog]`:
 
 ```css
 [data-fluidbox-dialog] {
-  --fluidbox-filmstrip-item-size: 64px;
+  --fluidbox-thumbnails-item-size: 64px;
   --fluidbox-sheet-peek: 120px;
 }
 ```
 
 ## The viewer layer
 
-While it is open, the viewer is one element, `[data-fluidbox-overlay]`, at the end of `<body>`. It is not inside your component, so it doesn't inherit your component's styles or CSS variables. Inside it:
+While it is open, the viewer is one element, `[data-fluidbox-viewer]`, at the end of `<body>`. It is not inside your component, so it doesn't inherit your component's styles or CSS variables. Inside it:
 
-<!-- css: parts data-fluidbox-overlay data-fluidbox-backdrop data-fluidbox-container data-fluidbox-dialog data-fluidbox-slides data-fluidbox-slide data-fluidbox-frame data-fluidbox-media data-fluidbox-portal data-fluidbox-addons -->
+<!-- css: parts data-fluidbox-viewer data-fluidbox-backdrop data-fluidbox-container data-fluidbox-dialog data-fluidbox-slides data-fluidbox-slide data-fluidbox-frame data-fluidbox-media data-fluidbox-portal data-fluidbox-addons -->
 
 The overlay's z-index is `var(--layer-fluidbox, 7)` and the flight's is `var(--layer-fluidbox-flight, 8)`. Set both on `:root` if your page has higher layers.
 
@@ -82,7 +82,7 @@ The overlay and the dialog both carry the viewer's state:
 
 <!-- css: states data-fluidbox-status data-open data-closed data-starting-style data-opening data-ending-style data-dragging data-dismissing -->
 
-The dialog alone also has `data-zoomed` while an image is zoomed, and `data-gallery` when there is more than one item. Style a dialog that holds a filmstrip with `[data-fluidbox-dialog]:has([data-fluidbox-filmstrip])`.
+The dialog alone also has `data-zoomed` while an image is zoomed, and `data-gallery` when there is more than one item. Style a dialog that holds thumbnails with `[data-fluidbox-dialog]:has([data-fluidbox-thumbnails])`.
 
 ```css
 [data-fluidbox-dialog][data-zoomed] .caption {
@@ -141,7 +141,7 @@ While an item is open, its thumbnail image on the page gets `data-fluidbox-thumb
 
 ## Reduced motion
 
-With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights, moves between slides without smooth scrolling, zooms and moves the sheet without animation, and its controls and filmstrip appear without fading. You don't need to set anything. Do the same for your own chrome:
+With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights, moves between slides without smooth scrolling, zooms and moves the sheet without animation, and its controls and thumbnails appear without fading. You don't need to set anything. Do the same for your own chrome:
 
 ```css
 @media (prefers-reduced-motion: reduce) {

@@ -19,7 +19,7 @@ import "./safari-chrome.css";
 import "./shop.css";
 import { addonSlide } from "../src/addon-slide";
 
-mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a filmstrip column" });
+mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a thumbnails column" });
 
 // The product: one print in seven photos. Frame options jump to their photo, as in Shop.
 
@@ -422,7 +422,7 @@ function Dots() {
   );
 }
 
-/** True while the window is wide: the viewer has a filmstrip down the left instead of dots. */
+/** True while the window is wide: the viewer has thumbnails down the left instead of dots. */
 function useWide() {
   const [wide, setWide] = useState(() => matchMedia(WIDE).matches);
   useEffect(() => {
@@ -486,9 +486,9 @@ function ShopViewer() {
         <Fluidbox.Previous />
         <Fluidbox.Next />
       </Fluidbox.Viewer>
-      {/* The package's filmstrip, docked down the left by --fluidbox-filmstrip-position.
+      {/* The package's thumbnails, docked down the left by --fluidbox-thumbnails-position.
         A phone has the dots instead, so the strip is only there on a wide screen. */}
-      {wide && <Fluidbox.Filmstrip />}
+      {wide && <Fluidbox.Thumbnails />}
     </>
   );
 }
@@ -843,8 +843,8 @@ function Findings() {
           Instagram and Shop.
         </li>
         <li>
-          <strong>Thumbnail column: CSS.</strong> The filmstrip is viewer content that the page's
-          CSS places. --fluidbox-filmstrip-axis: y runs it as a column down the left, over slides
+          <strong>Thumbnail column: CSS.</strong> The thumbnails is viewer content that the page's
+          CSS places. --fluidbox-thumbnails-axis: y runs it as a column down the left, over slides
           that cross the whole window; a vertical wheel scrolls it, and up and down step through it.
         </li>
         <li>

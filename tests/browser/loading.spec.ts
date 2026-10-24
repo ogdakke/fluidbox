@@ -12,8 +12,8 @@ function watchViewerCode(page: Page) {
   return seen;
 }
 
-async function open(page: Page, loading?: string) {
-  await page.goto(`/harness.html?no-filmstrip${loading ? `&loading=${loading}` : ""}`);
+async function open(page: Page, preload?: string) {
+  await page.goto(`/harness.html?no-thumbnails${preload ? `&preload=${preload}` : ""}`);
   await page.waitForLoadState("networkidle");
   return page.locator('[data-test-index="0"] button');
 }
@@ -88,7 +88,7 @@ test.describe("loading the viewer's code", () => {
       let clicked = false;
       document.addEventListener("click", () => (clicked = true), { capture: true });
       new MutationObserver(() => {
-        if (!clicked && document.querySelector("[data-fluidbox-overlay]")) record.prepared = true;
+        if (!clicked && document.querySelector("[data-fluidbox-viewer]")) record.prepared = true;
       }).observe(document.body, { subtree: true, childList: true, attributes: true });
     });
     const box = (await trigger.boundingBox())!;

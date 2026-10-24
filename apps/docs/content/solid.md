@@ -7,7 +7,7 @@ description: The Solid binding for fluidbox, with every Fluidbox part, hook and 
 
 # Solid
 
-`@ogdakke/fluidbox/solid` builds a gallery from parts: `Fluidbox.Root` owns one viewer, `Fluidbox.Trigger` opens it, and `Fluidbox.Viewer`, `Fluidbox.Filmstrip` and `Fluidbox.Sheet` render your components into it. It needs `solid-js` 1.8 or later.
+`@ogdakke/fluidbox/solid` builds a gallery from parts: `Fluidbox.Root` owns one viewer, `Fluidbox.Trigger` opens it, and `Fluidbox.Viewer`, `Fluidbox.Thumbnails` and `Fluidbox.Sheet` render your components into it. It needs `solid-js` 1.8 or later.
 
 ## Install
 
@@ -20,7 +20,7 @@ import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/solid
 import "@ogdakke/fluidbox/styles.css";
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. `Fluidbox.Filmstrip` and `Fluidbox.Sheet` turn their add-ons on by themselves. Each also needs its stylesheet, `@ogdakke/fluidbox/filmstrip.css` or `@ogdakke/fluidbox/sheet.css`.
+Import `@ogdakke/fluidbox/styles.css` once in your app. `Fluidbox.Thumbnails` and `Fluidbox.Sheet` turn their add-ons on by themselves. Each also needs its stylesheet, `@ogdakke/fluidbox/thumbnails.css` or `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 
@@ -82,33 +82,31 @@ All parts are properties of the `Fluidbox` object.
 | `Fluidbox.Controls`                                         | three `<button>`s                 | The default Previous, Next and Close, for a `Viewer` of your own. `zoom` adds the zoom group.  |
 | `Fluidbox.ZoomIn`, `Fluidbox.ZoomOut`, `Fluidbox.ZoomReset` | a `<button>`                      | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                          |
 | `Fluidbox.Previous`, `Fluidbox.Next`, `Fluidbox.Close`      | a `<button>`                      | Run the command, with the default icon and label, and disable themselves when they can't.      |
-| `Fluidbox.Filmstrip`                                        | its children, in each thumbnail   | Turns the filmstrip on, with the default thumbnails or yours.                                  |
+| `Fluidbox.Thumbnails`                                       | its children, in each thumbnail   | Turns the thumbnails on, with the default thumbnails or yours.                                 |
 | `Fluidbox.Sheet`                                            | its children, in the sheet        | Turns the sheet on, with your content for the active item, and gives the sheet its attributes. |
 | `Fluidbox.SheetStop`                                        | a `<button>`                      | Moves the sheet to a stop, and back down when it is there. Put it in the viewer or sheet.      |
 
 ### `Fluidbox.Root`
 
-| Prop                 | Type                                                            | Default               | Purpose                                                                                                                                       |
-| -------------------- | --------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `items`              | `readonly TItem[] \| FluidboxItemList<TItem>`                   |                       | The gallery's items, or a lazy list (see [Items and origins](./items-and-origins.md)).                                                        |
-| `open`               | `boolean`                                                       |                       | Whether the viewer is open, when your state owns it. It opens on `index` and closes as this changes. Leave it out to let the triggers own it. |
-| `index`              | `number`                                                        |                       | The item the viewer shows, when your state owns it. An index out of range is ignored.                                                         |
-| `labels`             | `Partial<FluidboxLabels>`                                       | English               | Every string the viewer shows or announces. Changes apply to an open viewer.                                                                  |
-| `zoom`               | `false \| { step?: number; max?: number }`                      | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off. Changes apply to an open viewer.                                                                     |
-| `loop`               | `boolean`                                                       | `false`               | Go round: past the last item comes the first, by swipe, key, button and filmstrip. A single item never loops.                                 |
-| `renderers`          | `Record<string, (ctx: { item, index, signal }) => JSX.Element>` | `{}`                  | Renders `type: "custom"` items by their `render` key. The type is `FluidboxSolidRenderer`.                                                    |
-| `origins`            | `FluidboxOriginAdapter<TItem>`                                  | triggers              | Finds origins for items without a mounted trigger, and `revealOrigin` scrolls one into view.                                                  |
-| `loading`            | `"hover" \| "press" \| "eager"`                                 | `"hover"`             | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                              |
-| `onBeforeToggle`     | `(event: FluidboxToggleEvent) => void`                          |                       | Before the viewer opens or closes. `event.preventDefault()` cancels it.                                                                       |
-| `onToggle`           | `(event: FluidboxToggleEvent) => void`                          |                       | As the viewer starts to open or close.                                                                                                        |
-| `onBeforeItemChange` | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | Before the viewer moves to another item. `event.preventDefault()` keeps it still.                                                             |
-| `onItemChange`       | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | When the active item changes, opening included.                                                                                               |
-| `onSettle`           | `(event: FluidboxItemChangeEvent<TItem>) => void`               |                       | When the active item comes to rest.                                                                                                           |
-| `onSheetChange`      | `(event: FluidboxSheetEvent) => void`                           |                       | When the sheet comes to rest at another stop: `event.stop`, `event.reason`.                                                                   |
-| `onZoomChange`       | `(event: FluidboxZoomEvent) => void`                            |                       | When the image on show comes to rest at another zoom: `event.scale`, `event.reason`.                                                          |
-| `onOpenChange`       | `(open: boolean, details: { reason }) => void`                  |                       | As the viewer opens or closes, from any input. Set `open` from it.                                                                            |
-| `onIndexChange`      | `(index: number, details: { reason }) => void`                  |                       | As the viewer moves to another item, opening included. Set `index` from it.                                                                   |
-| `children`           | `JSX.Element`                                                   |                       | Your page content and the other parts.                                                                                                        |
+| Prop                    | Type                                                            | Default               | Purpose                                                                                                                                          |
+| ----------------------- | --------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `items`                 | `readonly TItem[] \| FluidboxItemList<TItem>`                   |                       | The gallery's items, or a lazy list (see [Items and origins](./items-and-origins.md)).                                                           |
+| `open`                  | `boolean`                                                       |                       | Whether the viewer is open, when your state owns it. It opens on `index` and closes as this changes. Leave it out to let the triggers own it.    |
+| `index`                 | `number`                                                        |                       | The item the viewer shows, when your state owns it. An index out of range is ignored.                                                            |
+| `labels`                | `Partial<FluidboxLabels>`                                       | English               | Every string the viewer shows or announces. Changes apply to an open viewer.                                                                     |
+| `zoom`                  | `false \| { step?: number; max?: number }`                      | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off. Changes apply to an open viewer.                                                                        |
+| `loop`                  | `boolean`                                                       | `false`               | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                   |
+| `renderers`             | `Record<string, (ctx: { item, index, signal }) => JSX.Element>` | `{}`                  | Renders `type: "custom"` items by their `render` key. The type is `FluidboxSolidRenderer`.                                                       |
+| `findTrigger`           | `(item, index) => Element \| null`                              |                       | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter). |
+| `revealTrigger`         | `(item, index, { signal, phase }) => void \| Promise<void>`     |                       | Brings an item's trigger into view before the viewer flies back to it.                                                                           |
+| `preload`               | `"intent" \| "press" \| "eager"`                                | `"intent"`            | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                 |
+| `onValueChange`         | `(value, details: FluidboxValueChangeDetails<TItem>) => void`   |                       | Before every open, move and close, with the value it goes to. `details.cancel()` stops it.                                                       |
+| `onValueChangeComplete` | `(value, details: FluidboxValueChangeDetails<TItem>) => void`   |                       | Once the motion of a value change settled.                                                                                                       |
+| `onSheetChange`         | `(event: FluidboxSheetEvent) => void`                           |                       | When the sheet comes to rest at another stop: `event.snap`, `event.reason`.                                                                      |
+| `onZoomChange`          | `(event: FluidboxZoomEvent) => void`                            |                       | When the image on show comes to rest at another zoom: `event.scale`, `event.reason`.                                                             |
+| `onOpenChange`          | `(open: boolean, details: { reason }) => void`                  |                       | As the viewer opens or closes, from any input. Set `open` from it.                                                                               |
+| `onIndexChange`         | `(index: number, details: { reason }) => void`                  |                       | As the viewer moves to another item, opening included. Set `index` from it.                                                                      |
+| `children`              | `JSX.Element`                                                   |                       | Your page content and the other parts.                                                                                                           |
 
 A renderer's `ctx` also has `active` and `onActiveChange`, to play and pause as its slide comes on show and leaves it. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
 
@@ -162,7 +160,7 @@ It goes inside a travelling `ThumbnailOverlay` and renders a `<span data-fluidbo
 
 Each takes button attributes. With no children it shows the default icon and an `aria-label` from `labels`. `disabled` follows the viewer's state: `Previous` and `Next` at the ends of a gallery that doesn't loop, `Close` while the viewer is closed. Pass `disabled` to override it. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
 
-### `Fluidbox.Filmstrip`
+### `Fluidbox.Thumbnails`
 
 | Prop       | Type                                      | Purpose                                                                                      |
 | ---------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
@@ -179,15 +177,15 @@ The strip marks the selected button `data-fluidbox-selected`, so your thumbnail 
 | `children`   | `(active: { item, index }) => JSX.Element` |                      | The content for the active item. It renders again when the active item changes.  |
 | ...          | section attributes                         |                      | `class`, `style`, `data-*`, `aria-*` and the rest go on the sheet's `<section>`. |
 
-The runtime makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`. The content renders straight into it with no wrapper of its own, and the section gets the `Sheet`'s attributes. `active` is a `FluidboxItemContext<TItem>`, as a `Filmstrip` thumbnail's is. `Fluidbox.SheetStop` takes `stop: number` and button attributes. It is a button with `data-fluidbox-sheet-stop`, which works anywhere in the viewer. Pressed at its own stop, it lowers the sheet to 0.
+The runtime makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.sheet`. The content renders straight into it with no wrapper of its own, and the section gets the `Sheet`'s attributes. `active` is a `FluidboxItemContext<TItem>`, as a `Thumbnails` thumbnail's is. `Fluidbox.SheetStop` takes `stop: number` and button attributes. It is a button with `data-fluidbox-sheet-snap`, which works anywhere in the viewer. Pressed at its own stop, it lowers the sheet to 0.
 
 ## Hooks
 
-Call them in a component inside `Fluidbox.Root`, including the content of `Viewer`, `Sheet`, `Filmstrip` and renderers.
+Call them in a component inside `Fluidbox.Root`, including the content of `Viewer`, `Sheet`, `Thumbnails` and renderers.
 
 | Hook                    | Returns                                                                  | Purpose                                                                                                                                                                                                    |
 | ----------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useFluidbox()`         | `FluidboxApi<TItem>`                                                     | The state (`status`, `id`, `index`, `item`, `count`, `hasPrevious`, `hasNext`, `zoom`) and `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `resetZoom`, `setItems`, `preload`, `load`. |
+| `useFluidbox()`         | `FluidboxApi<TItem>`                                                     | The state (`status`, `id`, `index`, `item`, `count`, `hasPrevious`, `hasNext`, `zoom`) and `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `zoomReset`, `setItems`, `preload`, `load`. |
 | `useFluidbox(selector)` | `Accessor<T>`                                                            | A memo of the part of `FluidboxState` the selector picks.                                                                                                                                                  |
 | `useFluidboxSheet()`    | `FluidboxSheetApi`: `{ stop: Accessor<number>, set(stop, { animate }) }` | The stop the sheet rests at, following `sheetchange`, and a command to move it. Needs a `Fluidbox.Sheet`.                                                                                                  |
 
@@ -210,7 +208,7 @@ For a typed item, write `useFluidbox<Photo>()`, or annotate the selector: `useFl
 
 ### Types
 
-The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerPreview`, `FluidboxThumbnailOverlayProps`, `FluidboxFrameLayerProps`, `FluidboxViewerProps`, `FluidboxActionProps`, `FluidboxFilmstripProps`, `FluidboxSheetProps`, `FluidboxSheetStopProps`, `FluidboxItemContext`, `FluidboxSolidRenderer`, `FluidboxSolidRenderContext`, `FluidboxApi`, `FluidboxSheetApi` and `FluidboxSolidParts` (the type of `Fluidbox`). It re-exports the item, list, label, origin, state and event types of `@ogdakke/fluidbox`, including `FluidboxItemChangeEvent` and `FluidboxSheetEvent`.
+The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerPreview`, `FluidboxThumbnailOverlayProps`, `FluidboxFrameLayerProps`, `FluidboxViewerProps`, `FluidboxActionProps`, `FluidboxThumbnailsProps`, `FluidboxSheetProps`, `FluidboxSheetStopProps`, `FluidboxItemContext`, `FluidboxSolidRenderer`, `FluidboxSolidRenderContext`, `FluidboxApi`, `FluidboxSheetApi` and `FluidboxSolidParts` (the type of `Fluidbox`). It re-exports the item, list, label, origin, state and event types of `@ogdakke/fluidbox`, including `FluidboxValueChangeEvent` and `FluidboxSheetEvent`.
 
 ## Patterns
 
@@ -222,7 +220,7 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 | [Custom content](./patterns/renderers.md)          | `Root renderers={{ note: () => <Note /> }}`.                                                                       |
 | [Programmatic control](./patterns/programmatic.md) | `useFluidbox()`, `open(2)`, and `onBeforeItemChange` with `preventDefault()`.                                      |
 | [Zoom](./patterns/zoom.md)                         | `Root zoom={{ step, max }}` or `zoom={false}`.                                                                     |
-| [Filmstrip](./patterns/filmstrip.md)               | `<Fluidbox.Filmstrip />`, or with a child function for your own thumbnails.                                        |
+| [Thumbnails](./patterns/thumbnails.md)             | `<Fluidbox.Thumbnails />`, or with a child function for your own thumbnails.                                       |
 | [Sheet](./patterns/sheet.md)                       | `Fluidbox.Sheet snapPoints class` with `{({ item }) => ...}`, `useFluidboxSheet()`, and a `SheetStop` in `Viewer`. |
 | [Headless controls](./patterns/headless.md)        | Your own buttons in `Viewer`, using `useFluidbox()`.                                                               |
 | [Right to left](./patterns/rtl.md)                 | Root `labels`, inside a `dir="rtl"` element.                                                                       |
@@ -230,11 +228,11 @@ The entry exports `FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxTriggerP
 
 ## Solid notes
 
-**Options apply live.** `Root` makes its viewer once, in the browser. A change to `labels` or `zoom` goes to `fluidbox.update()`. So does mounting or unmounting a `Filmstrip` or `Sheet`, and changing the sheet's `snapPoints` or `dismiss`. An open viewer stays open, and only the filmstrip or sheet whose options changed draws again. Mounting or unmounting a `Viewer` swaps the viewer's controls in place. The binding reads `origins`, `renderers` and the event props when it uses them.
+**Options apply live.** `Root` makes its viewer once, in the browser. A change to `labels` or `zoom` goes to `fluidbox.update()`. So does mounting or unmounting a `Thumbnails` or `Sheet`, and changing the sheet's `snapPoints` or `dismiss`. An open viewer stays open, and only the thumbnails or sheet whose options changed draws again. Mounting or unmounting a `Viewer` swaps the viewer's controls in place. The binding reads `origins`, `renderers` and the event props when it uses them.
 
 **Reactive items.** `items` is tracked: pass a signal's value (`items={photos()}`) and set a new array to change the gallery. An open viewer stays on the same item id if the new items still have it. `useFluidbox().setItems` does the same from inside.
 
-**Context reaches custom content.** Renderers, travelling overlays and the viewer, filmstrip and sheet content render under `Root`, straight into the viewer's elements with no wrapper. Context provided around `Root` reaches them, as the [Custom content](./patterns/renderers.md) example does with a theme, and so do the hooks.
+**Context reaches custom content.** Renderers, travelling overlays and the viewer, thumbnails and sheet content render under `Root`, straight into the viewer's elements with no wrapper. Context provided around `Root` reaches them, as the [Custom content](./patterns/renderers.md) example does with a theme, and so do the hooks.
 
 **`as` instead of `asChild`.** The trigger renders its own element through `Dynamic`. Pass `as="a"` (with `href`) or a component. A component must forward `ref` and the event props (`onClick`, `onPointerDown`, `onPointerUp`, `onPointerCancel`) to a DOM element.
 

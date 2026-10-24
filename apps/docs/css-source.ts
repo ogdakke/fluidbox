@@ -2,7 +2,7 @@
 // and on every change in dev:
 //
 //   <!-- css: theme -->        the theme variables
-//   <!-- css: inputs -->       the other properties styles.css and filmstrip.css read
+//   <!-- css: inputs -->       the other properties styles.css and thumbnails.css read
 //   <!-- css: sheet -->        the properties sheet.css reads
 //   <!-- css: published -->    the properties the runtime sets
 //   <!-- css: parts -->        the viewer's parts, and the attributes that mark yours
@@ -10,7 +10,7 @@
 //   <!-- css: states -->       the state attributes
 //
 // Names after the table's name keep the rows whose names are all among them:
-// `<!-- css: parts data-fluidbox-overlay data-fluidbox-dialog -->`.
+// `<!-- css: parts data-fluidbox-viewer data-fluidbox-dialog -->`.
 //
 // Inputs are documented where the stylesheets declare or read them, in a
 // `/** … */` comment. Before a declaration, the comment takes its name and
@@ -67,7 +67,7 @@ const blank = (text: string, start: number, end: number) =>
 
 function stylesheets(): (Source & { readonly text: string })[] {
   // In the order the reference lists them.
-  const order = ["styles.css", "filmstrip.css", "sheet.css"];
+  const order = ["styles.css", "thumbnails.css", "sheet.css"];
   const missing = files(sourceDir, /\.css$/).filter((path) => !order.includes(basename(path)));
   if (missing.length) throw new Error(`css-source.ts doesn't read ${missing.join(", ")}.`);
   return order.map((name) => {

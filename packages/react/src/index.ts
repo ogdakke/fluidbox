@@ -64,7 +64,7 @@ import type {
   FluidboxApi,
   FluidboxCommands,
   FluidboxControlsProps,
-  FluidboxFilmstripProps,
+  FluidboxThumbnailsProps,
   FluidboxFrameLayerProps,
   FluidboxRootProps,
   FluidboxSheetApi,
@@ -80,7 +80,7 @@ export type {
   FluidboxApi,
   FluidboxCommands,
   FluidboxControlsProps,
-  FluidboxFilmstripProps,
+  FluidboxThumbnailsProps,
   FluidboxFrameLayerProps,
   FluidboxItemContext,
   FluidboxReactRenderContext,
@@ -105,7 +105,7 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
-  FluidboxLoading,
+  FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -156,9 +156,9 @@ function createMounts() {
 
 const noMounts: readonly Mount[] = [];
 
-/** What the Filmstrip and Sheet parts ask of the viewer. Their presence turns each on. */
+/** What the Thumbnails and Sheet parts ask of the viewer. Their presence turns each on. */
 interface Addons {
-  filmstrip: { readonly custom: boolean } | null;
+  thumbnails: { readonly custom: boolean } | null;
   sheet: Pick<FluidboxSheetProps, "snapPoints" | "dismiss"> | null;
 }
 
@@ -168,7 +168,7 @@ interface FluidboxContextValue {
   readonly items: FluidboxRootProps<any>["items"];
   readonly labels: FluidboxLabels;
   readonly viewerTarget: HTMLElement | null;
-  readonly filmstripSlots: FluidboxSlots<any>;
+  readonly thumbnailsSlots: FluidboxSlots<any>;
   readonly sheetSlots: FluidboxSlots<any>;
   /** Render a node into a runtime target until the returned function runs. */
   readonly mount: (target: HTMLElement, node: ReactNode) => () => void;
@@ -179,7 +179,7 @@ interface FluidboxContextValue {
 }
 
 interface ServerHints {
-  filmstrip: boolean;
+  thumbnails: boolean;
   sheet: boolean;
   viewer: boolean;
 }
@@ -217,15 +217,15 @@ const eventProps = {
 } as const satisfies Record<"sheetchange" | "zoomchange", keyof FluidboxRootProps>;
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
-  const { items, open, index, labels, zoom, loop, loading, href, children } = props;
+  const { items, open, index, labels, zoom, loop, preload, href, children } = props;
   const slotsRef = useRef<{
-    filmstrip: FluidboxSlots<TItem>;
+    thumbnails: FluidboxSlots<TItem>;
     sheet: FluidboxSlots<TItem>;
   } | null>(null);
-  slotsRef.current ??= { filmstrip: createSlots(), sheet: createSlots() };
+  slotsRef.current ??= { thumbnails: createSlots(), sheet: createSlots() };
   const slots = slotsRef.current;
   const serverHints = useRef<ServerHints>({
-    filmstrip: false,
+    thumbnails: false,
     sheet: false,
     viewer: false,
   }).current;
@@ -289,7 +289,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         labels: labelOptions(),
         zoom: zoomOption(),
         loop,
-        loading,
+        preload,
         // Renderers are looked up by name when an item renders, so the newest
         // render function is used without telling the viewer.
         slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
@@ -319,9 +319,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   );
   const fluidbox = fluidboxRef.current;
 
-  // The Viewer, Filmstrip and Sheet parts register in their layout effects.
+  // The Viewer, Thumbnails and Sheet parts register in their layout effects.
   // Changes go to the viewer once the commit is done.
-  const addons = useRef<Addons>({ filmstrip: null, sheet: null });
+  const addons = useRef<Addons>({ thumbnails: null, sheet: null });
   const viewers = useRef(0);
   const scheduled = useRef(false);
   const schedule = useCallback(() => {
@@ -330,12 +330,12 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     // A part that unmounts and mounts again within one commit changes nothing.
     queueMicrotask(() => {
       scheduled.current = false;
-      const { filmstrip, sheet } = addons.current;
+      const { thumbnails, sheet } = addons.current;
       fluidbox.update({
         viewer: viewers.current > 0 ? renderViewer : undefined,
-        filmstrip: filmstrip
-          ? filmstrip.custom
-            ? { render: slots.filmstrip.render }
+        thumbnails: thumbnails
+          ? thumbnails.custom
+            ? { render: slots.thumbnails.render }
             : true
           : undefined,
         sheet: sheet
@@ -366,9 +366,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   const first = useRef(true);
   useIsomorphicLayoutEffect(() => {
     if (first.current) first.current = false;
-    else fluidbox.update({ labels: labelOptions(), zoom: zoomOption(), loop, loading });
+    else fluidbox.update({ labels: labelOptions(), zoom: zoomOption(), loop, preload });
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [fluidbox, labelsKey, zoomKey, loop, loading]);
+  }, [fluidbox, labelsKey, zoomKey, loop, preload]);
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
@@ -459,7 +459,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
       zoomIn: (options) => fluidbox.zoomIn(options),
       zoomOut: (options) => fluidbox.zoomOut(options),
-      resetZoom: (options) => fluidbox.resetZoom(options),
+      zoomReset: (options) => fluidbox.zoomReset(options),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
       load: () => fluidbox.load(),
@@ -479,7 +479,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       items,
       labels: resolvedLabels,
       viewerTarget,
-      filmstripSlots: slots.filmstrip,
+      thumbnailsSlots: slots.thumbnails,
       sheetSlots: slots.sheet,
       mount,
       setAddon,
@@ -565,7 +565,7 @@ function ServerViewer({
     labels,
     loop,
     href,
-    filmstrip: hints.filmstrip,
+    thumbnails: hints.thumbnails,
     sheet: hints.sheet,
     controls: !hints.viewer,
   });
@@ -795,21 +795,21 @@ const slotKey = (slot: FluidboxSlot<any>) => {
 };
 
 /**
- * Turns the filmstrip on. With a render child, renders each thumbnail into its
+ * Turns the thumbnails on. With a render child, renders each thumbnail into its
  * button through a portal.
  */
-function Filmstrip<TItem extends FluidboxItem>({
+function Thumbnails<TItem extends FluidboxItem>({
   children,
-}: FluidboxFilmstripProps<TItem>): ReactElement | null {
-  const { setAddon, filmstripSlots, serverHints } = useFluidboxContext();
+}: FluidboxThumbnailsProps<TItem>): ReactElement | null {
+  const { setAddon, thumbnailsSlots, serverHints } = useFluidboxContext();
   // Read by the server's copy of the open viewer, which renders after this.
-  serverHints.filmstrip = true;
+  serverHints.thumbnails = true;
   const custom = children !== undefined;
   useIsomorphicLayoutEffect(() => {
-    setAddon("filmstrip", { custom });
-    return () => setAddon("filmstrip", null);
+    setAddon("thumbnails", { custom });
+    return () => setAddon("thumbnails", null);
   }, [setAddon, custom]);
-  const current = useSlots(filmstripSlots as FluidboxSlots<TItem>);
+  const current = useSlots(thumbnailsSlots as FluidboxSlots<TItem>);
   if (!children) return null;
   return createElement(
     Fragment,
@@ -954,7 +954,7 @@ const SheetStop = forwardRef<HTMLButtonElement, FluidboxSheetStopProps>(function
     ...attributes,
     ref,
     type: attributes.type ?? "button",
-    "data-fluidbox-sheet-stop": String(stop),
+    "data-fluidbox-sheet-snap": String(stop),
   });
 });
 
@@ -1101,11 +1101,11 @@ export function useFluidboxSheet(): FluidboxSheetApi {
   );
   const stop = useSyncExternalStore(
     subscribe,
-    () => fluidbox.sheet?.stop ?? 0,
+    () => fluidbox.sheet?.snap ?? 0,
     () => 0,
   );
   return useMemo(
-    () => ({ stop, set: (next, options) => fluidbox.sheet?.set(next, options) }),
+    () => ({ stop, set: (next, options) => fluidbox.sheet?.setSnap(next, options) }),
     [stop, fluidbox],
   );
 }
@@ -1121,7 +1121,7 @@ export const Fluidbox = {
   ZoomIn,
   ZoomOut,
   ZoomReset,
-  Filmstrip,
+  Thumbnails,
   Sheet,
   SheetStop,
   ThumbnailOverlay,

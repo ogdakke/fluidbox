@@ -1,7 +1,7 @@
 import { createOpenIndexSync } from "./controlled";
 import { createFluidbox } from "./create-fluidbox";
 import { forwardEvents } from "./events";
-import { FluidboxFilmstripElement, FluidboxSheetElement } from "./filmstrip";
+import { FluidboxThumbnailsElement, FluidboxSheetElement } from "./thumbnails";
 import { FluidboxItemElement, type DeclarativeFluidboxDefinition } from "./item";
 import { idOf, toList } from "./items";
 import type { FluidboxLabels } from "./labels";
@@ -9,11 +9,11 @@ import type {
   Fluidbox,
   FluidboxCommandOptions,
   FluidboxEventMap,
-  FluidboxFilmstripOptions,
+  FluidboxThumbnailsOptions,
   FluidboxItem,
   FluidboxItemList,
   FluidboxItems,
-  FluidboxLoading,
+  FluidboxPreload,
   FluidboxOptions,
   FluidboxRenderer,
   FluidboxSlideRenderer,
@@ -55,17 +55,17 @@ function sameItems(a: FluidboxItemList, b: FluidboxItemList) {
  */
 const ITEM_ATTRIBUTES = new Set([
   "item-id",
-  "data-fluidbox-item-id",
+  "data-fluidbox-value",
   "returns",
   "slot",
   "placeholder",
   "aria-label",
 ]);
 /** Attributes whose change updates the viewer. */
-const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max", "loop", "loading"];
+const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max", "loop", "preload"];
 /** Your state for the viewer: `open`, and the `index` it shows. */
 const CONTROL_ATTRIBUTES = ["open", "index"];
-const LOADINGS: readonly string[] = ["hover", "press", "eager"] satisfies FluidboxLoading[];
+const PRELOADS: readonly string[] = ["intent", "press", "eager"] satisfies FluidboxPreload[];
 
 /** The `<fluidbox-item>` trigger an element is in, or is. */
 const triggerOf = (node: Node) =>
@@ -115,11 +115,11 @@ function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined 
 
 /**
  * The fluidbox as markup: `<fluidbox-item>` children, or an `items` property
- * with descendants marked `data-fluidbox-item-id` as triggers. It takes the
+ * with descendants marked `data-fluidbox-value` as triggers. It takes the
  * same options as createFluidbox as properties, has the same commands, and
  * fires the same events.
  *
- * Children that turn features on: `<fluidbox-filmstrip>`, `<fluidbox-sheet>`
+ * Children that turn features on: `<fluidbox-thumbnails>`, `<fluidbox-sheet>`
  * (each needs its entry imported), and a `<template slot="viewer">` for your
  * own controls, where `<fluidbox-controls>` stands for the default ones.
  */
@@ -209,7 +209,7 @@ export class FluidboxGalleryElement extends HTMLElement {
         if (
           nodes.some(
             (node) =>
-              node instanceof FluidboxSheetElement || node instanceof FluidboxFilmstripElement,
+              node instanceof FluidboxSheetElement || node instanceof FluidboxThumbnailsElement,
           )
         ) {
           this.#queueUpdate();
@@ -362,14 +362,14 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#queueUpdate();
   }
 
-  /** When the viewer's code loads, as the `loading` attribute says: `hover` (the default), `press` or `eager`. */
-  get loading(): FluidboxLoading {
-    const value = this.getAttribute("loading") ?? "";
-    return LOADINGS.includes(value) ? (value as FluidboxLoading) : "hover";
+  /** When the viewer's code loads, as the `preload` attribute says: `intent` (the default), `press` or `eager`. */
+  get loading(): FluidboxPreload {
+    const value = this.getAttribute("preload") ?? "";
+    return PRELOADS.includes(value) ? (value as FluidboxPreload) : "intent";
   }
 
-  set loading(loading: FluidboxLoading) {
-    this.setAttribute("loading", loading);
+  set loading(loading: FluidboxPreload) {
+    this.setAttribute("preload", loading);
   }
 
   /** Follow the viewer state, across the rebuilds a change of options makes. */
@@ -430,8 +430,8 @@ export class FluidboxGalleryElement extends HTMLElement {
     return this.#run((fluidbox) => fluidbox.zoomOut(options));
   }
 
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
-    return this.#run((fluidbox) => fluidbox.resetZoom(options));
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomReset(options));
   }
 
   /**
@@ -483,22 +483,22 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   #options() {
     const sheetElement = this.querySelector<FluidboxSheetElement>(":scope > fluidbox-sheet");
-    const filmstripElement = this.querySelector<FluidboxFilmstripElement>(
-      ":scope > fluidbox-filmstrip",
+    const thumbnailsElement = this.querySelector<FluidboxThumbnailsElement>(
+      ":scope > fluidbox-thumbnails",
     );
-    const filmstrip: boolean | FluidboxFilmstripOptions | undefined = filmstripElement
-      ? filmstripElement.render
-        ? { render: filmstripElement.render }
+    const thumbnails: boolean | FluidboxThumbnailsOptions | undefined = thumbnailsElement
+      ? thumbnailsElement.render
+        ? { render: thumbnailsElement.render }
         : true
       : undefined;
     return {
       labels: this.#labels,
       zoom: this.zoom,
       loop: this.hasAttribute("loop"),
-      loading: this.loading,
+      preload: this.loading,
       controls: undefined,
       viewer: this.#viewerRenderer,
-      filmstrip,
+      thumbnails,
       sheet: sheetElement ? this.#sheetOptions(sheetElement) : undefined,
     } satisfies FluidboxUpdateOptions;
   }
@@ -645,16 +645,17 @@ export class FluidboxGalleryElement extends HTMLElement {
     if (template) context.target.append(template.content.cloneNode(true));
   };
 
-  /** One trigger per `<fluidbox-item>`, or per `data-fluidbox-item-id` descendant with `items` set. */
+  /** One trigger per `<fluidbox-item>`, or per `data-fluidbox-value` descendant with `items` set. */
   #bindTriggers(fluidbox: Fluidbox) {
     const wanted = new Map<
       HTMLElement,
       { target: string; returns: readonly string[]; item?: FluidboxItemElement }
     >();
     if (this.#items) {
-      for (const element of this.querySelectorAll<HTMLElement>("[data-fluidbox-item-id]")) {
-        const returns = element.dataset.fluidboxReturns?.split(/\s+/).filter(Boolean) ?? [];
-        wanted.set(element, { target: element.dataset.fluidboxItemId!, returns });
+      for (const element of this.querySelectorAll<HTMLElement>("[data-fluidbox-value]")) {
+        // An id, or ids separated by spaces: the first opens, every one closes back here.
+        const [target, ...returns] = element.dataset.fluidboxValue!.split(/\s+/).filter(Boolean);
+        if (target) wanted.set(element, { target, returns });
       }
     } else {
       for (const item of this.#elements()) {

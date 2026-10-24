@@ -36,7 +36,7 @@ test("indexed source open cost stays near constant with gallery size", async ({
       await expect(page.locator("[data-fluidbox-dialog]")).toBeVisible();
       maxViewerNodes = Math.max(
         maxViewerNodes,
-        await page.locator("[data-fluidbox-slide], [data-fluidbox-filmstrip-item]").count(),
+        await page.locator("[data-fluidbox-slide], [data-fluidbox-thumbnails-item]").count(),
       );
       if (iteration > 0) openMs.push(elapsed);
       await page.keyboard.press("Escape");
@@ -89,7 +89,7 @@ test("a photo's open flies as soon as before: waiting for slides adds no frame",
             const start = performance.now();
             let frames = 0;
             const count = () => {
-              const overlay = document.querySelector("[data-fluidbox-overlay]");
+              const overlay = document.querySelector("[data-fluidbox-viewer]");
               // The flight starts as the overlay stops being merely prepared.
               if (overlay && !overlay.hasAttribute("data-fluidbox-prepared")) {
                 resolve({ frames, ms: performance.now() - start });

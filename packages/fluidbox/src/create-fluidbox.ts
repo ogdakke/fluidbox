@@ -13,7 +13,7 @@ import {
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
-  type FluidboxLoading,
+  type FluidboxPreload,
   type FluidboxOptions,
   type FluidboxOverlayOptions,
   type FluidboxReason,
@@ -119,7 +119,7 @@ function sameOptions(a: unknown, b: unknown): boolean {
 
 type Settings<TItem extends FluidboxItem> = Pick<
   FluidboxOptions<TItem>,
-  "controls" | "viewer" | "filmstrip" | "sheet"
+  "controls" | "viewer" | "thumbnails" | "sheet"
 >;
 
 /**
@@ -157,13 +157,13 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** Changed in place by update, so every part of the viewer reads the new strings. */
   readonly #labels: FluidboxLabels;
   #settings: Settings<TItem>;
-  #loading: FluidboxLoading = "hover";
+  #preload: FluidboxPreload = "intent";
   readonly #lifetime = new AbortController();
   readonly #bindings = new Set<() => void>();
   /** Re-resolve each binding's targets after the items change. */
   readonly #refreshers = new Set<() => void>();
   #sheet: Addon<FluidboxSheet> | undefined;
-  #filmstrip: Addon<null> | undefined;
+  #thumbnails: Addon<null> | undefined;
   /** The add-on entries the settings need, while they load. Opening waits for them. */
   #addonsLoading: Promise<void> | undefined;
   #list: FluidboxItemList<TItem>;
@@ -196,8 +196,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       : undefined;
     this.#source = toSource(this.#list);
     this.#labels = { ...resolveLabels(options.labels) };
-    const { sheet, filmstrip, controls, viewer } = options;
-    this.#settings = { sheet, filmstrip, controls, viewer };
+    const { sheet, thumbnails, controls, viewer } = options;
+    this.#settings = { sheet, thumbnails, controls, viewer };
     this.#origins = new OriginRegistry(this.#triggerAdapter(options));
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
@@ -206,7 +206,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this[hostKey] = this.#host();
     this.#makeAddons();
     if (driver) this.#attach(driver);
-    this.#setLoading(options.loading);
+    this.#setPreload(options.preload);
     // A deep link opens as a viewer the server rendered does: without motion.
     const value = options.value;
     if (value != null && this.#source.getIndex(value) !== null && typeof document !== "undefined") {
@@ -214,10 +214,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     }
   }
 
-  #setLoading(loading: FluidboxLoading | undefined) {
-    this.#loading = loading ?? "hover";
+  #setPreload(preload: FluidboxPreload | undefined) {
+    this.#preload = preload ?? "intent";
     // Browsers without idle callbacks load on the next task.
-    if (this.#loading !== "eager" || this.#viewer || typeof window === "undefined") return;
+    if (this.#preload !== "eager" || this.#viewer || typeof window === "undefined") return;
     const idle = window.requestIdleCallback ?? setTimeout;
     idle(() => void this.load());
   }
@@ -326,10 +326,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   /** Make the add-ons the settings turn on. Their entries load on first use. */
   #makeAddons() {
-    const { sheet, filmstrip } = this.#settings;
+    const { sheet, thumbnails } = this.#settings;
     const loading = loadAddons([
       ...(sheet ? (["sheet"] as const) : []),
-      ...(filmstrip ? (["filmstrip"] as const) : []),
+      ...(thumbnails ? (["thumbnails"] as const) : []),
     ]);
     if (loading) {
       // The latest load makes the add-ons of the settings it finds, which a
@@ -352,17 +352,17 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#addonsLoading = undefined;
     this.#sheet = sheet
       ? addon("sheet")(sheet === true ? {} : sheet, (stop, reason) => {
-          this.dispatchEvent(new FluidboxSheetEvent("sheetchange", { stop, reason }));
+          this.dispatchEvent(new FluidboxSheetEvent("sheetchange", { snap: stop, reason }));
         })
       : undefined;
-    this.#filmstrip = filmstrip
-      ? addon("filmstrip")(filmstrip === true ? {} : filmstrip)
+    this.#thumbnails = thumbnails
+      ? addon("thumbnails")(thumbnails === true ? {} : thumbnails)
       : undefined;
   }
 
   #extensions() {
     return [
-      this.#filmstrip?.extension as FluidboxExtension<TItem> | undefined,
+      this.#thumbnails?.extension as FluidboxExtension<TItem> | undefined,
       this.#sheet?.extension as FluidboxExtension<TItem> | undefined,
     ];
   }
@@ -374,11 +374,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const next: Settings<TItem> = {
       controls: has("controls") ? options.controls : previous.controls,
       viewer: has("viewer") ? options.viewer : previous.viewer,
-      filmstrip: has("filmstrip") ? options.filmstrip : previous.filmstrip,
+      thumbnails: has("thumbnails") ? options.thumbnails : previous.thumbnails,
       sheet: has("sheet") ? options.sheet : previous.sheet,
     };
     this.#settings = next;
-    if (has("loading")) this.#setLoading(options.loading);
+    if (has("preload")) this.#setPreload(options.preload);
     if (has("zoom")) {
       this.#zoom = options.zoom;
       this.#viewer?.setZoom(options.zoom);
@@ -411,7 +411,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       this.#viewer?.setPortal(this.#portal());
     }
     if (
-      !sameOptions(next.filmstrip, previous.filmstrip) ||
+      !sameOptions(next.thumbnails, previous.thumbnails) ||
       !sameOptions(next.sheet, previous.sheet)
     ) {
       // The outgoing sheet announces its return to rest as it is torn down.
@@ -455,7 +455,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return this.#zoomCommand((from) => from / ZOOM_FACTOR, "api", options);
   }
 
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">) {
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">) {
     return this.#zoomCommand(() => 1, "api", options);
   }
 
@@ -738,7 +738,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return {
       registerOrigin: (ids, origin) => this.#registerOrigin(ids, origin),
       intend: () => {
-        if (this.#loading === "hover") void this.load();
+        if (this.#preload === "intent") void this.load();
       },
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),

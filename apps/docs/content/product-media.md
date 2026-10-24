@@ -103,7 +103,7 @@ createModelRenderer({ load: () => import("@google/model-viewer") });
 
 The thumbnail and the poster show through the opening flight, and until the model has loaded; a slide beside the one on show keeps its poster and loads nothing. The box gets `data-fluidbox-model-ready` once the model shows, and `data-fluidbox-model-error` if it fails, keeping the poster. A closing flight carries the poster home, as a photo, rather than the live model.
 
-On the model, a drag turns it, a pinch or a trackpad pinch zooms it, and the arrow keys turn it while it has focus. None of them swipe, dismiss or zoom the viewer. A swipe that starts beside the model, the buttons, the keys off the model and the filmstrip still move the viewer, and Escape still closes it.
+On the model, a drag turns it, a pinch or a trackpad pinch zooms it, and the arrow keys turn it while it has focus. None of them swipe, dismiss or zoom the viewer. A swipe that starts beside the model, the buttons, the keys off the model and the thumbnails still move the viewer, and Escape still closes it.
 
 ## Content that owns its gestures
 
@@ -114,13 +114,13 @@ The spin and the model keep their gestures through one contract any renderer can
 - **Wheel.** A vertical wheel on it doesn't dismiss the viewer.
 - **Keys.** The arrow keys, Page Up and Down, Home and End pressed on it are its own; Escape still belongs to the viewer, and Tab moves focus as it does on any page.
 
-The filmstrip and the sheet use the same attribute.
+The thumbnails and the sheet use the same attribute.
 
 ## Slides that play and pause
 
 A renderer in `renderers` gets two more members than other renderers, which follow whether its slide is the one on show:
 
-<!-- api: FluidboxSlideRenderContext -->
+<!-- api: FluidboxSlide -->
 
 A slide mounts once it is within one slide of the current one, so it often mounts before it shows, and `active` starts false. `onActiveChange` calls back with `true` as it comes on show, as the viewer opens on it or a swipe lands on it, and `false` as the viewer moves away or closes. The slide that leaves hears first, so its player stops before the next one starts. The `signal` aborts when the slide unloads, which ends the listening too.
 

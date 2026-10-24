@@ -10,7 +10,7 @@ export interface FluidboxItemBase {
    */
   readonly id?: string;
   /**
-   * A small image of the item: the filmstrip's thumbnail, an iframe's still, and
+   * A small image of the item: the thumbnails' thumbnail, an iframe's still, and
    * the picture shown while the full image loads. With `srcset`, the browser
    * picks a sharper one where it can.
    */
@@ -185,7 +185,7 @@ export interface FluidboxRenderContext<TItem extends FluidboxItem = FluidboxItem
 }
 
 /**
- * Draws into `target`: a filmstrip thumbnail, the
+ * Draws into `target`: a thumbnail, the
  * sheet, or a travelling thumbnail overlay. Return a function to release your own
  * resources, such as timers.
  */
@@ -359,7 +359,7 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
  * a click on a trigger, and "keyboard" the arrow keys, Escape, or a page-scrolling
  * key that closes the viewer. "pointer" is a swipe or scroll through the slides, a
  * drag to dismiss or a tap on the backdrop, and "wheel" a wheel or trackpad scroll
- * that dismisses. "items" is a move made by `setItems`. A move from the filmstrip
+ * that dismisses. "items" is a move made by `setItems`. A move from the thumbnails
  * has the reason of its input.
  */
 export type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items";
@@ -431,13 +431,13 @@ export interface FluidboxValueChangeDetails<TItem extends FluidboxItem = Fluidbo
  * button "keyboard", and `sheet.set` or the viewer opening and closing "api".
  */
 export class FluidboxSheetEvent extends Event {
-  /** The stop the sheet rests at: 0 at rest, then one per snap point. */
-  readonly stop: number;
+  /** The snap the sheet rests at: 0 at rest, then one per snap point. */
+  readonly snap: number;
   readonly reason: FluidboxReason;
 
-  constructor(type: "sheetchange", init: EventInit & { stop: number; reason: FluidboxReason }) {
+  constructor(type: "sheetchange", init: EventInit & { snap: number; reason: FluidboxReason }) {
     super(type, init);
-    this.stop = init.stop;
+    this.snap = init.snap;
     this.reason = init.reason;
   }
 }
@@ -511,15 +511,15 @@ export interface FluidboxSheetOptions<TItem extends FluidboxItem = FluidboxItem>
   readonly render?: FluidboxRenderer<TItem>;
 }
 
-/** Reads and moves the sheet. A `sheetchange` event follows each new stop. */
+/** Reads and moves the sheet. A `sheetchange` event follows each new snap. */
 export interface FluidboxSheet {
-  /** The stop the sheet rests at: 0 at rest, then one per snap point. */
-  readonly stop: number;
-  /** Move the sheet to a stop. Ignored while the viewer is not open. */
-  set(stop: number, options?: { readonly animate?: boolean }): void;
+  /** The snap the sheet rests at: 0 at rest, then one per snap point. */
+  readonly snap: number;
+  /** Move the sheet to a snap. Ignored while the viewer is not open. */
+  setSnap(snap: number, options?: { readonly animate?: boolean }): void;
 }
 
-export interface FluidboxFilmstripOptions<TItem extends FluidboxItem = FluidboxItem> {
+export interface FluidboxThumbnailsOptions<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Fills each thumbnail button instead of the default image, while the button
    * is in the strip's rendered window. The `signal` aborts as it leaves.
@@ -542,13 +542,13 @@ export type FluidboxControlName =
   | "zoomReset";
 
 /**
- * When the viewer's code loads. `"hover"` loads it when a mouse rests on a
+ * When the viewer's code loads. `"intent"` loads it when a mouse rests on a
  * trigger for 100 ms, a finger or pen touches one, or one takes focus.
  * `"press"` loads it when a trigger is pressed, and `"eager"` once the page is
  * idle. In every mode, an open loads it if it hasn't loaded yet, and
  * `load()` loads it whenever you call it.
  */
-export type FluidboxLoading = "hover" | "press" | "eager";
+export type FluidboxPreload = "intent" | "press" | "eager";
 
 /**
  * Every option but `items`, `value`, `slides`, `findTrigger` and
@@ -575,7 +575,7 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly slides?: FluidboxSlides<TItem>;
   /**
    * Go round: past the last item comes the first, and before the first the
-   * last, by swipe, key, button and filmstrip alike. A single item never loops.
+   * last, by swipe, key, button and thumbnails alike. A single item never loops.
    * @default false
    */
   readonly loop?: boolean;
@@ -588,10 +588,10 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    */
   readonly controls?: boolean | readonly FluidboxControlName[];
   /**
-   * A thumbnail strip. Needs `import "@ogdakke/fluidbox/filmstrip"` and its
+   * A thumbnail strip. Needs `import "@ogdakke/fluidbox/thumbnails"` and its
    * stylesheet. Without the import, it throws an Error that names it.
    */
-  readonly filmstrip?: boolean | FluidboxFilmstripOptions<TItem>;
+  readonly thumbnails?: boolean | FluidboxThumbnailsOptions<TItem>;
   /**
    * A sheet over the photo. Needs `import "@ogdakke/fluidbox/sheet"` and its
    * stylesheet. Without the import, it throws an Error that names it.
@@ -614,9 +614,9 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   ) => void | Promise<void>;
   /**
    * When the viewer's code loads.
-   * @default "hover"
+   * @default "intent"
    */
-  readonly loading?: FluidboxLoading;
+  readonly preload?: FluidboxPreload;
 }
 
 /**
@@ -630,9 +630,9 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
     | "loop"
     | "controls"
     | "viewer"
-    | "filmstrip"
+    | "thumbnails"
     | "sheet"
-    | "loading"]?: FluidboxOptions<TItem>[K] | undefined;
+    | "preload"]?: FluidboxOptions<TItem>[K] | undefined;
 };
 
 export interface FluidboxCommandOptions {
@@ -722,11 +722,11 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   /** Zoom out by 1.5, as the `-` key does. */
   zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
   /** Zoom back out to fit, as the `0` key does. */
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
   /**
    * Change options without closing the viewer. Labels and zoom apply in place, so
    * a zoomed photo zooms out when zoom turns off. A change of `controls`, `viewer`
-   * or the labels redraws the viewer's layer, and a change of `filmstrip` or
+   * or the labels redraws the viewer's layer, and a change of `thumbnails` or
    * `sheet` mounts that add-on again, with the sheet at rest. It compares option
    * objects member by member and functions by identity, so a fresh object with the
    * same members changes nothing. Turning an add-on on without its import
@@ -754,7 +754,7 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
    * Make an element a trigger. `value` is one target, or a list: the first
    * opens, and every one closes back onto the element. It sets
    * `data-fluidbox-trigger` and `aria-haspopup="dialog"` on the element, loads
-   * the viewer's code as the `loading` option says, preloads on a
+   * the viewer's code as the `preload` option says, preloads on a
    * primary-button `pointerdown`, and drops that work 250 ms after the pointer
    * lifts without a click. A plain primary click opens the item the trigger
    * shows, its first or the one of its list it last closed onto, unless the

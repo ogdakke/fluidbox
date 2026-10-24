@@ -66,14 +66,14 @@ binding migration are incomplete.
 - Added deterministic open/close interruption geometry checks, focus/inert restoration checks, and trace/video evidence in `tests/browser/motion.spec.ts`. This protects pose continuity at command handoff, not gesture velocity or compositor performance.
 - Fixed indexed-source opening preparation to resolve mounted thumbnails before the gallery becomes active; added opening-pose and missing-origin scale/fade regressions.
 - Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.
-- Added the React/TanStack Virtual photo-library pilot with 10k and 100k datasets, responsive rows, and a filmstrip toggle. Its source can reveal the selected item in the background. Closing uses an available target immediately or falls back without waiting. See [virtualized host integration](VIRTUALIZATION.md).
+- Added the React/TanStack Virtual photo-library pilot with 10k and 100k datasets, responsive rows, and a thumbnails toggle. Its source can reveal the selected item in the background. Closing uses an available target immediately or falls back without waiting. See [virtualized host integration](VIRTUALIZATION.md).
 - Added total activation bundle accounting, including lazy chunks and `unlazy`, with separate CSS and combined budgets. See [bundle baseline](../baseline/bundle-budget.md).
 - Removed stylesheet dependence on `@scope`. Viewer selectors use data-attribute roots, with tests for outside-element isolation, stylesheet override order, and host theme copying. [Styling documentation](FLUIDBOX.md) distinguishes author inputs from runtime-published motion values.
 - Recorded the recent-browser target and available physical devices in [browser support policy](BROWSER_SUPPORT.md). Exact supported versions and physical-device results remain pending.
 
 The immediate milestone is to finish behavior ownership after the public API lock. Migrate the
 Solid, Vue, and Angular bindings and reduce the custom elements to declarative adapters. The legacy
-filmstrip now reuses the extracted runtime, and pointerdown opening preparation is available through
+thumbnails now reuses the extracted runtime, and pointerdown opening preparation is available through
 the controller API. Keep compatibility-specific tests, while making the direct runtime the canonical
 interaction suite.
 
@@ -103,7 +103,7 @@ Solid/Vue/Angular APIs, a structural/theme stylesheet split, or a CDN adapter.
 ### What headless means
 
 - The runtime owns interaction state, gesture arbitration, zoom, transition geometry, gallery windowing, the body-level portal, media scheduling, and accessibility mechanics.
-- Applications own visual design, icons, control placement, captions, toolbars, and framework-authored content. No default toolbar, filmstrip, or visual theme is mandatory.
+- Applications own visual design, icons, control placement, captions, toolbars, and framework-authored content. No default toolbar, thumbnails, or visual theme is mandatory.
 - Framework bindings connect composed parts to the runtime and render framework content through native portals or equivalent facilities. They do not implement separate gesture or animation systems.
 - Per-frame transforms and gesture samples stay inside the runtime. Framework subscriptions expose discrete semantic state, not a render for every pointer move.
 - Headless does not mean arbitrary markup can replace every internal node. Publish supported parts and their layout constraints; keep scroll tracks, flight layers, and measurement nodes private.
@@ -114,9 +114,9 @@ Preserve the body-level custom portal. Do not replace it with a native `dialog`.
 
 ### Public composition points
 
-The initial parts are `Root`, `Item`, `Trigger`, `Portal`, `Content`, `Close`, `Previous`, `Next`, and optional `Filmstrip`. Provide a caption/description association and state hooks for application-authored controls. Exact names are validated in the contract spike.
+The initial parts are `Root`, `Item`, `Trigger`, `Portal`, `Content`, `Close`, `Previous`, `Next`, and optional `Thumbnails`. Provide a caption/description association and state hooks for application-authored controls. Exact names are validated in the contract spike.
 
-`Portal` places application-authored viewer controls/content into the runtime-owned body portal. `Content` connects media or framework-rendered content to the runtime's measured frame. Navigation and close parts supply command wiring and applicable accessibility/disabled state; consumers supply appearance and children. `Filmstrip` uses the runtime's bounded rendering and selection behavior rather than requiring one thumbnail component per source item.
+`Portal` places application-authored viewer controls/content into the runtime-owned body portal. `Content` connects media or framework-rendered content to the runtime's measured frame. Navigation and close parts supply command wiring and applicable accessibility/disabled state; consumers supply appearance and children. `Thumbnails` uses the runtime's bounded rendering and selection behavior rather than requiring one thumbnail component per source item.
 
 Document which element receives refs, state attributes, accessible relationships, and required styles for every part. Do not expose every internal node as a public component or promise unrestricted replacement of geometry-critical markup.
 
@@ -160,9 +160,9 @@ Define the integration checks against public source/origin APIs so they can be r
 - Default to 10,000 items with a 100,000-item stress option, date sections, mixed portrait/landscape dimensions, and responsive columns. Keep host and viewer DOM independently bounded.
 - Provide a deterministic local fixture mode for CI and a documented varied-photo mode for manual decode/memory testing. Repeated SVGs are useful for geometry but cannot establish realistic image-memory or transfer behavior. Use redistributable assets or caller-supplied photos; record the dataset and candidate dimensions with results.
 - Lazy-load thumbnails within a bounded host overscan range. Record host thumbnail requests separately from viewer preview/full-image requests. Exercise slow and failed media without making CI depend on a remote image service.
-- Open from a visible image after scrolling deep into the library; assert the opening pose matches that thumbnail. Navigate beyond the mounted host range and jump far away through the filmstrip while keeping the viewer mounted.
+- Open from a visible image after scrolling deep into the library; assert the opening pose matches that thumbnail. Navigate beyond the mounted host range and jump far away through the thumbnails while keeping the viewer mounted.
 - Change the host window programmatically while the modal is open to simulate recycling/source updates; do not unlock background scrolling merely for the benchmark. A recycled node must never become another item's close target.
-- Follow the selected item in the background by default in this example, including distant filmstrip navigation. Ask the host virtualizer to reveal it through an explicit public source hook, then re-resolve the mounted origin for closing and focus. Coalesce rapid navigation and cancel stale reveal work so an older request cannot move the host away from the final selection. Closing never waits for the host. Abort pending reveal work and use a matching visible origin immediately, or use the fallback transition.
+- Follow the selected item in the background by default in this example, including distant thumbnails navigation. Ask the host virtualizer to reveal it through an explicit public source hook, then re-resolve the mounted origin for closing and focus. Coalesce rapid navigation and cancel stale reveal work so an older request cannot move the host away from the final selection. Closing never waits for the host. Abort pending reveal work and use a matching visible origin immediately, or use the fallback transition.
 - Test repeated open/navigate/close sessions, reverse scroll direction, viewport/column changes, keyboard use, and physical touch/trackpad input. Assert selected IDs, visible ranges, focus, DOM bounds, and request cleanup; record first useful paint, frame gaps, and retained memory separately.
 
 Deliver a linked playground route, reproducible dataset/seed, browser scenarios, and raw measurements for both item counts. This is the next substantial example/benchmark part after the initial transition and bundle checks; it contributes evidence to Stage 0 without claiming that all performance gates are complete.
@@ -195,7 +195,7 @@ Adopt these proposed rules in the contract spike:
 - Motion commands resolve after their requested state settles. Return a discriminated result for completed, superseded, prevented, or aborted work. Invalid arguments reject. No promise remains pending after interruption or destruction.
 - A newer incompatible command supersedes the old command and continues from the painted pose. Repeated requests for the same pending destination share its outcome. `destroy()` is immediate and idempotent, cancels pending work, and releases all session resources.
 - Before-events are synchronous and cancelable for application-requested or user-requested actions. They cannot veto mandatory cleanup on destroy or prevent recovery from an empty source.
-- Carry reasons through commands and notifications, including trigger, keyboard, pointer, wheel, filmstrip, API, source update, and teardown as applicable.
+- Carry reasons through commands and notifications, including trigger, keyboard, pointer, wheel, thumbnails, API, source update, and teardown as applicable.
 - Separate accepted selection changes from settlement; specify event order for prevention, interruption, no-op requests, source replacement, and reduced motion with trace-based tests.
 - Accept an `AbortSignal` for commands/loading that may outlive the caller. Aborting a command must settle it and leave a documented valid viewer state; it is not synonymous with destroying the viewer.
 
@@ -333,7 +333,7 @@ Accessibility mechanics belong to the headless contract. Custom appearance must 
 
 Audit keyboard routing before advertising arbitrary content. Editing text or operating a native media/form control must not trigger gallery shortcuts. Test Escape ownership, focus traversal, nested scroll containers, open shadow roots, disabled/hidden controls, recycled-origin focus fallback, and teardown. Provide configurable UI/status labels and test RTL, high contrast, reduced motion, and screen reader announcements. Reduced motion must preserve correct state and event ordering, not just shorten animation duration.
 
-Audit every current CSS rule into required behavior, optional appearance, or portfolio-specific presentation. Replace `@scope` dependence with explicit data-attribute isolation; test both stylesheet orders against application overrides. Preserve accessible state hooks and document motion variables so consumers can customize appearance and coordinated effects without replacing the engine. Keep the existing `./styles.css` path during migration; settle the behavior/appearance export names before beta. Verify two substantially different application-designed viewers using the same parts and behavior styles, including custom captions, controls, and filmstrip placement. Both must pass interaction and accessibility checks without relying on an example theme.
+Audit every current CSS rule into required behavior, optional appearance, or portfolio-specific presentation. Replace `@scope` dependence with explicit data-attribute isolation; test both stylesheet orders against application overrides. Preserve accessible state hooks and document motion variables so consumers can customize appearance and coordinated effects without replacing the engine. Keep the existing `./styles.css` path during migration; settle the behavior/appearance export names before beta. Verify two substantially different application-designed viewers using the same parts and behavior styles, including custom captions, controls, and thumbnails placement. Both must pass interaction and accessibility checks without relying on an example theme.
 
 ## Delivery order and exit criteria
 

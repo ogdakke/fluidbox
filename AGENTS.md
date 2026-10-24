@@ -4,7 +4,7 @@ This is a Bun workspace. The only published package is `packages/fluidbox` (`@og
 
 - Use `bun install` for dependencies and `bun run <script>` for scripts.
 - Use `bun run build` for tsdown, `bun run test` for Vitest, `bun run test:ssr` and `bun run test:bundle` for package checks, `bun run lint:all` for oxlint and TypeScript 7, and `bun run format:check` for oxfmt.
-- Keep the package root safe to import without browser globals. Custom-element registration belongs in the browser-only `./elements` entry. The sheet and filmstrip register through side-effect imports of `./sheet` and `./filmstrip`.
+- Keep the package root safe to import without browser globals. Custom-element registration belongs in the browser-only `./elements` entry. The sheet and thumbnails register through side-effect imports of `./sheet` and `./thumbnails`.
 - Items are flat (`type: "img" | "video" | "iframe" | "custom"` with HTML attribute names) in the public API and inside the runtime alike; there is no conversion layer.
 - Keep gesture, zoom, transition, gallery, and portal behavior in the runtime package. Bindings use only the plain JS API, the add-on entries and the binding kit (`@ogdakke/fluidbox/kit`, `src/kit.ts`), never the custom elements. Every binding, the custom elements and the plain JS API support the same patterns.
 - Preserve the body-level custom portal. Do not replace it with a native `dialog`.
