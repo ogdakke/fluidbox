@@ -1,6 +1,6 @@
 import { controlSelector, drawViewerLayer } from "./viewer-layer";
 import { idOf } from "./items";
-import { FluidboxMediaErrorEvent } from "./public-api";
+import { FluidboxMediaErrorEvent, type FluidboxOptions } from "./public-api";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
@@ -353,9 +353,12 @@ export class DomViewerDriver<
     this.#portal.dialog.toggleAttribute("data-zoomable", !!this.#zoomOptions);
   }
 
-  /** What may close the viewer, and what a vertical wheel does. */
-  setGestures(gestures: ViewerGestures) {
-    this.#gestures = gestures;
+  /** What may close the viewer, and what a vertical wheel does, with their defaults. */
+  setGestures({ dismiss, wheel }: Pick<FluidboxOptions, "dismiss" | "wheel">) {
+    this.#gestures = {
+      dismiss: { drag: dismiss?.drag ?? true, backdrop: dismiss?.backdrop ?? true },
+      wheel: wheel ?? "dismiss",
+    };
   }
 
   /** The document's fullscreen element, by the WebKit name too, as older iPad Safari has it. */

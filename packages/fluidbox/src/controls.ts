@@ -107,7 +107,7 @@ export const controlNames = ["previous", "next", "close"] as const;
 /** The zoom controls, shown when `controls` lists them. */
 export const zoomControlNames = ["zoomIn", "zoomOut", "zoomReset"] as const;
 
-/** A control the bindings draw a button with an icon for. */
+/** One of the default controls or the zoom controls. */
 export type FluidboxIconControlName =
   | (typeof controlNames)[number]
   | (typeof zoomControlNames)[number];

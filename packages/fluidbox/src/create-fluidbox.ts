@@ -46,7 +46,6 @@ import type {
   SessionController,
   SessionReason,
   SessionTarget,
-  ViewerGestures,
   ViewerSessionMotionContext,
 } from "./runtime-types";
 import { bindTrigger, resolveOrigin } from "./trigger";
@@ -102,16 +101,12 @@ export type FluidboxRuntimeDriver<TItem extends FluidboxItem> = Pick<
   keyof DomViewerDriver<TItem>
 >;
 
-/** The gestures that close the viewer, and what the wheel does, with their defaults. */
-function gesturesOf({
-  dismiss,
-  wheel,
-}: Pick<FluidboxOptions, "dismiss" | "wheel">): ViewerGestures {
-  return {
-    dismiss: { drag: dismiss?.drag ?? true, backdrop: dismiss?.backdrop ?? true },
-    wheel: wheel ?? "dismiss",
-  };
-}
+/**
+ * Every control's name, so `bindControl` can check one before its wiring
+ * loads. A test keeps it in step with `allControlNames`.
+ */
+export const controlNameList =
+  "previous next close zoomIn zoomOut zoomReset counter fullscreen download share retry".split(" ");
 
 /** Options objects with the same members, so a binding may pass a fresh literal each render. */
 function sameOptions(a: unknown, b: unknown): boolean {
@@ -201,7 +196,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #zoomId: string | null = null;
   /** Whether the viewer is the document's fullscreen element, as it last said. */
   #fullscreen = false;
-  #gestures: ViewerGestures;
+  #gestures: Pick<FluidboxOptions, "dismiss" | "wheel">;
   #shareUrl: FluidboxOptions<TItem>["shareUrl"];
   readonly [hostKey]: FluidboxHost;
 
@@ -219,7 +214,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
     this.#slides = options.slides;
-    this.#gestures = gesturesOf(options);
+    this.#gestures = { dismiss: options.dismiss, wheel: options.wheel };
     this.#shareUrl = options.shareUrl;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
@@ -408,10 +403,10 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     if (has("preload")) this.#setPreload(options.preload);
     if (has("shareUrl")) this.#shareUrl = options.shareUrl;
     if (has("dismiss") || has("wheel")) {
-      this.#gestures = gesturesOf({
+      this.#gestures = {
         dismiss: has("dismiss") ? options.dismiss : this.#gestures.dismiss,
         wheel: has("wheel") ? options.wheel : this.#gestures.wheel,
-      });
+      };
       this.#viewer?.setGestures(this.#gestures);
       // A sheet reads whether a drag may close as it mounts.
       if (has("dismiss") && !this.#addonsLoading) this.#viewer?.setExtensions(this.#extensions());
@@ -542,21 +537,27 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   setFullscreen(on?: boolean) {
-    if (this.#state.status !== "open" || !this.#viewer) return Promise.resolve(false);
-    return this.#viewer.setFullscreen(on ?? !this.#fullscreen);
+    return this.#onShow((viewer) => viewer.setFullscreen(on ?? !this.#fullscreen));
   }
 
   download() {
-    const item = this.#state.item;
-    if (this.#state.status !== "open" || !item || !this.#viewer) return Promise.resolve(false);
-    return this.#viewer.download(item);
+    return this.#onShow((viewer, item) => viewer.download(item));
   }
 
   share() {
-    const item = this.#state.item;
-    const url = item && this.#shareLink(item);
-    if (this.#state.status !== "open" || !url || !this.#viewer) return Promise.resolve(false);
-    return this.#viewer.share(item, url);
+    return this.#onShow((viewer, item, url = this.#shareLink(item)) =>
+      url ? viewer.share(item, url) : false,
+    );
+  }
+
+  /** Run a command on the item on show; with none open it does nothing and resolves false. */
+  #onShow(
+    run: (viewer: FluidboxRuntimeDriver<TItem>, item: TItem) => Promise<boolean> | false,
+  ): Promise<boolean> {
+    const { status, item } = this.#state;
+    return Promise.resolve(
+      status === "open" && !!item && !!this.#viewer && run(this.#viewer, item),
+    );
   }
 
   /** The link Share shares, resolved against the page; undefined when there is none. */
@@ -664,6 +665,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     options: { readonly signal?: AbortSignal } = {},
   ) {
     this.#assertAlive();
+    if (!controlNameList.includes(name)) {
+      throw new TypeError(`Fluidbox has no control named "${name}".`);
+    }
     // The control code loads on first use, so a page that binds none skips it.
     let release: (() => void) | undefined;
     let released = false;

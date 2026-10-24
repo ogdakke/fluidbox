@@ -87,7 +87,6 @@ export function bindControl(
   signal?: AbortSignal,
 ): () => void {
   const control = fluidboxControls[name];
-  if (!control) throw new TypeError(`Fluidbox has no control named "${name}".`);
   const scope = new AbortController();
   signal?.addEventListener("abort", () => scope.abort(), { once: true, signal: scope.signal });
   element.setAttribute(control.attribute, "");

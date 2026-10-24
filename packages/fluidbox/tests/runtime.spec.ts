@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { FluidboxRuntime, type FluidboxRuntimeDriver } from "../src/create-fluidbox";
+import { allControlNames } from "../src/controls";
+import {
+  controlNameList,
+  FluidboxRuntime,
+  type FluidboxRuntimeDriver,
+} from "../src/create-fluidbox";
 import { hostOf } from "../src/host";
 import type {
   FluidboxItem,
@@ -140,6 +145,15 @@ function record(fluidbox: EventTarget, into: string[]) {
 }
 
 describe("the fluidbox runtime", () => {
+  it("knows every control's name before the control code loads", () => {
+    expect(controlNameList).toEqual(allControlNames);
+    const fluidbox = make(new TestDriver());
+    const button = { setAttribute() {} } as unknown as HTMLElement;
+    expect(() => fluidbox.bindControl(button, "slideshow" as never)).toThrow(
+      new TypeError('Fluidbox has no control named "slideshow".'),
+    );
+  });
+
   it("prepares a valid closed target without publishing state", () => {
     const driver = new TestDriver();
     const fluidbox = make(driver);
