@@ -199,6 +199,71 @@ test.describe("YouTube and Vimeo facades", () => {
     expect(requests.players).toHaveLength(1);
   });
 
+  for (const [id, name] of [
+    ["youtube:M7lc1UVf-VE", "YouTube"],
+    ["vimeo:76979871", "Vimeo"],
+  ] as const) {
+    test(`a reopen of a played ${name} video holds its poster, with no player coming back`, async ({
+      page,
+    }) => {
+      const requests = await load(page);
+      await open(page, id);
+      await page
+        .locator(shown)
+        .getByRole("button", { name: `Play ${name} video` })
+        .click();
+      await expect(page.locator(`${shown} [data-fluidbox-embed-ready]`)).toHaveCount(1);
+      await page.evaluate(() => window.mediaFixture.fluidbox.close());
+      await expect(page.locator(dialog)).toHaveCount(0);
+      // Whether an iframe joined the page during the reopen, and whether the
+      // poster showed as its flight started.
+      const watched = page.evaluate(
+        () =>
+          new Promise<{ iframe: boolean; poster: boolean }>((resolve) => {
+            let iframe = false;
+            const observer = new MutationObserver((records) => {
+              for (const record of records) {
+                for (const node of record.addedNodes) {
+                  if (
+                    node instanceof Element &&
+                    (node.matches("iframe") || node.querySelector("iframe"))
+                  )
+                    iframe = true;
+                }
+              }
+            });
+            observer.observe(document.body, { subtree: true, childList: true });
+            const check = () => {
+              const viewer = document.querySelector("[data-fluidbox-viewer]");
+              if (viewer && !viewer.hasAttribute("data-fluidbox-prepared")) {
+                const poster = viewer.querySelector<HTMLElement>(
+                  '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media-poster="poster"]',
+                );
+                observer.disconnect();
+                resolve({
+                  iframe,
+                  poster:
+                    !!poster &&
+                    getComputedStyle(poster).visibility !== "hidden" &&
+                    getComputedStyle(poster).opacity !== "0",
+                });
+                return;
+              }
+              requestAnimationFrame(check);
+            };
+            check();
+          }),
+      );
+      await open(page, id);
+      expect(await watched).toEqual({ iframe: false, poster: true });
+      await expect(page.locator(`${shown} iframe`)).toHaveCount(0);
+      await expect(
+        page.locator(shown).getByRole("button", { name: `Play ${name} video` }),
+      ).toBeVisible();
+      expect(requests.players).toHaveLength(1);
+    });
+  }
+
   test("a video that hasn't played flies home like a photo", async ({ page }) => {
     await load(page);
     await open(page, "youtube:M7lc1UVf-VE");
