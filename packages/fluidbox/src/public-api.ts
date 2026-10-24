@@ -282,6 +282,7 @@ export type FluidboxPlaybackSource =
  */
 export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
+  /** The item's index, read live: new items keep a slide whose item moved. */
   readonly index: number;
   /**
    * The media box: the element that flies, follows a drag to dismiss and

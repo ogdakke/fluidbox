@@ -1435,19 +1435,22 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const { signal } = controller;
     const zoomListeners = (slide.zoomListeners = new Set<(pose: FluidboxZoomPose) => void>());
     const layer = () => this.#layer(slide);
-    const itemIndex = this.#item(index);
+    // The item's index now: new items keep a slide whose item moved.
+    const itemIndex = () => this.#item(slide.position);
     const waits = (slide.waits = new Set<Promise<void>>());
     let release!: () => void;
     slide.commit = new Promise<void>((resolve) => (release = resolve));
     slide.release = release;
     let holds = 0;
     let rendering = true;
-    const opening = () => (this.#opening?.index === itemIndex ? this.#opening : undefined);
-    const originVideo = this.#originVideo?.index === itemIndex ? this.#originVideo.video : null;
+    const opening = () => (this.#opening?.index === itemIndex() ? this.#opening : undefined);
+    const originVideo = this.#originVideo?.index === itemIndex() ? this.#originVideo.video : null;
     if (originVideo) slide.originPlayback = { video: livePlayback(originVideo) };
     const context: FluidboxSlide<any> & { [holdCommit]?: () => () => void } = {
       item,
-      index: itemIndex,
+      get index() {
+        return itemIndex();
+      },
       media: slide.media,
       get layer() {
         return layer();

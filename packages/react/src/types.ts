@@ -288,6 +288,10 @@ export interface FluidboxSheetApi {
 /** The slide a part is inside, from `useFluidboxSlide`. */
 export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
+  /**
+   * The item's index, read live: new items keep a slide whose item moved. Read
+   * it where you use it, not once into a ref or an effect's closure.
+   */
   readonly index: number;
   /** Whether the slide is the one on show. It re-renders as this changes. */
   readonly active: boolean;
@@ -298,7 +302,8 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
   /**
    * What the trigger showed, on the slide an open started from it: `video`
-   * reads the trigger's `<video>` live. Null on the other slides.
+   * reads the trigger's `<video>` live. Null on the other slides. Read live,
+   * as an open can start from a trigger after the slide rendered.
    */
   readonly origin: FluidboxSlideOrigin | null;
   /**

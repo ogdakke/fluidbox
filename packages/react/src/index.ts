@@ -855,14 +855,18 @@ export function useFluidboxSlide<
   return useMemo(
     () => ({
       item: slide.item,
-      index: slide.index,
+      get index() {
+        return slide.index;
+      },
       active,
       get opening() {
         return slide.opening;
       },
       signal: slide.signal,
       onActiveChange: slide.onActiveChange,
-      origin: slide.origin,
+      get origin() {
+        return slide.origin;
+      },
       returnPlayback: slide.returnPlayback,
       waitUntil: slide.waitUntil,
       fail: slide.fail,

@@ -39,8 +39,8 @@ const fixture = {
   openGate: undefined as (() => void) | undefined,
   /** Each reel slide's origin, read again whenever the test asks. */
   reels: [] as { index: number; read: () => FluidboxSlideOrigin | null }[],
-  /** The index each held slide rendered with. */
-  heldIndexes: [] as number[],
+  /** Each held slide's index, read again whenever the test asks. */
+  held: [] as { id: string; read: () => number }[],
   /** The items of the held viewer, which the test can change. */
   setHeldItems: undefined as ((items: FluidboxItem[]) => void) | undefined,
 };
@@ -89,8 +89,10 @@ const gate = new Promise<void>((resolve) => (fixture.openGate = resolve));
 
 function Held() {
   const slide = useFluidboxSlide<FluidboxCustomItemBase<"held">>();
-  fixture.heldIndexes.push(slide.index);
-  useLayoutEffect(() => slide.waitUntil(gate), [slide]);
+  useLayoutEffect(() => {
+    slide.waitUntil(gate);
+    fixture.held.push({ id: slide.item.id!, read: () => slide.index });
+  }, [slide]);
   return (
     <Fluidbox.Media>
       <div className="media-probe" data-test="held-card">

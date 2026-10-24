@@ -8,12 +8,12 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | On demand JS gzip | Reachable JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | ----------------: | ----------------: | -----------------------: |
-| Root           |         9,802 B |           44,031 B |           1,151 B |          45,182 B |                 46,841 B |
-| Elements       |        13,947 B |           47,374 B |           1,151 B |          48,525 B |                 50,184 B |
-| React          |        17,183 B |           50,774 B |           1,151 B |          51,925 B |                 53,584 B |
-| Solid          |        13,611 B |           47,194 B |           1,151 B |          48,345 B |                 50,004 B |
-| Vue            |        14,309 B |           47,887 B |           1,151 B |          49,038 B |                 50,697 B |
-| Angular        |        14,713 B |           48,221 B |           1,151 B |          49,372 B |                 51,031 B |
+| Root           |         9,802 B |           44,037 B |           1,151 B |          45,188 B |                 46,847 B |
+| Elements       |        13,946 B |           47,379 B |           1,151 B |          48,530 B |                 50,189 B |
+| React          |        17,182 B |           50,777 B |           1,151 B |          51,928 B |                 53,587 B |
+| Solid          |        13,613 B |           47,200 B |           1,151 B |          48,351 B |                 50,010 B |
+| Vue            |        14,311 B |           47,893 B |           1,151 B |          49,044 B |                 50,703 B |
+| Angular        |        14,715 B |           48,226 B |           1,151 B |          49,377 B |                 51,036 B |
 | Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
 | Sheet          |         7,277 B |            7,277 B |               0 B |           7,277 B |                  8,272 B |
 | Kit            |         1,499 B |            1,499 B |               0 B |           1,499 B |                  4,309 B |
@@ -21,9 +21,9 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
 | Model          |         1,449 B |            1,449 B |               0 B |           1,449 B |                  4,259 B |
 | Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
-| React embed    |        19,685 B |           53,317 B |           1,151 B |          54,468 B |                 56,127 B |
-| React model    |        18,353 B |           51,925 B |           1,151 B |          53,076 B |                 54,735 B |
-| React spin     |        19,106 B |           52,665 B |           1,151 B |          53,816 B |                 55,475 B |
+| React embed    |        19,684 B |           53,326 B |           1,151 B |          54,477 B |                 56,136 B |
+| React model    |        18,351 B |           51,928 B |           1,151 B |          53,079 B |                 54,738 B |
+| React spin     |        19,105 B |           52,668 B |           1,151 B |          53,819 B |                 55,478 B |
 
 `styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
