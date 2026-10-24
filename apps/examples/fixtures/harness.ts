@@ -1,5 +1,5 @@
 import { mountSite } from "../src/site";
-import type { FluidboxItemList, FluidboxOriginAdapter } from "@ogdakke/fluidbox";
+import type { FluidboxItemList } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import type { FluidboxGalleryElement } from "@ogdakke/fluidbox/elements";
 import "./site.css";
@@ -48,14 +48,8 @@ if (params.has("virtual")) {
       return Number.isInteger(index) && index >= 0 && index < count ? index : -1;
     },
   };
-  const originAdapter: FluidboxOriginAdapter = {
-    getOrigin(id) {
-      const trigger = origins.get(id);
-      return trigger ? { trigger, visual: trigger } : null;
-    },
-  };
   gallery.items = items;
-  gallery.origins = originAdapter;
+  gallery.findTrigger = (item) => origins.get(item.id!) ?? null;
   function renderWindow(start: number) {
     for (const button of origins.values()) button.remove();
     origins.clear();

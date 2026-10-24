@@ -9,14 +9,27 @@ import type {
   FluidboxDispose,
   FluidboxItem,
   FluidboxItemId,
+  FluidboxRenderer,
   FluidboxThumbnailOverlayRegistration,
 } from "./runtime-types";
+
+/** The overlays on one item's trigger, as one flight carries them. */
+interface OverlayGroup<TItem extends FluidboxItem> {
+  /** Every overlay, each of which gets the phase and progress. */
+  readonly elements: readonly HTMLElement[];
+  /** The one whose progress the flight reads back: the live one, else the first. */
+  readonly element: HTMLElement;
+  /** Draws live content into the flying frame. */
+  readonly renderer?: FluidboxRenderer<TItem>;
+  /** Moves into the flying frame and scales with it, as a scrim does. */
+  readonly frameLayer?: HTMLElement;
+}
 
 interface ActiveOverlay<TItem extends FluidboxItem> {
   readonly id: FluidboxItemId;
   readonly item: TItem;
   readonly index: number;
-  readonly registration: FluidboxThumbnailOverlayRegistration<TItem>;
+  readonly group: OverlayGroup<TItem>;
   readonly controller?: AbortController;
   readonly target?: HTMLDivElement;
   readonly dispose?: FluidboxDispose;
@@ -146,7 +159,11 @@ const opacityResponse = 0.65;
 /** Publishes thumbnail-overlay motion without taking ownership of application DOM. */
 export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   readonly #document: Document;
-  readonly #registrations = new Map<FluidboxItemId, FluidboxThumbnailOverlayRegistration<TItem>>();
+  readonly #registrations = new Map<
+    FluidboxItemId,
+    FluidboxThumbnailOverlayRegistration<TItem>[]
+  >();
+  readonly #groups = new Map<FluidboxItemId, OverlayGroup<TItem>>();
   #active: ActiveOverlay<TItem> | undefined;
   readonly #boxes = new WeakMap<HTMLElement, FrameBox>();
 
@@ -168,14 +185,41 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     }
   }
 
+  /** Add an overlay to an item's trigger, beside the ones it has. */
   register(id: FluidboxItemId, registration: FluidboxThumbnailOverlayRegistration<TItem>) {
-    this.#registrations.set(id, registration);
+    const list = this.#registrations.get(id) ?? [];
+    list.push(registration);
+    this.#registrations.set(id, list);
+    this.#groups.delete(id);
     this.#publish(registration.element, "idle", 1);
     return () => {
-      if (this.#registrations.get(id) !== registration) return;
-      this.#registrations.delete(id);
-      if (this.#active?.registration !== registration) this.#reset(registration.element);
+      const at = list.indexOf(registration);
+      if (at < 0) return;
+      list.splice(at, 1);
+      if (!list.length && this.#registrations.get(id) === list) this.#registrations.delete(id);
+      this.#groups.delete(id);
+      const { element } = registration;
+      if (this.#active?.group.elements.includes(element)) return;
+      if (!this.#group(id)?.elements.includes(element)) this.#reset(element);
     };
+  }
+
+  /** The overlays on an item's trigger, combined: one live, one frame layer, any that stay. */
+  #group(id: FluidboxItemId): OverlayGroup<TItem> | undefined {
+    const cached = this.#groups.get(id);
+    if (cached) return cached;
+    const list = this.#registrations.get(id);
+    if (!list?.length) return undefined;
+    const live = list.find((registration) => registration.behavior === "travel");
+    const frame = list.find((registration) => registration.behavior === "frame");
+    const group: OverlayGroup<TItem> = {
+      elements: [...new Set(list.map((registration) => registration.element))],
+      element: (live ?? list[0]!).element,
+      renderer: live?.renderer,
+      frameLayer: frame?.element,
+    };
+    this.#groups.set(id, group);
+    return group;
   }
 
   prepare(
@@ -185,13 +229,13 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
     phase: ThumbnailOverlayPhase,
     progress: number,
   ) {
-    const registration = this.#registrations.get(idOf(item));
+    const group = this.#group(idOf(item));
     const active = this.#active;
-    if (active?.registration !== registration || active?.id !== idOf(item)) {
+    if (active?.group !== group || active?.id !== idOf(item)) {
       this.#disposeActive();
-      if (!registration) return;
-      if (registration.behavior === "travel") {
-        const frameLayer = registration.frameLayer;
+      if (!group) return;
+      if (group.renderer || group.frameLayer) {
+        const frameLayer = group.frameLayer;
         let marker: Comment | undefined;
         let ghost: HTMLElement | undefined;
         let previousStyles: Map<string, string> | undefined;
@@ -238,7 +282,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
         this.#publish(target, phase, progress);
         this.#position(target, frame);
         this.#document.body.append(host);
-        const dispose = registration.renderer({
+        const dispose = group.renderer?.({
           item,
           index,
           target,
@@ -248,7 +292,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
           id: idOf(item),
           item,
           index,
-          registration,
+          group,
           controller,
           target,
           dispose: dispose ?? undefined,
@@ -272,7 +316,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
           id: idOf(item),
           item,
           index,
-          registration,
+          group,
           adopted: new Map(),
           scale: "none",
           childAnimations: [],
@@ -306,7 +350,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
       return { offset, "--fluidbox-closed": String(from + (to - from) * fade) };
     }) as Keyframe[];
     const targets = [
-      ...new Set([active.registration.element, active.frameLayer, active.target]),
+      ...new Set([...active.group.elements, active.frameLayer, active.target]),
     ].filter((element): element is HTMLElement => !!element && element.isConnected);
     const animations = targets.map((target) =>
       this.#progressHolder(target).animate(progress, options),
@@ -329,10 +373,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   set(phase: ThumbnailOverlayPhase, progress: number, transform?: DOMMatrix) {
     const active = this.#active;
     if (!active) return;
-    this.#publish(active.registration.element, phase, progress);
-    if (active.frameLayer && active.frameLayer !== active.registration.element) {
-      this.#publish(active.frameLayer, phase, progress);
-    }
+    for (const element of active.group.elements) this.#publish(element, phase, progress);
     if (!active.target) return;
     this.#publish(active.target, phase, progress);
     const frame = active.frameLayer?.parentElement;
@@ -352,7 +393,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   }
 
   currentProgress(fallback: number) {
-    const target = this.#active?.target ?? this.#active?.registration.element;
+    const target = this.#active?.target ?? this.#active?.group.element;
     if (!target?.isConnected) return fallback;
     const value = Number.parseFloat(getComputedStyle(target).getPropertyValue("--fluidbox-closed"));
     return Number.isFinite(value) ? value : fallback;
@@ -400,7 +441,7 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
   preservePaint() {
     const active = this.#active;
     if (!active) return;
-    for (const target of new Set([active.registration.element, active.frameLayer, active.target])) {
+    for (const target of new Set([...active.group.elements, active.frameLayer, active.target])) {
       if (!target?.isConnected) continue;
       const holder = this.#progressHolder(target);
       holder.style.setProperty(
@@ -431,8 +472,11 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
 
   destroy() {
     this.#disposeActive();
-    for (const registration of this.#registrations.values()) this.#reset(registration.element);
+    for (const list of this.#registrations.values()) {
+      for (const registration of list) this.#reset(registration.element);
+    }
     this.#registrations.clear();
+    this.#groups.clear();
   }
 
   /** Counter-scale the children of the frame layer and the target, including late ones. */
@@ -532,14 +576,12 @@ export class ThumbnailOverlayRuntime<TItem extends FluidboxItem> {
         if (value) active.frameLayer.style.setProperty(property, value);
         else active.frameLayer.style.removeProperty(property);
       }
-      if (active.frameLayer !== active.registration.element) {
-        this.#publish(active.frameLayer, "idle", 1);
-      }
     }
-    if (this.#registrations.get(active.id) === active.registration) {
-      this.#publish(active.registration.element, "idle", 1);
-    } else {
-      this.#reset(active.registration.element);
+    // The overlays still on the trigger rest; the ones that left let go.
+    const kept = this.#group(active.id)?.elements ?? [];
+    for (const element of active.group.elements) {
+      if (kept.includes(element)) this.#publish(element, "idle", 1);
+      else this.#reset(element);
     }
   }
 

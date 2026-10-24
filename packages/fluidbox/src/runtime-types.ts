@@ -21,19 +21,36 @@ export interface FluidboxSource<TItem extends FluidboxItem = FluidboxItem> {
   getIndex(id: FluidboxItemId): number | null;
 }
 
-export type {
-  FluidboxOrigin,
-  FluidboxOriginAdapter,
-  FluidboxRevealContext,
-  FluidboxStatus,
-} from "./public-api";
+export type { FluidboxRevealContext, FluidboxStatus } from "./public-api";
 import type {
   Fluidbox,
   FluidboxControlName,
-  FluidboxOrigin,
+  FluidboxRevealContext,
   FluidboxState,
   FluidboxViewerRenderer,
 } from "./public-api";
+
+/** Where a flight starts and lands: a trigger, and what in it shows the item. */
+export interface FluidboxOrigin<TItem extends FluidboxItem = FluidboxItem> {
+  /** The element that opened the item, scrolled into view on close. */
+  readonly trigger: HTMLElement;
+  /** The box the flight starts from and lands on. */
+  readonly visual: HTMLElement;
+  /** The image painted at the start of the flight, if any. */
+  readonly thumbnail?: HTMLImageElement;
+  /**
+   * Called before the closing flight measures `visual`, with the item it lands
+   * on: show that item on the trigger, synchronously, as an album cover does.
+   */
+  readonly onPreviewChange?: (item: TItem, index: number) => void;
+}
+
+/** Finds origins for items without a bound trigger, from `findTrigger` and `revealTrigger`. */
+export interface FluidboxOriginAdapter {
+  getOrigin(id: string): FluidboxOrigin | null;
+  /** Bring the item's trigger into view. Without it, the viewer scrolls it into view. */
+  revealOrigin?(id: string, index: number, context: FluidboxRevealContext): void | Promise<void>;
+}
 
 export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel";
 
@@ -81,7 +98,7 @@ export interface FluidboxViewerLayer {
   readonly labels: FluidboxLabels;
 }
 
-export type FluidboxThumbnailOverlayBehavior = "host" | "travel";
+export type FluidboxThumbnailOverlayBehavior = "host" | "travel" | "frame";
 
 export type FluidboxThumbnailOverlayRegistration<TItem extends FluidboxItem = FluidboxItem> =
   | {
@@ -94,10 +111,14 @@ export type FluidboxThumbnailOverlayRegistration<TItem extends FluidboxItem = Fl
       readonly behavior: "travel";
       /** Existing host overlay. The runtime publishes phase and progress here. */
       readonly element: HTMLElement;
-      /** Optional mask to move into the animated frame and restore on close. */
-      readonly frameLayer?: HTMLElement;
       /** Mounts application-owned content into a runtime transition target. */
       readonly renderer: FluidboxRenderer<TItem>;
+    }
+  | {
+      readonly behavior: "frame";
+      /** Moves into the animated frame for the flight, and back on close. */
+      readonly element: HTMLElement;
+      readonly renderer?: never;
     };
 
 export interface FluidboxZoomOptions {

@@ -6,7 +6,6 @@ import {
   type FluidboxValue,
   type FluidboxValueChangeDetails,
   type FluidboxImageItem,
-  type FluidboxOriginAdapter,
   type FluidboxRevealContext,
 } from "@ogdakke/fluidbox";
 import "./photo-library.css";
@@ -126,21 +125,14 @@ export function PhotoLibrary({
       }),
     [count, images],
   );
-  const originAdapter = useMemo<FluidboxOriginAdapter<PhotoItem>>(
-    () => ({
-      getOrigin(id) {
-        const element = origins.current.get(id);
-        if (!element?.isConnected || element.dataset.photoId !== id) return null;
-        return {
-          trigger: element,
-          visual: element,
-          thumbnail: element.querySelector("img") ?? undefined,
-        };
-      },
-      revealOrigin(id, index, context) {
-        return revealOrigin.current?.(id, index, context);
-      },
-    }),
+  // The tile is its own origin (data-fluidbox-origin), with its image as the thumbnail.
+  const findTrigger = useCallback((photo: PhotoItem) => {
+    const element = origins.current.get(photo.id);
+    return element?.isConnected && element.dataset.photoId === photo.id ? element : null;
+  }, []);
+  const revealTrigger = useCallback(
+    (photo: PhotoItem, index: number, context: FluidboxRevealContext) =>
+      revealOrigin.current?.(photo.id, index, context),
     [],
   );
   const getScrollElement = useCallback(() => scrollElement.current, []);
@@ -250,7 +242,12 @@ export function PhotoLibrary({
   const visibleEnd = lastRow?.kind === "photos" ? lastRow.firstPhoto + lastRow.count : visibleStart;
 
   return (
-    <Fluidbox.Root items={items} origins={originAdapter} onValueChangeComplete={onSettle}>
+    <Fluidbox.Root
+      items={items}
+      findTrigger={findTrigger}
+      revealTrigger={revealTrigger}
+      onValueChangeComplete={onSettle}
+    >
       <OpenBridge openRef={openRef} />
       {showFilmstrip && <Fluidbox.Filmstrip />}
       <main

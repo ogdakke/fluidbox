@@ -58,8 +58,6 @@ export type {
   FluidboxItems,
   FluidboxLabels,
   FluidboxLoading,
-  FluidboxOrigin,
-  FluidboxOriginAdapter,
   FluidboxReason,
   FluidboxSheetSnapPoint,
   FluidboxState,

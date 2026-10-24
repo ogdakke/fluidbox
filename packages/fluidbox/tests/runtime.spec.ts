@@ -146,8 +146,8 @@ describe("the fluidbox runtime", () => {
   it("publishes the open lifecycle and an immutable state", async () => {
     const driver = new TestDriver();
     const order: string[] = [];
-    const revealOrigin = vi.fn();
-    const fluidbox = make(driver, { origins: { getOrigin: () => null, revealOrigin } });
+    const revealTrigger = vi.fn();
+    const fluidbox = make(driver, { findTrigger: () => null, revealTrigger });
     record(fluidbox, order);
     fluidbox.subscribe((state) => order.push(`state:${state.status}:${state.value}`));
 
@@ -171,7 +171,11 @@ describe("the fluidbox runtime", () => {
     driver.steps[0]!.resolve();
     await expect(result).resolves.toBe(true);
     expect(order.slice(3)).toEqual(["state:open:two", "valuechangecomplete:open:two"]);
-    expect(revealOrigin).toHaveBeenCalledWith("two", 1, expect.objectContaining({ phase: "open" }));
+    expect(revealTrigger).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "two" }),
+      1,
+      expect.objectContaining({ phase: "open" }),
+    );
   });
 
   it("reports moves and closes with the value they go to and the one they leave", async () => {
@@ -300,7 +304,7 @@ describe("the fluidbox runtime", () => {
     expect(driver.opens).toEqual([]);
   });
 
-  it("forwards overlay ownership and ignores stale registration cleanup", () => {
+  it("keeps overlays on one item side by side, each released by its own cleanup", () => {
     const driver = new TestDriver();
     const firstDriverDispose = vi.fn();
     const secondDriverDispose = vi.fn();
@@ -311,11 +315,13 @@ describe("the fluidbox runtime", () => {
     const fluidbox = make(driver);
     const element = {} as HTMLElement;
 
-    const disposeFirst = fluidbox.bindOverlay(element, "one");
+    const disposeFirst = fluidbox.bindOverlay(element, "one", { flight: "frame" });
     const disposeSecond = fluidbox.bindOverlay(element, "one");
-    expect(firstDriverDispose).toHaveBeenCalledOnce();
+    expect(firstDriverDispose).not.toHaveBeenCalled();
 
     disposeFirst();
+    disposeFirst();
+    expect(firstDriverDispose).toHaveBeenCalledOnce();
     expect(secondDriverDispose).not.toHaveBeenCalled();
     disposeSecond();
     expect(secondDriverDispose).toHaveBeenCalledOnce();
@@ -365,12 +371,10 @@ describe("the fluidbox runtime", () => {
     const driver = new TestDriver();
     const revealSignals: AbortSignal[] = [];
     const fluidbox = make(driver, {
-      origins: {
-        getOrigin: () => null,
-        revealOrigin: (_id, _index, { signal }) => {
-          revealSignals.push(signal);
-          return new Promise(() => {});
-        },
+      findTrigger: () => null,
+      revealTrigger: (_item, _index, { signal }) => {
+        revealSignals.push(signal);
+        return new Promise(() => {});
       },
     });
 

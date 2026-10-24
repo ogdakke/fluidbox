@@ -15,7 +15,6 @@ import type {
   FluidboxItems,
   FluidboxLoading,
   FluidboxOptions,
-  FluidboxOriginAdapter,
   FluidboxRenderer,
   FluidboxSlideRenderer,
   FluidboxSheet,
@@ -29,8 +28,8 @@ import type {
   FluidboxZoomCommandOptions,
 } from "./public-api";
 import { FluidboxValueChangeEvent } from "./public-api";
-import { latestOrigins } from "./origins";
-import { bindTrigger, frameLayerOf, type FluidboxTrigger } from "./trigger";
+import { latestFindTrigger } from "./origins";
+import { bindTrigger, type FluidboxTrigger } from "./trigger";
 
 /** Markup attributes whose change re-reads the items. */
 function same(a: unknown, b: unknown): boolean {
@@ -74,10 +73,20 @@ const triggerOf = (node: Node) =>
     "fluidbox-item > [slot=trigger]",
   ) ?? null;
 
+/** A marked overlay, but not the still copy a flight leaves on the card. */
+const OVERLAY = "[data-fluidbox-trigger-overlay]:not([data-fluidbox-ghost])";
+
+/** An overlay coming or going, but not a frame layer the flight moves out and back. */
 const isOverlay = (node: Node) =>
   node instanceof Element &&
-  (node.matches("[data-fluidbox-thumbnail-overlay]") ||
-    !!node.querySelector("[data-fluidbox-thumbnail-overlay]"));
+  !node.matches("[data-fluidbox-travel-layer]") &&
+  (node.matches(OVERLAY) || !!node.querySelector(OVERLAY));
+
+/** How a marked overlay goes with the flight, from its attribute. */
+const overlayFlight = (overlay: HTMLElement) => {
+  const flight = overlay.dataset.fluidboxTriggerOverlay;
+  return flight === "copy" || flight === "frame" ? flight : "none";
+};
 
 const closedState: FluidboxState = Object.freeze({
   status: "closed",
@@ -155,7 +164,8 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   #fluidbox: Fluidbox | null = null;
   #items: FluidboxItems | null = null;
-  #origins: FluidboxOriginAdapter | undefined;
+  #findTrigger: FluidboxOptions["findTrigger"];
+  #revealTrigger: FluidboxOptions["revealTrigger"];
   #renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>> = {};
   #viewer: FluidboxViewerRenderer<any> | undefined;
   #labels: Partial<FluidboxLabels> | undefined;
@@ -292,13 +302,22 @@ export class FluidboxGalleryElement extends HTMLElement {
     return (await this.#itemsResult) ?? true;
   }
 
-  /** Origins for items that have no trigger in the gallery. */
-  get origins(): FluidboxOriginAdapter | undefined {
-    return this.#origins;
+  /** Find the trigger of an item that has none in the gallery. Read on each use. */
+  get findTrigger(): FluidboxOptions["findTrigger"] {
+    return this.#findTrigger;
   }
 
-  set origins(origins: FluidboxOriginAdapter | undefined) {
-    this.#origins = origins;
+  set findTrigger(findTrigger: FluidboxOptions["findTrigger"]) {
+    this.#findTrigger = findTrigger;
+  }
+
+  /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
+  get revealTrigger(): FluidboxOptions["revealTrigger"] {
+    return this.#revealTrigger;
+  }
+
+  set revealTrigger(revealTrigger: FluidboxOptions["revealTrigger"]) {
+    this.#revealTrigger = revealTrigger;
   }
 
   /** Renderers of `custom` items, by name. Read when a slide mounts. */
@@ -593,13 +612,13 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   #create(items: FluidboxItems) {
-    const fluidbox = createFluidbox({
-      ...this.#options(),
-      items,
-      // The origins property can change after the viewer is made.
-      origins: latestOrigins(() => this.#origins),
-      slides: this.#runtimeRenderers,
-    });
+    // The findTrigger and revealTrigger properties can change after the viewer is made.
+    const fluidbox = createFluidbox(
+      latestFindTrigger({ ...this.#options(), items, slides: this.#runtimeRenderers }, () => ({
+        findTrigger: this.#findTrigger,
+        revealTrigger: this.#revealTrigger,
+      })),
+    );
     this.#fluidbox = fluidbox;
     this.#sync = createOpenIndexSync(fluidbox);
     this.#events = new AbortController();
@@ -651,9 +670,9 @@ export class FluidboxGalleryElement extends HTMLElement {
     for (const dispose of this.#overlays) dispose();
     this.#overlays = [];
     for (const [element, { target, returns, item }] of wanted) {
+      const value = [target, ...returns];
       const options = {
-        target,
-        returns,
+        value,
         onPreviewChange: item
           ? (selected: FluidboxItem) => item.previewChange(idOf(selected), selected)
           : undefined,
@@ -665,15 +684,10 @@ export class FluidboxGalleryElement extends HTMLElement {
       } else {
         this.#triggers.set(element, { element, trigger: bindTrigger(fluidbox, element, options) });
       }
-      const overlay = element.querySelector<HTMLElement>("[data-fluidbox-thumbnail-overlay]");
-      if (overlay) {
-        const travel = overlay.dataset.fluidboxThumbnailOverlay === "travel";
+      // The still copy a flight leaves on the card is never an overlay of its own.
+      for (const overlay of element.querySelectorAll<HTMLElement>(OVERLAY)) {
         this.#overlays.push(
-          fluidbox.bindOverlay(overlay, target, {
-            returns,
-            travel,
-            frameLayer: travel ? frameLayerOf(overlay) : undefined,
-          }),
+          fluidbox.bindOverlay(overlay, value, { flight: overlayFlight(overlay) }),
         );
       }
     }

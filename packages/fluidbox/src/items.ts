@@ -70,12 +70,16 @@ export function targetKey(target: FluidboxTarget): number | string {
   return typeof target === "object" && target !== null ? idOf(target) : target;
 }
 
-/** A target and the items that return to it, as indexes and ids, without repeats. */
-export function targetKeys(
-  target: FluidboxTarget,
-  returns: readonly FluidboxTarget[] = [],
-): (number | string)[] {
-  return [...new Set([target, ...returns].map(targetKey))];
+/**
+ * A trigger's value as indexes and ids, without repeats: one target, or a
+ * list of them. An empty list is a TypeError.
+ */
+export function targetKeys(value: FluidboxTarget | readonly FluidboxTarget[]): (number | string)[] {
+  const targets: readonly FluidboxTarget[] = Array.isArray(value)
+    ? value
+    : [value as FluidboxTarget];
+  if (!targets.length) throw new TypeError("A fluidbox trigger needs at least one item.");
+  return [...new Set(targets.map(targetKey))];
 }
 
 function checkCount(count: number) {

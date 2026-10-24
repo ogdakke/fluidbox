@@ -3,10 +3,10 @@ import { idOf, idsIn, indexIn, targetKeys } from "./items";
 import type {
   Fluidbox,
   FluidboxItem,
-  FluidboxOrigin,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
+  FluidboxTriggerValue,
 } from "./public-api";
 import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
 
@@ -14,7 +14,7 @@ import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
  * Find the parts of a trigger the flight uses: the box marked with
  * `data-fluidbox-origin`, else its image or video, else the trigger itself.
  */
-export function resolveOrigin(trigger: HTMLElement): FluidboxOrigin {
+export function resolveOrigin(trigger: HTMLElement): RuntimeOrigin {
   const visual =
     (trigger.matches("[data-fluidbox-origin]")
       ? trigger
@@ -30,10 +30,8 @@ export function resolveOrigin(trigger: HTMLElement): FluidboxOrigin {
 
 /** What a trigger opens and returns to. */
 export interface FluidboxTriggerOptions<TItem extends FluidboxItem = FluidboxItem> {
-  /** The item the trigger opens. */
-  readonly target: FluidboxTarget<TItem>;
-  /** More items that close back onto the trigger. */
-  readonly returns?: readonly FluidboxTarget<TItem>[];
+  /** One target, or a list: the first opens, and every one closes back onto the trigger. */
+  readonly value: FluidboxTriggerValue<TItem>;
   /** Called before the closing flight measures the trigger, with the item it lands on. */
   readonly onPreviewChange?: (item: TItem, index: number) => void;
 }
@@ -114,7 +112,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   options: FluidboxTriggerOptions<TItem>,
 ): FluidboxTrigger<TItem> {
   const host = hostOf(fluidbox);
-  let targets = targetKeys(options.target, options.returns);
+  let targets = targetKeys(options.value);
   let onPreviewChange = options.onPreviewChange;
   let element: HTMLElement | null = null;
   let registered = "";
@@ -212,7 +210,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     },
     update(next) {
       onPreviewChange = next.onPreviewChange;
-      const nextTargets = targetKeys(next.target, next.returns);
+      const nextTargets = targetKeys(next.value);
       if (nextTargets.join("\u0000") === targets.join("\u0000")) return;
       targets = nextTargets;
       register();
@@ -295,18 +293,4 @@ export function bindTrigger<TItem extends FluidboxItem = FluidboxItem>(
       destroy();
     },
   });
-}
-
-/**
- * The element of a thumbnail overlay marked `data-fluidbox-frame-layer`, the
- * overlay itself or one inside it: it moves into the flying frame for the
- * flight and scales with it, as a scrim does.
- */
-export function frameLayerOf(overlay: HTMLElement): HTMLElement | undefined {
-  return overlay.matches("[data-fluidbox-frame-layer]")
-    ? overlay
-    : // The still copy a flight leaves on the card is never the layer itself.
-      (overlay.querySelector<HTMLElement>(
-        "[data-fluidbox-frame-layer]:not([data-fluidbox-ghost])",
-      ) ?? undefined);
 }

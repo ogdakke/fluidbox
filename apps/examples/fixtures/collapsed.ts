@@ -79,20 +79,23 @@ void gallery.whenReady().then((fluidbox) => {
   };
   teaser.addEventListener("fluidbox-preview-change", (event) => showPreview(event.detail.id));
   const overlay = teaser.querySelector<HTMLElement>("[data-fluidbox-transition-layer]")!;
-  fluidbox.bindOverlay(overlay, teaser.itemId, {
-    returns: [...hiddenIds],
-    frameLayer: overlay,
-    travel({ target }) {
-      target.style.setProperty("--fluidbox-transition-content-opacity", "1");
-      const label = overlay.querySelector<HTMLElement>("[data-collapsed-label]")!;
-      const marker = document.createComment("collapsed-label");
-      label.before(marker);
-      label.dataset.fluidboxCounterScale = "";
-      target.append(label);
-      return () => {
-        delete label.dataset.fluidboxCounterScale;
-        marker.replaceWith(label);
-      };
+  const value = [teaser.itemId, ...hiddenIds];
+  // The overlay itself moves into the flying frame, and its label rides live on it.
+  fluidbox.bindOverlay(overlay, value, { flight: "frame" });
+  fluidbox.bindOverlay(overlay, value, {
+    flight: {
+      live({ target }) {
+        target.style.setProperty("--fluidbox-transition-content-opacity", "1");
+        const label = overlay.querySelector<HTMLElement>("[data-collapsed-label]")!;
+        const marker = document.createComment("collapsed-label");
+        label.before(marker);
+        label.dataset.fluidboxCounterScale = "";
+        target.append(label);
+        return () => {
+          delete label.dataset.fluidboxCounterScale;
+          marker.replaceWith(label);
+        };
+      },
     },
   });
   let closingId: string | null = null;

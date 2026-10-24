@@ -918,21 +918,23 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     const host = document.createElement("span");
     host.dataset.testThumbnailOverlay = "";
     document.querySelector('[data-photo-id="one"]')!.append(host);
+    window.headlessViewer.bindOverlay(host, "one", { flight: "frame" });
     window.headlessViewer.bindOverlay(host, "one", {
-      frameLayer: host,
-      travel({ target, item, signal }) {
-        const badge = document.createElement("strong");
-        badge.dataset.testTravelingOverlay = "";
-        badge.textContent = `Traveling ${item.id}`;
-        const actions = document.createElement("span");
-        actions.dataset.fluidboxVideoActions = "";
-        target.append(badge, actions);
-        signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
-          once: true,
-        });
-        return () => {
-          host.dataset.rendererDisposed = "";
-        };
+      flight: {
+        live({ target, item, signal }) {
+          const badge = document.createElement("strong");
+          badge.dataset.testTravelingOverlay = "";
+          badge.textContent = `Traveling ${item.id}`;
+          const actions = document.createElement("span");
+          actions.dataset.fluidboxVideoActions = "";
+          target.append(badge, actions);
+          signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
+            once: true,
+          });
+          return () => {
+            host.dataset.rendererDisposed = "";
+          };
+        },
       },
     });
   });
@@ -1078,12 +1080,13 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
     const host = document.createElement("span");
     host.dataset.testParkedLayer = "";
     document.querySelector('[data-photo-id="one"]')!.append(host);
-    window.headlessViewer.bindOverlay(host, "one", {
-      returns: ["two"],
-      frameLayer: host,
-      travel({ target }) {
-        host.dataset.mounts = String(Number(host.dataset.mounts ?? 0) + 1);
-        target.textContent = "Overlay";
+    window.headlessViewer.bindOverlay(host, ["one", "two"], { flight: "frame" });
+    window.headlessViewer.bindOverlay(host, ["one", "two"], {
+      flight: {
+        live({ target }) {
+          host.dataset.mounts = String(Number(host.dataset.mounts ?? 0) + 1);
+          target.textContent = "Overlay";
+        },
       },
     });
     await window.headlessViewer.open("one");
@@ -1388,4 +1391,43 @@ test("a pinch that lands on a drag starts from where the finger took the photo",
   await expect(slide).toHaveAttribute("aria-label", "Item 3 of 4");
   await touch("touchEnd", []);
   await expect(slide).toHaveAttribute("aria-label", "Item 3 of 4");
+});
+
+test("a frame overlay and a live overlay sit side by side on one trigger", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/headless.html");
+  const during = await page.evaluate(async () => {
+    const trigger = document.querySelector<HTMLElement>('[data-photo-id="one"]')!;
+    const scrim = document.createElement("span");
+    scrim.dataset.testScrim = "";
+    const count = document.createElement("span");
+    count.dataset.testCount = "";
+    trigger.append(scrim, count);
+    const viewer = window.headlessViewer;
+    viewer.bindOverlay(scrim, "one", { flight: "frame" });
+    viewer.bindOverlay(count, ["one", "two"], {
+      flight: { live: ({ target }) => void (target.textContent = "+1") },
+    });
+    const opened = viewer.open("one");
+    // Look while the flight is under way.
+    const seen = await new Promise<{ scrimInFrame: boolean; live: string; phase: string | null }>(
+      (resolve) => {
+        const look = () => {
+          const live = document.querySelector("[data-fluidbox-transition-content]");
+          if (viewer.state.status === "opening" && live) {
+            resolve({
+              scrimInFrame: !!scrim.parentElement?.matches("[data-fluidbox-frame]"),
+              live: live.textContent ?? "",
+              phase: count.getAttribute("data-fluidbox-phase"),
+            });
+          } else requestAnimationFrame(look);
+        };
+        look();
+      },
+    );
+    await opened;
+    await viewer.close();
+    return { ...seen, scrimBack: scrim.parentElement === trigger };
+  });
+  expect(during).toEqual({ scrimInFrame: true, live: "+1", phase: "opening", scrimBack: true });
 });

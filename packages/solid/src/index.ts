@@ -27,6 +27,7 @@ import {
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
+  type FluidboxOptions,
   type FluidboxLabels,
   type FluidboxRenderer,
   type FluidboxSlideRenderer,
@@ -41,8 +42,7 @@ import {
   createTrigger,
   fluidboxControlIcon,
   fluidboxControls,
-  frameLayerOf,
-  latestOrigins,
+  latestFindTrigger,
   resolveLabels,
   createOpenIndexSync,
   targetKeys,
@@ -97,8 +97,6 @@ export type {
   FluidboxItems,
   FluidboxLabels,
   FluidboxLoading,
-  FluidboxOrigin,
-  FluidboxOriginAdapter,
   FluidboxReason,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -260,40 +258,45 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
 
   // The fluidbox exists from the start, so parts bind to it as they render. It
   // touches nothing until a viewer is pressed or opened.
-  const fluidbox = createFluidbox<TItem>({
-    items: untrack(() => props.items),
-    labels: untrack(() => props.labels),
-    zoom: untrack(zoom),
-    loop: untrack(() => props.loop),
-    loading: untrack(() => props.loading),
-    // Renderers resolve by key when an item renders, so the newest render
-    // function is used without rebuilding the viewer.
-    slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
-      get(_, key) {
-        const renderer = typeof key === "string" ? props.renderers?.[key] : undefined;
-        return renderer
-          ? (((context) =>
-              mount(context.media, () =>
-                renderer({
-                  item: context.item,
-                  index: context.index,
-                  signal: context.signal,
-                  get active() {
-                    return context.active;
-                  },
-                  onActiveChange: context.onActiveChange,
-                }),
-              )) satisfies FluidboxSlideRenderer<TItem>)
-          : undefined;
+  // findTrigger and revealTrigger are read from the newest props on each use.
+  const fluidbox = createFluidbox<TItem>(
+    latestFindTrigger<TItem, FluidboxOptions<TItem>>(
+      {
+        items: untrack(() => props.items),
+        labels: untrack(() => props.labels),
+        zoom: untrack(zoom),
+        loop: untrack(() => props.loop),
+        loading: untrack(() => props.loading),
+        // Renderers resolve by key when an item renders, so the newest render
+        // function is used without rebuilding the viewer.
+        slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
+          get(_, key) {
+            const renderer = typeof key === "string" ? props.renderers?.[key] : undefined;
+            return renderer
+              ? (((context) =>
+                  mount(context.media, () =>
+                    renderer({
+                      item: context.item,
+                      index: context.index,
+                      signal: context.signal,
+                      get active() {
+                        return context.active;
+                      },
+                      onActiveChange: context.onActiveChange,
+                    }),
+                  )) satisfies FluidboxSlideRenderer<TItem>)
+              : undefined;
+          },
+          has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
+        }) as FluidboxSlides<TItem>,
+        viewer: ({ target }) => {
+          setViewerTarget(target);
+          return () => setViewerTarget((shown) => (shown === target ? null : shown));
+        },
       },
-      has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
-    }) as FluidboxSlides<TItem>,
-    origins: latestOrigins(() => props.origins),
-    viewer: ({ target }) => {
-      setViewerTarget(target);
-      return () => setViewerTarget((shown) => (shown === target ? null : shown));
-    },
-  });
+      () => props,
+    ),
+  );
   onCleanup(() => unloadFluidbox(fluidbox));
 
   const [state, setState] = createSignal(fluidbox.state);
@@ -438,8 +441,7 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
   // synchronously, so the preview is current before the flight measures it.
   const [landing, setLanding] = createSignal(0);
   const options = () => ({
-    target: target(),
-    returns: local.returns,
+    value: [target(), ...(local.returns ?? [])],
     onPreviewChange: () => setLanding((count) => count + 1),
   });
   const trigger = createTrigger<TItem>(context.fluidbox, untrack(options));
@@ -687,7 +689,8 @@ function ThumbnailOverlay(props: FluidboxThumbnailOverlayProps): JSX.Element {
   const [local, attributes] = splitProps(props, ["travel", "ref", "children"]);
   const [element, setElement] = createSignal<HTMLSpanElement | null>(null);
   const owner = getOwner();
-  const targets = createMemo(() => targetKeys(trigger.target(), trigger.returns()).join("\u0000"));
+  const value = () => [trigger.target(), ...(trigger.returns() ?? [])];
+  const targets = createMemo(() => targetKeys(value()).join("\u0000"));
   const content = (where: "page" | "travel") =>
     createComponent(OverlayContext.Provider, {
       value: where,
@@ -703,17 +706,19 @@ function ThumbnailOverlay(props: FluidboxThumbnailOverlayProps): JSX.Element {
     const travels = local.travel;
     targets();
     if (!host) return;
-    onCleanup(
-      untrack(() =>
-        context.fluidbox.bindOverlay(
-          host,
-          trigger.target(),
-          travels
-            ? { returns: trigger.returns(), travel, frameLayer: frameLayerOf(host) }
-            : { returns: trigger.returns() },
-        ),
-      ),
-    );
+    untrack(() => {
+      const keys = value();
+      onCleanup(
+        context.fluidbox.bindOverlay(host, keys, { flight: travels ? { live: travel } : "none" }),
+      );
+      // A FrameLayer inside flies as an overlay of its own, beside this one.
+      const layer = travels
+        ? host.querySelector<HTMLElement>(
+            '[data-fluidbox-trigger-overlay="frame"]:not([data-fluidbox-ghost])',
+          )
+        : null;
+      if (layer) onCleanup(context.fluidbox.bindOverlay(layer, keys, { flight: "frame" }));
+    });
   });
 
   return createComponent(
@@ -724,8 +729,8 @@ function ThumbnailOverlay(props: FluidboxThumbnailOverlayProps): JSX.Element {
         setRef(local.ref, next);
         setElement(next);
       },
-      get "data-fluidbox-thumbnail-overlay"() {
-        return local.travel ? "travel" : "";
+      get "data-fluidbox-trigger-overlay"() {
+        return local.travel ? "live" : "none";
       },
       get children() {
         return content("page");
@@ -746,7 +751,7 @@ function FrameLayer(props: FluidboxFrameLayerProps): JSX.Element {
   if (where === "travel") return null;
   return createComponent(
     Dynamic,
-    mergeProps(props, { component: "span", "data-fluidbox-frame-layer": "" }) as never,
+    mergeProps(props, { component: "span", "data-fluidbox-trigger-overlay": "frame" }) as never,
   );
 }
 

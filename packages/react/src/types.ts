@@ -5,7 +5,6 @@ import type {
   FluidboxItems,
   FluidboxLabels,
   FluidboxOptions,
-  FluidboxOriginAdapter,
   FluidboxSheetEvent,
   FluidboxSheetOptions,
   FluidboxState,
@@ -70,8 +69,10 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly zoom?: FluidboxOptions<TItem>["zoom"];
   /** Draw `custom` items, by the name in their `render`. */
   readonly renderers?: Readonly<Record<string, FluidboxReactRenderer<TItem>>>;
-  /** Find origins the viewer can't see, as in a virtualized grid. */
-  readonly origins?: FluidboxOriginAdapter<TItem>;
+  /** Find the trigger of an item without a mounted Trigger, as in a virtualised grid. */
+  readonly findTrigger?: FluidboxOptions<TItem>["findTrigger"];
+  /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
+  readonly revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
   /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
   readonly loading?: FluidboxOptions<TItem>["loading"];
   /**

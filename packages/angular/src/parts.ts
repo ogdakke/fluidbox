@@ -35,7 +35,6 @@ import {
   createTrigger,
   fluidboxControlIcon,
   fluidboxControls,
-  frameLayerOf,
   targetKeys,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
@@ -80,7 +79,7 @@ export class FluidboxTriggerDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly #previewChanges = signal(0);
   #followsPreview = false;
   readonly #trigger = createTrigger<TItem>(this.#root.fluidbox, {
-    target: 0,
+    value: 0,
     onPreviewChange: () => this.#previewChanged(),
   });
   /**
@@ -104,12 +103,15 @@ export class FluidboxTriggerDirective<TItem extends FluidboxItem = FluidboxItem>
     if (target === undefined || target === null || target === "")
       throw new Error("fluidboxTrigger needs an item, its index or its id.");
     const returns = this.fluidboxReturns ?? [];
-    const keys = targetKeys(target, returns);
+    const keys = targetKeys([target, ...returns]);
     if (sameKeys(keys, this.#keys)) return;
     this.#keys = keys;
     this.#target.set(target);
     this.#returns.set(returns);
-    this.#trigger.update({ target, returns, onPreviewChange: () => this.#previewChanged() });
+    this.#trigger.update({
+      value: [target, ...returns],
+      onPreviewChange: () => this.#previewChanged(),
+    });
   }
 
   ngOnInit(): void {
@@ -233,22 +235,34 @@ export class FluidboxThumbnailOverlayComponent<TItem extends FluidboxItem = Flui
     const element = this.#element.nativeElement;
     const target = trigger.target();
     const returns = trigger.returns();
-    const travel = !this.travel ? false : this.content ? this.#travel : true;
+    const flight = !this.travel ? "none" : this.content ? { live: this.#travel } : "copy";
     // While the layer flies it is out of the overlay, so a lookup finds nothing;
     // the bound one, still in the page, is in the flying frame and stays.
     const bound = this.#bound[1];
     const flying = bound instanceof HTMLElement && bound.isConnected ? bound : undefined;
-    const frameLayer = this.travel ? (this.#layer ?? frameLayerOf(element) ?? flying) : undefined;
+    const frameLayer = this.travel
+      ? (this.#layer ??
+        element.querySelector<HTMLElement>(
+          '[data-fluidbox-trigger-overlay="frame"]:not([data-fluidbox-ghost])',
+        ) ??
+        flying)
+      : undefined;
+    const value = [target, ...returns];
     // Overlays are found by id when they bind, so new items bind them again.
-    const key = [travel, frameLayer, this.#root.fluidbox.items, ...targetKeys(target, returns)];
+    const key = [this.travel, frameLayer, this.#root.fluidbox.items, ...targetKeys(value)];
     if (sameKeys(key, this.#bound)) return;
     this.#bound = key;
     this.#release?.();
-    this.#release = this.#root.fluidbox.bindOverlay(element, target, {
-      returns,
-      travel,
-      frameLayer,
-    });
+    const fluidbox = this.#root.fluidbox;
+    const unbind = fluidbox.bindOverlay(element, value, { flight });
+    // The frame layer flies as an overlay of its own, beside this one.
+    const unbindLayer = frameLayer
+      ? fluidbox.bindOverlay(frameLayer, value, { flight: "frame" })
+      : undefined;
+    this.#release = () => {
+      unbind();
+      unbindLayer?.();
+    };
   }
 }
 
@@ -261,7 +275,7 @@ export class FluidboxThumbnailOverlayComponent<TItem extends FluidboxItem = Flui
   selector: "[fluidboxFrameLayer]",
   standalone: true,
   host: {
-    "data-fluidbox-frame-layer": "",
+    "data-fluidbox-trigger-overlay": "frame",
     "[style.display]": "travelling ? 'none' : null",
   },
 })

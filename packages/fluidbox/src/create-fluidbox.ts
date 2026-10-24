@@ -15,14 +15,13 @@ import {
   type FluidboxItems,
   type FluidboxLoading,
   type FluidboxOptions,
-  type FluidboxOrigin,
-  type FluidboxOriginAdapter,
   type FluidboxOverlayOptions,
   type FluidboxReason,
   type FluidboxSheet,
   type FluidboxState,
   type FluidboxStatus,
   type FluidboxTarget,
+  type FluidboxTriggerValue,
   type FluidboxUpdateOptions,
   type FluidboxValue,
   type FluidboxValueChangeAction,
@@ -35,6 +34,8 @@ import type {
   FluidboxDispose,
   FluidboxExtension,
   FluidboxItemId,
+  FluidboxOrigin,
+  FluidboxOriginAdapter,
   FluidboxViewerLayer,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
@@ -46,7 +47,7 @@ import type {
   SessionTarget,
   ViewerSessionMotionContext,
 } from "./runtime-types";
-import { bindTrigger } from "./trigger";
+import { bindTrigger, resolveOrigin } from "./trigger";
 
 const defaultControls = ["previous", "next", "close"] as const;
 /** The factor of zoomIn, zoomOut and the zoom controls, as of the + and - keys. */
@@ -85,8 +86,9 @@ interface PendingCommand {
   removeExternalAbort?: () => void;
 }
 
+/** One overlay on one item's trigger. A trigger can have several, side by side. */
 interface OverlayRegistration<TItem extends FluidboxItem> {
-  readonly token: object;
+  readonly id: FluidboxItemId;
   readonly registration: FluidboxThumbnailOverlayRegistration<TItem>;
   /** Its registration with the viewer, once there is one. */
   dispose?: FluidboxDispose | void;
@@ -171,7 +173,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #state: FluidboxState<TItem>;
   readonly #origins: OriginRegistry;
   readonly #listeners = new Set<(state: FluidboxState<TItem>) => void>();
-  readonly #overlays = new Map<FluidboxItemId, OverlayRegistration<TItem>>();
+  readonly #overlays = new Set<OverlayRegistration<TItem>>();
   #pending: PendingCommand | undefined;
   #revealController: AbortController | undefined;
   /** The item whose origin the user last saw: the one opened or last revealed. */
@@ -196,8 +198,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#labels = { ...resolveLabels(options.labels) };
     const { sheet, filmstrip, controls, viewer } = options;
     this.#settings = { sheet, filmstrip, controls, viewer };
-    // The adapter only ever sees this fluidbox's items.
-    this.#origins = new OriginRegistry(options.origins as FluidboxOriginAdapter | undefined);
+    this.#origins = new OriginRegistry(this.#triggerAdapter(options));
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
     this.#slides = options.slides;
@@ -226,8 +227,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     viewer.setLoop(this.#loop);
     viewer.setSource(this.#source);
     viewer.connect(this.#controls, this.#portal(), this.#extensions());
-    for (const [id, overlay] of this.#overlays) {
-      overlay.dispose = viewer.registerThumbnailOverlay(id, overlay.registration);
+    for (const overlay of this.#overlays) {
+      overlay.dispose = viewer.registerThumbnailOverlay(overlay.id, overlay.registration);
     }
     this.#viewer = viewer;
   }
@@ -549,16 +550,42 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     );
   }
 
+  /**
+   * Origins for items without a bound trigger, from the options' `findTrigger`
+   * and `revealTrigger`, read on each use.
+   */
+  #triggerAdapter(options: FluidboxOptions<TItem>): FluidboxOriginAdapter {
+    const item = (id: string) => {
+      const index = this.#source.getIndex(id);
+      return index === null ? null : { item: this.#source.getItem(index), index };
+    };
+    return {
+      getOrigin: (id) => {
+        const find = options.findTrigger;
+        const found = find && item(id);
+        const trigger = found ? find(found.item, found.index) : null;
+        return trigger ? resolveOrigin(trigger) : null;
+      },
+      get revealOrigin(): FluidboxOriginAdapter["revealOrigin"] {
+        const reveal = options.revealTrigger;
+        if (!reveal) return undefined;
+        return (id, index, context) => {
+          const found = item(id);
+          return found ? reveal(found.item, index, context) : undefined;
+        };
+      },
+    };
+  }
+
   bind(
     element: HTMLElement,
-    target: FluidboxTarget<TItem>,
+    value: FluidboxTriggerValue<TItem>,
     options: FluidboxBindOptions<TItem> = {},
   ) {
     // Before anything is attached, so a destroyed fluidbox holds no listeners.
     this.#assertAlive();
     const trigger = bindTrigger(this, element, {
-      target,
-      returns: options.returns,
+      value,
       onPreviewChange: options.onPreviewChange,
     });
     const refresh = () => trigger.refresh();
@@ -571,26 +598,28 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   bindOverlay(
     element: HTMLElement,
-    target: FluidboxTarget<TItem>,
+    value: FluidboxTriggerValue<TItem>,
     options: FluidboxOverlayOptions<TItem> = {},
   ) {
     this.#assertAlive();
-    const { travel, frameLayer } = options;
-    const registration: FluidboxThumbnailOverlayRegistration<TItem> = travel
-      ? {
-          behavior: "travel",
-          element,
-          frameLayer,
-          renderer:
-            travel === true
-              ? ({ target: frame }) => {
-                  frame.append(...[...element.childNodes].map((node) => node.cloneNode(true)));
-                  return () => frame.replaceChildren();
-                }
-              : travel,
-        }
-      : { behavior: "host", element };
-    const targets = targetKeys(target, options.returns);
+    const { flight = "none" } = options;
+    const registration: FluidboxThumbnailOverlayRegistration<TItem> =
+      flight === "frame"
+        ? { behavior: "frame", element }
+        : flight === "none"
+          ? { behavior: "host", element }
+          : {
+              behavior: "travel",
+              element,
+              renderer:
+                flight === "copy"
+                  ? ({ target: frame }) => {
+                      frame.append(...[...element.childNodes].map((node) => node.cloneNode(true)));
+                      return () => frame.replaceChildren();
+                    }
+                  : flight.live,
+            };
+    const targets = targetKeys(value);
     for (const each of targets) {
       if (typeof each === "string" ? !each : !Number.isInteger(each) || each < 0) {
         throw new RangeError(`Not a fluidbox item target: ${String(each)}`);
@@ -753,9 +782,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   ): FluidboxDispose {
     if (this.#lifetime.signal.aborted) return () => {};
     this.#assertKnownId(id);
-    this.#overlays.get(id)?.dispose?.();
-    const overlay: OverlayRegistration<TItem> = { token: {}, registration };
-    this.#overlays.set(id, overlay);
+    const overlay: OverlayRegistration<TItem> = { id, registration };
+    this.#overlays.add(overlay);
     if (this.#viewer) overlay.dispose = this.#viewer.registerThumbnailOverlay(id, registration);
     // The overlay's resting state is public styling, so it shows before the viewer loads.
     else publishOverlayPhase(registration.element, "idle", 1);
@@ -763,8 +791,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return () => {
       if (disposed) return;
       disposed = true;
-      if (this.#overlays.get(id) !== overlay) return;
-      this.#overlays.delete(id);
+      if (!this.#overlays.delete(overlay)) return;
       if (overlay.dispose) overlay.dispose();
       else resetOverlayPhase(registration.element);
     };

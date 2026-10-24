@@ -11,8 +11,8 @@ export const mount: MountLive = async (root) => {
       <fluidbox-item item-id="${first!.id}">
         <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
           <img src="${first!.src}" alt="${coverAlt}" />
-          <span class="pattern-overlay" data-test="count" data-fluidbox-thumbnail-overlay="travel"
-            ><span class="live-layer" data-test="layer" data-fluidbox-frame-layer></span
+          <span class="pattern-overlay" data-test="count" data-fluidbox-trigger-overlay="copy"
+            ><span class="live-layer" data-test="layer" data-fluidbox-trigger-overlay="frame"></span
             >${countText}</span
           >
         </button>

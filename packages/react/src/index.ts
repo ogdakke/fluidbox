@@ -31,7 +31,6 @@ import {
   type FluidboxControlName,
   type FluidboxItem,
   type FluidboxLabels,
-  type FluidboxOriginAdapter,
   type FluidboxSlideRenderer,
   type FluidboxSlides,
   type FluidboxState,
@@ -45,8 +44,7 @@ import {
   fluidboxControlIcon,
   fluidboxControls,
   idOf,
-  frameLayerOf,
-  latestOrigins,
+  latestFindTrigger,
   resolveLabels,
   createOpenIndexSync,
   fluidboxStaticViewerNodes,
@@ -108,8 +106,6 @@ export type {
   FluidboxItems,
   FluidboxLabels,
   FluidboxLoading,
-  FluidboxOrigin,
-  FluidboxOriginAdapter,
   FluidboxReason,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -285,40 +281,42 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
   // The fluidbox exists from the first render, so parts bind to it as they
   // render. It touches nothing until a viewer is pressed or opened.
   const fluidboxRef = useRef<FluidboxInstance<TItem> | null>(null);
-  fluidboxRef.current ??= createFluidbox<TItem>({
-    items,
-    labels: labelOptions(),
-    zoom: zoomOption(),
-    loop,
-    loading,
-    // Renderers are looked up by name when an item renders, so the newest
-    // render function is used without telling the viewer.
-    slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
-      get(_, key) {
-        const render = typeof key === "string" ? latest.current.renderers?.[key] : undefined;
-        if (!render) return undefined;
-        const renderer: FluidboxSlideRenderer<TItem> = (context) =>
-          mount(
-            context.media,
-            render({
-              item: context.item,
-              index: context.index,
-              signal: context.signal,
-              get active() {
-                return context.active;
-              },
-              onActiveChange: context.onActiveChange,
-            }),
-          );
-        return renderer;
+  // findTrigger and revealTrigger are read from the newest props on each use.
+  fluidboxRef.current ??= createFluidbox<TItem>(
+    latestFindTrigger(
+      {
+        items,
+        labels: labelOptions(),
+        zoom: zoomOption(),
+        loop,
+        loading,
+        // Renderers are looked up by name when an item renders, so the newest
+        // render function is used without telling the viewer.
+        slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
+          get(_, key) {
+            const render = typeof key === "string" ? latest.current.renderers?.[key] : undefined;
+            if (!render) return undefined;
+            const renderer: FluidboxSlideRenderer<TItem> = (context) =>
+              mount(
+                context.media,
+                render({
+                  item: context.item,
+                  index: context.index,
+                  signal: context.signal,
+                  get active() {
+                    return context.active;
+                  },
+                  onActiveChange: context.onActiveChange,
+                }),
+              );
+            return renderer;
+          },
+          has: (_, key) => typeof key === "string" && !!latest.current.renderers?.[key],
+        }) as FluidboxSlides<TItem>,
       },
-      has: (_, key) => typeof key === "string" && !!latest.current.renderers?.[key],
-    }) as FluidboxSlides<TItem>,
-    // latestOrigins is not generic; the adapter only ever sees this Root's items.
-    origins: latestOrigins(
-      () => latest.current.origins as FluidboxOriginAdapter | undefined,
-    ) as FluidboxOriginAdapter<TItem>,
-  });
+      () => latest.current,
+    ),
+  );
   const fluidbox = fluidboxRef.current;
 
   // The Viewer, Filmstrip and Sheet parts register in their layout effects.
@@ -597,15 +595,14 @@ function Trigger<TItem extends FluidboxItem>({
     throw new Error("<Fluidbox.Trigger> needs an item: the item, its id or its index.");
   }
   // Its target first; the rest close back onto it. Compared by value.
-  const keysKey = JSON.stringify(targetKeys(item, returns));
+  const keysKey = JSON.stringify(targetKeys([item, ...(returns ?? [])]));
   const keys = useMemo(() => JSON.parse(keysKey) as (number | string)[], [keysKey]);
   const followsSelection = typeof children === "function";
   // Only a trigger whose children follow the selection re-renders with the viewer.
   const state = useFluidbox((current) => (followsSelection ? current : null));
   const [, rerender] = useState(0);
   const options = {
-    target: item,
-    returns,
+    value: [item, ...(returns ?? [])],
     // The closing flight measures the trigger right after this, so render now.
     onPreviewChange: followsSelection
       ? () => flushSync(() => rerender((count) => count + 1))
@@ -979,18 +976,24 @@ const ThumbnailOverlay = forwardRef<HTMLSpanElement, FluidboxThumbnailOverlayPro
     const [layer, setLayer] = useState<HTMLElement | null>(null);
     useEffect(() => {
       if (!element) return;
-      const [target, ...returns] = keys;
-      return fluidbox.bindOverlay(element, target!, {
-        returns,
-        travel: travel
-          ? ({ target: frame }) =>
-              mount(
-                frame,
-                createElement(TravelContext.Provider, { value: true }, latestChildren.current),
-              )
-          : false,
-        frameLayer: travel ? frameLayerOf(element) : undefined,
+      const unbind = fluidbox.bindOverlay(element, keys, {
+        flight: travel
+          ? {
+              live: ({ target: frame }) =>
+                mount(
+                  frame,
+                  createElement(TravelContext.Provider, { value: true }, latestChildren.current),
+                ),
+            }
+          : "none",
       });
+      // A FrameLayer inside flies as an overlay of its own, beside this one.
+      const unbindLayer =
+        travel && layer ? fluidbox.bindOverlay(layer, keys, { flight: "frame" }) : undefined;
+      return () => {
+        unbind();
+        unbindLayer?.();
+      };
     }, [element, travel, keys, fluidbox, items, mount, latestChildren, layer]);
     const latestRef = useLatest(forwardedRef);
     const ref = useCallback(
@@ -1008,7 +1011,7 @@ const ThumbnailOverlay = forwardRef<HTMLSpanElement, FluidboxThumbnailOverlayPro
         {
           ...attributes,
           ref,
-          "data-fluidbox-thumbnail-overlay": travel ? "travel" : "",
+          "data-fluidbox-trigger-overlay": travel ? "live" : "none",
         },
         children,
       ),
@@ -1044,7 +1047,7 @@ const FrameLayer = forwardRef<HTMLSpanElement, FluidboxFrameLayerProps>(function
     {
       ...attributes,
       ref,
-      "data-fluidbox-frame-layer": "",
+      "data-fluidbox-trigger-overlay": "frame",
     },
     children,
   );

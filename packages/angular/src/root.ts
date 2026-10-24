@@ -23,7 +23,6 @@ import {
   type FluidboxItems,
   type FluidboxLabels,
   type FluidboxOptions,
-  type FluidboxOriginAdapter,
   type FluidboxRenderer,
   type FluidboxSlide,
   type FluidboxSlides,
@@ -39,7 +38,7 @@ import {
   type FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import {
-  latestOrigins,
+  latestFindTrigger,
   resolveLabels,
   createOpenIndexSync,
   watchOpenIndex,
@@ -139,8 +138,10 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   @Input({ transform: booleanAttribute }) loop = false;
   /** Draw `custom` items, by the name in their `render`: a template or a component. */
   @Input() renderers?: Readonly<Record<string, FluidboxContent<TItem>>>;
-  /** Find origins the viewer can't see, as in a virtualized grid. */
-  @Input() origins?: FluidboxOriginAdapter<TItem>;
+  /** Find the trigger of an item without a bound trigger, as in a virtualised grid. */
+  @Input() findTrigger?: FluidboxOptions<TItem>["findTrigger"];
+  /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
+  @Input() revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
   /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
   @Input() loading?: FluidboxOptions["loading"];
 
@@ -164,28 +165,33 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly #container = inject(ViewContainerRef);
   readonly #browser = injectIsBrowser();
   /** The fluidbox. Parts bind to it as they are made. */
-  readonly fluidbox: Fluidbox<TItem> = createFluidbox<TItem>({
-    items: [],
-    // Renderers resolve by name when a slide mounts, so the newest one is used.
-    slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
-      get: (_, name) => {
-        const content = typeof name === "string" ? this.renderers?.[name] : undefined;
-        if (!content) return undefined;
-        return (context: FluidboxSlide<TItem>) =>
-          mountContent(
-            this.#zone,
-            this.#container,
-            content,
-            context.item,
-            context.index,
-            context.media,
-            context,
-          );
+  // findTrigger and revealTrigger are read from the newest inputs on each use.
+  readonly fluidbox: Fluidbox<TItem> = createFluidbox<TItem>(
+    latestFindTrigger<TItem, FluidboxOptions<TItem>>(
+      {
+        items: [],
+        // Renderers resolve by name when a slide mounts, so the newest one is used.
+        slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
+          get: (_, name) => {
+            const content = typeof name === "string" ? this.renderers?.[name] : undefined;
+            if (!content) return undefined;
+            return (context: FluidboxSlide<TItem>) =>
+              mountContent(
+                this.#zone,
+                this.#container,
+                content,
+                context.item,
+                context.index,
+                context.media,
+                context,
+              );
+          },
+          has: (_, name) => typeof name === "string" && !!this.renderers?.[name],
+        }) as FluidboxSlides<TItem>,
       },
-      has: (_, name) => typeof name === "string" && !!this.renderers?.[name],
-    }) as FluidboxSlides<TItem>,
-    origins: latestOrigins(() => this.origins),
-  });
+      () => this,
+    ),
+  );
   readonly #state = signal(this.fluidbox.state);
   readonly #list = signal(this.fluidbox.items);
   readonly #labels = signal(resolveLabels(undefined));

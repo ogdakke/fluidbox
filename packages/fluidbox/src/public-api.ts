@@ -315,33 +315,12 @@ export type FluidboxViewerRenderer<TItem extends FluidboxItem = FluidboxItem> = 
   context: FluidboxViewerContext<TItem>,
 ) => void | (() => void);
 
-// Origins: where a flight starts and lands.
-
-export interface FluidboxOrigin<TItem extends FluidboxItem = FluidboxItem> {
-  /** The element that opened the item, scrolled into view on close. */
-  readonly trigger: HTMLElement;
-  /** The box the flight starts from and lands on. */
-  readonly visual: HTMLElement;
-  /** The image painted at the start of the flight, if any. */
-  readonly thumbnail?: HTMLImageElement;
-  /**
-   * Called before the closing flight measures `visual`, with the item it lands
-   * on: show that item on the trigger, synchronously, as an album cover does.
-   */
-  readonly onPreviewChange?: (item: TItem, index: number) => void;
-}
+// Triggers: where a flight starts and lands.
 
 export interface FluidboxRevealContext {
   readonly signal: AbortSignal;
   /** "open" before the opening flight, "selection" as the viewer moves between items. */
   readonly phase: "open" | "selection";
-}
-
-/** Finds origins the viewer can't see, as in a virtualized grid. */
-export interface FluidboxOriginAdapter<TItem extends FluidboxItem = FluidboxItem> {
-  getOrigin(id: string): FluidboxOrigin<TItem> | null;
-  /** Bring the item's trigger into view. Without it, the viewer scrolls it into view. */
-  revealOrigin?(id: string, index: number, context: FluidboxRevealContext): void | Promise<void>;
 }
 
 // State and events.
@@ -571,7 +550,10 @@ export type FluidboxControlName =
  */
 export type FluidboxLoading = "hover" | "press" | "eager";
 
-/** Every option but `items`, `value`, `slides` and `origins` can change later through `update`. */
+/**
+ * Every option but `items`, `value`, `slides`, `findTrigger` and
+ * `revealTrigger` can change later through `update`.
+ */
 export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly items: FluidboxItems<TItem>;
   /**
@@ -615,8 +597,21 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
    * stylesheet. Without the import, it throws an Error that names it.
    */
   readonly sheet?: boolean | FluidboxSheetOptions<TItem>;
-  /** Find origins the viewer can't see, as in a virtualized grid. Read on each use. */
-  readonly origins?: FluidboxOriginAdapter<TItem>;
+  /**
+   * Find the trigger of an item the page doesn't have bound, as in a
+   * virtualised grid. Read on each use. Return null when it isn't rendered. The
+   * flight starts from what is in it, as from a bound trigger.
+   */
+  readonly findTrigger?: (item: TItem, index: number) => HTMLElement | null;
+  /**
+   * Bring an item's trigger into view: before the opening flight, and as the
+   * viewer moves between items. Without it, the viewer scrolls it into view.
+   */
+  readonly revealTrigger?: (
+    item: TItem,
+    index: number,
+    context: FluidboxRevealContext,
+  ) => void | Promise<void>;
   /**
    * When the viewer's code loads.
    * @default "hover"
@@ -663,11 +658,17 @@ export interface FluidboxZoomCommandOptions {
   readonly origin?: { readonly x: number; readonly y: number };
 }
 
+/**
+ * What a trigger opens: one target, or a list of them. The first opens, and
+ * every one closes back onto the trigger, as on an album cover.
+ */
+export type FluidboxTriggerValue<TItem extends FluidboxItem = FluidboxItem> =
+  | FluidboxTarget<TItem>
+  | readonly FluidboxTarget<TItem>[];
+
 export interface FluidboxBindOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Unbinds when aborted. */
   readonly signal?: AbortSignal;
-  /** More items that close back onto this element, as on an album cover. */
-  readonly returns?: readonly FluidboxTarget<TItem>[];
   /**
    * Called before the closing flight measures the trigger, with the item it
    * lands on: show that item on the trigger, synchronously, as an album cover does.
@@ -678,15 +679,15 @@ export interface FluidboxBindOptions<TItem extends FluidboxItem = FluidboxItem> 
 export interface FluidboxOverlayOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** Unbinds when aborted. */
   readonly signal?: AbortSignal;
-  /** More items whose flights carry the overlay, as with the trigger's `returns`. */
-  readonly returns?: readonly FluidboxTarget<TItem>[];
   /**
-   * Fly with the photo. `true` flies a copy of the element; a renderer draws
-   * live content into the flying frame.
+   * How it goes with the photo's flight. `"none"` stays on the card, with
+   * `--fluidbox-closed` and `data-fluidbox-phase`; `"copy"` flies a still copy
+   * of it; `{ live }` draws live content into the flying frame; `"frame"` moves
+   * the element itself into the flying frame, scaling with it as a scrim does.
+   * A trigger can have several overlays, as a scrim beside a count.
+   * @default "none"
    */
-  readonly travel?: boolean | FluidboxRenderer<TItem>;
-  /** With `travel`, an element moved into the flying frame for the flight and put back after. */
-  readonly frameLayer?: HTMLElement;
+  readonly flight?: "none" | "copy" | "frame" | { readonly live: FluidboxRenderer<TItem> };
 }
 
 /**
@@ -750,30 +751,31 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
    */
   load(): Promise<boolean>;
   /**
-   * Make an element a trigger that opens the viewer on an item. The item, and any
-   * in `returns`, close back onto it. It sets `data-fluidbox-trigger` and
-   * `aria-haspopup="dialog"` on the element, loads the viewer's
-   * code as the `loading` option says, preloads on a primary-button `pointerdown`,
-   * and drops that work 250 ms after the pointer lifts without a click. A plain
-   * primary click opens the item the trigger shows, its target or the item of
-   * `returns` it last closed onto, unless the click was prevented, and prevents
-   * it, so an `<a href>` trigger stays on the page. A click with a modifier key
-   * is left to the link, and a link is followed when the viewer fails to open.
-   * Returns a function that unbinds.
+   * Make an element a trigger. `value` is one target, or a list: the first
+   * opens, and every one closes back onto the element. It sets
+   * `data-fluidbox-trigger` and `aria-haspopup="dialog"` on the element, loads
+   * the viewer's code as the `loading` option says, preloads on a
+   * primary-button `pointerdown`, and drops that work 250 ms after the pointer
+   * lifts without a click. A plain primary click opens the item the trigger
+   * shows, its first or the one of its list it last closed onto, unless the
+   * click was prevented, and prevents it, so an `<a href>` trigger stays on the
+   * page. A click with a modifier key is left to the link, and a link is
+   * followed when the viewer fails to open. Returns a function that unbinds.
    */
   bind(
     element: HTMLElement,
-    target: FluidboxTarget<TItem>,
+    value: FluidboxTriggerValue<TItem>,
     options?: FluidboxBindOptions<TItem>,
   ): () => void;
   /**
-   * Make an element on a trigger, such as a badge or a caption, a thumbnail
-   * overlay: it gets `--fluidbox-closed` and `data-fluidbox-phase` as the
-   * viewer opens and closes, and with `travel` it flies with the photo.
+   * Make an element on a trigger, such as a badge or a caption, a trigger
+   * overlay for the same `value`: it gets `--fluidbox-closed` and
+   * `data-fluidbox-phase` as the viewer opens and closes, and goes with the
+   * flight as `flight` says.
    */
   bindOverlay(
     element: HTMLElement,
-    target: FluidboxTarget<TItem>,
+    value: FluidboxTriggerValue<TItem>,
     options?: FluidboxOverlayOptions<TItem>,
   ): () => void;
   /**

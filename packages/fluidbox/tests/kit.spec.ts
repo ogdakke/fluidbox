@@ -108,7 +108,7 @@ describe("createFluidboxSync", () => {
 describe("a trigger", () => {
   it("does nothing on a press after its fluidbox is destroyed", () => {
     const fluidbox = createFluidbox({ items });
-    const trigger = createTrigger(fluidbox, { target: "two" });
+    const trigger = createTrigger(fluidbox, { value: "two" });
     fluidbox.destroy();
     const press = { defaultPrevented: false, isPrimary: true, button: 0 } as PointerEvent;
     expect(() => trigger.pointerDown(press)).not.toThrow();

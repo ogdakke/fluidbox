@@ -17,8 +17,8 @@ import {
   type FluidboxItemList,
   type FluidboxLabels,
   type FluidboxOptions,
-  type FluidboxOrigin,
-  type FluidboxOriginAdapter,
+  type FluidboxRevealContext,
+  type FluidboxTriggerValue,
   type FluidboxReason,
   type FluidboxRenderer,
   type FluidboxSheet,
@@ -52,9 +52,8 @@ import {
   fluidboxControls,
   createSlots,
   fluidboxEventTypes,
-  frameLayerOf,
+  latestFindTrigger,
   itemLabel,
-  latestOrigins,
   resolveOrigin,
   unloadFluidbox,
   type FluidboxSlot,
@@ -180,20 +179,17 @@ const viewer: FluidboxViewerRenderer<Photo> = ({ target, fluidbox, signal }) => 
   const stop = fluidbox.subscribe((state) => (caption.textContent = state.item?.credit ?? ""));
   signal.addEventListener("abort", stop);
 };
-const origins: FluidboxOriginAdapter<Photo> = {
-  getOrigin(): FluidboxOrigin<Photo> | null {
-    const trigger = document.createElement("button");
-    const visual = document.createElement("img");
-    return {
-      trigger,
-      visual,
-      thumbnail: visual,
-      onPreviewChange: (item, index) => void [item.credit, index],
-    };
-  },
-  revealOrigin(_id, _index, { signal, phase }) {
-    if (!signal.aborted && phase === "selection") return Promise.resolve();
-  },
+const findTrigger = (item: Photo, index: number): HTMLElement | null => {
+  void [item.credit, index];
+  return document.createElement("button");
+};
+const revealTrigger = (
+  item: Photo,
+  _index: number,
+  { signal, phase }: FluidboxRevealContext,
+): Promise<void> | undefined => {
+  void item.credit;
+  if (!signal.aborted && phase === "selection") return Promise.resolve();
 };
 const labels: Partial<FluidboxLabels> = {
   close: "Sulje",
@@ -211,7 +207,8 @@ const fluidbox = createFluidbox({
   controls: ["close"],
   filmstrip: { render: ({ item, target }) => void (target.title = item.credit) },
   sheet: { snapPoints: ["40%", 600, "content"], dismiss: "scroll", render: () => {} },
-  origins,
+  findTrigger,
+  revealTrigger,
 });
 assert<Equal<typeof fluidbox, Fluidbox<Photo>>>();
 assert<Equal<typeof fluidbox.state, FluidboxState<Photo>>>();
@@ -351,8 +348,7 @@ const flatZoom: FluidboxImageItem = { ...masterPhoto, zoomSrc: "/one-master.jpg"
 void [masterPhoto, flatZoom];
 
 const button = document.createElement("button");
-const unbind: () => void = fluidbox.bind(button, photos[0]!, {
-  returns: ["one", 1, ...photos],
+const unbind: () => void = fluidbox.bind(button, [photos[0]!, "one", 1, ...photos], {
   signal: new AbortController().signal,
   onPreviewChange(item, index) {
     assert<Equal<typeof item, Photo>>();
@@ -360,16 +356,22 @@ const unbind: () => void = fluidbox.bind(button, photos[0]!, {
   },
 });
 unbind();
-// @ts-expect-error one target; the rest go in returns
-fluidbox.bind(button, ["one", 1]);
+fluidbox.bind(button, "one");
+const value: FluidboxTriggerValue<Photo> = ["one", 1];
+// @ts-expect-error the list is the value; there are no returns
+fluidbox.bind(button, "one", { returns: [1] });
 fluidbox.bindOverlay(document.createElement("span"), "one");
-fluidbox.bindOverlay(document.createElement("span"), "one", { returns: [1], travel: true });
+fluidbox.bindOverlay(document.createElement("span"), value, { flight: "copy" });
 fluidbox.bindOverlay(document.createElement("span"), 0, {
-  travel: ({ item, target }) => void (target.textContent = item.credit),
-  frameLayer: document.createElement("span"),
+  flight: { live: ({ item, target }) => void (target.textContent = item.credit) },
 });
-// @ts-expect-error a frame layer is an element
-fluidbox.bindOverlay(button, 0, { travel: true, frameLayer: "badge" });
+fluidbox.bindOverlay(document.createElement("span"), value, { flight: "frame" });
+// @ts-expect-error travel and frameLayer are now flight
+fluidbox.bindOverlay(button, 0, { travel: true });
+// @ts-expect-error a live flight is an object with its renderer
+fluidbox.bindOverlay(button, 0, { flight: "live" });
+// @ts-expect-error origins became findTrigger and revealTrigger
+createFluidbox({ items: photos, origins: {} });
 
 fluidbox.addEventListener("beforevaluechange", (event) => {
   assert<Equal<typeof event, FluidboxValueChangeEvent<Photo>>>();
@@ -456,8 +458,7 @@ void [sheetOptions, filmstripOptions];
 
 const stand: Fluidbox<Photo> = createFluidbox<Photo>({ items: photos });
 const trigger: FluidboxTrigger<Photo> = createTrigger(stand, {
-  target: "one",
-  returns: photos,
+  value: ["one", ...photos],
   onPreviewChange: (item) => void item.credit,
 });
 const preview: FluidboxTriggerPreview<Photo> = trigger.preview(stand.state);
@@ -465,24 +466,25 @@ void preview.item?.credit;
 trigger.setElement(button);
 trigger.click({ defaultPrevented: false });
 trigger.destroy();
-bindTrigger(stand, button, { target: 0 }).destroy();
+bindTrigger(stand, button, { value: 0 }).destroy();
 stand.update({ zoom: false });
 const slotRenderer: FluidboxSlots<Photo> = createSlots<Photo>();
 const firstSlot: FluidboxSlot<Photo> | undefined = slotRenderer.slots[0];
 slotRenderer.subscribe(
   () => void [firstSlot?.item.credit, firstSlot?.target, firstSlot?.container],
 )();
-const layer: HTMLElement | undefined = frameLayerOf(button);
-void layer;
 unloadFluidbox(stand);
 const label: string = itemLabel(note);
 const close: Promise<boolean> = fluidboxControls.close.run(stand);
 const disabled: boolean = fluidboxControls.next.disabled(stand.state);
 void fluidboxControls.zoomIn.run(stand);
 void [label, close, disabled, fluidboxControlIcon.paths, defaultLabels.viewer, fluidboxEventTypes];
-const adapter: FluidboxOriginAdapter = latestOrigins(() => origins as FluidboxOriginAdapter);
-const resolved: FluidboxOrigin = resolveOrigin(button);
-void [adapter, resolved];
+const latestOptions: FluidboxOptions<Photo> = latestFindTrigger(
+  { items: photos } as FluidboxOptions<Photo>,
+  () => ({ findTrigger, revealTrigger }),
+);
+const resolved: HTMLElement = resolveOrigin(button).visual;
+void [latestOptions, resolved];
 
 // The custom elements.
 
@@ -493,7 +495,8 @@ gallery.renderers = { note: note2 };
 gallery.viewer = ({ target }) => {
   target.append("Caption");
 };
-gallery.origins = origins as FluidboxOriginAdapter;
+gallery.findTrigger = (found) => (found.id ? button : null);
+gallery.revealTrigger = undefined;
 gallery.zoom = false;
 gallery.labels = labels;
 const galleryState: FluidboxState = gallery.state;

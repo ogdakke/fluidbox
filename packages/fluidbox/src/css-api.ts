@@ -140,17 +140,19 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-flight"] },
   /** A travelling overlay's copy, in the flight. */
   { names: ["data-fluidbox-transition-content"] },
-  /** Mark a travel overlay's `frameLayer` with it to get the layer inputs. */
+  /** Mark a `frame` overlay with it to get the layer inputs. */
   { names: ["data-fluidbox-transition-layer"] },
   /** A trigger, on the page. */
   { names: ["data-fluidbox-trigger"] },
   /** On an element inside a trigger: the flight starts and ends there instead. */
   { names: ["data-fluidbox-origin"] },
-  /** A thumbnail overlay inside a trigger. The value `travel` makes it fly with the photo. */
-  { names: ["data-fluidbox-thumbnail-overlay"] },
-  /** A travelling overlay's frame layer. It moves into the flying frame and scales with it. */
-  { names: ["data-fluidbox-frame-layer"] },
-  /** The still copy of a frame layer the page shows in the thumbnail while a flight starts. */
+  /**
+   * An overlay inside a trigger. Its value is how it goes with the flight:
+   * `none`, `copy`, `live`, or `frame`, which moves into the flying frame and
+   * scales with it.
+   */
+  { names: ["data-fluidbox-trigger-overlay"] },
+  /** The still copy of a `frame` overlay the page shows in the thumbnail while a flight starts. */
   { names: ["data-fluidbox-ghost"] },
   /** In a `<fluidbox-gallery>` with `items` set, makes the element a trigger of the item with that id. */
   { names: ["data-fluidbox-item-id"] },

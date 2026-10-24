@@ -40,7 +40,7 @@ import {
   type FluidboxItems,
   type FluidboxLabels,
   type FluidboxLoading,
-  type FluidboxOriginAdapter,
+  type FluidboxOptions,
   type FluidboxRenderer,
   type FluidboxSlide,
   type FluidboxSlideRenderer,
@@ -61,8 +61,7 @@ import {
   fluidboxControlIcon,
   fluidboxControls,
   fluidboxEventTypes,
-  frameLayerOf,
-  latestOrigins,
+  latestFindTrigger,
   resolveLabels,
   createOpenIndexSync,
   unloadFluidbox,
@@ -99,8 +98,6 @@ export type {
   FluidboxItems,
   FluidboxLabels,
   FluidboxLoading,
-  FluidboxOrigin,
-  FluidboxOriginAdapter,
   FluidboxReason,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
@@ -277,8 +274,10 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly loop?: boolean;
   /** Draw `custom` items, by the name in their `render`. */
   readonly renderers?: Readonly<Record<string, FluidboxVueRenderer<TItem>>>;
-  /** Find origins the viewer can't see, as in a virtualized grid. */
-  readonly origins?: FluidboxOriginAdapter<TItem>;
+  /** Find the trigger of an item without a mounted Trigger, as in a virtualised grid. */
+  readonly findTrigger?: FluidboxOptions<TItem>["findTrigger"];
+  /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
+  readonly revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
   /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
   readonly loading?: FluidboxLoading;
 }
@@ -364,12 +363,17 @@ const Root = defineComponent(
     };
 
     let applied = settings();
-    const fluidbox = createFluidbox<TItem>({
-      items: items.value,
-      ...(applied as FluidboxUpdateOptions<TItem>),
-      slides: renderers as FluidboxSlides<TItem>,
-      origins: latestOrigins(() => props.origins as FluidboxOriginAdapter<TItem> | undefined),
-    });
+    // findTrigger and revealTrigger are read from the newest props on each use.
+    const fluidbox = createFluidbox<TItem>(
+      latestFindTrigger<TItem, FluidboxOptions<TItem>>(
+        {
+          items: items.value,
+          ...(applied as FluidboxUpdateOptions<TItem>),
+          slides: renderers as FluidboxSlides<TItem>,
+        },
+        () => props as FluidboxRootProps<TItem>,
+      ),
+    );
     const state = shallowRef(fluidbox.state);
     const list = shallowRef(fluidbox.items);
     const sheetStop = shallowRef(0);
@@ -493,7 +497,18 @@ const Root = defineComponent(
   },
   {
     name: "FluidboxRoot",
-    props: ["items", "open", "index", "labels", "zoom", "loop", "renderers", "origins", "loading"],
+    props: [
+      "items",
+      "open",
+      "index",
+      "labels",
+      "zoom",
+      "loop",
+      "renderers",
+      "findTrigger",
+      "revealTrigger",
+      "loading",
+    ],
     emits: [...fluidboxEventTypes, "update:open", "update:index"],
   },
 );
@@ -537,8 +552,7 @@ const Trigger = defineComponent(
     // Read by render, so the forced update below sees a change.
     const previewed = shallowRef(0);
     const options = () => ({
-      target: target(),
-      returns: returns(),
+      value: [target(), ...(returns() ?? [])],
       // The closing flight measures right after this, so patch the DOM now.
       onPreviewChange() {
         previewed.value++;
@@ -631,19 +645,20 @@ const ThumbnailOverlay = defineComponent({
         const overlay = element.value;
         void items.value;
         if (!overlay) return;
+        const value = [trigger.target(), ...(trigger.returns() ?? [])];
         onCleanup(
-          fluidbox.bindOverlay(
-            overlay,
-            trigger.target(),
-            props.travel
-              ? {
-                  returns: trigger.returns(),
-                  travel,
-                  frameLayer: layer.value ?? frameLayerOf(overlay),
-                }
-              : { returns: trigger.returns() },
-          ),
+          fluidbox.bindOverlay(overlay, value, {
+            flight: props.travel ? { live: travel } : "none",
+          }),
         );
+        // A FrameLayer inside flies as an overlay of its own, beside this one.
+        const frame = props.travel
+          ? (layer.value ??
+            overlay.querySelector<HTMLElement>(
+              '[data-fluidbox-trigger-overlay="frame"]:not([data-fluidbox-ghost])',
+            ))
+          : null;
+        if (frame) onCleanup(fluidbox.bindOverlay(frame, value, { flight: "frame" }));
       },
       { flush: "post" },
     );
@@ -652,7 +667,7 @@ const ThumbnailOverlay = defineComponent({
         "span",
         mergeProps(attrs, {
           ref: element,
-          "data-fluidbox-thumbnail-overlay": props.travel ? "travel" : "",
+          "data-fluidbox-trigger-overlay": props.travel ? "live" : "none",
         }),
         slots.default?.(),
       ),
@@ -664,7 +679,7 @@ const ThumbnailOverlay = defineComponent({
 /**
  * A layer of a travelling ThumbnailOverlay that is moved into the flying frame
  * for the flight and put back after, as one element: a frame, a border, a
- * shadow. It renders a `<span data-fluidbox-frame-layer>`.
+ * shadow. It renders a `<span data-fluidbox-trigger-overlay="frame">`.
  */
 const FrameLayer = defineComponent({
   name: "FluidboxFrameLayer",
@@ -681,7 +696,7 @@ const FrameLayer = defineComponent({
     return () =>
       h(
         "span",
-        mergeProps(attrs, { ref: setLayer, "data-fluidbox-frame-layer": "" }),
+        mergeProps(attrs, { ref: setLayer, "data-fluidbox-trigger-overlay": "frame" }),
         slots.default?.(),
       );
   },

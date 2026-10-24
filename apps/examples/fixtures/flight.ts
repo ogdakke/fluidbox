@@ -92,13 +92,15 @@ const cases: FlightCase[] = [
     setup(fluidbox, trigger) {
       const host = trigger.querySelector<HTMLElement>("[data-flight-badge-host]")!;
       fluidbox.bindOverlay(host, "flight-meadow", {
-        travel({ target }) {
-          // Travel content fades near the card by default; a badge stays on the image.
-          target.style.setProperty("--fluidbox-transition-content-opacity", "1");
-          const badge = document.createElement("span");
-          badge.className = "flight-badge";
-          badge.textContent = "New";
-          target.append(badge);
+        flight: {
+          live({ target }) {
+            // Travel content fades near the card by default; a badge stays on the image.
+            target.style.setProperty("--fluidbox-transition-content-opacity", "1");
+            const badge = document.createElement("span");
+            badge.className = "flight-badge";
+            badge.textContent = "New";
+            target.append(badge);
+          },
         },
       });
     },

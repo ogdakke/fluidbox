@@ -31,14 +31,7 @@ const items: FluidboxItemList = {
   },
 };
 gallery.items = items;
-gallery.origins = {
-  getOrigin(id) {
-    const trigger = origins.get(id);
-    if (!trigger) return null;
-    const thumbnail = trigger.querySelector("img");
-    return { trigger, visual: thumbnail ?? trigger, thumbnail: thumbnail ?? undefined };
-  },
-};
+gallery.findTrigger = (item) => origins.get(item.id!) ?? null;
 
 function renderWindow(start: number) {
   for (const button of origins.values()) button.remove();

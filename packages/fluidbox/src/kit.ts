@@ -14,7 +14,6 @@ export { defaultLabels, resolveLabels };
 export {
   bindTrigger,
   createTrigger,
-  frameLayerOf,
   resolveOrigin,
   type FluidboxTrigger,
   type FluidboxTriggerOptions,
@@ -32,7 +31,7 @@ export const fluidboxControlIcon = {
 /** The fluidbox events, for bindings that forward them as props, emits or outputs. */
 export { fluidboxEventTypes };
 
-export { latestOrigins } from "./origins";
+export { latestFindTrigger } from "./origins";
 
 /**
  * Drop a fluidbox's viewer and close it at once, keeping its bindings, as a

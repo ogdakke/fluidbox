@@ -1,12 +1,7 @@
 import { mountSite } from "../src/site";
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type {
-  FluidboxImageItem,
-  FluidboxItem,
-  FluidboxOriginAdapter,
-  FluidboxSlideRenderer,
-} from "@ogdakke/fluidbox";
+import type { FluidboxImageItem, FluidboxItem, FluidboxSlideRenderer } from "@ogdakke/fluidbox";
 import { renderEmbed, youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embeds";
 import { createModelRenderer, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
 import { createSpinRenderer, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
@@ -802,17 +797,14 @@ function ProductPage() {
   const [cart, setCart] = useState(0);
   // The viewer scrolls the carousel to the photo on show, so the close lands
   // on that card and the page is left where the viewer was.
-  const origins = useMemo<FluidboxOriginAdapter<ShopItem>>(
-    () => ({
-      getOrigin: () => null,
-      revealOrigin: (_id, index) => carousel.scrollTo(index, "instant"),
-    }),
+  const revealTrigger = useCallback(
+    (_item: ShopItem, index: number) => carousel.scrollTo(index, "instant"),
     [carousel.scrollTo],
   );
   return (
     <Fluidbox.Root
       items={media}
-      origins={origins}
+      revealTrigger={revealTrigger}
       renderers={renderers}
       zoom={{ step: 2.5, max: 4 }}
     >

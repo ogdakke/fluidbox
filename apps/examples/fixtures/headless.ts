@@ -51,13 +51,8 @@ const items: readonly DemoItem[] = [
   },
 ];
 
-const origins = {
-  getOrigin(id: string) {
-    const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${id}"]`);
-    const visual = trigger?.querySelector<HTMLImageElement>("img");
-    return trigger && visual ? { trigger, visual, thumbnail: visual } : null;
-  },
-};
+const findTrigger = (item: DemoItem) =>
+  document.querySelector<HTMLElement>(`[data-photo-id="${item.id}"]`);
 const increment = (name: string) => {
   document.body.dataset[name] = String(Number(document.body.dataset[name] ?? 0) + 1);
 };
@@ -76,7 +71,7 @@ const slides = {
 
 const viewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
+  findTrigger,
   slides,
   viewer({ target, fluidbox, signal }) {
     const controls = document.createElement("div");
@@ -115,19 +110,19 @@ const viewer: Fluidbox<DemoItem> = createFluidbox({
 });
 const secondaryViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
+  findTrigger,
   slides,
 });
 // The filmstrip is an option: its code loads only with the side-effect import.
 const filmstripViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
+  findTrigger,
   slides,
   filmstrip: true,
 });
 const protectedViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
+  findTrigger,
   slides,
 });
 protectedViewer.addEventListener("beforevaluechange", (event) => {

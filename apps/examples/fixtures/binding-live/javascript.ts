@@ -25,7 +25,8 @@ export const mount: MountLive = (root) => {
   root.append(button);
 
   fluidbox.bind(button, album[0]!);
-  fluidbox.bindOverlay(count, album[0]!, { travel: true, frameLayer: layer });
+  fluidbox.bindOverlay(count, album[0]!, { flight: "copy" });
+  fluidbox.bindOverlay(layer, album[0]!, { flight: "frame" });
 
   // The same function each time, so update sees no change while it stays on.
   const viewer: FluidboxViewerRenderer<FluidboxImageItem> = ({ target }) => {
