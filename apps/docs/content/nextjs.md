@@ -53,7 +53,7 @@ export const photos = files.map(({ slug, src, alt }) => {
   });
   return {
     ...imageItem(full.props, thumb.props),
-    slug,
+    id: slug,
     thumb: thumb.props,
   };
 });
@@ -65,7 +65,7 @@ export type Photo = (typeof photos)[number];
 - `thumb` keeps the grid's props for the triggers to render, so the grid's `sizes` lives in one place. The viewer sees that the trigger already shows the thumbnail and flies the image the page has decoded.
 - On a 1200 px screen the viewer loads the 1200w file, and the thumbnails takes the thumbnail's smallest candidate. `src` is the largest width, which only browsers without `srcset` load.
 - A static import gives Next the width, the height and the blur. For a remote file, pass `width`, `height` and a `blurDataURL` of your own.
-- `slug` and `thumb` are [fields of your own](./media.md#fields-of-your-own). The viewer hands them back in every state and callback.
+- The slug is the item's `id`, which triggers and `value` name it by. `thumb` is a [field of your own](./media.md#fields-of-your-own); the viewer hands it back in every state and callback.
 
 ## The gallery
 
@@ -83,7 +83,7 @@ export function Gallery({ photos }: { photos: Photo[] }) {
     <Fluidbox.Root items={photos}>
       <div className="grid">
         {photos.map((photo) => (
-          <Fluidbox.Trigger key={photo.slug} item={photo}>
+          <Fluidbox.Trigger key={photo.id} value={photo.id}>
             <img {...photo.thumb} />
           </Fluidbox.Trigger>
         ))}
@@ -158,26 +158,22 @@ import type { Photo } from "./photos";
 
 export function Gallery({ photos }: { photos: Photo[] }) {
   const photoAt = (path: string | null) =>
-    photos.findIndex(({ slug }) => path === `/photos/${slug}`);
+    photos.find(({ id }) => path === `/photos/${id}`)?.id ?? null;
   const shown = photoAt(usePathname());
 
   return (
     <Fluidbox.Root
       items={photos}
-      open={shown >= 0}
-      index={shown >= 0 ? shown : undefined}
-      onOpenChange={(open) => {
-        // Back to the grid, unless Back closed it already.
-        if (!open && photoAt(location.pathname) >= 0) {
-          history.back();
-        }
-      }}
-      onIndexChange={(index) => {
-        const url = `/photos/${photos[index]!.slug}`;
-        if (photoAt(location.pathname) >= 0) {
-          history.replaceState(null, "", url);
+      value={shown}
+      onValueChange={(value) => {
+        const open = photoAt(location.pathname) !== null;
+        if (value === null) {
+          // Back to the grid, unless Back closed it already.
+          if (open) history.back();
+        } else if (open) {
+          history.replaceState(null, "", `/photos/${value}`);
         } else {
-          history.pushState(null, "", url);
+          history.pushState(null, "", `/photos/${value}`);
         }
       }}
     >
@@ -193,14 +189,14 @@ import { notFound } from "next/navigation";
 import { photos } from "../../photos";
 
 export function generateStaticParams() {
-  return photos.map(({ slug }) => ({ slug }));
+  return photos.map(({ id }) => ({ slug: id }));
 }
 
 type Props = { params: Promise<{ slug: string }> };
 
 export default async function PhotoPage({ params }: Props) {
   const { slug } = await params;
-  const photo = photos.find((each) => each.slug === slug);
+  const photo = photos.find((each) => each.id === slug);
   if (!photo) notFound();
   return <img {...photo.thumb} sizes="100vw" />;
 }
@@ -208,4 +204,3 @@ export default async function PhotoPage({ params }: Props) {
 
 - `history.pushState` and `replaceState` update `usePathname` without a navigation, so the grid stays on screen under the viewer. Opening adds one entry, moving replaces it, and Back closes the viewer.
 - A reload at `/photos/canyon` loads the photo's own page, not the grid.
-- Checked with `next build` in Chromium, Firefox and WebKit: opening, moving, closing, Back, Forward and a reload.

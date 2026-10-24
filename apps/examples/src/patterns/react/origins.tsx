@@ -9,7 +9,7 @@ const products = [product];
 export function ProductCard() {
   return (
     <Fluidbox.Root items={products}>
-      <Fluidbox.Trigger item={product} asChild>
+      <Fluidbox.Trigger value={product.id} asChild>
         <button type="button" className="pattern-card" data-test="product">
           <span data-fluidbox-origin>
             <img src={product.src} alt={itemLabel(product)} />
@@ -32,8 +32,8 @@ export function Scroller() {
       <div className="pattern-scroller" data-test="scroller">
         {strip.map((photo) => (
           <Fluidbox.Trigger
-            key={photo.src}
-            item={photo}
+            key={photo.id}
+            value={photo.id}
             className="pattern-thumb"
             data-test="trigger"
           >

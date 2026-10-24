@@ -39,6 +39,18 @@
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
     },
+    "./react/embed": {
+      "types": "./dist/react/embed.d.ts",
+      "import": "./dist/react/embed.js"
+    },
+    "./react/model": {
+      "types": "./dist/react/model.d.ts",
+      "import": "./dist/react/model.js"
+    },
+    "./react/spin": {
+      "types": "./dist/react/spin.d.ts",
+      "import": "./dist/react/spin.js"
+    },
     "./solid": {
       "types": "./dist/solid/index.d.ts",
       "import": "./dist/solid/index.js"

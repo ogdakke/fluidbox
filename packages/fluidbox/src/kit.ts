@@ -6,6 +6,7 @@ import { hostOf } from "./host";
 import { idOf, indexIn, itemLabel, targetKey, targetKeys } from "./items";
 import { defaultLabels, resolveLabels } from "./labels";
 import { fluidboxEventTypes } from "./events";
+import { crossOrigin, downloadName, fileOf } from "./item-file";
 import type { Fluidbox, FluidboxItem, FluidboxRenderer, FluidboxSlide } from "./public-api";
 
 export {
@@ -31,6 +32,15 @@ export { idOf, itemLabel, targetKey, targetKeys };
 export { fluidboxEventTypes };
 
 export { latestFindTrigger } from "./origins";
+
+/** A Download link's `href` and `download` for an item, or null when it has no file. */
+export function downloadLink(item: FluidboxItem | null) {
+  const file = item && fileOf(item);
+  return file ? { href: file.src, download: downloadName(item, file) } : null;
+}
+
+/** Whether a browser ignores `download` on a link to `href` and navigates, so Download fetches it. */
+export { crossOrigin };
 
 /**
  * Hold a slide's commit while a framework renders it: call it in the slide's

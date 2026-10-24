@@ -1016,6 +1016,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #jump(index: number) {
+    // A settle while a smooth selection glided can have moved the window off it.
+    if (!this.#slides.has(index)) this.#renderWindow(index, index);
     this.#instantTarget = index;
     this.element.style.scrollSnapType = "none";
     this.#align(index);

@@ -193,7 +193,7 @@ function Grid({ post }: { post: Post }) {
   return (
     <div className="x-grid" data-count={post.items.length}>
       {post.items.map((item) => (
-        <Fluidbox.Trigger key={item.id} item={item} asChild>
+        <Fluidbox.Trigger key={item.id} value={item} asChild>
           <button type="button" aria-label={`Open ${item.alt}`}>
             <img
               data-fluidbox-origin
@@ -534,9 +534,9 @@ function InstagramViewer() {
                   <p className="ig-caption">
                     <strong>{post.by.handle}</strong> {post.text}
                   </p>
-                  <Fluidbox.SheetStop stop={2} className="ig-more">
+                  <Fluidbox.SheetSnap to={2} className="ig-more">
                     View all {post.stats.replies} comments
-                  </Fluidbox.SheetStop>
+                  </Fluidbox.SheetSnap>
                   <IgComments post={post} />
                 </>
               )}
@@ -578,7 +578,7 @@ function InstagramProfile() {
         </header>
         <div className="ig-grid">
           {grams.map((gram) => (
-            <Fluidbox.Trigger key={gram.id} item={gram.items[0]} asChild>
+            <Fluidbox.Trigger key={gram.id} value={gram.items[0]} asChild>
               <button type="button" aria-label={`Open ${gram.text}`}>
                 <img data-fluidbox-origin src={gram.items[0].src} alt="" />
               </button>

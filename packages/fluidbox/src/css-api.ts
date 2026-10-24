@@ -89,8 +89,19 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-slide-preview"] },
   /** The still over an iframe until it loads. */
   { names: ["data-fluidbox-media-cover"] },
-  /** The "Unable to load media." message with its Retry button. */
+  /**
+   * The "Unable to load media." message with its Retry button. A Retry or an
+   * error part of yours in the viewer's layer or the slide's stands in for it.
+   */
   { names: ["data-fluidbox-error"] },
+  /** A binding's Error part: your error content, laid out as its children. */
+  { names: ["data-fluidbox-error-content"] },
+  /** A binding's Loading part, while the item on show loads. Hidden from assistive technology. */
+  { names: ["data-fluidbox-loading"] },
+  /** A binding's Caption part: the item's caption, which describes the dialog. */
+  { names: ["data-fluidbox-caption"] },
+  /** A binding's Toolbar, a group of controls. It takes no box until you style it. */
+  { names: ["data-fluidbox-toolbar"] },
   /** A visually hidden live region. */
   { names: ["data-fluidbox-announcer"] },
   /** The viewer's layer, where your controls and captions go. */

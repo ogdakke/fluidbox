@@ -164,9 +164,10 @@ The framework bindings hand a custom slide's component the same `active` and `on
 
 ### The add-ons in a framework
 
-The add-ons' slides are plain renderers: they draw into the slide's media box. The custom elements and the plain JS API take them as they are, in `slides`. The framework bindings' slides take the framework's own content instead, so each example above gives the add-on an element inside a slide component of its own, and passes on the slide's `item`, `index`, `signal` and activity:
+The add-ons' slides are plain renderers: they draw into the slide's media box. The custom elements and the plain JS API take them as they are, in `slides`. The framework bindings' slides take the framework's own content instead:
 
-- **React** and **Vue**: a small component that calls the renderer on its `<span style="display: contents">` once it mounts, aborts its signal and calls the cleanup as it unmounts.
+- **React**: the parts `Embed`, `Spin` and `Model`, from `@ogdakke/fluidbox/react/embed`, `/react/spin` and `/react/model`, in `Fluidbox.Slides`. Each is a `Fluidbox.Media` that draws the add-on, and takes the add-on's options as props: `<Model load={load} />`, `<Embed label play />`, `<Spin label keep turns />`. Any plain-JS slide works the same way, as `<Fluidbox.Media render={slide} />`.
+- **Vue**: a small component that calls the renderer on its `<span style="display: contents">` once it mounts, aborts its signal and calls the cleanup as it unmounts.
 - **Solid**: the renderer returns the `<span>` itself, and calls the add-on in `onMount` with `onCleanup`.
 - **Angular**: a slide component gets only `item`, `index` and `active` inputs, so each add-on is a component of its own, extending a small base directive that makes the `signal` and `onActiveChange` from its lifecycle and from the `active` input.
 

@@ -18,30 +18,28 @@ import "./patterns.css";
 
 export { artSrc, sceneById, scenes };
 
+/** An item with its id, which triggers and `value` name it by. */
+export type WithId<T extends FluidboxItem = FluidboxImageItem> = T & { readonly id: string };
+
 const art = (prefix: string, ids: string[]) =>
-  ids.map((id) => artItem(sceneById(id), `${prefix}-${id}`));
+  ids.map((id) => artItem(sceneById(id), `${prefix}-${id}`) as WithId);
 
 /** 1 basic, 5 programmatic, 6 zoom (zoom off), 7 thumbnails, 8 sheet, 9 headless, 10 rtl. */
-export const photos: FluidboxImageItem[] = art("photo", ["aurora", "ridge", "fjord", "lagoon"]);
+export const photos: WithId[] = art("photo", ["aurora", "ridge", "fjord", "lagoon"]);
 
 /** 2 overlay: an album behind one trigger. */
-export const album: FluidboxImageItem[] = art("album", [
-  "dune",
-  "canyon",
-  "coast",
-  "meadow",
-  "alpine",
-]);
+export const album: WithId[] = art("album", ["dune", "canyon", "coast", "meadow", "alpine"]);
 
 /** 3 origins: a product card and a horizontal scroller. */
-export const product: FluidboxImageItem = {
+export const product: WithId = {
+  id: "runner",
   type: "image",
   src: "/runner.svg",
   alt: "Illustrated coral running shoe",
   width: 1000,
   height: 700,
 };
-export const strip: FluidboxImageItem[] = art("strip", [
+export const strip: WithId[] = art("strip", [
   "alpine",
   "meadow",
   "aurora",
@@ -64,7 +62,7 @@ declare module "@ogdakke/fluidbox" {
 }
 
 /** 4 renderers: one custom note, one live map, one video, one YouTube embed. */
-export const media: FluidboxItem[] = [
+export const media: WithId<FluidboxItem>[] = [
   {
     type: "note",
     id: "media-note",
@@ -113,7 +111,7 @@ export const media: FluidboxItem[] = [
  * 6 zoom: photos at two widths in `srcset`, and the full-size file as `zoom.src`,
  * which the viewer loads once a zoom shows more pixels than the 1280w has.
  */
-const ladder = (id: string, alt: string, width: number, height: number): FluidboxImageItem => ({
+const ladder = (id: string, alt: string, width: number, height: number): WithId => ({
   id: `zoom-${id}`,
   type: "image",
   src: `/photos/${id}-1280.webp`,
@@ -124,7 +122,7 @@ const ladder = (id: string, alt: string, width: number, height: number): Fluidbo
   height,
   thumbnail: { src: `/photos/${id}-thumb.webp` },
 });
-export const zoomPhotos: FluidboxImageItem[] = [
+export const zoomPhotos: WithId[] = [
   ladder("1015", "Fjord from the cliff edge", 1800, 1200),
   ladder("883", "Still lake", 1800, 1200),
   ladder("1016", "Red rock canyon", 1920, 1080),
@@ -132,7 +130,7 @@ export const zoomPhotos: FluidboxImageItem[] = [
 ];
 
 /** 12 hover: a product photo, shown on the page at 640w, magnified from the 1600w. */
-export const productPhoto: FluidboxImageItem = {
+export const productPhoto: WithId = {
   id: "fjord-wood",
   type: "image",
   src: "/products/fjord-wood.webp",
@@ -144,7 +142,7 @@ export const productPhoto: FluidboxImageItem = {
 };
 
 /** 13 media: a photo, a video, a 360° spin and a 3D model, from the add-ons' helpers. */
-export const productMedia: FluidboxItem[] = [
+export const productMedia: WithId<FluidboxItem>[] = [
   productPhoto,
   youtubeItem("https://www.youtube.com/watch?v=M7lc1UVf-VE", {
     id: "product-video",

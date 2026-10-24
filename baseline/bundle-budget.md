@@ -6,21 +6,24 @@ The check builds one small consumer per public entry with tsdown as minified bro
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | -----------------------: |
-| Root           |        10,330 B |           44,595 B |                 47,336 B |
-| Elements       |        14,388 B |           47,817 B |                 50,558 B |
-| React          |        16,352 B |           49,941 B |                 52,682 B |
-| Solid          |        14,171 B |           47,751 B |                 50,492 B |
-| Vue            |        14,827 B |           48,449 B |                 51,190 B |
-| Angular        |        15,245 B |           48,782 B |                 51,523 B |
+| Root           |        10,331 B |           44,610 B |                 47,420 B |
+| Elements       |        14,387 B |           47,825 B |                 50,635 B |
+| React          |        17,778 B |           51,403 B |                 54,213 B |
+| Solid          |        14,171 B |           47,761 B |                 50,571 B |
+| Vue            |        14,827 B |           48,457 B |                 51,267 B |
+| Angular        |        15,244 B |           48,790 B |                 51,600 B |
 | Thumbnails     |         3,763 B |            3,763 B |                  4,858 B |
 | Sheet          |         7,277 B |            7,277 B |                  8,272 B |
-| Kit            |         1,662 B |            1,662 B |                  4,403 B |
-| Hover zoom     |         1,453 B |            1,453 B |                  4,194 B |
-| Embed          |         2,991 B |            2,991 B |                  5,732 B |
-| Model          |         1,375 B |            1,375 B |                  4,116 B |
-| Spin           |         2,388 B |            2,388 B |                  5,129 B |
+| Kit            |         1,662 B |            1,662 B |                  4,472 B |
+| Hover zoom     |         1,453 B |            1,453 B |                  4,263 B |
+| Embed          |         2,991 B |            2,991 B |                  5,801 B |
+| Model          |         1,375 B |            1,375 B |                  4,185 B |
+| Spin           |         2,388 B |            2,388 B |                  5,198 B |
+| React embed    |        20,246 B |           53,948 B |                 56,758 B |
+| React model    |        18,859 B |           52,475 B |                 55,285 B |
+| React spin     |        19,704 B |           53,300 B |                 56,110 B |
 
-`styles.css` is 2,741 B gzip. The opt-in `baseline.css` is 3,235 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
+`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,235 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
 The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each core entry, record the hardening and product-media work merged together:
 
@@ -40,5 +43,9 @@ On 2026-10-24 the API redesign moved every core entry by about 1.2 KB initial an
 - `styles.css` lost 824 B to `baseline.css`, which holds the colours, shadows, radii, transitions and mask glyphs. The embeds add-on lost its Play SVG; model and spin lost their looks.
 
 Later on 2026-10-24 the media add-ons became slides. The `embeds` entry became `embed` and grew 434 B, to 2,991 B: `createEmbedProvider` with its URL and origin checks, the provider lookup, a preconnect to the player's origin, the `play` content option, and `fail` for an item whose provider the slide doesn't have. The spec estimated 2,800–2,950 B. YouTube and Vimeo stay in the default provider list, so neither shakes out of `embedSlide`. Model grew 63 B, to 1,375 B, because a model the viewer opens on holds the opening until its first frame has painted; spin lost 51 B with `isSpinItem`.
+
+The React binding's new parts then moved React by 1,426 B initial, to 17,778 B, and about 1,460 B activation: `Slides` with a slide host that holds each slide's commit until its layout effect, `Media` with `render`, attributes and children, `Image`, `Video` and `Iframe`, `Toolbar`, `ZoomControls`, `Counter`, `Caption`, `Fullscreen`, `Download`, `Share`, `Loading`, `Error` and `Retry`, the label rule on every control, `Overlay` in place of `ThumbnailOverlay` and `FrameLayer`, `SheetSnap`, `useFluidboxSlide`, and `value` in place of the open and index sync. The spec estimated 600–1,200 B for the redesign's parts and 300–500 B for features 1–5. `styles.css` grew 69 B, to 2,810 B: the rules that let an error part or a Retry of yours stand in for the default error, and the toolbar's `display: contents`. Every entry's activation with CSS moved with it.
+
+The React add-on parts are entries of their own, `react/embed`, `react/model` and `react/spin`. Each consumer imports `Fluidbox` and the part, so it measures the binding, the part and the add-on together; each also checks that it carries no other add-on.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

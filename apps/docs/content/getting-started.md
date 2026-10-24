@@ -52,7 +52,7 @@ One viewer for the whole list, and a trigger for each thumbnail. Pick your frame
 
 <!-- pattern: basic -->
 
-The examples import `photos` from a local `./data` module, described in [the example data](./patterns/index.md#the-example-data). They import `itemLabel` from `@ogdakke/fluidbox`, which returns an item's `alt` or `title`. Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own. After that, the `controls` option, the `Controls` part or `<fluidbox-controls>` keeps them.
+The examples import `photos` from a local `./data` module, described in [the example data](./patterns/index.md#the-example-data). They import `itemLabel` from `@ogdakke/fluidbox`, which returns an item's `alt` or `title`. Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own. After that, the `controls` option, React's `Toolbar`, the other bindings' `Controls` part or `<fluidbox-controls>` keeps them.
 
 ## Framework setup
 

@@ -340,6 +340,44 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: none;
 }
 
+/* An error part or a Retry of yours, in the viewer's layer or the slide's,
+   stands in for the default error. The default's message stays, unseen, for
+   the announcement; its Retry goes. */
+:where(
+    [data-fluidbox-viewer]:has(
+      [data-fluidbox-portal] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    ),
+    [data-fluidbox-slide]:has(
+      > [data-fluidbox-slide-layer] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    )
+  )
+  [data-fluidbox-error] {
+  opacity: 0;
+  pointer-events: none;
+}
+:where(
+    [data-fluidbox-viewer]:has(
+      [data-fluidbox-portal] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    ),
+    [data-fluidbox-slide]:has(
+      > [data-fluidbox-slide-layer] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    )
+  )
+  [data-fluidbox-error]
+  > [data-fluidbox-retry] {
+  display: none;
+}
+/* An error part's content, laid out as its children. */
+[data-fluidbox-error-content] {
+  display: contents;
+}
+
+/* A toolbar of the bindings leaves its controls where they would be without
+   it, until you style it. */
+:where([data-fluidbox-toolbar]) {
+  display: contents;
+}
+
 /* Each slide carries half the gap on both sides; the strip is one gap wider
    than the dialog, which clips it. */
 /** Space between slides, seen only while swiping. @input --fluidbox-slide-gap @on Slides */

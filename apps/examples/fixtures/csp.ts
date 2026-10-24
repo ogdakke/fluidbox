@@ -23,11 +23,11 @@ if (params.has("react")) {
   createRoot(document.querySelector("[data-csp-react]")!).render(
     createElement(
       Fluidbox.Root,
-      { items: photos, open: true, index: 1 },
+      { items: photos, value: photos[1]!.id! },
       photos.map((photo, index) =>
         createElement(Fluidbox.Trigger, {
           key: photo.id,
-          item: index,
+          value: index,
           children: createElement("img", { src: photo.src, alt: photo.alt, width: 160 }),
         }),
       ),

@@ -366,7 +366,7 @@ export function PhotoLibrary({
                         const index = row.firstPhoto + offset;
                         const photo = photoAt(index, images);
                         return (
-                          <Fluidbox.Trigger key={photo.id} item={photo.id} asChild>
+                          <Fluidbox.Trigger key={photo.id} value={photo.id} asChild>
                             <button
                               type="button"
                               className="library-photo"

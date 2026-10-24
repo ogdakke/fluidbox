@@ -22,7 +22,7 @@ export function Zoom() {
           {zoomPhotos.map((photo) => (
             <Fluidbox.Trigger
               key={photo.id}
-              item={photo}
+              value={photo.id}
               className="pattern-thumb"
               data-test="trigger"
             >
@@ -32,7 +32,8 @@ export function Zoom() {
         </div>
         <Fluidbox.Viewer>
           {/* Previous, Next and Close, then Zoom in, Zoom out and Fit. */}
-          <Fluidbox.Controls zoom />
+          <Fluidbox.Toolbar />
+          <Fluidbox.ZoomControls />
           <ZoomLevel />
         </Fluidbox.Viewer>
       </Fluidbox.Root>
@@ -42,7 +43,7 @@ export function Zoom() {
           {photos.map((photo) => (
             <Fluidbox.Trigger
               key={photo.id}
-              item={photo}
+              value={photo.id}
               className="pattern-thumb"
               data-test="trigger"
             >

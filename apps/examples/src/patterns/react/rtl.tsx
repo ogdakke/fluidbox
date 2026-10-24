@@ -13,8 +13,8 @@ export function Rtl() {
         <div className="pattern-grid">
           {photos.map((photo) => (
             <Fluidbox.Trigger
-              key={photo.src}
-              item={photo}
+              key={photo.id}
+              value={photo.id}
               className="pattern-thumb"
               data-test="trigger"
             >

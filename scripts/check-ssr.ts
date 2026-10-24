@@ -3,6 +3,9 @@ import "@ogdakke/fluidbox";
 for (const subpath of [
   "",
   "/react",
+  "/react/embed",
+  "/react/model",
+  "/react/spin",
   "/solid",
   "/vue",
   "/angular",

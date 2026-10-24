@@ -15,6 +15,9 @@ const entrypoints = [
   "embed",
   "model",
   "spin",
+  "react-embed",
+  "react-model",
+  "react-spin",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -31,16 +34,21 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   embed: [],
   model: [],
   spin: [],
+  "react-embed": ["react", "react-dom"],
+  "react-model": ["react", "react-dom"],
+  "react-spin": ["react", "react-dom"],
 };
+
+/** What each media add-on's code carries, so an entry can be checked for the others'. */
+const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fluidboxSpin" };
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 // baseline/bundle-budget.md records the measurements behind them and why they moved.
-// Controlled open and index added about 250 B to each binding's initial chunk,
-// and looping about 100 B to the core's and 270 B to its viewer chunk.
+// The React binding's redesigned parts added about 1,430 B to its initial chunk.
 const initialGzipLimits: Record<Entry, number> = {
   root: 10_400,
   elements: 14_450,
-  react: 16_400,
+  react: 17_850,
   solid: 14_250,
   vue: 14_900,
   angular: 15_300,
@@ -54,8 +62,11 @@ const initialGzipLimits: Record<Entry, number> = {
   embed: 3_050,
   model: 1_450,
   spin: 2_500,
+  "react-embed": 20_300,
+  "react-model": 18_900,
+  "react-spin": 19_750,
 };
-const cssGzipLimit = 2_800;
+const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
 // entry's activation total.
 const baselineCssGzipLimit = 3_300;
@@ -66,7 +77,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   root: 44_650,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
   elements: 47_900,
-  react: 50_000,
+  react: 51_450,
   solid: 47_800,
   vue: 48_500,
   angular: 48_850,
@@ -77,22 +88,28 @@ const activationJsGzipLimits: Record<Entry, number> = {
   embed: 3_050,
   model: 1_450,
   spin: 2_500,
+  "react-embed": 54_000,
+  "react-model": 52_550,
+  "react-spin": 53_350,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 47_400,
-  elements: 50_600,
-  react: 52_750,
-  solid: 50_550,
-  vue: 51_250,
-  angular: 51_600,
+  root: 47_500,
+  elements: 50_700,
+  react: 54_300,
+  solid: 50_650,
+  vue: 51_350,
+  angular: 51_650,
   thumbnails: 4_900,
   sheet: 8_350,
-  kit: 4_450,
+  kit: 4_550,
   // It needs no stylesheet; the base one counts, as for the kit.
-  "hover-zoom": 4_250,
-  embed: 5_800,
-  model: 4_200,
+  "hover-zoom": 4_350,
+  embed: 5_850,
+  model: 4_250,
   spin: 5_250,
+  "react-embed": 56_800,
+  "react-model": 55_350,
+  "react-spin": 56_150,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
@@ -172,6 +189,12 @@ for (const name of entrypoints) {
     name !== "elements" && registersFluidbox && "custom elements loaded eagerly",
     name === "elements" && !registersFluidbox && "custom element registration missing",
     carriesExtension && "sheet extension bundled into a core entry",
+    ...Object.entries(addonMarkers)
+      .filter(
+        ([addon, marker]) =>
+          addon !== name.replace(/^react-/, "") && activationCode.includes(marker),
+      )
+      .map(([addon]) => `carries the ${addon} add-on`),
   ].filter((error): error is string => typeof error === "string");
 
   report.entries[name] = {

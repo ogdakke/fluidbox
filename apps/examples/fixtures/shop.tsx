@@ -1,23 +1,20 @@
 import { mountSite } from "../src/site";
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { FluidboxImageItem, FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { embedSlide, youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embed";
-import { createModelSlide, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
-import { createSpinSlide, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
-import {
-  Fluidbox,
-  useFluidbox,
-  type FluidboxReactRenderContext,
-  type FluidboxReactRenderer,
-} from "@ogdakke/fluidbox/react";
+import type { FluidboxImageItem } from "@ogdakke/fluidbox";
+import { youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embed";
+import { modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
+import { spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
+import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
+import { Embed } from "@ogdakke/fluidbox/react/embed";
+import { Model } from "@ogdakke/fluidbox/react/model";
+import { Spin } from "@ogdakke/fluidbox/react/spin";
 import { hoverZoom } from "@ogdakke/fluidbox/hover-zoom";
 import { thumbHashToDataURL } from "thumbhash";
 import hashes from "./shop-photos.json";
 import { Avatar, compact, type Person } from "./social-ui";
 import "./safari-chrome.css";
 import "./shop.css";
-import { addonSlide } from "../src/addon-slide";
 
 mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a thumbnails column" });
 
@@ -115,45 +112,10 @@ const cover = (item: ShopItem) =>
 /** What a card says it holds besides a photo. */
 const badges: Record<string, string> = { embed: "Video", spin: "360°", model: "3D" };
 
-/**
- * The add-ons' renderers draw into an element. A React slide gets a span of
- * its own to draw them into, with the slide's signal and activity.
- */
-function addon(render: FluidboxSlideRenderer<any>): FluidboxReactRenderer<ShopItem> {
-  return (context) => <AddonSlide render={render} context={context} />;
-}
-
-function AddonSlide({
-  render,
-  context,
-}: {
-  render: FluidboxSlideRenderer<any>;
-  context: FluidboxReactRenderContext<ShopItem>;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const target = ref.current!;
-    const controller = new AbortController();
-    const dispose = render(
-      addonSlide(context, target, AbortSignal.any([context.signal, controller.signal])),
-    );
-    return () => {
-      controller.abort();
-      dispose?.();
-      target.replaceChildren();
-    };
-  }, [render, context]);
-  return <span ref={ref} style={{ display: "contents" }} />;
-}
-
 // The model's element loads from a CDN only when a model slide is first on show.
 const MODEL_VIEWER = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
 
-const renderers = {
-  embed: addon(embedSlide),
-  spin: addon(createSpinSlide()),
-  model: addon(createModelSlide({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) })),
-};
+const loadModelViewer = () => import(/* @vite-ignore */ MODEL_VIEWER);
 
 const sizes = [
   { id: "9x12", label: "9″ × 12″", price: 32.95 },
@@ -338,7 +300,7 @@ function Gallery({ carousel }: { carousel: Carousel }) {
       <div className="shop-stage">
         <div className="shop-carousel" ref={ref} onScroll={onScroll}>
           {media.map((item, at) => (
-            <Fluidbox.Trigger key={item.id} item={item} asChild>
+            <Fluidbox.Trigger key={item.id} value={item} asChild>
               <button
                 type="button"
                 className="shop-slide"
@@ -802,12 +764,12 @@ function ProductPage() {
     [carousel.scrollTo],
   );
   return (
-    <Fluidbox.Root
-      items={media}
-      revealTrigger={revealTrigger}
-      renderers={renderers}
-      zoom={{ step: 2.5, max: 4 }}
-    >
+    <Fluidbox.Root items={media} revealTrigger={revealTrigger} zoom={{ step: 2.5, max: 4 }}>
+      <Fluidbox.Slides
+        embed={() => <Embed />}
+        spin={() => <Spin />}
+        model={() => <Model load={loadModelViewer} />}
+      />
       <article className="shop-page">
         <div className="shop-seller-row">
           <Seller />

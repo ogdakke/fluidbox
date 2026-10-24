@@ -4,7 +4,7 @@ import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import { photos } from "../shared";
 
 function Caption() {
-  const { item, index, count, hasPrevious, hasNext, previous, next, close } = useFluidbox();
+  const { item, hasPrevious, hasNext, previous, next, close } = useFluidbox();
   return (
     <div className="pattern-caption">
       <button type="button" disabled={!hasPrevious} data-test="prev" onClick={() => previous()}>
@@ -12,7 +12,9 @@ function Caption() {
       </button>
       <span>
         <strong data-test="title">{item && itemLabel(item)}</strong>{" "}
-        <small data-test="counter">{index === null ? "" : `${index + 1} / ${count}`}</small>
+        <small data-test="counter">
+          <Fluidbox.Counter />
+        </small>
       </span>
       <button type="button" disabled={!hasNext} data-test="next" onClick={() => next()}>
         Next
@@ -30,8 +32,8 @@ export function Headless() {
       <div className="pattern-grid">
         {photos.map((photo) => (
           <Fluidbox.Trigger
-            key={photo.src}
-            item={photo}
+            key={photo.id}
+            value={photo.id}
             className="pattern-thumb"
             data-test="trigger"
           >

@@ -11,7 +11,7 @@ export function Hover() {
   useEffect(() => hoverZoom(image.current!, productPhoto), []);
   return (
     <Fluidbox.Root items={[productPhoto]}>
-      <Fluidbox.Trigger item={productPhoto} className="pattern-product" data-test="product">
+      <Fluidbox.Trigger value={productPhoto.id} className="pattern-product" data-test="product">
         <img
           ref={image}
           src={thumbnailSrc(productPhoto)}

@@ -10,8 +10,8 @@ function Grid() {
     <div className="pattern-grid">
       {photos.map((photo) => (
         <Fluidbox.Trigger
-          key={photo.src}
-          item={photo}
+          key={photo.id}
+          value={photo.id}
           className="pattern-thumb"
           data-test="trigger"
         >
@@ -32,7 +32,7 @@ export function Thumbnails() {
       </Fluidbox.Root>
       <Fluidbox.Root items={photos}>
         <Grid />
-        {/* Your own thumbnails. The selected button has data-fluidbox-selected. */}
+        {/* Your own thumbnails. The selected button has data-active. */}
         <Fluidbox.Thumbnails>
           {({ index }) => (
             <span className="pattern-thumbnails-thumb" data-test="thumb">
