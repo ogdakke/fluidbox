@@ -382,8 +382,10 @@ const attachHls = hlsAttach({ load: () => import("hls.js") });
 - Native HLS first: if `video.canPlayType("application/vnd.apple.mpegurl")` says `"maybe"` or
   `"probably"` (Safari, iOS), it sets `video.src` and loads nothing.
 - Otherwise it loads hls.js once per page, and if `Hls.isSupported()`, attaches with
-  `autoStartLoad: false`, then calls `startLoad()` on the video's first `play` or when
-  `preload` is `"auto"`. A neighbour slide then fetches only the manifest, not segments. If hls.js
+  `autoStartLoad: false` and calls `startLoad()` once the slide is active or opening, from the
+  `slide` argument of §2.8 (`slide.active || slide.opening` at attach, otherwise on
+  `onActiveChange`). A mounted neighbour then fetches only the manifest, not segments, until it is
+  shown. If hls.js
   isn't supported, it sets `video.src` so the slide shows its error state.
 - On `signal` abort it calls `hls.destroy()`.
 - Never bundles hls.js: `load` is the app's dynamic import, as the model add-on's `load` is.

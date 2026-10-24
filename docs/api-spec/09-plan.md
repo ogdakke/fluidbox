@@ -349,6 +349,8 @@ New tests:
 - Video `attach`: called once per load with the runtime's `<video>`, no `src` set by the runtime,
   the signal aborts on unload, and autoplay, pause on leave and tracks still work (a stub engine
   that sets a blob URL).
+- Video `attach` on a neighbour: a mounted neighbour attaches with `active` and `opening` false
+  and fetches no segments; moving to it fires `onActiveChange(true)` and loading starts.
 - Embed providers: a provider made in the test plays, pauses and preconnects; a `url()` off its
   `origin` shows the error slide; an item naming an unregistered provider shows the error slide
   and warns.
