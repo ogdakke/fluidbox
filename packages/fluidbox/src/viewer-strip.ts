@@ -31,6 +31,13 @@ export interface ViewerZoomPose {
   readonly top: number;
   readonly width: number;
   readonly height: number;
+  /** The zoom viewport the box is seen through, in client pixels. */
+  readonly viewport: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 import { sharperCandidate, srcsetCandidates } from "./srcset";
 
@@ -328,7 +335,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // In the item's own pixels, as its width and height count them.
     const width = item.width ?? pose.width;
     const height = item.height ?? pose.height;
-    const view = this.#ownerDocument.defaultView;
+    const { viewport } = pose;
     const shownWidth = pose.width * pose.scale;
     const shownHeight = pose.height * pose.scale;
     const left = pose.left + pose.x;
@@ -337,10 +344,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       shownWidth && shownHeight
         ? Math.max(0, Math.min(total, ((start - extent) / size) * total))
         : 0;
-    const x = from(0, left, shownWidth, width);
-    const y = from(0, top, shownHeight, height);
-    const right = from(view?.innerWidth ?? 0, left, shownWidth, width);
-    const bottom = from(view?.innerHeight ?? 0, top, shownHeight, height);
+    // What of the item shows through the zoom viewport, the stage.
+    const x = from(viewport.left, left, shownWidth, width);
+    const y = from(viewport.top, top, shownHeight, height);
+    const right = from(viewport.left + viewport.width, left, shownWidth, width);
+    const bottom = from(viewport.top + viewport.height, top, shownHeight, height);
     const visible = new DOMRectReadOnly(x, y, right - x, bottom - y);
     const shown: FluidboxZoomPose = {
       scale: pose.scale,

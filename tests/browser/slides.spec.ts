@@ -173,6 +173,8 @@ test("a slide's own box zooms once it says so, to its own max, and reports its p
   page,
 }) => {
   await load(page);
+  // A stage inset, so the stage the zoom shows the box through is not the window.
+  await page.addStyleTag({ content: "[data-fluidbox-dialog] { --fluidbox-stage-top: 120px; }" });
   await open(page, "#hooks", "card");
   await expect.poll(() => page.evaluate(() => window.slidesFixture.hooks.state.zoom?.max)).toBe(3);
   expect(await page.evaluate(() => window.slidesFixture.hooks.zoomTo(5))).toBe(true);
@@ -186,16 +188,17 @@ test("a slide's own box zooms once it says so, to its own max, and reports its p
   expect(poses.some((pose) => pose.moving && pose.scale > 1 && pose.scale < 3)).toBe(true);
   const last = poses.at(-1)!;
   expect(last.scale).toBeCloseTo(3, 2);
-  // Zoomed 3× into the middle, the window shows a window-shaped part of the item's
-  // 800 × 600 pixels: a third of it along the side the box fits.
-  const { innerWidth, innerHeight } = await page.evaluate(() => ({
-    innerWidth: window.innerWidth,
-    innerHeight: window.innerHeight,
+  // Zoomed 3× into the middle, the zoom viewport (the stage) shows a part of the
+  // item's 800 × 600 pixels its own shape: a third of it along the side the box fits.
+  const stage = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight - 120,
   }));
   expect(Math.min(last.visible.width / 800, last.visible.height / 600)).toBeCloseTo(1 / 3, 1);
-  expect(last.visible.width / last.visible.height).toBeCloseTo(innerWidth / innerHeight, 1);
-  expect(last.visible.x + last.visible.width / 2).toBeCloseTo(400, 0);
-  expect(last.visible.y + last.visible.height / 2).toBeCloseTo(300, 0);
+  expect(last.visible.width / last.visible.height).toBeCloseTo(stage.width / stage.height, 1);
+  // Around the item's middle, as the zoom centres the box in the stage.
+  expect(Math.abs(last.visible.x + last.visible.width / 2 - 400)).toBeLessThan(2);
+  expect(Math.abs(last.visible.y + last.visible.height / 2 - 300)).toBeLessThan(2);
   // New items while zoomed release the zoom without an error.
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

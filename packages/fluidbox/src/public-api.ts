@@ -265,7 +265,10 @@ export interface FluidboxZoomPose {
   /** The box's translation in CSS pixels, as the zoom has it. */
   readonly x: number;
   readonly y: number;
-  /** The part of the media on screen, in the item's own pixels (0…width, 0…height). */
+  /**
+   * The part of the media showing through the zoom viewport, the stage, in the
+   * item's own pixels (0…width, 0…height).
+   */
   readonly visible: DOMRectReadOnly;
   /** True while a pinch, wheel or animation moves it; false once it rests. */
   readonly moving: boolean;

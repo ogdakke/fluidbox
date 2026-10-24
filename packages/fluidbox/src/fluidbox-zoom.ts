@@ -39,6 +39,13 @@ export interface ZoomPose extends Pose {
   readonly top: number;
   readonly width: number;
   readonly height: number;
+  /** The zoom viewport, the stage: the window less the stage insets, in client pixels. */
+  readonly viewport: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 type SafariGesture = Event & { scale: number; clientX?: number; clientY?: number };
 const fit = (): Pose => ({ scale: 1, x: 0, y: 0 });
@@ -440,6 +447,12 @@ export class FluidboxZoom {
       top: g.top,
       width: g.width,
       height: g.height,
+      viewport: {
+        left: g.stage.left,
+        top: g.stage.top,
+        width: g.viewportWidth,
+        height: g.viewportHeight,
+      },
     });
   }
 
