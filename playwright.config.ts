@@ -21,6 +21,8 @@ const recording = recordings[record as keyof typeof recordings];
 
 export default defineConfig({
   testDir: "./tests/browser",
+  // baseline.spec.ts only captures; without BASELINE_CAPTURE every test in it would skip.
+  testIgnore: process.env.BASELINE_CAPTURE ? [] : ["**/baseline.spec.ts"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

@@ -34,11 +34,9 @@ function focused(page: Page) {
 }
 
 test.describe("keyboard", () => {
-  test.beforeEach(({ browserName, isMobile }) => {
-    test.skip(isMobile, "keyboard-only behaviour is checked on desktop");
-    // WebKit only tabs to buttons with full keyboard access turned on.
-    test.skip(browserName === "webkit", "WebKit's Tab skips buttons by default");
-  });
+  test.skip(({ isMobile }) => isMobile, "keyboard-only behaviour is checked on desktop");
+  // WebKit only tabs to buttons with full keyboard access turned on.
+  test.skip(({ browserName }) => browserName === "webkit", "WebKit's Tab skips buttons by default");
 
   test("Tab runs natively past a hidden input and hidden elements, into editable and shadow content", async ({
     page,
