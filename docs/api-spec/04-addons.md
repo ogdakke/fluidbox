@@ -18,8 +18,10 @@ export function Model(props: FluidboxModelSlideOptions) {
 }
 ```
 
-`Media render` calls the renderer with the slide (its `media` box, `signal`, `active`,
-`onActiveChange`) when the part mounts, and calls its disposer on unmount. That is today's
+`Media render` calls the renderer with the slide (its `media` box, `signal`, `active`, `opening`,
+`onActiveChange`, `waitUntil`) when the part mounts, and calls its disposer on unmount. It calls
+the renderer in its own layout effect (or `onMounted`, `onMount`, the Angular mount), which runs
+before the slide host reports its commit. So the add-on's `waitUntil` calls always count (§5.3). That is today's
 `AddonSlide` adapter (`apps/examples/src/patterns/react/media.tsx:18`), moved into the binding once
 instead of being written in every app. In Angular it removes the abstract directive and the three
 classes of `angular/media.ts:32-83`.
@@ -79,6 +81,10 @@ export const embedSlide: FluidboxSlideRenderer<FluidboxEmbedItem>;
 (`embeds.ts:292`): draw into `slide.media`, pause on deactivate, reset to the poster when the box
 leaves the document.
 
+Opening waits for the poster: the slide calls `slide.waitUntil(poster.decode())` while it mounts
+(§5.3). The thumbnail layer is the trigger's own decoded picture, so this only waits when a
+sharper `poster` is given, and only up to the cap. The player iframe is never waited on.
+
 The `label` option stays an option rather than a key in `FluidboxLabels`. It's the add-on's only
 string, and putting it in the core labels would add bytes to every page that never shows a video.
 Pass it per Root through the part: `<Embed label={(item) => t("play", { title: item.title })} />`.
@@ -117,6 +123,10 @@ Unchanged behaviour (`spin.ts:129`): a `role="slider"` with `data-fluidbox-owns-
 inertia, arrow keys, Home, End, `data-frame`, `data-grabbing`, `data-fluidbox-spin-loaded`. The
 media box is not zoomable (the spin owns its pointer input).
 
+Opening waits for the first frame: the slide calls `slide.waitUntil(first.decode())` while it
+mounts, so the flight lands on a frame, not an empty slider (§5.3). The other frames keep
+loading after the flight, as now.
+
 ## 4.4 Model (`@ogdakke/fluidbox/model`)
 
 ```ts
@@ -139,8 +149,8 @@ export function modelItem(options: FluidboxModelItemOptions): FluidboxModelItem;
 
 export interface FluidboxModelSlideOptions {
   /**
-   * Loads <model-viewer>. Called when a model first comes on show; the slide
-   * then waits for customElements.whenDefined("model-viewer").
+   * Loads <model-viewer>. Called when a model is first opened or comes on
+   * show; the slide then waits for customElements.whenDefined("model-viewer").
    * @default waits for the element without loading anything
    */
   readonly load?: () => Promise<unknown>;
@@ -153,6 +163,19 @@ export function createModelSlide(
 The `model: true` marker goes: `type: "model"` says the same thing. `load` becomes optional so the
 custom elements entry can register a model slide for pages that load `<model-viewer>` with their own
 `<script>`. Never bundles `@google/model-viewer`, as now.
+
+Opening waits for the model's first rendered frame (§5.3). When the slide mounts with
+`slide.opening` true, it starts `load()` and the model at once, instead of when the slide first
+becomes active as today (`model.ts:162`). It calls `slide.waitUntil()` with a promise for
+`<model-viewer>`'s `load` event followed by one animation frame. If the trigger itself holds a
+live `<model-viewer>` (a 3D thumbnail), the slide first copies the thumbnail's camera orbit,
+target and field of view to its own, so the flight lands on the view the card showed. Neighbouring
+model slides still wait until they become active, so a gallery of models doesn't load every
+model at once.
+
+A cold open needs the `<model-viewer>` script, the model file and a frame. On a slow connection
+that reaches the 3 s cap, and the open then flies on the poster, as it does today. The pointerdown
+preparation starts the load before the click (§5.3, Cost).
 
 Name: the part is `Model`, not `ModelViewer` (§8.4). In Angular it is `<fluidbox-model>`, because
 `<model-viewer>` is Google's element and `fluidbox-model-viewer` would read as a wrapper of it.

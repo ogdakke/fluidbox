@@ -122,18 +122,29 @@ mirror the bindings' `onValueChange` and `onValueChangeComplete`, so the docs te
 Cost: listeners that used `toggle` to lazy-load something change to
 `event.action === "open"` (getting-started.md:85-91 is the one docs case, §6.14).
 
-## 8.6 Holding the open is opt-in
+## 8.6 Waiting for the slide is the default
 
-**Recommendation: `useFluidboxSlide({ holdOpen: true })` returns `ready()`; plain JS calls
-`slide.holdOpen()`, which returns `ready`.**
+**Decided (the user's call, replacing the opt-in this spec first proposed): every open waits for
+the opened slide to be ready, at most 3 s. `slide.waitUntil(promise)` covers what the engine
+can't see.**
 
-The brief's agreed direction was a bare `ready()` on the slide. The engine has to know before the
-flight starts whether to wait, and it starts the flight in the frame after the press
-(`dom-viewer-driver.ts:657`). A slide that might call `ready()` later can't be told apart from one
-that never will, so either every open waits for the cap, or the call has to be declared up front.
-The opt-in is the declaration. ramka's `onBeforeOpen` is the same idea at the Root level with no
-time limit; the spec keeps the 3 s cap the image path already has (`#mediaReady`, `:957`), so a
-slide that never calls `ready` still opens. Details in §5.3.
+The brief's sketch was a bare `ready()` on the slide. That can't work alone: a slide that might
+call `ready()` later can't be told apart from one that never will. The first draft of this spec
+made the hold opt-in (`holdOpen`). The user asked for waiting to be the default instead, and that
+works because the engine doesn't need to be told whether to wait. Every slide's content lands in
+a mount window the engine waits through anyway: a React microtask, Vue's `nextTick`, Solid
+synchronously, Angular's `detectChanges()`, a renderer's return. The bindings report the commit.
+After it the engine reads the box: images decoded, videos able to show a frame. Then it waits for
+any `waitUntil` promises.
+
+Compared with ramka's `onBeforeOpen` (a root callback, no time limit): the wait sits on the slide,
+where the canvas and its "painted" signal live, and keeps the 3 s cap, so a slide that never
+settles still opens. A root-level hook can be added later on top of the same wait.
+
+The trade is latency for custom slides. A slide whose own `<img>` hasn't decoded used to fly an
+empty box at once; now it waits for the image. Photos are unaffected, because built-in media keeps
+today's rules. The pointerdown preparation starts the wait before the click. §5.3 has the details
+and the costs, and §9.4 has the latency test.
 
 ## 8.7 Two layers in a slide, and Media holds framework content
 

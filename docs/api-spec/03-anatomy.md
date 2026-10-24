@@ -278,14 +278,15 @@ function useFluidboxSheet(): {
 };
 
 /** Inside a slide. Throws elsewhere. */
-function useFluidboxSlide<TItem>(options?: { holdOpen?: boolean }): {
+function useFluidboxSlide<TItem>(): {
   readonly item: TItem;
   readonly index: number;
   readonly active: boolean; // re-renders as it changes
+  readonly opening: boolean; // true while an open waits for this slide (§5.3)
   readonly signal: AbortSignal;
   onActiveChange(listener: (active: boolean) => void): () => void;
-  /** With holdOpen: let the opening flight start. Without it: does nothing. */
-  ready(): void;
+  /** Make the opening flight also wait for this promise (§5.3). */
+  waitUntil(promise: Promise<unknown>): void;
 };
 ```
 
@@ -293,8 +294,14 @@ function useFluidboxSlide<TItem>(options?: { holdOpen?: boolean }): {
 the commands (`open, close, next, previous, zoomTo, zoomIn, zoomOut, zoomReset, setItems, preload,
 load`).
 
-`useFluidboxSlide({ holdOpen: true })` registers the hold during the first render (in a ref
-initialiser, so StrictMode's second render reuses it). §5.3 has the semantics.
+Every open waits for the opened slide's images and videos without a call (§5.3). `waitUntil` is
+for what the engine can't see, such as a canvas's first frame. Call it during render or in a
+layout effect so it lands before the slide commits; StrictMode's second call adds the same
+promise again, which is harmless.
+
+Each binding reports the slide's commit to the core: React from a layout effect in the slide
+host, Vue from `onMounted`, Solid from `onMount`, Angular after the mount's `detectChanges()`.
+App code never does.
 
 ## 3.13 Vue
 
@@ -414,7 +421,7 @@ as today.
 | `SheetSnap`                | `button[fluidboxSheetSnap]="1"`                                                                                                  |
 | `useFluidbox`              | `injectFluidbox()` → `Signal<FluidboxApi>`; `injectFluidbox(select)` → `Signal<T>`                                               |
 | `useFluidboxSheet`         | `injectFluidboxSheet()` → `{ snap: Signal<number>, setSnap }`                                                                    |
-| `useFluidboxSlide`         | `injectFluidboxSlide({ holdOpen? })` → `{ item: Signal, index: Signal, active: Signal<boolean>, signal, onActiveChange, ready }` |
+| `useFluidboxSlide`         | `injectFluidboxSlide()` → `{ item: Signal, index: Signal, active: Signal<boolean>, opening, signal, onActiveChange, waitUntil }` |
 
 Why `(beforeValueChange)` and not a `details` argument: a `model()`'s `valueChange` output carries
 the value only, and Angular has no second output argument. The cancelable event is the Angular way
@@ -422,7 +429,7 @@ to veto, and it is the same event plain JS dispatches.
 
 A slide template's context is `{ $implicit: item, item, index, active }`. A component inside it
 calls `injectFluidboxSlide()`; the binding creates the template's view with an injector that
-provides the slide, so components get `signal`, `onActiveChange` and `ready` too. That closes the
+provides the slide, so components get `signal`, `onActiveChange` and `waitUntil` too. That closes the
 gap the media example works around today (Angular slide components get only `item`, `index` and
 `active`, `angular/src/mount.ts:97`).
 

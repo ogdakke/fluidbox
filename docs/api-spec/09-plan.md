@@ -7,7 +7,7 @@ use what it renames.
 ## 9.1 Order
 
 ```
-Step 1  Core: items, value, events, slides, Media box, layer, holdOpen, triggers   ─┐
+Step 1  Core: items, value, events, slides, Media box, layer, waiting, triggers  ─┐
 Step 2  React binding                                                  (after 1's types) ─┤ one branch
 Step 3  Plain-JS add-on slides (embed, spin, model)                     (after 1's slide contract)
         ────────────────────────────────────────────────────────────────────────────────
@@ -48,8 +48,14 @@ In sub-steps that can each be reviewed alone, in this order:
    `dom-viewer-driver.ts:1024-1030`; `#prepareZoom`, `:1474`, drops the `HTMLImageElement`
    requirement and asks the box's `zoomable` state; `create-fluidbox.ts:482` `#zoomFor` likewise).
    `setItems` suspends a zoomed box rather than dropping it (§5.1 constraints).
-5. **Holding the open.** `slide.holdOpen()` and the strip's `holds(index, 3000)` in `prepare`
-   (§5.3), reusing `#whileWaiting` for Escape and arrows.
+5. **Waiting for the opened slide.** Every open waits, with no flag (§5.3). In `ViewerStrip`: a
+   commit deferred per slide (resolved synchronously for built-in media and plain-JS renderers,
+   and by a `commit(index)` call the bindings make), `slide.waitUntil`, `slide.opening`, and
+   `ready(index, cap)`. `ready` awaits the commit, then the box's `<img>` decodes and `<video>`
+   frames or posters, plus the `waitUntil` promises, all raced against the 3 s cap. Built-in
+   `draw*` media is exempt and keeps today's rules. `DomViewerDriver.open` awaits it through
+   `#whileWaiting` in both the flight and instant branches. Development builds warn at the cap and
+   when `waitUntil` comes too late.
 6. **Triggers.** `bind`/`bindOverlay` take a value (a target or a list); `returns` goes.
    `findTrigger`/`revealTrigger` replace the `origins` adapter (`origin-registry.ts` keeps its
    registrations, and calls the two functions where it called the adapter). Overlays: `flight`
@@ -70,7 +76,9 @@ Sub-steps 1, 2 and 7 are renames and API reshaping; 3–6 are the engine work an
 `packages/react/src/index.ts` (1,121 lines) and `types.ts`. In order: `value`/`defaultValue`/
 `onValueChange`/`onValueChangeComplete` on Root; `Trigger value`; `Slides` (a map passed to the
 core, replacing the `renderers` proxy at `index.ts:294`); `Media` with `render` and children
-(portal into the box); `Image`/`Video`/`Iframe`; `useFluidboxSlide` with `holdOpen`;
+(portal into the box); `Image`/`Video`/`Iframe`; `useFluidboxSlide` with `waitUntil` and
+`opening`; reporting each slide's commit to the core from a layout effect in the slide host, after
+the children's effects (so `Media render` and add-ons have called `waitUntil`);
 `Toolbar`, `ZoomControls`, `Counter`, `Caption`; `Overlay` replacing `ThumbnailOverlay` and
 `FrameLayer`; `Thumbnails`, `SheetSnap`, `useFluidboxSheet` → `{ snap, setSnap }`. Delete
 `Controls`, `Filmstrip`, `SheetStop`.
@@ -112,18 +120,18 @@ dozen lines (§4.1). Done by whoever does that framework in step 4.
 
 Estimates, gzip, against `baseline/bundle-budget.md` (2026-10-23):
 
-| Entry                      | Initial today | Initial estimate | Activation today | Activation estimate | Why                                                                                                                                                                                                                                             |
-| -------------------------- | ------------: | ---------------: | ---------------: | ------------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Root                       |       9,126 B |    +50 to +150 B |         37,231 B |      +400 to +800 B | Initial: `value` option and state, item type checks, slide lookup. Activation: media box and layer for every type, zoom on any box, holdOpen, the drawing split, overlay frame registration. Merging five events into three saves a little.     |
-| React                      |      14,864 B | +600 to +1,200 B |         42,551 B |  +1,000 to +2,000 B | New parts (`Slides`, `Media`, `Image`/`Video`/`Iframe`, `Toolbar`, `ZoomControls`, `Counter`, `Caption`), `useFluidboxSlide`, the details object; less `Controls`, `FrameLayer` and the open/index double sync. Activation includes the core's. |
-| Vue                        |      13,443 B | +600 to +1,200 B |         41,138 B |            as React | Same parts.                                                                                                                                                                                                                                     |
-| Solid                      |      12,723 B | +500 to +1,000 B |         40,379 B |            as React | Solid's parts are the smallest.                                                                                                                                                                                                                 |
-| Angular                    |      13,898 B | +700 to +1,300 B |         41,578 B |            as React | Directive metadata per new part.                                                                                                                                                                                                                |
-| Elements                   |      13,082 B |   +500 to +900 B |         40,620 B |    +900 to +1,700 B | Four new elements, the template-slide reader and the registry.                                                                                                                                                                                  |
-| Thumbnails (was Filmstrip) |       3,644 B |            ±30 B |          3,644 B |               ±30 B | Rename; `data-active`.                                                                                                                                                                                                                          |
-| Sheet                      |       7,249 B |            ±30 B |          7,249 B |               ±30 B | `snap` naming.                                                                                                                                                                                                                                  |
-| Kit                        |       1,635 B |            ±50 B |          1,635 B |               ±50 B | `takeOverFluidbox` takes a value.                                                                                                                                                                                                               |
-| Add-ons                    |               |                  |                  |                     | §4.7                                                                                                                                                                                                                                            |
+| Entry                      | Initial today | Initial estimate | Activation today | Activation estimate | Why                                                                                                                                                                                                                                                   |
+| -------------------------- | ------------: | ---------------: | ---------------: | ------------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root                       |       9,126 B |    +50 to +150 B |         37,231 B |      +400 to +800 B | Initial: `value` option and state, item type checks, slide lookup. Activation: media box and layer for every type, zoom on any box, the readiness wait, the drawing split, overlay frame registration. Merging five events into three saves a little. |
+| React                      |      14,864 B | +600 to +1,200 B |         42,551 B |  +1,000 to +2,000 B | New parts (`Slides`, `Media`, `Image`/`Video`/`Iframe`, `Toolbar`, `ZoomControls`, `Counter`, `Caption`), `useFluidboxSlide`, the details object; less `Controls`, `FrameLayer` and the open/index double sync. Activation includes the core's.       |
+| Vue                        |      13,443 B | +600 to +1,200 B |         41,138 B |            as React | Same parts.                                                                                                                                                                                                                                           |
+| Solid                      |      12,723 B | +500 to +1,000 B |         40,379 B |            as React | Solid's parts are the smallest.                                                                                                                                                                                                                       |
+| Angular                    |      13,898 B | +700 to +1,300 B |         41,578 B |            as React | Directive metadata per new part.                                                                                                                                                                                                                      |
+| Elements                   |      13,082 B |   +500 to +900 B |         40,620 B |    +900 to +1,700 B | Four new elements, the template-slide reader and the registry.                                                                                                                                                                                        |
+| Thumbnails (was Filmstrip) |       3,644 B |            ±30 B |          3,644 B |               ±30 B | Rename; `data-active`.                                                                                                                                                                                                                                |
+| Sheet                      |       7,249 B |            ±30 B |          7,249 B |               ±30 B | `snap` naming.                                                                                                                                                                                                                                        |
+| Kit                        |       1,635 B |            ±50 B |          1,635 B |               ±50 B | `takeOverFluidbox` takes a value.                                                                                                                                                                                                                     |
+| Add-ons                    |               |                  |                  |                     | §4.7                                                                                                                                                                                                                                                  |
 
 The React figure is the one to watch: 1.2 KB is about 8% on 14.9 KB. Two ways to keep it near the
 low end if the measurement comes in high:
@@ -151,19 +159,19 @@ Counts are lines naming an old API name today (`grep` for `type: "img"`, `zoomSr
 | File                                  | Lines | Changes                                                                                                                   |
 | ------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------- |
 | `tests/public-api.contract.ts`        |    55 | Every rename in part 1; add `FluidboxItemTypes` merging, `FluidboxSlides` narrowing, `FluidboxValueChangeDetails.cancel`. |
-| `tests/react-public-api.contract.tsx` |    15 | New parts and props; `Slides` prop types per item type; `useFluidboxSlide` with and without `holdOpen`.                   |
+| `tests/react-public-api.contract.tsx` |    15 | New parts and props; `Slides` prop types per item type; `useFluidboxSlide` with `waitUntil` and `opening`.                |
 
 **Unit** (`packages/fluidbox/tests`, Vitest):
 
-| File                                                                                    |  Lines | Changes                                                                                                         |
-| --------------------------------------------------------------------------------------- | -----: | --------------------------------------------------------------------------------------------------------------- |
-| `runtime.spec.ts`                                                                       |     23 | Events → valuechange family; `value`; cancel; slides lookup; error slide; holdOpen timing (cap, Escape, abort). |
-| `filmstrip-thumbnail.spec.ts`                                                           |      8 | Rename to `thumbnails-thumbnail.spec.ts`.                                                                       |
-| `static-viewer.spec.ts`                                                                 |      6 | `value`, `href(value)`, `thumbnails`, `data-fluidbox-viewer`.                                                   |
-| `kit.spec.ts`                                                                           |      4 | `takeOverFluidbox(…, value)`.                                                                                   |
-| `origin-registry.spec.ts`                                                               |      2 | Adapter → `findTrigger`/`revealTrigger`.                                                                        |
-| `item-list.spec.ts`, `image-item.spec.ts`, `embeds.spec.ts`, `fluidbox-gesture.spec.ts` | 2 each | Item fields; `embeds` → `embed`.                                                                                |
-| `viewer-ownership.spec.ts`, `media-url.spec.ts`                                         | 1 each | Item type.                                                                                                      |
+| File                                                                                    |  Lines | Changes                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------- | -----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime.spec.ts`                                                                       |     23 | Events → valuechange family; `value`; cancel; slides lookup; error slide; readiness wait (commit, img decode, video frame, `waitUntil`, cap, Escape, abort, late-call warning). |
+| `filmstrip-thumbnail.spec.ts`                                                           |      8 | Rename to `thumbnails-thumbnail.spec.ts`.                                                                                                                                       |
+| `static-viewer.spec.ts`                                                                 |      6 | `value`, `href(value)`, `thumbnails`, `data-fluidbox-viewer`.                                                                                                                   |
+| `kit.spec.ts`                                                                           |      4 | `takeOverFluidbox(…, value)`.                                                                                                                                                   |
+| `origin-registry.spec.ts`                                                               |      2 | Adapter → `findTrigger`/`revealTrigger`.                                                                                                                                        |
+| `item-list.spec.ts`, `image-item.spec.ts`, `embeds.spec.ts`, `fluidbox-gesture.spec.ts` | 2 each | Item fields; `embeds` → `embed`.                                                                                                                                                |
+| `viewer-ownership.spec.ts`, `media-url.spec.ts`                                         | 1 each | Item type.                                                                                                                                                                      |
 
 **Browser** (`tests/browser`, Playwright), heaviest first:
 
@@ -189,25 +197,33 @@ New tests:
 
 - `Media` flight and zoom for a custom slide, per binding (React in step 2, others in step 4), and
   the unmount-while-zoomed case from the spike (§5.1), which must not throw.
-- `holdOpen`: the open waits for `ready`, opens at the 3 s cap without it, Escape cancels while
-  waiting, and a reduced-motion open still waits.
+- The readiness wait, per binding: a custom slide with an undecoded `<img>` flies only once it
+  has decoded; a `waitUntil` promise delays the flight; the cap opens anyway and warns; Escape
+  cancels while waiting; a neighbour's slow image doesn't delay the open; reduced motion and the
+  instant open still wait.
+- **Image-open latency doesn't regress.** In `performance.spec.ts`, measure from click (and from
+  pointerdown for a prepared open) to the opening flight's first animation frame for a built-in
+  image, before and after step 1.5, over repeated runs. The new time must be within noise of the
+  old. A photo open must never wait on the full image's decode.
+- Add-ons: the model open waits for a frame (with a stub `<model-viewer>`), spin for its first
+  frame, embed for its poster.
 - `onValueChange` cancel for open, move and close, per binding.
 - `Counter`, `Caption`, `Toolbar` roles and labels in `a11y.spec.ts`.
 - An unknown item type shows the error slide with `labels.error`.
 
 ## 9.5 What runs in parallel
 
-| Track                               | Depends on                                            | Can run with                                                                    |
-| ----------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1.1 item types, 1.7 renames         | —                                                     | each other; they touch different names, but rebase often, as both edit fixtures |
-| 1.2 state and events                | 1.1                                                   | 1.3                                                                             |
-| 1.3–1.5 slides, Media box, holdOpen | 1.1                                                   | 1.2, 1.6                                                                        |
-| 1.6 triggers and overlays           | 1.2                                                   | 1.3–1.5                                                                         |
-| 2 React                             | 1's public types (write them first, implement behind) | 3                                                                               |
-| 3 plain-JS add-on slides            | 1.3's slide contract                                  | 2                                                                               |
-| 4 Vue, Solid, Angular, elements     | 1 done, 2's `Media` portal proven                     | each other                                                                      |
-| 5 add-on parts                      | 3, and that framework's step 4                        | the other frameworks                                                            |
-| 6 docs and examples                 | each framework's step                                 | per page; patterns per framework                                                |
+| Track                              | Depends on                                            | Can run with                                                                    |
+| ---------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1.1 item types, 1.7 renames        | —                                                     | each other; they touch different names, but rebase often, as both edit fixtures |
+| 1.2 state and events               | 1.1                                                   | 1.3                                                                             |
+| 1.3–1.5 slides, Media box, waiting | 1.1                                                   | 1.2, 1.6                                                                        |
+| 1.6 triggers and overlays          | 1.2                                                   | 1.3–1.5                                                                         |
+| 2 React                            | 1's public types (write them first, implement behind) | 3                                                                               |
+| 3 plain-JS add-on slides           | 1.3's slide contract                                  | 2                                                                               |
+| 4 Vue, Solid, Angular, elements    | 1 done, 2's `Media` portal proven                     | each other                                                                      |
+| 5 add-on parts                     | 3, and that framework's step 4                        | the other frameworks                                                            |
+| 6 docs and examples                | each framework's step                                 | per page; patterns per framework                                                |
 
 With four people or agents: one on 1.3–1.5 (the engine), one on 1.1/1.2/1.6/1.7, one on 2 then
 Vue, one on 3 then Angular; Solid and elements follow. The critical path is 1.3 → 1.4 → React

@@ -1,8 +1,8 @@
 # 5. Engine additions
 
 Two real additions: the media box as the flight and zoom target for content the framework renders
-(`Fluidbox.Media`), and holding the opening flight until a slide has painted (`holdOpen` /
-`ready`). Everything else in this redesign is naming and binding work on top of the existing
+(`Fluidbox.Media`), and making every open wait until the opened slide is ready (`waitUntil` for what the engine
+can't see). Everything else in this redesign is naming and binding work on top of the existing
 engine.
 
 File and line references are to `packages/fluidbox/src` at `59cb944`.
@@ -155,13 +155,13 @@ didn't test them.
 
 ### Risks
 
-| Risk                                                                                                                                 | Where                      | Mitigation                                                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Splitting media building from item type touches the most tuned code in the strip (decode staging, preview swap, sharpening).         | `viewer-strip.ts:440-1200` | Keep the built-in path's DOM and order exactly; move code, don't change it. The flight, zoom and media browser suites (§9.4) cover it.                                |
-| `prepareOpening` paints the trigger's thumbnail into the slide's preview before the framework has drawn a custom slide's image.      | `viewer-strip.ts:559`      | `drawImage` reads the thumbnail `prepareOpening` stored for that index and paints it on creation. The `Image` part holds the open until it has drawn (one microtask). |
-| A custom slide matching its trigger: `originMatchesItem` compares image sources only for `img` items, so a product slide crossfades. | `origin-match.ts:41`       | Compare against the drawn image's sources when the slide has one.                                                                                                     |
-| `state.zoom` arrives a moment after the slide opens for custom zoomable boxes, so a zoom control may flash disabled.                 | controller ↔ driver        | The `Media zoom` prop sets zoomability while the binding mounts, before the open settles; `state.zoom` is only non-null once `status` is `"open"` anyway.             |
-| The layer sits inside the strip's scroller, so wide layer content could widen the slide.                                             | CSS                        | The layer is `position: absolute; inset: 0; overflow: clip`.                                                                                                          |
+| Risk                                                                                                                                 | Where                      | Mitigation                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Splitting media building from item type touches the most tuned code in the strip (decode staging, preview swap, sharpening).         | `viewer-strip.ts:440-1200` | Keep the built-in path's DOM and order exactly; move code, don't change it. The flight, zoom and media browser suites (§9.4) cover it.                                                                   |
+| `prepareOpening` paints the trigger's thumbnail into the slide's preview before the framework has drawn a custom slide's image.      | `viewer-strip.ts:559`      | `drawImage` reads the thumbnail `prepareOpening` stored for that index and paints it on creation. Every open waits for the slide's commit (§5.3), so the `Image` part has drawn before the flight plays. |
+| A custom slide matching its trigger: `originMatchesItem` compares image sources only for `img` items, so a product slide crossfades. | `origin-match.ts:41`       | Compare against the drawn image's sources when the slide has one.                                                                                                                                        |
+| `state.zoom` arrives a moment after the slide opens for custom zoomable boxes, so a zoom control may flash disabled.                 | controller ↔ driver        | The `Media zoom` prop sets zoomability while the binding mounts, before the open settles; `state.zoom` is only non-null once `status` is `"open"` anyway.                                                |
+| The layer sits inside the strip's scroller, so wide layer content could widen the slide.                                             | CSS                        | The layer is `position: absolute; inset: 0; overflow: clip`.                                                                                                                                             |
 
 ## 5.2 What zoomable means for state and controls
 
@@ -172,68 +172,131 @@ already go through `#prepareZoom`, so they follow.
 Content with `data-fluidbox-owns-input` keeps its gestures inside a zoomable box, as today
 (`fluidbox-zoom.ts:52`).
 
-## 5.3 Holding the opening flight
+## 5.3 Waiting for the opened slide
+
+Every open waits for the slide being opened to be ready, at most 3 seconds, before its flight
+starts. There is no flag to turn it on.
 
 ### Need
 
 A live 3D thumbnail that flies into a synced 3D viewer has to paint its first frame in the viewer
-before the flight starts, or the flight lands on a blank canvas. ramka does this at the root with
-`onBeforeOpen`, which "runs after the lightbox is mounted hidden — so destination nodes exist — and
-before `startViewTransition`", leaves the timeout to the app, and aborts `ctx.signal` when a newer
-open wins (ramka.dev/docs/lightbox/state-lifecycle).
+before the flight starts, or the flight lands on a blank canvas. The same goes for a custom slide
+whose `<img>` hasn't decoded: today it flies an empty box and the picture pops in after. ramka
+solves the first case at the root with `onBeforeOpen`, which "runs after the lightbox is mounted
+hidden — so destination nodes exist — and before `startViewTransition`". It leaves the timeout to
+the app, and aborts `ctx.signal` when a newer open wins (ramka.dev/docs/lightbox/state-lifecycle).
 
-### API
+### Why waiting can be the default
+
+A bare `ready()` that a slide may or may not call can't work: the engine can't tell a slide that
+will call it from one that never will, so it would wait out the cap on every open. The engine
+doesn't need to be told, though. Every slide's content lands in a short mount window the engine
+already waits through:
+
+| Content                                                 | Window closes when                                                               |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Built-in media (`drawImage`, `drawVideo`, `drawIframe`) | synchronously, as the strip makes the slide                                      |
+| A plain-JS renderer                                     | it returns                                                                       |
+| React                                                   | the slide's layout effect runs (the mount store's change renders in a microtask) |
+| Vue                                                     | the slide's `onMounted` (after `nextTick`)                                       |
+| Solid                                                   | the slide's `onMount` (rendering is synchronous)                                 |
+| Angular                                                 | after the mount's `detectChanges()` (`angular/src/mount.ts:49-63`)               |
+| Custom elements                                         | the slide template is stamped (synchronous)                                      |
+
+Each binding tells the core when the slide's content has committed (§9.2, step 2). The engine waits
+for that commit, then reads what is in the media box. A slide that needs nothing more is ready at
+commit, which is before the frame the flight would start in anyway.
+
+### Readiness
+
+Once the slide has committed, the engine infers readiness from the media box:
+
+- Every `<img>` in the box has decoded (`decode()` resolves or rejects).
+- Every `<video>` has `readyState >= HAVE_CURRENT_DATA`, or its `poster` has decoded.
+- Iframes are not waited on. An iframe can take seconds and the slide already covers it, as
+  the embed facade does with its poster image, which is waited on.
+- Built-in media keeps today's rules exactly. A normal open flies on the trigger's own picture,
+  which `prepareOpening` paints into the slide already decoded (`viewer-strip.ts:559`), and the full
+  image sharpens after the flight (`sharpen`, `:837`). So a built-in image adds no wait. The
+  instant open (server takeover) keeps `#mediaReady` (`dom-viewer-driver.ts:957`). Applying the
+  generic `<img>` rule to built-in images would wait for the full-size image and slow every photo
+  open, so the drawn image is exempt.
+- An empty box is ready at commit. It opens with a fade, as in §5.1.
+- Content in the slide layer, outside `Media`, never holds the open.
+- `slide.waitUntil(promise)` adds a promise the open also waits for.
+
+### `waitUntil`
+
+For what the engine can't see in the DOM, such as a WebGL canvas having painted. It is modelled on
+`ExtendableEvent.waitUntil`.
 
 ```ts
 // plain JS, in a slide renderer
-const ready = slide.holdOpen();
-renderer.render(scene).then(ready);
+slide.waitUntil(renderer.render(scene));
 
 // React, Vue, Solid
-const { ready } = useFluidboxSlide({ holdOpen: true });
+const { waitUntil } = useFluidboxSlide();
+useLayoutEffect(() => waitUntil(firstFrame(canvas)), []);
 
 // Angular
-readonly slide = injectFluidboxSlide({ holdOpen: true });
-// … this.slide.ready();
+readonly slide = injectFluidboxSlide();
+// in ngOnInit or the constructor: this.slide.waitUntil(firstFrame(canvas));
 ```
 
-### Why an opt-in
+- Calls before the slide commits always count: during render, a layout effect, `onMounted`,
+  `onMount`, `ngOnInit`, or a renderer's body. A call after commit counts if the flight hasn't
+  started yet.
+- A call once the flight is under way doesn't delay it. Development builds warn.
+- A rejected promise counts as settled. The open goes ahead and the slide shows its own error
+  state.
+- Outside an open (moving between slides, or a neighbour mounting) the promise is ignored.
 
-The brief's sketch has `ready()` on `useSlide()`. A bare `ready()` can't tell the engine to wait:
-by the time a slide that _doesn't_ call it has rendered, the engine would have to have waited
-already, for every slide, every open. The engine needs to know before planning the flight whether
-any slide is holding it. So the hold is declared when the slide mounts (`holdOpen`), and released
-with `ready()`.
+The add-ons call it themselves, so app code never does it for them (§4):
 
-A slide-level hold rather than ramka's root-level `onBeforeOpen` because the slide is where the
-renderer, its canvas and its "painted" signal live; a root callback would need a way back to the
-slide. A root-level `onBeforeOpen` can be added later on top of the same wait.
+| Add-on | Waits for                                                                                                                                                                                                                           |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model  | `<model-viewer>`'s first rendered frame (its `load`, then one `requestAnimationFrame`); with a live `<model-viewer>` thumbnail as the trigger, a frame drawn with the thumbnail's camera (orbit, target, field of view) copied over |
+| Spin   | its first frame's `decode()`                                                                                                                                                                                                        |
+| Embed  | its poster's `decode()` (the generic `<img>` rule would cover it; the add-on says so explicitly)                                                                                                                                    |
 
 ### Semantics
 
-- A hold counts if it is registered before the open plans its flight: while the slide mounts, in
-  the frame after the strip mounts the slide. The bindings register it during the first render
-  (React: a ref initialiser, so StrictMode's double render registers once), which lands in that
-  window: React renders the mount store's change in a microtask, Vue in `nextTick`, Solid
-  synchronously, and the Angular binding calls `detectChanges()` while mounting
-  (`angular/src/mount.ts:49-63`). A later hold doesn't delay a flight already flying; development
-  builds warn.
-- Only holds on the slide being opened count. Neighbours that mount at the same time don't delay it.
-- The open waits until every hold is released, at most **3 seconds**, the same cap the instant open
-  uses for its image (`#mediaReady`, `:957`). After the cap the flight starts and development
-  builds warn that the slide never called `ready()`.
+- Only the slide being opened counts. Neighbours that mount at the same time don't delay it.
+- The open waits for commit, then for readiness, at most **3 seconds** in total: the same cap the
+  instant open uses (`#mediaReady`). At the cap the flight starts anyway. Development builds warn
+  and name what was still pending (an `<img>` src, a `<video>`, or a `waitUntil` promise).
 - While waiting, the card keeps its thumbnail painted (`#keepThumbnailVisible`, already called at
   the start of `open`), `state.status` is `"opening"`, and keys work as they do while the viewer's
   code loads (`#whileWaiting`, `:987`): Escape calls the open off, the arrows retarget it.
-- Retargeting to another item waits for that slide's holds instead.
-- `ready()` is idempotent. Unmounting the slide releases its hold.
-- The wait races the open's `signal`: a close, a newer open, `setItems` or `destroy` ends it, and
-  the open is abandoned as any other interrupted open (`#abandonOpen`).
-- Reduced motion: the open still waits, so the viewer doesn't appear with an unpainted canvas; it
+- Retargeting to another item waits for that slide instead.
+- The wait races the open's `signal`. A close, a newer open, `setItems` or `destroy` ends it, and
+  the open is abandoned like any other interrupted open (`#abandonOpen`).
+- Reduced motion: the open still waits, so the viewer doesn't appear on an unpainted canvas. It
   then appears without a flight.
-- The instant open (server takeover) waits for holds alongside `#mediaReady`, so the server copy
-  stays until the slide has painted.
-- A prepared open (pointerdown) builds its plan as now; the hold delays playing it, not building it.
+- The instant open (server takeover) waits too, alongside `#mediaReady`, so the server copy stays
+  until the slide is ready.
+- A prepared open (pointerdown) builds its plan as now. The box is sized from the item, so the
+  plan doesn't need the content. The wait delays playing the plan, not building it.
+
+### Cost
+
+- **Photos: none.** Built-in images open as now: the trigger's decoded picture is the slide's
+  first paint, and commit is synchronous. Videos and iframes drawn by the runtime likewise.
+- **Custom slides: their content's decode.** A product slide with a `<Fluidbox.Image>` costs
+  nothing (it draws through `drawImage`). A slide with its own `<img src="large.jpg">` now waits
+  for that image instead of flying an empty box. That is the point of the change, but it is new
+  latency.
+- **Models: the most.** A cold model open waits for the `<model-viewer>` script, the model file
+  and a first frame. On a slow connection that is the 3 s cap; the open then flies on the poster
+  as today.
+
+The press hides most of it. `prepare` runs on pointerdown and mounts the slide
+(`prepareOpening` → `#load`), so the content starts decoding 50–150 ms before the click that opens
+it. The wait begins then, not at the click. With `preload: "intent"` the viewer's code is already
+loaded on hover. Apps can also call `fluidbox.preload(target)` on hover to warm a heavy slide.
+
+The plan adds a latency test: image-open latency, from click to the flight's first frame, must not
+regress against today's (§9.4).
 
 ### Where it goes
 
@@ -242,15 +305,16 @@ In `DomViewerDriver.open`, between the frame wait and the reduced-motion branch 
 ```ts
 if (!prepared) await nextFrame();
 if (abandoned()) return;
-await this.#whileWaiting(this.#strip.holds(context.index, 3000), context.signal); // new
+await this.#whileWaiting(this.#strip.ready(context.index, 3000), context.signal); // new
 if (abandoned()) return;
 if (this.#prefersReducedMotion()) { … }
 ```
 
-and in the instant branch next to `#mediaReady()`. `ViewerStrip` keeps a set of deferreds per
-slide (`slide.holds`), created by `holdOpen()` and resolved by `ready()` or `#unload`;
-`holds(index, cap)` races `Promise.all` of them against the cap.
+and in the instant branch next to `#mediaReady()`. `ViewerStrip` keeps per slide a commit
+deferred, resolved by the binding's report (or synchronously for built-in media and plain-JS
+renderers), and a list of `waitUntil` promises. `ready(index, cap)` awaits the commit, then reads
+the box (`img.decode()`, video `readyState` or poster), adds the `waitUntil` promises, and races
+`Promise.allSettled` of them against the cap. `#unload` resolves everything for a slide it drops.
 
-The built-in `Image`/`Video`/`Iframe` parts and `Media render` use the same mechanism internally
-to hold the open until their first draw (one microtask), which closes the `prepareOpening` gap in
-the risks table above.
+Since the wait already covers commit, the `prepareOpening` gap in the risks table closes: a custom
+slide's `Fluidbox.Image` has drawn before the flight plays.

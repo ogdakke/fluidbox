@@ -364,6 +364,12 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   /** Aborted when the slide is disposed. */
   readonly signal: AbortSignal;
   readonly active: boolean;
+  /**
+   * True while an open is waiting for this slide: it mounted as the item
+   * being opened. Neighbours that mount with it are false. Lets a slide start
+   * heavy work early only when an open waits for it, as the model add-on does.
+   */
+  readonly opening: boolean;
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
   /**
    * Let the media box zoom (pinch, double-tap, wheel, the zoom controls).
@@ -371,11 +377,12 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    */
   zoomable(this: void, on: boolean): void;
   /**
-   * Hold the opening flight until the returned function is called, at most
-   * three seconds. Call it while the slide mounts, before the next frame.
-   * See §5.3.
+   * Make the opening flight also wait for `promise`, as
+   * ExtendableEvent.waitUntil does. For what the engine can't see in the box,
+   * such as a canvas having painted. Every open already waits for the box's
+   * images and videos, at most three seconds in all. See §5.3.
    */
-  holdOpen(this: void): () => void;
+  waitUntil(this: void, promise: Promise<unknown>): void;
   /** Draw the built-in image, video or iframe for an item into `media`. */
   drawImage(this: void, item?: FluidboxImageItem): () => void;
   drawVideo(this: void, item?: FluidboxVideoItem): () => void;
@@ -391,8 +398,13 @@ Rules, which hold for every binding too:
 - Slides outside the window are disposed and may mount again as new instances. Unchanged.
 - The runtime empties `media` and `layer` after the disposer runs. It never moves a node you put
   in them; it may move `media` itself (§5.1).
-- If nothing is drawn into `media` by the time the open plans its flight, the slide opens and
-  closes with a fade instead of a flight (§5.1).
+- Every open waits until the opened slide is ready, at most 3 seconds (§5.3). Ready means the
+  renderer has returned (or the binding has committed), every `<img>` in `media` has decoded,
+  every `<video>` in it can show a frame or has a decoded poster, and every `waitUntil` promise has
+  settled. What `draw*` drew follows today's rules and adds no wait. The slide layer never holds
+  the open.
+- If `media` is empty when the slide commits, the slide opens and closes with a fade instead of a
+  flight (§5.1).
 - `drawImage()` without an argument draws `slide.item`, which must then be an image item; the
   other `draw*` likewise. With an argument it draws that item: a product slide can draw its
   `image` field.
