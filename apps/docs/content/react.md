@@ -117,26 +117,26 @@ All parts are properties of the `Fluidbox` object.
 
 ### `Fluidbox.Root`
 
-| Prop                    | Type                                                          | Default               | Purpose                                                                                                                                          |
-| ----------------------- | ------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `items`                 | `readonly TItem[] \| FluidboxItemList<TItem>`                 |                       | The gallery's items, or a list read on demand (see [Items and origins](./items-and-origins.md)).                                                 |
-| `value`                 | `string \| null`                                              |                       | The open item's id, or `null`, when your state owns it. A change opens, moves or closes the viewer to match.                                     |
-| `defaultValue`          | `string \| null`                                              | `null`                | The item to open with, when the viewer owns its value.                                                                                           |
-| `onValueChange`         | `(value, details: FluidboxValueChangeDetails<TItem>) => void` |                       | Before every open, move and close, with the value it goes to. `details.cancel()` stops it.                                                       |
-| `onValueChangeComplete` | `(value, details: FluidboxValueChangeDetails<TItem>) => void` |                       | Once the motion of a value change settled.                                                                                                       |
-| `labels`                | `Partial<FluidboxLabels>`                                     | English               | Every string the viewer shows or announces.                                                                                                      |
-| `zoom`                  | `false \| { step?: number; max?: number }`                    | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                                         |
-| `loop`                  | `boolean`                                                     | `false`               | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                   |
-| `dismiss`               | `{ drag?: boolean; backdrop?: boolean }`                      | both on               | Which gestures close the viewer. Escape and Close always do.                                                                                     |
-| `wheel`                 | `"dismiss" \| "zoom" \| "navigate" \| "none"`                 | `"dismiss"`           | What a vertical wheel does on an unzoomed slide.                                                                                                 |
-| `href`                  | `(value: string \| null) => string \| undefined`              |                       | Where the server-rendered viewer's controls lead before JavaScript runs.                                                                         |
-| `shareUrl`              | `(item) => string \| undefined`                               | `href` of the id      | The link Share shares. Without either, Share hides.                                                                                              |
-| `findTrigger`           | `(item, index) => Element \| null`                            |                       | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter). |
-| `revealTrigger`         | `(item, index, { signal, phase }) => void \| Promise<void>`   |                       | Brings an item's trigger into view before the viewer flies back to it.                                                                           |
-| `preload`               | `"intent" \| "press" \| "eager"`                              | `"intent"`            | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                 |
-| `onZoomChange`          | `(event: FluidboxZoomEvent) => void`                          |                       | When the image on show comes to rest at another zoom. `scale` and `reason`.                                                                      |
-| `onMediaError`          | `(event: FluidboxMediaErrorEvent<TItem>) => void`             |                       | When a slide's media fails to load. `kind` and `cause`.                                                                                          |
-| `children`              | `ReactNode`                                                   |                       | Your page content and the other parts.                                                                                                           |
+| Prop                    | Type                                                          | Default                                               | Purpose                                                                                                                                                     |
+| ----------------------- | ------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `items`                 | `readonly TItem[] \| FluidboxItemList<TItem>`                 |                                                       | The gallery's items, or a list read on demand (see [Items and origins](./items-and-origins.md)).                                                            |
+| `value`                 | `string \| null`                                              |                                                       | The open item's id, or `null`, when your state owns it. A change opens, moves or closes the viewer to match.                                                |
+| `defaultValue`          | `string \| null`                                              | `null`                                                | The item to open with, when the viewer owns its value.                                                                                                      |
+| `onValueChange`         | `(value, details: FluidboxValueChangeDetails<TItem>) => void` |                                                       | Before every open, move and close, with the value it goes to. `details.cancel()` stops it.                                                                  |
+| `onValueChangeComplete` | `(value, details: FluidboxValueChangeDetails<TItem>) => void` |                                                       | Once the motion of a value change settled.                                                                                                                  |
+| `labels`                | `Partial<FluidboxLabels>`                                     | English                                               | Every string the viewer shows or announces.                                                                                                                 |
+| `zoom`                  | `false \| { step?, max?, click?, tap? }`                      | `{ step: 2, max: 4, click: "single", tap: "double" }` | Zoom steps, what a click (`"single"`, `"double"`, `false`) and a tap (`"double"`, `false`) on the photo do, or `false` to turn zoom off. Compared by value. |
+| `loop`                  | `boolean`                                                     | `false`                                               | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                              |
+| `dismiss`               | `{ drag?: boolean; backdrop?: boolean }`                      | both on                                               | Which gestures close the viewer. Escape and Close always do.                                                                                                |
+| `wheel`                 | `"dismiss" \| "zoom" \| "navigate" \| "none"`                 | `"dismiss"`                                           | What a vertical wheel does on an unzoomed slide.                                                                                                            |
+| `href`                  | `(value: string \| null) => string \| undefined`              |                                                       | Where the server-rendered viewer's controls lead before JavaScript runs.                                                                                    |
+| `shareUrl`              | `(item) => string \| undefined`                               | `href` of the id                                      | The link Share shares. Without either, Share hides.                                                                                                         |
+| `findTrigger`           | `(item, index) => Element \| null`                            |                                                       | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter).            |
+| `revealTrigger`         | `(item, index, { signal, phase }) => void \| Promise<void>`   |                                                       | Brings an item's trigger into view before the viewer flies back to it.                                                                                      |
+| `preload`               | `"intent" \| "press" \| "eager"`                              | `"intent"`                                            | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                            |
+| `onZoomChange`          | `(event: FluidboxZoomEvent) => void`                          |                                                       | When the image on show comes to rest at another zoom. `scale` and `reason`.                                                                                 |
+| `onMediaError`          | `(event: FluidboxMediaErrorEvent<TItem>) => void`             |                                                       | When a slide's media fails to load. `kind` and `cause`.                                                                                                     |
+| `children`              | `ReactNode`                                                   |                                                       | Your page content and the other parts.                                                                                                                      |
 
 `value` is a request, not a lock. When the viewer changes on its own, by a swipe or Escape, `onValueChange` reports it; leave `value` alone and the viewer still changes. To refuse a change, call `details.cancel()`.
 
@@ -191,7 +191,29 @@ The trigger adds `data-fluidbox-trigger` and `aria-haspopup="dialog"` to its ele
 
 `Fluidbox.Image`, `Fluidbox.Video` and `Fluidbox.Iframe` draw the viewer's own media into the box, for the slide's item or the `item` you give. They keep the built-in media's loading, placeholders, sharper zoom images, error and Retry. Outside a `Media` they draw into the box all the same. `Video` takes `attach`, to load the media yourself, as hls.js does. Pass a stable function: a new one loads the video again.
 
-`useFluidboxSlide()`, in a component inside a slide, returns its `item`, `index`, `active` (it re-renders as this changes), `opening`, `signal`, `onActiveChange`, `waitUntil`, `fail` and `onZoom`. An open waits for the slide's images and videos by itself; `waitUntil(promise)` makes it wait for what it can't see, such as a canvas's first frame. Call it during render or in a layout effect. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
+`useFluidboxSlide()`, in a component inside a slide, returns its `item`, `index`, `active` (it re-renders as this changes), `opening`, `signal`, `onActiveChange`, `origin`, `returnPlayback`, `waitUntil`, `fail` and `onZoom`. An open waits for the slide's images and videos by itself; `waitUntil(promise)` makes it wait for what it can't see, such as a canvas's first frame. Call it during render or in a layout effect. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
+
+A player of your own continues the trigger's video through `origin` and `returnPlayback`, as in [A player of your own continues the trigger's video](./product-media.md#a-player-of-your-own-continues-the-triggers-video). `origin` doesn't change for a slide. Register the player in an effect, and return what `returnPlayback` returns as the cleanup:
+
+```tsx
+function MuxSlide() {
+  const slide = useFluidboxSlide<MuxItem>();
+  const player = useRef<MuxPlayerRefAttributes>(null);
+  useEffect(() => slide.returnPlayback(player.current!), [slide]);
+  const from = slide.origin?.video;
+  return (
+    <Fluidbox.Media>
+      <MuxPlayer
+        ref={player}
+        playbackId={slide.item.playbackId}
+        startTime={from?.currentTime}
+        autoPlay={from ? !from.paused : false}
+        muted={from?.muted}
+      />
+    </Fluidbox.Media>
+  );
+}
+```
 
 ### `Fluidbox.Viewer`, `Fluidbox.Toolbar` and the controls
 

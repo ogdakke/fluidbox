@@ -26,6 +26,8 @@ import type {
   FluidboxZoomCommandOptions,
   FluidboxZoomEvent,
   FluidboxZoomPose,
+  FluidboxPlaybackSource,
+  FluidboxSlideOrigin,
 } from "@ogdakke/fluidbox";
 import type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
@@ -294,6 +296,16 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
   /** Aborted when the slide unloads. */
   readonly signal: AbortSignal;
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
+  /**
+   * What the trigger showed, on the slide an open started from it: `video`
+   * reads the trigger's `<video>` live. Null on the other slides.
+   */
+  readonly origin: FluidboxSlideOrigin | null;
+  /**
+   * Hand the playback back to the trigger's video as the viewer closes from
+   * this slide. Call it in an effect, and return what it returns as the cleanup.
+   */
+  returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
   /** Make the opening flight also wait for this promise. Call it during render or in a layout effect. */
   waitUntil(this: void, promise: Promise<unknown>): void;
   /** Put the slide in its error state, with `error` as the `mediaerror`'s cause. */

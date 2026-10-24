@@ -57,6 +57,11 @@ function Price(): ReactElement {
   const stop: () => void = slide.onActiveChange((active: boolean) => void active);
   stop();
   slide.onZoom((pose) => void pose.scale);
+  const from: number | undefined = slide.origin?.video?.currentTime;
+  const unregister: () => void = slide.returnPlayback(() =>
+    from ? null : { currentTime: 1, paused: true },
+  );
+  unregister();
   if (slide.opening && !slide.active) slide.fail(new Error("no price"));
   return <p>{`${slide.item.credit} ${slide.index}`}</p>;
 }
@@ -67,7 +72,7 @@ function ContractExample(): ReactElement {
       items={items}
       defaultValue="one"
       labels={{ close: "Sulje" }}
-      zoom={{ step: 3, max: 6 }}
+      zoom={{ step: 3, max: 6, click: "double", tap: false }}
       loop
       preload="press"
       dismiss={{ drag: false }}

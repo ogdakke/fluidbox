@@ -426,7 +426,8 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
 
   // Objects are compared by value, so inline labels, zoom or dismiss change nothing.
   const labelsKey = JSON.stringify(labels ?? {});
-  const zoomKey = zoom === false ? "off" : `${zoom?.step ?? ""}:${zoom?.max ?? ""}`;
+  const zoomKey =
+    zoom === false ? "off" : [zoom?.step, zoom?.max, zoom?.click, zoom?.tap].join(":");
   const dismissKey = JSON.stringify(dismiss ?? null);
   const first = useRef(true);
   useIsomorphicLayoutEffect(() => {
@@ -829,6 +830,8 @@ export function useFluidboxSlide<
       },
       signal: slide.signal,
       onActiveChange: slide.onActiveChange,
+      origin: slide.origin,
+      returnPlayback: slide.returnPlayback,
       waitUntil: slide.waitUntil,
       fail: slide.fail,
       onZoom: slide.onZoom,
