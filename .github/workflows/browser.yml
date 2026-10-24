@@ -8,6 +8,10 @@ jobs:
   browser:
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -24,17 +28,46 @@ jobs:
       - run: bun run build:docs
       - run: bunx playwright install --with-deps chromium firefox webkit
       - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
-      - run: bun run test:browser
+      - run: bunx playwright test --shard=${{ matrix.shard }}/8 --reporter=dot,blob
       - name: Index failure videos
         if: failure()
         run: bun run inspect:failures
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: browser-results
-          path: |
-            playwright-report
-            test-results
+          name: blob-${{ matrix.shard }}
+          path: blob-report
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: browser-results-${{ matrix.shard }}
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  merge-reports:
+    needs: browser
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          path: all-blobs
+          pattern: blob-*
+          merge-multiple: true
+      - run: bunx playwright merge-reports --reporter=html,github ./all-blobs
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: browser-report
+          path: playwright-report
           retention-days: 14
 
   baseline:

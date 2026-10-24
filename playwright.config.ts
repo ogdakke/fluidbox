@@ -5,6 +5,9 @@ const port = Number(process.env.FLUIDBOX_PORT) || 4173;
 const baseURL = `http://127.0.0.1:${port}`;
 // FLUIDBOX_SERVER=preview serves the built examples (bun run build:examples) instead of the dev server.
 const preview = process.env.FLUIDBOX_SERVER === "preview";
+// FLUIDBOX_WORKERS overrides the worker count. Six stay reliable when other suites share the
+// machine; each CI shard runs two on a four-core runner.
+const workers = Number(process.env.FLUIDBOX_WORKERS) || (process.env.CI ? 2 : 6);
 // FLUIDBOX_RECORD chooses when to record a trace and video. Locally nothing is recorded unless
 // asked for; CI records the retry of a failure.
 const recordings = {
@@ -26,7 +29,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers,
   reporter: process.env.CI
     ? [["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
