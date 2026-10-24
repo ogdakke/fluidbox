@@ -7,35 +7,21 @@ import { createModelRenderer } from "@ogdakke/fluidbox/model";
 import { Fluidbox, type FluidboxSolidRenderer } from "@ogdakke/fluidbox/solid";
 import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
+import { addonSlide } from "../../addon-slide";
 
 /**
  * The add-ons draw into an element. A Solid renderer returns one, and hands
  * the add-on the slide's item, signal and activity.
  */
-const noDrawing = (): never => {
-  throw new Error("This slide draws no built-in media.");
-};
-
 const addon =
   (render: FluidboxSlideRenderer): FluidboxSolidRenderer =>
   (context) => {
     const target = (<span style={{ display: "contents" }} />) as HTMLSpanElement;
     onMount(() => {
       const controller = new AbortController();
-      const dispose = render({
-        item: context.item,
-        index: context.index,
-        media: target,
-        signal: AbortSignal.any([context.signal, controller.signal]),
-        // A framework slide draws no built-in media for an add-on.
-        drawImage: noDrawing,
-        drawVideo: noDrawing,
-        drawIframe: noDrawing,
-        get active() {
-          return context.active;
-        },
-        onActiveChange: context.onActiveChange,
-      });
+      const dispose = render(
+        addonSlide(context, target, AbortSignal.any([context.signal, controller.signal])),
+      );
       onCleanup(() => {
         controller.abort();
         dispose?.();

@@ -22,6 +22,7 @@ import hashes from "./shop-photos.json";
 import { Avatar, compact, type Person } from "./social-ui";
 import "./safari-chrome.css";
 import "./shop.css";
+import { addonSlide } from "../src/addon-slide";
 
 mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a filmstrip column" });
 
@@ -127,10 +128,6 @@ function addon(render: FluidboxSlideRenderer<FluidboxItem>): FluidboxReactRender
   return (context) => <AddonSlide render={render} context={context} />;
 }
 
-const noDrawing = (): never => {
-  throw new Error("This slide draws no built-in media.");
-};
-
 function AddonSlide({
   render,
   context,
@@ -142,21 +139,9 @@ function AddonSlide({
   useLayoutEffect(() => {
     const target = ref.current!;
     const controller = new AbortController();
-    const dispose = render({
-      item: context.item,
-      index: context.index,
-      media: target,
-      signal: AbortSignal.any([context.signal, controller.signal]),
-      // A framework slide draws no built-in media for an add-on.
-      drawImage: noDrawing,
-      drawVideo: noDrawing,
-      drawIframe: noDrawing,
-
-      get active() {
-        return context.active;
-      },
-      onActiveChange: context.onActiveChange,
-    });
+    const dispose = render(
+      addonSlide(context, target, AbortSignal.any([context.signal, controller.signal])),
+    );
     return () => {
       controller.abort();
       dispose?.();

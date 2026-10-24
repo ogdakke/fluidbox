@@ -315,6 +315,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       allows: (target, reason) => this.#allowed("goTo", target, reason),
       subscribe: (listener) => this.subscribe(listener),
       zoomed: (scale, reason) => this.#zoomed(scale, reason),
+      zoomableChanged: () => {
+        const { status, index, item, zoom } = this.#state;
+        const next = this.#zoomFor(status, index, item);
+        if (next?.max !== zoom?.max || !next !== !zoom) this.#publish(status, index);
+      },
     };
   }
 
@@ -378,7 +383,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       this.#viewer?.setZoom(options.zoom);
       // The zoom state may gain, lose or change its bounds.
       const { status, index, item, zoom } = this.#state;
-      if (this.#zoomFor(status, item)?.max !== zoom?.max) this.#publish(status, index);
+      if (this.#zoomFor(status, index, item)?.max !== zoom?.max) this.#publish(status, index);
     }
     if (has("loop") && !!options.loop !== this.#loop) {
       this.#loop = !!options.loop;
@@ -482,12 +487,19 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     );
   }
 
-  /** The zoom of the item on show: open on an image, with zoom on. */
-  #zoomFor(status: FluidboxStatus, item: TItem | null): FluidboxZoomState | null {
-    if (status !== "open" || item?.type !== "image" || this.#zoom === false) return null;
+  /** The zoom of the item on show: open on a box that zooms, with zoom on. */
+  #zoomFor(
+    status: FluidboxStatus,
+    index: number | null,
+    item: TItem | null,
+  ): FluidboxZoomState | null {
+    if (status !== "open" || index === null || !item || this.#zoom === false) return null;
+    // The viewer knows whether the box on show zooms; until it is on the item, an image does.
+    const box = this.#viewer?.zoomable(index) ?? (item.type === "image" ? {} : null);
+    if (!box) return null;
     // The scale belongs to the item it rested on; another item starts fitted.
     const scale = this.#zoomId === idOf(item) ? this.#zoomScale : 1;
-    return Object.freeze({ scale, min: 1, max: this.#zoom?.max ?? 4 });
+    return Object.freeze({ scale, min: 1, max: box.max ?? this.#zoom?.max ?? 4 });
   }
 
   next(options?: FluidboxCommandOptions) {
@@ -1271,7 +1283,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       count: this.#source.count,
       hasPrevious: index !== null && (index > 0 || this.#loops),
       hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
-      zoom: this.#zoomFor(status, item),
+      zoom: this.#zoomFor(status, index, item),
     });
   }
 

@@ -174,6 +174,8 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   subscribe(listener: (state: FluidboxState<TItem>) => void): FluidboxDispose;
   /** The zoom came to rest at another scale, for the reason given or the last command's. */
   zoomed?(scale: number, reason: SessionReason | undefined): void;
+  /** The box on show may have started or stopped being zoomable. */
+  zoomableChanged?(): void;
 }
 
 export interface ViewerSessionMotionContext<TItem extends FluidboxItem = FluidboxItem> {

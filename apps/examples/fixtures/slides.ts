@@ -1,6 +1,7 @@
 import { mountSite } from "../src/site";
 import {
   createFluidbox,
+  type FluidboxZoomPose,
   itemLabel,
   type Fluidbox,
   type FluidboxCustomItemBase,
@@ -31,6 +32,8 @@ declare module "@ogdakke/fluidbox" {
     clip: ClipItem;
     mystery: FluidboxCustomItemBase<"mystery">;
     other: FluidboxCustomItemBase<"other">;
+    card: FluidboxCustomItemBase<"card">;
+    blank: FluidboxCustomItemBase<"blank">;
   }
 }
 
@@ -131,6 +134,41 @@ const replaced: Fluidbox = createFluidbox({
   },
 });
 
+/** Each pose the card's box reported, for the tests. */
+const poses: (Omit<FluidboxZoomPose, "visible"> & {
+  visible: { x: number; y: number; width: number; height: number };
+})[] = [];
+
+const hookItems: FluidboxItem[] = [
+  { type: "card", id: "card", title: "Card", width: 800, height: 600 },
+  { type: "blank", id: "blank", title: "Blank", width: 800, height: 600 },
+  photo("after", "/photo-square.svg"),
+];
+
+const hooks: Fluidbox = createFluidbox({
+  items: hookItems,
+  slides: {
+    card: (slide) => {
+      const art = document.createElement("div");
+      art.className = "slides-card";
+      art.style.cssText =
+        "width: 100%; height: 100%; background: linear-gradient(45deg, #335, #c96)";
+      slide.media.append(art);
+      slide.zoomable({ max: 3 });
+      const caption = document.createElement("p");
+      caption.className = "slides-caption";
+      caption.textContent = "Card caption";
+      slide.layer.append(caption);
+      return slide.onZoom((pose) => {
+        const { x, y, width, height } = pose.visible;
+        poses.push({ ...pose, visible: { x, y, width, height } });
+      });
+    },
+    // Draws nothing: the open has no picture to fly.
+    blank: () => {},
+  },
+});
+
 function grid(selector: string, box: Fluidbox, list: readonly FluidboxItem[]) {
   const root = document.querySelector<HTMLElement>(selector)!;
   for (const item of list) {
@@ -149,5 +187,6 @@ function grid(selector: string, box: Fluidbox, list: readonly FluidboxItem[]) {
 
 grid("#slides", fluidbox, items);
 grid("#replaced", replaced, replacedItems);
+grid("#hooks", hooks, hookItems);
 
-Object.assign(window, { slidesFixture: { fluidbox, replaced, log } });
+Object.assign(window, { slidesFixture: { fluidbox, replaced, hooks, log, poses } });

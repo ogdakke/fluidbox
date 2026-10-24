@@ -45,6 +45,8 @@ export const publishedValues: readonly CssName[] = [
   { names: ["--fluidbox-sheet-dismiss"], on: "Overlay" },
   /** Pixels the software keyboard covers, while a sheet field has focus. */
   { names: ["--fluidbox-sheet-keyboard"], on: "Overlay" },
+  /** The media's zoom scale, `1` at fit. Set from the first zoom until the slide unloads. */
+  { names: ["--fluidbox-zoom-scale"], on: "Media box" },
 ];
 
 /** The elements of the viewer, and the attributes that mark your own. */
@@ -74,6 +76,11 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-media"] },
   /** A custom slide's content element. */
   { names: ["data-fluidbox-item-content"] },
+  /**
+   * A slide's own layer over the media, from `slide.layer`. It covers the slide,
+   * stays put while the media flies and zooms, and hides with the controls.
+   */
+  { names: ["data-fluidbox-slide-layer"] },
   /** A framework binding's wrapper inside custom content, with `display: contents`. */
   { names: ["data-fluidbox-mount"] },
   /** The item's `placeholder` image. */

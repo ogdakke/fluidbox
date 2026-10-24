@@ -6,7 +6,15 @@ declare global {
     slidesFixture: {
       fluidbox: Fluidbox;
       replaced: Fluidbox;
+      hooks: Fluidbox;
       log: string[];
+      poses: {
+        scale: number;
+        x: number;
+        y: number;
+        moving: boolean;
+        visible: { x: number; y: number; width: number; height: number };
+      }[];
     };
   }
 }
@@ -137,4 +145,109 @@ test("a slide for a built-in type replaces it, and default draws the other types
   );
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(`${shown} .slides-default`)).toHaveText("Default slide for other");
+});
+
+// At rest zoomed, the box sits in the zoom's native scroller, outside its slide.
+const zoomScale = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("[data-fluidbox-media]")]
+      .map((box) => box.style.getPropertyValue("--fluidbox-zoom-scale"))
+      .find(Boolean),
+  );
+
+test("a slide drawing the built-in image zooms its box", async ({ page }) => {
+  await load(page);
+  await open(page, "#slides", "product");
+  await expect
+    .poll(() => page.evaluate(() => window.slidesFixture.fluidbox.state.zoom?.scale))
+    .toBe(1);
+  expect(await page.evaluate(() => window.slidesFixture.fluidbox.zoomTo(2))).toBe(true);
+  expect(Number(await zoomScale(page))).toBeCloseTo(2, 2);
+  // The clip draws a video, which doesn't zoom. Zoomed, the arrows pan, so move by command.
+  await page.evaluate(() => window.slidesFixture.fluidbox.next());
+  await expect.poll(() => page.evaluate(() => window.slidesFixture.fluidbox.state.zoom)).toBeNull();
+});
+
+test("a slide's own box zooms once it says so, to its own max, and reports its pose", async ({
+  page,
+}) => {
+  await load(page);
+  await open(page, "#hooks", "card");
+  await expect.poll(() => page.evaluate(() => window.slidesFixture.hooks.state.zoom?.max)).toBe(3);
+  expect(await page.evaluate(() => window.slidesFixture.hooks.zoomTo(5))).toBe(true);
+  expect(await page.evaluate(() => window.slidesFixture.hooks.state.zoom?.scale)).toBeCloseTo(3, 2);
+  expect(Number(await zoomScale(page))).toBeCloseTo(3, 2);
+  await expect
+    .poll(() => page.evaluate(() => window.slidesFixture.poses.at(-1)?.moving))
+    .toBe(false);
+  const poses = await page.evaluate(() => window.slidesFixture.poses);
+  // The zoom moved through frames on its way, then rested at 3.
+  expect(poses.some((pose) => pose.moving && pose.scale > 1 && pose.scale < 3)).toBe(true);
+  const last = poses.at(-1)!;
+  expect(last.scale).toBeCloseTo(3, 2);
+  // Zoomed 3× into the middle, the window shows a window-shaped part of the item's
+  // 800 × 600 pixels: a third of it along the side the box fits.
+  const { innerWidth, innerHeight } = await page.evaluate(() => ({
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+  }));
+  expect(Math.min(last.visible.width / 800, last.visible.height / 600)).toBeCloseTo(1 / 3, 1);
+  expect(last.visible.width / last.visible.height).toBeCloseTo(innerWidth / innerHeight, 1);
+  expect(last.visible.x + last.visible.width / 2).toBeCloseTo(400, 0);
+  expect(last.visible.y + last.visible.height / 2).toBeCloseTo(300, 0);
+  // New items while zoomed release the zoom without an error.
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.evaluate(() =>
+    window.slidesFixture.hooks.setItems([
+      { type: "card", id: "card", title: "Card", width: 800, height: 600 },
+    ]),
+  );
+  await expect
+    .poll(() => page.evaluate(() => window.slidesFixture.hooks.state.zoom?.scale))
+    .toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test("a slide's layer sits over the slide, outside the box, and doesn't fly", async ({ page }) => {
+  await load(page);
+  await page.locator('#hooks [data-item="card"]').click();
+  const layer = page.locator(`${shown} > [data-fluidbox-slide-layer]`);
+  await expect(layer).toHaveAttribute("data-fluidbox-chrome", "");
+  await expect(layer.locator(".slides-caption")).toHaveText("Card caption");
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(layer).toHaveCSS("opacity", "1");
+  const placed = await layer.evaluate((element) => {
+    const slide = element.parentElement!.getBoundingClientRect();
+    const own = element.getBoundingClientRect();
+    return {
+      inBox: !!element.closest("[data-fluidbox-media]"),
+      same: [own.x - slide.x, own.y - slide.y, own.width - slide.width, own.height - slide.height],
+      pointer: getComputedStyle(element).pointerEvents,
+    };
+  });
+  expect(placed).toEqual({ inBox: false, same: [0, 0, 0, 0], pointer: "none" });
+  // Zoomed, the layer stays where it is.
+  await page.evaluate(() => window.slidesFixture.hooks.zoomTo(2));
+  expect(await layer.evaluate((element) => getComputedStyle(element).transform)).toBe("none");
+});
+
+test("an empty box opens and closes with a fade, not a flight", async ({ page }) => {
+  await load(page);
+  await page.locator('#hooks [data-item="blank"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "opening");
+  const start = await page.locator(`${shown} [data-fluidbox-frame]`).evaluate(
+    (frame) =>
+      frame
+        .getAnimations()
+        .map((animation) => (animation.effect as KeyframeEffect).getKeyframes()[0])
+        .find((keyframe) => keyframe.opacity !== undefined)?.opacity,
+  );
+  expect(start).toBe("0");
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "closing");
+  // No copy of the box travels to the trigger.
+  await expect(page.locator("[data-fluidbox-flight]")).toHaveCount(0);
+  await expect(page.locator(dialog)).toHaveCount(0);
 });

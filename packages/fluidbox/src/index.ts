@@ -37,6 +37,8 @@ export type {
   FluidboxSlide,
   FluidboxSlideRenderer,
   FluidboxSlides,
+  FluidboxZoomableOptions,
+  FluidboxZoomPose,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,

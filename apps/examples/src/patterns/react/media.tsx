@@ -10,15 +10,12 @@ import {
 } from "@ogdakke/fluidbox/react";
 import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
+import { addonSlide } from "../../addon-slide";
 
 /**
  * The add-ons draw into an element. A React renderer gets the slide's item,
  * signal and activity, so give the add-on an element of the component's own.
  */
-const noDrawing = (): never => {
-  throw new Error("This slide draws no built-in media.");
-};
-
 function AddonSlide({
   render,
   context,
@@ -30,21 +27,9 @@ function AddonSlide({
   useLayoutEffect(() => {
     const target = ref.current!;
     const controller = new AbortController();
-    const dispose = render({
-      item: context.item,
-      index: context.index,
-      media: target,
-      signal: AbortSignal.any([context.signal, controller.signal]),
-      // A framework slide draws no built-in media for an add-on.
-      drawImage: noDrawing,
-      drawVideo: noDrawing,
-      drawIframe: noDrawing,
-
-      get active() {
-        return context.active;
-      },
-      onActiveChange: context.onActiveChange,
-    });
+    const dispose = render(
+      addonSlide(context, target, AbortSignal.any([context.signal, controller.signal])),
+    );
     return () => {
       controller.abort();
       dispose?.();

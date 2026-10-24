@@ -272,6 +272,14 @@ export class DomViewerDriver<
       },
       { signal: this.#lifetime.signal },
     );
+    // Ahead of every other listener, the zoom's included: each input a person makes.
+    for (const type of ["pointerdown", "touchstart", "wheel"] as const) {
+      this.#portal.container.addEventListener(type, () => this.#userInteraction(), {
+        capture: true,
+        passive: true,
+        signal: this.#lifetime.signal,
+      });
+    }
     for (const [type, listener, passive] of [
       ["pointerdown", this.#onPointerDown, true],
       ["pointermove", this.#onPointerMove, false],
@@ -395,7 +403,12 @@ export class DomViewerDriver<
       return (this.#zoom = new FluidboxZoom(this.#portal.container, {
         prepare: () => this.#prepareZoom(),
         // Read on every gesture, so a change of options applies to the next one.
-        config: () => this.#zoomOptions ?? { max: 1, step: 1 },
+        config: () => {
+          const options = this.#zoomOptions ?? { max: 1, step: 1 };
+          // A box of your own can zoom further, or less far, than the rest.
+          const max = this.#strip?.zoomable()?.max;
+          return max ? { ...options, max } : options;
+        },
         get label() {
           return labels.zoomed;
         },
@@ -424,9 +437,44 @@ export class DomViewerDriver<
           }
         },
         reducedMotion: () => this.#prefersReducedMotion(),
+        duration: (ms) => this.#duration(ms),
+        watched: () => this.#strip?.watchesZoom() ?? false,
+        pose: (image, pose) => this.#strip?.zoomPose(image, pose),
+        interact: () => this.#userInteraction(),
       }));
     });
     return this.#zoomLoad;
+  }
+
+  /**
+   * Every duration and spring response the viewer plays, in milliseconds, as
+   * its motion plays it. One place, so a motion speed changes them all.
+   */
+  #duration(ms: number) {
+    return ms;
+  }
+
+  /** Listeners for a person's input to the open viewer. */
+  readonly #interactions = new Set<() => void>();
+
+  /** Follow every gesture, key and zoom a person makes in the viewer. Returns a function that stops. */
+  onUserInteraction(listener: () => void) {
+    this.#interactions.add(listener);
+    return () => void this.#interactions.delete(listener);
+  }
+
+  /** A person's input: a pointer, a touch, a wheel, a key or a zoom. Every one passes here. */
+  #userInteraction() {
+    for (const listener of this.#interactions) listener();
+  }
+
+  /**
+   * Whether the box of the item at `index` zooms, with its own largest scale if
+   * it has one: null when it doesn't, undefined when the strip isn't on it.
+   */
+  zoomable(index: number): { readonly max?: number } | null | undefined {
+    // Until the strip is on the item, the item's type answers, as an image zooms.
+    return this.#strip?.index === index ? this.#strip.zoomable() : undefined;
   }
 
   /**
@@ -501,6 +549,13 @@ export class DomViewerDriver<
       this.#labels,
       this.#loop,
     );
+    // A box the zoom holds goes back before its slide unloads, as new items can do.
+    this.#strip.onUnload = (media) => {
+      if (this.#zoom?.target !== media) return;
+      this.#zoom.suspend();
+      this.#zoom.release();
+    };
+    this.#strip.onZoomableChange = () => this.#controller?.zoomableChanged?.();
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
   }
@@ -797,8 +852,9 @@ export class DomViewerDriver<
       this.#finishClose();
       return;
     }
-    const from = visibleOrigin(context.origin?.visual);
-    const closing = this.#strip?.activeItem;
+    // A renderer's box with nothing in it has no picture to fly: it fades in place.
+    const from = this.#strip?.empty ? null : visibleOrigin(context.origin?.visual);
+    const closing = this.#strip?.shownItem;
     const crossfade = !!from && !!closing && !originMatchesItem(context.origin, closing);
     const picture = this.#originPicture(from, context.origin, crossfade);
     if (picture instanceof HTMLVideoElement) this.#handBackVideo(picture);
@@ -870,8 +926,8 @@ export class DomViewerDriver<
         width,
         height,
         backdropFrom: Number(start.backdropOpacity),
-        duration,
-        response: duration * 0.9,
+        duration: this.#duration(duration),
+        response: this.#duration(duration * 0.9),
         samples: 60,
         fadeFrame: !originTarget,
         crossfade,
@@ -1138,8 +1194,13 @@ export class DomViewerDriver<
     interrupted?: PaintedPose,
     prepared?: PreparedOpen<TItem>,
   ) {
-    const origin = prepared?.origin ?? visibleOrigin(context.origin?.visual);
-    const crossfade = !!origin && !originMatchesItem(context.origin, context.item);
+    // A renderer's box with nothing in it opens as if without an origin.
+    const origin = this.#strip?.empty
+      ? null
+      : (prepared?.origin ?? visibleOrigin(context.origin?.visual));
+    const shown = this.#strip?.shows(context.index) ? this.#strip.shownItem : undefined;
+    const crossfade =
+      !!origin && !originMatchesItem(context.origin, (shown as TItem | undefined) ?? context.item);
     const picture = prepared
       ? prepared.picture
       : this.#originPicture(origin, context.origin, crossfade);
@@ -1200,8 +1261,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: Number(start.backdropOpacity),
-      duration: OPEN_DURATION,
-      response,
+      duration: this.#duration(OPEN_DURATION),
+      response: this.#duration(response),
       samples: 24,
       fadeFrame: !start.fromOrigin,
       crossfade,
@@ -1478,7 +1539,7 @@ export class DomViewerDriver<
       this.#extensions.some((extension) => extension.allowsZoom?.() === false) ||
       this.#flight ||
       !this.#strip ||
-      !(this.#media instanceof HTMLImageElement)
+      !this.#strip.zoomable()
     )
       return null;
     // A pinch can land mid-dismiss. Drop the drag whole, or the strip stays
@@ -1920,8 +1981,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: opacity,
-      duration,
-      response: duration * 0.8,
+      duration: this.#duration(duration),
+      response: this.#duration(duration * 0.8),
       samples: 24,
     });
     const animations = this.#fly(
@@ -2000,6 +2061,7 @@ export class DomViewerDriver<
     ) {
       return;
     }
+    this.#userInteraction();
     if (event.key === "Escape") {
       const owner = target?.closest(ESCAPE_OWNERS);
       if (owner && dialog.contains(owner) && owner !== dialog) return;

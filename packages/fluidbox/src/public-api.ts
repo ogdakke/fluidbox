@@ -206,6 +206,12 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    * media here. The runtime empties it after your disposer runs.
    */
   readonly media: HTMLElement;
+  /**
+   * The slide's layer beside the box, over the whole slide. It doesn't fly or
+   * zoom, and it shows and hides with the viewer's controls. Made the first
+   * time you read it; the runtime empties it after your disposer runs.
+   */
+  readonly layer: HTMLElement;
   /** Aborted when the slide is disposed. */
   readonly signal: AbortSignal;
   /** Whether the slide is the one on show in the viewer. */
@@ -217,6 +223,16 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    */
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
   /**
+   * Let the media box zoom (pinch, double-tap, wheel, the zoom controls), or
+   * stop it. Off by default for your own media; on for `drawImage`.
+   */
+  zoomable(this: void, on: boolean | FluidboxZoomableOptions): void;
+  /**
+   * Follow the box's zoom pose: every frame it changes while it moves, and
+   * once as it comes to rest. Returns a function that stops listening.
+   */
+  onZoom(this: void, listener: (pose: FluidboxZoomPose) => void): () => void;
+  /**
    * Draw the built-in image into `media`: it loads, sharpens and fails as a
    * photo's does. Without an argument it draws `item`, which must be an image
    * item. A slide draws one built-in media at a time: drawing again replaces it.
@@ -227,6 +243,25 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   drawVideo(this: void, item?: FluidboxVideoItem): () => void;
   /** Draw the built-in iframe into `media`, as `drawImage` does the image. */
   drawIframe(this: void, item?: FluidboxIframeItem): () => void;
+}
+
+/** Where a zoomable box's zoom is. */
+export interface FluidboxZoomPose {
+  readonly scale: number;
+  /** The box's translation in CSS pixels, as the zoom has it. */
+  readonly x: number;
+  readonly y: number;
+  /** The part of the media on screen, in the item's own pixels (0…width, 0…height). */
+  readonly visible: DOMRectReadOnly;
+  /** True while a pinch, wheel or animation moves it; false once it rests. */
+  readonly moving: boolean;
+}
+
+export interface FluidboxZoomableOptions {
+  /** This box's largest scale, over the fluidbox's `zoom.max`. */
+  readonly max?: number;
+  /** Load the sharper `zoom` image when zoomed. @default true for a drawn image */
+  readonly sharpen?: boolean;
 }
 
 /** Draws a slide. Return a function to release your own resources, such as timers. */

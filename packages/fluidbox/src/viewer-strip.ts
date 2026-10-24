@@ -16,7 +16,22 @@ import type {
   FluidboxImageItem,
   FluidboxThumbnail,
   FluidboxVideoItem,
+  FluidboxZoomableOptions,
+  FluidboxZoomPose,
 } from "./public-api";
+
+/** A zoom pose as the zoom engine has it, with the box's size before the zoom. */
+export interface ViewerZoomPose {
+  readonly scale: number;
+  readonly x: number;
+  readonly y: number;
+  readonly moving: boolean;
+  /** The box's layout rectangle at fit, in client pixels. */
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
 import { sharperCandidate, srcsetCandidates } from "./srcset";
 
 const WINDOW_SIZE = 31;
@@ -74,6 +89,12 @@ interface ViewerSlide {
   content?: AbortController;
   /** The origin an open prepared before the renderer drew, for the image it draws. */
   origin?: HTMLImageElement | null;
+  /** The slide's layer beside the box, made when a renderer first asks for it. */
+  layer?: HTMLDivElement;
+  /** What the renderer said of zoom, if it did: off, or on with these options. */
+  zoom?: false | FluidboxZoomableOptions;
+  /** The renderer's listeners for the box's zoom pose. */
+  zoomListeners?: Set<(pose: FluidboxZoomPose) => void>;
   decoded: boolean;
   fullApplied: boolean;
   imageVersion: number;
@@ -201,6 +222,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     });
   }
 
+  /** Called before a slide's media unloads, with its box: the zoom lets go of it. */
+  onUnload: ((media: HTMLElement) => void) | undefined;
+  /** Called when the slide on show may have started or stopped being zoomable. */
+  onZoomableChange: (() => void) | undefined;
+
   /** The item on show. */
   get index() {
     return this.#item(this.#index);
@@ -227,6 +253,71 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   get activeItem() {
     return this.#source.getItem(this.index);
+  }
+
+  /**
+   * The item the slide on show pictures, for matching it to its trigger: the
+   * built-in media it draws, else its own item.
+   */
+  get shownItem(): FluidboxItem | undefined {
+    return this.current?.drawn ?? this.activeItem;
+  }
+
+  /** Whether the slide on show is a renderer's box with nothing in it, which doesn't fly. */
+  get empty() {
+    const slide = this.current;
+    return !!slide?.custom && !slide.media.hasChildNodes();
+  }
+
+  /**
+   * Whether the box on show zooms, and how: a drawn image does unless its
+   * renderer said otherwise, and a renderer's own box does once it says so.
+   * Null when it doesn't.
+   */
+  zoomable(): { readonly max?: number; readonly sharpen: boolean } | null {
+    const slide = this.current;
+    if (!slide || slide.zoom === false) return null;
+    const image = slide.drawn?.type === "image" && slide.image instanceof HTMLImageElement;
+    if (slide.zoom) return { max: slide.zoom.max, sharpen: slide.zoom.sharpen ?? image };
+    return image ? { sharpen: true } : null;
+  }
+
+  /** Whether a slide follows its box's zoom pose, so the zoom reports every frame. */
+  watchesZoom() {
+    return !!this.current?.zoomListeners?.size;
+  }
+
+  /** Tell the slide whose box this is where its zoom is. */
+  zoomPose(media: HTMLElement, pose: ViewerZoomPose) {
+    const slide = this.current?.media === media ? this.current : undefined;
+    const listeners = slide?.zoomListeners;
+    if (!slide || !listeners?.size) return;
+    const item = this.#source.getItem(this.#item(this.#index));
+    // In the item's own pixels, as its width and height count them.
+    const width = item.width ?? pose.width;
+    const height = item.height ?? pose.height;
+    const view = this.#ownerDocument.defaultView;
+    const shownWidth = pose.width * pose.scale;
+    const shownHeight = pose.height * pose.scale;
+    const left = pose.left + pose.x;
+    const top = pose.top + pose.y;
+    const from = (start: number, extent: number, size: number, total: number) =>
+      shownWidth && shownHeight
+        ? Math.max(0, Math.min(total, ((start - extent) / size) * total))
+        : 0;
+    const x = from(0, left, shownWidth, width);
+    const y = from(0, top, shownHeight, height);
+    const right = from(view?.innerWidth ?? 0, left, shownWidth, width);
+    const bottom = from(view?.innerHeight ?? 0, top, shownHeight, height);
+    const visible = new DOMRectReadOnly(x, y, right - x, bottom - y);
+    const shown: FluidboxZoomPose = {
+      scale: pose.scale,
+      x: pose.x,
+      y: pose.y,
+      visible,
+      moving: pose.moving,
+    };
+    for (const listener of listeners) listener(shown);
   }
 
   /** Whether the strip goes round: a single item has nowhere to go. */
@@ -885,6 +976,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (previous?.image instanceof HTMLVideoElement) previous.image.pause();
     this.#index = index;
     this.#present(this.active, true);
+    this.onZoomableChange?.();
     // An error a hidden slide raised was not heard; say it as the slide arrives.
     if (!this.active.error.hidden) this.#alert(this.active);
     this.#loadWindow();
@@ -922,6 +1014,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    */
   sharpen(scale: number) {
     const index = this.#index;
+    if (this.zoomable()?.sharpen === false) return;
     // An image still loading sharpens once it shows; see #revealImage.
     this.#zoomed = { index, scale };
     const slide = this.#slides.get(index);
@@ -1107,10 +1200,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     });
     slide.content = controller;
     const { signal } = controller;
+    const zoomListeners = (slide.zoomListeners = new Set<(pose: FluidboxZoomPose) => void>());
+    const layer = () => this.#layer(slide);
     const context: FluidboxSlide<any> = {
       item,
       index: this.#item(index),
       media: slide.media,
+      get layer() {
+        return layer();
+      },
       signal,
       get active() {
         return activity.active;
@@ -1118,6 +1216,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       onActiveChange(listener: (active: boolean) => void) {
         activity.listeners.add(listener);
         return () => activity.listeners.delete(listener);
+      },
+      zoomable: (on) => {
+        if (signal.aborted) return;
+        slide.zoom = on === true ? {} : on;
+        this.#zoomableChanged(slide);
+      },
+      onZoom(listener: (pose: FluidboxZoomPose) => void) {
+        zoomListeners.add(listener);
+        return () => zoomListeners.delete(listener);
       },
       drawImage: (image?: FluidboxItem) => this.#draw(slide, signal, "image", image ?? item),
       drawVideo: (video?: FluidboxItem) => this.#draw(slide, signal, "video", video ?? item),
@@ -1143,6 +1250,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.origin = undefined;
     if (origin !== undefined) this.#paintOpening(slide, origin);
     this.#loadMedia(slide.position, slide);
+    this.#zoomableChanged(slide);
     return () => {
       if (slide.drawing === drawing) this.#undraw(slide);
     };
@@ -1173,6 +1281,27 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       cover: undefined,
       image: undefined,
     });
+    this.#zoomableChanged(slide);
+  }
+
+  /**
+   * The slide's layer: over the whole slide, beside its frame, so it doesn't
+   * fly or zoom. It reveals and hides with the viewer's controls.
+   */
+  #layer(slide: ViewerSlide) {
+    if (!slide.layer) {
+      const layer = this.#ownerDocument.createElement("div");
+      layer.dataset.fluidboxSlideLayer = "";
+      layer.dataset.fluidboxChrome = "";
+      slide.layer = layer;
+    }
+    if (!slide.layer.isConnected) slide.element.append(slide.layer);
+    return slide.layer;
+  }
+
+  /** A slide's zoom may have changed: tell the viewer, if it is the slide on show. */
+  #zoomableChanged(slide: ViewerSlide) {
+    if (slide === this.current) this.onZoomableChange?.();
   }
 
   /** Stop the drawn media's work that outlives a load: a hand-off, a sharper image, a preview. */
@@ -1186,6 +1315,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #unload(slide: ViewerSlide) {
+    if (slide.loaded || slide.rendered) this.onUnload?.(slide.media);
     this.#stopMedia(slide);
     slide.origin = undefined;
     if (slide.rendered) {
@@ -1194,11 +1324,18 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.dispose?.();
       slide.dispose = undefined;
       slide.activity = undefined;
+      slide.zoomListeners = undefined;
       slide.rendered = false;
       this.#undraw(slide);
       slide.error.hidden = true;
       slide.element.removeAttribute("aria-busy");
       slide.media.replaceChildren();
+      slide.layer?.replaceChildren();
+      slide.layer?.remove();
+      if (slide.zoom !== undefined) {
+        slide.zoom = undefined;
+        this.#zoomableChanged(slide);
+      }
       return;
     }
     this.#unloadMedia(slide);

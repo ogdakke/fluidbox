@@ -11,10 +11,7 @@ import {
 } from "@ogdakke/fluidbox/vue";
 import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
-
-const noDrawing = (): never => {
-  throw new Error("This slide draws no built-in media.");
-};
+import { addonSlide } from "../../addon-slide";
 
 /**
  * The add-ons draw into an element. A Vue renderer gets the slide's item,
@@ -31,20 +28,9 @@ const AddonSlide = defineComponent({
     let dispose: void | (() => void);
     onMounted(() => {
       const { context } = props;
-      dispose = props.render({
-        item: context.item,
-        index: context.index,
-        media: target.value!,
-        signal: AbortSignal.any([context.signal, controller.signal]),
-        // A framework slide draws no built-in media for an add-on.
-        drawImage: noDrawing,
-        drawVideo: noDrawing,
-        drawIframe: noDrawing,
-        get active() {
-          return context.active;
-        },
-        onActiveChange: context.onActiveChange,
-      });
+      dispose = props.render(
+        addonSlide(context, target.value!, AbortSignal.any([context.signal, controller.signal])),
+      );
     });
     onBeforeUnmount(() => {
       controller.abort();

@@ -14,10 +14,7 @@ import { renderEmbed } from "@ogdakke/fluidbox/embeds";
 import { createModelRenderer } from "@ogdakke/fluidbox/model";
 import { createSpinRenderer } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
-
-const noDrawing = (): never => {
-  throw new Error("This slide draws no built-in media.");
-};
+import { addonSlide } from "../../addon-slide";
 
 /**
  * The add-ons draw into an element. An Angular slide is a component that gets
@@ -45,23 +42,23 @@ abstract class AddonSlide implements OnInit, OnDestroy {
 
   ngOnInit() {
     const active = () => this.#active;
-    this.#dispose = this.render({
-      item: this.item,
-      index: this.index,
-      media: this.#host.nativeElement,
-      signal: this.#controller.signal,
-      // A framework slide draws no built-in media for an add-on.
-      drawImage: noDrawing,
-      drawVideo: noDrawing,
-      drawIframe: noDrawing,
-      get active() {
-        return active();
-      },
-      onActiveChange: (listener) => {
-        this.#listeners.add(listener);
-        return () => this.#listeners.delete(listener);
-      },
-    });
+    this.#dispose = this.render(
+      addonSlide(
+        {
+          item: this.item,
+          index: this.index,
+          get active() {
+            return active();
+          },
+          onActiveChange: (listener) => {
+            this.#listeners.add(listener);
+            return () => this.#listeners.delete(listener);
+          },
+        },
+        this.#host.nativeElement,
+        this.#controller.signal,
+      ),
+    );
   }
 
   ngOnDestroy() {

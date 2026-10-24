@@ -547,6 +547,18 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   [data-fluidbox-drawn][data-fluidbox-image-pending] {
   visibility: hidden;
 }
+/* A slide's own layer covers the slide over its media and takes no pointer
+   events but its content's. The slide's transform makes it the layer's box. */
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide-layer] {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: clip;
+  pointer-events: none;
+}
+:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide-layer] > * {
+  pointer-events: auto;
+}
 /**
  * The layer's opacity during a flight.
  * @input --fluidbox-transition-layer-opacity

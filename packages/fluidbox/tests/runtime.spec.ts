@@ -58,6 +58,9 @@ class TestDriver {
   zoomGoal() {
     return this.goal;
   }
+  zoomable() {
+    return undefined;
+  }
   setZoom() {}
   setLoop() {}
   relabel() {}
