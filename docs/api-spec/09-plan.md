@@ -117,6 +117,14 @@ In sub-steps that can each be reviewed alone, in this order:
     The migration rule: the visual snapshots don't move, except for glyph-edge antialiasing,
     reviewed diff by diff (§10.4).
 
+13. **Trigger video playback and click zoom** (§2.22, §2.23). Two independent pieces:
+    - `slide.origin` and `slide.returnPlayback`. `#handBackVideo` reads the closing slide's
+      registered source instead of `#media`, and `drawVideo` registers its `<video>`. Needs 1.3
+      (the slide contract) and 1.8 (`drawVideo`).
+    - `zoom.click` and `zoom.tap` in `handleClick` and `#tapAt` (`fluidbox-zoom.ts:705-750`), with
+      `data-fluidbox-zoom-click` on the viewer, live through `update({ zoom })`. Needs 1.4,
+      which moves the zoom onto the box.
+
 Sub-steps 1, 2 and 7 are renames and API reshaping; 3–6, 8 and 9 are the engine work and carry the risk
 (§5.1 risks table). 3 and 4 must land together for any non-image slide to fly.
 
@@ -133,7 +141,8 @@ the children's effects (so `Media render` and add-ons have called `waitUntil`);
 `Fullscreen`, `Download`, `Share`; Root `dismiss`, `wheel`, `shareUrl`, `onMediaError` (with
 `shareUrl` defaulting to `href`); `useFluidboxSlide().fail` and `.onZoom`; Sheet `dismissMotion`;
 `Loading`, `Error`, `Retry`; the `label` prop and the children rule on every control (§3.19), with
-`defaultIcon` deleted. Delete
+`defaultIcon` deleted; `origin` and `returnPlayback` on `useFluidboxSlide()`, and the Root `zoom`
+prop's `click` and `tap` (§2.22, §2.23). Delete
 `Controls`, `Filmstrip`, `SheetStop`.
 
 ### Step 3: plain-JS add-on slides
@@ -267,6 +276,10 @@ the React total stays within 7–12%. Separate entries would cost every user an 
 bundle check two consumers per framework. The fallback stays (§8.20): move them out if step 7's
 measurement exceeds the upper estimate.
 
+**Fifth amendment.** `origin`, `returnPlayback` and the click and tap modes add about 150–250 B
+to activation (the viewer chunk), and 20–40 B to each binding's initial chunk for the two hook
+members. The built-in hand-back gets slightly smaller, since it reads one source.
+
 If the measurement still comes in high:
 
 - The controls (`Toolbar`, `ZoomControls`, `Counter`, `Caption`, the zoom buttons) share one
@@ -382,6 +395,26 @@ Third amendment, steps 1–2:
 - `onZoom`: a listener sees the pose during a pinch and at rest, `visible` matches the scroller's
   viewport, and `--fluidbox-zoom-scale` is set on the box.
 
+Fifth amendment (sub-step 1.13):
+
+- **Origin playback.** A trigger with a playing `<video>` opens a custom slide: `origin.video` is
+  set on that slide and null on its neighbours; `currentTime` reads live. Opening without a
+  trigger, or moving to another slide, gives null.
+- **Hand-back.** A custom slide registers a stub player at 7.5 s, playing; closing seeks the
+  trigger's video to 7.5 s and plays it. A function source returning null leaves the trigger
+  untouched. With nothing registered the trigger is untouched, as today. The built-in video's
+  existing hand-back tests pass unchanged through the new path.
+- **Bindings.** `useFluidboxSlide().returnPlayback` in an effect unregisters on unmount; Angular's
+  `injectFluidboxSlide()` has both members.
+- **Click zoom.** `click: "single"`: one click toggles, a double-click toggles once.
+  `click: "double"`: one click does nothing and doesn't close, a double-click toggles at the
+  pointer. `click: false`: clicks do nothing, and the zoom buttons, keys, pinch and wheel still
+  zoom. In every mode a click beside a zoomed image zooms out.
+- **Tap zoom.** `tap: "double"` keeps the 350 ms / 40 px test; `tap: false` ignores double taps
+  and pinch still zooms.
+- **Live.** `update({ zoom: { click: "double" } })` while open applies to the next click, and
+  `data-fluidbox-zoom-click` follows it.
+
 Fourth amendment (sub-step 1.12):
 
 - **Snapshots.** `collapsed-visual`, `interactions` and `motion` run with `baseline.css` imported
@@ -450,6 +483,7 @@ Step 7:
 | 1.10 features 1–5                            | 1.2 (events), 1.4 (the box)                           | 1.6, 1.8, 1.9                                                                   |
 | 1.11 hooks for step 7                        | inside 1.4 and 1.5                                    | —                                                                               |
 | 1.12 CSS split and icon removal              | 1.4 and 1.9 (they edit `styles.css`)                  | 1.5, 1.6, 1.8; before any control work in step 2                                |
+| 1.13 origin playback; click and tap zoom     | 1.3 and 1.8 (playback); 1.4 (zoom)                    | 1.10, 1.12; the two halves run in parallel                                      |
 | 7.1–7.4 speed, reachend, slideshow, hotspots | 2 landed, 1.11                                        | each other, and step 4                                                          |
 | 7.5 deep zoom                                | `onZoom`, `zoomable({ max, sharpen })`; after 1.0     | anything                                                                        |
 

@@ -66,22 +66,22 @@ layer; putting them inside reads better, and the examples do.
 
 ## 3.2 Root
 
-| Prop                    | Type                                                        | Default               |                                                                                               |
-| ----------------------- | ----------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------- |
-| `items`                 | `FluidboxItems<TItem>`                                      | required              | An array or a lazy list. A new array equal field by field to the current one changes nothing. |
-| `value`                 | `string \| null`                                            | —                     | The open item's id, or `null`. Controlled when present.                                       |
-| `defaultValue`          | `string \| null`                                            | `null`                | Uncontrolled start.                                                                           |
-| `onValueChange`         | `(value, details) => void`                                  | —                     | Before every open, move and close. `details.cancel()` stops it.                               |
-| `onValueChangeComplete` | `(value, details) => void`                                  | —                     | After the motion settles.                                                                     |
-| `loop`                  | `boolean`                                                   | `false`               |                                                                                               |
-| `labels`                | `Partial<FluidboxLabels>`                                   | —                     | Compared by value.                                                                            |
-| `zoom`                  | `false \| { step?, max? }`                                  | `{ step: 2, max: 4 }` | Compared by value.                                                                            |
-| `preload`               | `"intent" \| "press" \| "eager"`                            | `"intent"`            |                                                                                               |
-| `findTrigger`           | `(item, index) => HTMLElement \| null`                      | —                     | For triggers the page doesn't render.                                                         |
-| `revealTrigger`         | `(item, index, { signal, phase }) => void \| Promise<void>` | —                     |                                                                                               |
-| `href`                  | `(value: string \| null) => string \| undefined`            | —                     | Links for the server-rendered open viewer's controls (§7.2).                                  |
-| `onZoomChange`          | `(event: FluidboxZoomEvent) => void`                        | —                     |                                                                                               |
-| `children`              | `ReactNode`                                                 | —                     |                                                                                               |
+| Prop                    | Type                                                        | Default                                               |                                                                                               |
+| ----------------------- | ----------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `items`                 | `FluidboxItems<TItem>`                                      | required                                              | An array or a lazy list. A new array equal field by field to the current one changes nothing. |
+| `value`                 | `string \| null`                                            | —                                                     | The open item's id, or `null`. Controlled when present.                                       |
+| `defaultValue`          | `string \| null`                                            | `null`                                                | Uncontrolled start.                                                                           |
+| `onValueChange`         | `(value, details) => void`                                  | —                                                     | Before every open, move and close. `details.cancel()` stops it.                               |
+| `onValueChangeComplete` | `(value, details) => void`                                  | —                                                     | After the motion settles.                                                                     |
+| `loop`                  | `boolean`                                                   | `false`                                               |                                                                                               |
+| `labels`                | `Partial<FluidboxLabels>`                                   | —                                                     | Compared by value.                                                                            |
+| `zoom`                  | `false \| { step?, max?, click?, tap? }` (§2.23)            | `{ step: 2, max: 4, click: "single", tap: "double" }` | Compared by value.                                                                            |
+| `preload`               | `"intent" \| "press" \| "eager"`                            | `"intent"`                                            |                                                                                               |
+| `findTrigger`           | `(item, index) => HTMLElement \| null`                      | —                                                     | For triggers the page doesn't render.                                                         |
+| `revealTrigger`         | `(item, index, { signal, phase }) => void \| Promise<void>` | —                                                     |                                                                                               |
+| `href`                  | `(value: string \| null) => string \| undefined`            | —                                                     | Links for the server-rendered open viewer's controls (§7.2).                                  |
+| `onZoomChange`          | `(event: FluidboxZoomEvent) => void`                        | —                                                     |                                                                                               |
+| `children`              | `ReactNode`                                                 | —                                                     |                                                                                               |
 
 Behaviour:
 
@@ -413,30 +413,30 @@ The Angular binding moves to signal APIs (`input()`, `model()`, `output()`), whi
 17.3; the peer range today is `>=17`. Directives keep their attribute selectors on native elements,
 as today.
 
-| React                      | Angular                                                                                                                          |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `Root`                     | `[fluidboxRoot]`, `exportAs: "fluidbox"`                                                                                         |
-| `value` + `onValueChange`  | `[(value)]` (a `model()`)                                                                                                        |
-| `details.cancel()`         | `(beforeValueChange)="$event.preventDefault()"`: the cancelable `FluidboxValueChangeEvent`                                       |
-| `onValueChangeComplete`    | `(valueChangeComplete)`                                                                                                          |
-| `Trigger`                  | `[fluidboxTrigger]="value"`, `exportAs: "fluidboxTrigger"`, signal `preview()`                                                   |
-| `Overlay`                  | `[fluidboxOverlay] flight="live"`; live content in an `<ng-template>` child, as today                                            |
-| `Viewer`                   | `<ng-template fluidboxViewer>`                                                                                                   |
-| `Slides` prop `model`      | `<ng-template fluidboxSlide="model" let-item let-index="index">`                                                                 |
-| `Slides` prop `default`    | `<ng-template fluidboxSlide>` (no value)                                                                                         |
-| `Media`                    | `<ng-template fluidboxMedia [zoom]="true">` inside a slide template                                                              |
-| `Image`, `Video`, `Iframe` | `<fluidbox-image />`, `<fluidbox-video />`, `<fluidbox-iframe />`                                                                |
-| `Toolbar`                  | `<div fluidboxToolbar>` (empty: the defaults)                                                                                    |
-| `ZoomControls`             | `<div fluidboxZoomControls>`                                                                                                     |
-| controls                   | `button[fluidboxClose]`, `[fluidboxPrevious]`, `[fluidboxNext]`, `[fluidboxZoomIn]`, `[fluidboxZoomOut]`, `[fluidboxZoomReset]`  |
-| `Counter`                  | `<span fluidboxCounter>`                                                                                                         |
-| `Caption`                  | `<p fluidboxCaption>`; an `<ng-template>` child for custom content                                                               |
-| `Thumbnails`               | `<ng-container fluidboxThumbnails />` or `<ng-template fluidboxThumbnails let-item let-active="active">`                         |
-| `Sheet`                    | `<ng-template fluidboxSheet [snapPoints] (snapChange) let-item>`                                                                 |
-| `SheetSnap`                | `button[fluidboxSheetSnap]="1"`                                                                                                  |
-| `useFluidbox`              | `injectFluidbox()` → `Signal<FluidboxApi>`; `injectFluidbox(select)` → `Signal<T>`                                               |
-| `useFluidboxSheet`         | `injectFluidboxSheet()` → `{ snap: Signal<number>, setSnap }`                                                                    |
-| `useFluidboxSlide`         | `injectFluidboxSlide()` → `{ item: Signal, index: Signal, active: Signal<boolean>, opening, signal, onActiveChange, waitUntil }` |
+| React                      | Angular                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Root`                     | `[fluidboxRoot]`, `exportAs: "fluidbox"`                                                                                                                 |
+| `value` + `onValueChange`  | `[(value)]` (a `model()`)                                                                                                                                |
+| `details.cancel()`         | `(beforeValueChange)="$event.preventDefault()"`: the cancelable `FluidboxValueChangeEvent`                                                               |
+| `onValueChangeComplete`    | `(valueChangeComplete)`                                                                                                                                  |
+| `Trigger`                  | `[fluidboxTrigger]="value"`, `exportAs: "fluidboxTrigger"`, signal `preview()`                                                                           |
+| `Overlay`                  | `[fluidboxOverlay] flight="live"`; live content in an `<ng-template>` child, as today                                                                    |
+| `Viewer`                   | `<ng-template fluidboxViewer>`                                                                                                                           |
+| `Slides` prop `model`      | `<ng-template fluidboxSlide="model" let-item let-index="index">`                                                                                         |
+| `Slides` prop `default`    | `<ng-template fluidboxSlide>` (no value)                                                                                                                 |
+| `Media`                    | `<ng-template fluidboxMedia [zoom]="true">` inside a slide template                                                                                      |
+| `Image`, `Video`, `Iframe` | `<fluidbox-image />`, `<fluidbox-video />`, `<fluidbox-iframe />`                                                                                        |
+| `Toolbar`                  | `<div fluidboxToolbar>` (empty: the defaults)                                                                                                            |
+| `ZoomControls`             | `<div fluidboxZoomControls>`                                                                                                                             |
+| controls                   | `button[fluidboxClose]`, `[fluidboxPrevious]`, `[fluidboxNext]`, `[fluidboxZoomIn]`, `[fluidboxZoomOut]`, `[fluidboxZoomReset]`                          |
+| `Counter`                  | `<span fluidboxCounter>`                                                                                                                                 |
+| `Caption`                  | `<p fluidboxCaption>`; an `<ng-template>` child for custom content                                                                                       |
+| `Thumbnails`               | `<ng-container fluidboxThumbnails />` or `<ng-template fluidboxThumbnails let-item let-active="active">`                                                 |
+| `Sheet`                    | `<ng-template fluidboxSheet [snapPoints] (snapChange) let-item>`                                                                                         |
+| `SheetSnap`                | `button[fluidboxSheetSnap]="1"`                                                                                                                          |
+| `useFluidbox`              | `injectFluidbox()` → `Signal<FluidboxApi>`; `injectFluidbox(select)` → `Signal<T>`                                                                       |
+| `useFluidboxSheet`         | `injectFluidboxSheet()` → `{ snap: Signal<number>, setSnap }`                                                                                            |
+| `useFluidboxSlide`         | `injectFluidboxSlide()` → `{ item: Signal, index: Signal, active: Signal<boolean>, opening, origin, signal, onActiveChange, waitUntil, returnPlayback }` |
 
 Why `(beforeValueChange)` and not a `details` argument: a `model()`'s `valueChange` output carries
 the value only, and Angular has no second output argument. The cancelable event is the Angular way
@@ -502,28 +502,28 @@ Markup reads as the same anatomy. Placeholders inside `<template slot="viewer">`
 viewer's layer, as `<fluidbox-controls>` is today (`viewer-layer.ts:73`); they are not custom
 elements, so they cost no registration.
 
-| React                        | Custom elements                                                                                                                                                                          |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Root`                       | `<fluidbox-gallery>`; attributes `value`, `loop`, `nozoom`, `zoom-step`, `zoom-max`, `preload`; properties `items`, `labels`, `zoom`, `slides`, `findTrigger`, `revealTrigger`, `viewer` |
-| `onValueChange` + cancel     | `beforevaluechange` event, `preventDefault()`                                                                                                                                            |
-| —                            | `valuechange`, `valuechangecomplete`, `zoomchange`, `sheetchange` events                                                                                                                 |
-| `Trigger` (markup items)     | `<fluidbox-item value="a">` with a `slot="trigger"` child; `value="a b c"` for an album                                                                                                  |
-| `Trigger` (with `items` set) | any element with `data-fluidbox-value="a"` (or `"a b c"`)                                                                                                                                |
-| `Overlay`                    | `<span data-fluidbox-trigger-overlay="live">` inside a trigger                                                                                                                           |
-| `Viewer`                     | `<template slot="viewer">`                                                                                                                                                               |
-| `Toolbar`                    | `<fluidbox-toolbar>` (empty: the defaults)                                                                                                                                               |
-| `ZoomControls`               | `<fluidbox-zoom-controls>`                                                                                                                                                               |
-| controls                     | `<button data-fluidbox-close>` etc., as now                                                                                                                                              |
-| `Counter`                    | `<fluidbox-counter>`                                                                                                                                                                     |
-| `Caption`                    | `<fluidbox-caption>`                                                                                                                                                                     |
-| `Thumbnails`                 | `<fluidbox-thumbnails>` (property `render`)                                                                                                                                              |
-| `Sheet`                      | `<fluidbox-sheet snap-points dismiss>`                                                                                                                                                   |
-| `SheetSnap`                  | `<button data-fluidbox-sheet-snap="1">`                                                                                                                                                  |
-| `Slides` prop `product`      | `<template data-fluidbox-slide="product">`                                                                                                                                               |
-| `Media`                      | `<fluidbox-media zoom>` inside a slide template                                                                                                                                          |
-| `Image`                      | `<fluidbox-image>`; `field="image"` draws that field of the item                                                                                                                         |
-| add-on parts                 | `import "@ogdakke/fluidbox/elements/model"` registers the `model` slide                                                                                                                  |
-| zoom image                   | `<img data-zoom-src data-zoom-srcset>` in a `slot="content"` template                                                                                                                    |
+| React                        | Custom elements                                                                                                                                                                                                    |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Root`                       | `<fluidbox-gallery>`; attributes `value`, `loop`, `nozoom`, `zoom-step`, `zoom-max`, `zoom-click`, `zoom-tap`, `preload`; properties `items`, `labels`, `zoom`, `slides`, `findTrigger`, `revealTrigger`, `viewer` |
+| `onValueChange` + cancel     | `beforevaluechange` event, `preventDefault()`                                                                                                                                                                      |
+| —                            | `valuechange`, `valuechangecomplete`, `zoomchange`, `sheetchange` events                                                                                                                                           |
+| `Trigger` (markup items)     | `<fluidbox-item value="a">` with a `slot="trigger"` child; `value="a b c"` for an album                                                                                                                            |
+| `Trigger` (with `items` set) | any element with `data-fluidbox-value="a"` (or `"a b c"`)                                                                                                                                                          |
+| `Overlay`                    | `<span data-fluidbox-trigger-overlay="live">` inside a trigger                                                                                                                                                     |
+| `Viewer`                     | `<template slot="viewer">`                                                                                                                                                                                         |
+| `Toolbar`                    | `<fluidbox-toolbar>` (empty: the defaults)                                                                                                                                                                         |
+| `ZoomControls`               | `<fluidbox-zoom-controls>`                                                                                                                                                                                         |
+| controls                     | `<button data-fluidbox-close>` etc., as now                                                                                                                                                                        |
+| `Counter`                    | `<fluidbox-counter>`                                                                                                                                                                                               |
+| `Caption`                    | `<fluidbox-caption>`                                                                                                                                                                                               |
+| `Thumbnails`                 | `<fluidbox-thumbnails>` (property `render`)                                                                                                                                                                        |
+| `Sheet`                      | `<fluidbox-sheet snap-points dismiss>`                                                                                                                                                                             |
+| `SheetSnap`                  | `<button data-fluidbox-sheet-snap="1">`                                                                                                                                                                            |
+| `Slides` prop `product`      | `<template data-fluidbox-slide="product">`                                                                                                                                                                         |
+| `Media`                      | `<fluidbox-media zoom>` inside a slide template                                                                                                                                                                    |
+| `Image`                      | `<fluidbox-image>`; `field="image"` draws that field of the item                                                                                                                                                   |
+| add-on parts                 | `import "@ogdakke/fluidbox/elements/model"` registers the `model` slide                                                                                                                                            |
+| zoom image                   | `<img data-zoom-src data-zoom-srcset>` in a `slot="content"` template                                                                                                                                              |
 
 ### Slide templates
 
