@@ -27,7 +27,8 @@ for (const rtl of [false, true]) {
   test(`hidden top-bar controls leave no gap${rtl ? ", right to left" : ""}`, async ({ page }) => {
     await page.goto(`/resets.html?controls=${controls}${rtl ? "&rtl" : ""}`);
     await expect(page.locator("html")).toHaveAttribute("data-fixture-ready", "");
-    await page.locator('[data-item="square"]').click();
+    // On a phone the right-to-left grid can sit off screen; the trigger isn't what's tested.
+    await page.evaluate(() => window.resetsFixture.fluidbox.open("square"));
     const dialog = page.locator("[data-fluidbox-dialog]");
     await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
     await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
