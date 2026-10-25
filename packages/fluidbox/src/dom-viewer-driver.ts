@@ -2252,6 +2252,10 @@ export class DomViewerDriver<
       target.toggleAttribute("data-dismissing", state === "closing" || this.#dragGesture.active);
     }
     if (state === "closed") this.#endReveal();
+    // Once open, the actions load out of the flight's way, so a press on a
+    // button of the app's own that calls setFullscreen, download or share
+    // finds them ready, and keeps its user activation.
+    if (state === "open" && !this.#actions) void this.#loadActions();
   }
 
   /**
