@@ -195,6 +195,36 @@
   cursor: pointer;
 }
 
+/* baseline.css places and draws every control by its attribute, so controls
+   marked up in the caption, as the custom elements' are, take the caption's
+   look instead. Qualified to outweigh the design system's gallery arrows. */
+[data-fluidbox-viewer]
+  [data-fluidbox-dialog]
+  .pattern-caption
+  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+[data-fluidbox-viewer] .pattern-caption [data-fluidbox-counter] {
+  position: static;
+  display: inline;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  background: none;
+}
+
 .pattern-caption button:disabled {
   opacity: 0.4;
 }

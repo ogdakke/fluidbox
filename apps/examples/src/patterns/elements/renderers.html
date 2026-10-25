@@ -1,5 +1,11 @@
 <!-- #region example -->
 <fluidbox-gallery class="pattern-grid">
+  <!-- Items of type "note" show this in their media box; the rest are built in. -->
+  <template data-fluidbox-slide="note">
+    <fluidbox-media>
+      <article class="pattern-note" data-theme></article>
+    </fluidbox-media>
+  </template>
   <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-value="media-note">
     <img src="/art/meadow.svg" alt="A note" />
   </button>

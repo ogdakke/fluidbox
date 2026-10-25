@@ -1,5 +1,9 @@
 <!-- #region example -->
 <fluidbox-gallery class="pattern-grid">
+  <!-- Without a viewer template, the viewer has these same three buttons. -->
+  <template slot="viewer">
+    <fluidbox-toolbar></fluidbox-toolbar>
+  </template>
   <fluidbox-item value="photo-aurora">
     <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
       <img src="/art/aurora.svg" alt="Aurora over the tundra" />
