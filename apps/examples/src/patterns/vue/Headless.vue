@@ -11,32 +11,32 @@ import { photos } from "../shared";
       <Fluidbox.Trigger
         v-for="photo in photos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >
         <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
-    <!-- Your own controls and caption, in place of the default ones. -->
+    <!-- Your own controls and caption replace the default ones. -->
     <Fluidbox.Viewer>
       <div class="pattern-caption">
         <button
           type="button"
-          data-test="prev"
           :disabled="!fluidbox.hasPrevious"
+          data-test="prev"
           @click="fluidbox.previous()"
         >
           Previous
         </button>
-        <span v-if="fluidbox.item && fluidbox.index !== null">
-          <strong data-test="title">{{ itemLabel(fluidbox.item) }}</strong>
-          <small data-test="counter">{{ fluidbox.index + 1 }} / {{ fluidbox.count }}</small>
+        <span>
+          <strong data-test="title">{{ fluidbox.item && itemLabel(fluidbox.item) }}</strong>
+          <small data-test="counter"><Fluidbox.Counter /></small>
         </span>
         <button
           type="button"
-          data-test="next"
           :disabled="!fluidbox.hasNext"
+          data-test="next"
           @click="fluidbox.next()"
         >
           Next

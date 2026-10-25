@@ -3,16 +3,20 @@
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
 import { product, strip } from "../shared";
+
+const products = [product];
 </script>
 
 <template>
-  <!-- The photo flies from the element marked data-fluidbox-origin, not the whole card. -->
-  <Fluidbox.Root :items="[product]">
-    <Fluidbox.Trigger :item="product" class="pattern-card" data-test="product">
-      <span data-fluidbox-origin>
-        <img :src="product.src" :alt="itemLabel(product)" />
-      </span>
-      <span><strong>Coral runner</strong><br />€120</span>
+  <!-- Only the photo flies: the card marks it with data-fluidbox-origin. -->
+  <Fluidbox.Root :items="products">
+    <Fluidbox.Trigger :value="product.id" as-child>
+      <button type="button" class="pattern-card" data-test="product">
+        <span data-fluidbox-origin>
+          <img :src="product.src" :alt="itemLabel(product)" />
+        </span>
+        <span><strong>Coral runner</strong><br />€120</span>
+      </button>
     </Fluidbox.Trigger>
   </Fluidbox.Root>
 
@@ -22,7 +26,7 @@ import { product, strip } from "../shared";
       <Fluidbox.Trigger
         v-for="photo in strip"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >

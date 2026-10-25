@@ -118,6 +118,7 @@ test("a photo's open flies as soon as before: waiting for slides adds no frame",
 
 for (const [article, binding] of [
   ["a", "React"],
+  ["a", "Vue"],
   ["an", "Angular"],
 ]) {
   test(`${article} ${binding} slide that draws the image opens as soon as the built-in image, on a first open`, async ({
