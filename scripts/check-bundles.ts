@@ -45,11 +45,14 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "vue-spin": ["vue"],
 };
 
-/** The bindings whose add-on parts are entries of their own, as `react-embed`. */
-const bindingPrefix = new RegExp(`^(${["react", "vue", "solid", "angular"].join("|")})-`);
-
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
 const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fluidboxSpin" };
+
+/** The prefixes of the add-on parts that are entries of their own, as `react-` of `react-embed`. */
+const addonEntry = new RegExp(`^(.+)-(${Object.keys(addonMarkers).join("|")})$`);
+const bindingPrefix = new RegExp(
+  `^(${[...new Set(entrypoints.map((name) => addonEntry.exec(name)?.[1]).filter(Boolean))].join("|")})-`,
+);
 
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 // baseline/bundle-budget.md records the measurements behind them and why they moved.
