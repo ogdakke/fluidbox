@@ -85,11 +85,16 @@ const modelStyles = `
 :where([data-fluidbox-model][data-fluidbox-model-ready] > [data-fluidbox-media-poster]) {
   visibility: hidden;
 }
-/* A closing flight carries the poster home, as a photo, and leaves the live model behind. */
-:where([data-fluidbox-flight] [data-fluidbox-model]) > [data-fluidbox-media-poster] {
+/* A close carries the poster home, as a photo, and leaves the live model behind:
+   in a flight, or in the slide's own frame, where a box holding the element closes. */
+:where([data-fluidbox-flight], [data-fluidbox-status="closing"])
+  :where([data-fluidbox-model])
+  > [data-fluidbox-media-poster] {
   visibility: visible;
 }
-:where([data-fluidbox-flight] [data-fluidbox-model]) > model-viewer {
+:where([data-fluidbox-flight], [data-fluidbox-status="closing"])
+  :where([data-fluidbox-model])
+  > model-viewer {
   visibility: hidden;
 }
 `;

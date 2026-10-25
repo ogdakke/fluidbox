@@ -8,22 +8,22 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | On demand JS gzip | Reachable JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | ----------------: | ----------------: | -----------------------: |
-| Root           |         9,802 B |           44,037 B |           1,151 B |          45,188 B |                 46,847 B |
-| Elements       |        13,946 B |           47,379 B |           1,151 B |          48,530 B |                 50,189 B |
-| React          |        17,182 B |           50,777 B |           1,151 B |          51,928 B |                 53,587 B |
-| Solid          |        13,613 B |           47,200 B |           1,151 B |          48,351 B |                 50,010 B |
-| Vue            |        14,311 B |           47,893 B |           1,151 B |          49,044 B |                 50,703 B |
-| Angular        |        14,715 B |           48,226 B |           1,151 B |          49,377 B |                 51,036 B |
+| Root           |         9,802 B |           44,045 B |           1,151 B |          45,196 B |                 46,855 B |
+| Elements       |        13,946 B |           47,387 B |           1,151 B |          48,538 B |                 50,197 B |
+| React          |        17,183 B |           50,787 B |           1,151 B |          51,938 B |                 53,597 B |
+| Solid          |        13,611 B |           47,206 B |           1,151 B |          48,357 B |                 50,016 B |
+| Vue            |        14,309 B |           47,899 B |           1,151 B |          49,050 B |                 50,709 B |
+| Angular        |        14,713 B |           48,233 B |           1,151 B |          49,384 B |                 51,043 B |
 | Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
 | Sheet          |         7,277 B |            7,277 B |               0 B |           7,277 B |                  8,272 B |
 | Kit            |         1,499 B |            1,499 B |               0 B |           1,499 B |                  4,309 B |
 | Hover zoom     |         1,453 B |            1,453 B |               0 B |           1,453 B |                  4,263 B |
 | Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
-| Model          |         1,449 B |            1,449 B |               0 B |           1,449 B |                  4,259 B |
+| Model          |         1,505 B |            1,505 B |               0 B |           1,505 B |                  4,315 B |
 | Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
-| React embed    |        19,684 B |           53,326 B |           1,151 B |          54,477 B |                 56,136 B |
-| React model    |        18,351 B |           51,928 B |           1,151 B |          53,079 B |                 54,738 B |
-| React spin     |        19,105 B |           52,668 B |           1,151 B |          53,819 B |                 55,478 B |
+| React embed    |        19,683 B |           53,333 B |           1,151 B |          54,484 B |                 56,143 B |
+| React model    |        18,409 B |           51,994 B |           1,151 B |          53,145 B |                 54,804 B |
+| React spin     |        19,108 B |           52,678 B |           1,151 B |          53,829 B |                 55,488 B |
 
 `styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
@@ -61,6 +61,8 @@ The trigger video's playback for custom players and the click and tap zoom modes
 The model slide grew 74 B, to 1,449 B, when it began to make a fresh `<model-viewer>` each time its slide comes on show and remove it when the slide leaves, holding a reopen for the new element's first frame: the element draws nothing, or a clipped frame, once it has left the page and come back.
 
 A close that keeps a box holding a custom element in its frame added about 30 B to every viewer's activation. React slide content then gained a Suspense boundary of its own, with the commit reported beside the content inside it, so a slide that suspends keeps the app around the viewer up and the open waits for it: about 35 B initial and 70 B activation, which moves the React limits.
+
+The model slide grew 56 B, to 1,505 B, when its close began to carry the poster in the slide's own frame as well as in a flight: a box that holds `<model-viewer>` closes in place.
 
 The React add-on parts are entries of their own, `react/embed`, `react/model` and `react/spin`. Each consumer imports `Fluidbox` and the part, so it measures the binding, the part and the add-on together; each also checks that it carries no other add-on.
 

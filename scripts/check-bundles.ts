@@ -61,10 +61,10 @@ const initialGzipLimits: Record<Entry, number> = {
   // The media add-ons carry their few rules in their JS. Embed providers added
   // about 430 B to the embed slide; a model that waits for its first frame, 60 B.
   embed: 3_050,
-  model: 1_500,
+  model: 1_550,
   spin: 2_450,
   "react-embed": 19_750,
-  "react-model": 18_400,
+  "react-model": 18_450,
   "react-spin": 19_150,
 };
 const cssGzipLimit = 2_850;
@@ -87,7 +87,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   kit: 1_550,
   "hover-zoom": 1_500,
   embed: 3_050,
-  model: 1_500,
+  model: 1_550,
   spin: 2_450,
   "react-embed": 53_350,
   "react-model": 52_000,
@@ -125,7 +125,7 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   kit: 1_550,
   "hover-zoom": 1_500,
   embed: 3_050,
-  model: 1_500,
+  model: 1_550,
   spin: 2_450,
   "react-embed": 54_500,
   "react-model": 53_150,
@@ -144,10 +144,10 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   // It needs no stylesheet; the base one counts, as for the kit.
   "hover-zoom": 4_350,
   embed: 5_850,
-  model: 4_300,
+  model: 4_400,
   spin: 5_250,
   "react-embed": 56_150,
-  "react-model": 54_750,
+  "react-model": 54_850,
   "react-spin": 55_550,
 };
 
