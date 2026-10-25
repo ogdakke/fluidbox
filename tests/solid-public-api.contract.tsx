@@ -32,6 +32,9 @@ function Details(): JSX.Element {
   const fluidbox: FluidboxApi<Photo> = useFluidbox<Photo>();
   const credit: string | undefined = fluidbox.item?.credit;
   const fullscreen: boolean = fluidbox.fullscreen;
+  const playing: boolean = fluidbox.playing;
+  fluidbox.play();
+  fluidbox.pause();
   const index: Accessor<number | null> = useFluidbox((state) => state.index);
   const sheet: FluidboxSheetApi = useFluidboxSheet();
   const snap: Accessor<number> = sheet.snap;
@@ -47,7 +50,7 @@ function Details(): JSX.Element {
   sheet.setSnap(1, { animate: false });
   return (
     <p>
-      {credit} {index()} {snap()} {String(fullscreen)}
+      {credit} {index()} {snap()} {String(fullscreen)} {String(playing)}
     </p>
   );
 }
@@ -80,6 +83,7 @@ function ContractExample(): JSX.Element {
       wheel="navigate"
       href={(value) => (value ? `/photos/${value}` : "/photos")}
       shareUrl={(item) => `https://example.com/${item.id}`}
+      slideshow={{ interval: 4000, loop: true, autoplay: false }}
       onMediaError={(event: FluidboxMediaErrorEvent<Photo>) => void event.item.credit}
       onValueChange={(value: string | null, details: FluidboxValueChangeDetails<Photo>) => {
         if (value === null && details.reason === "keyboard") details.cancel();
@@ -140,6 +144,8 @@ function ContractExample(): JSX.Element {
           <Fluidbox.Fullscreen>
             <svg />
           </Fluidbox.Fullscreen>
+          <Fluidbox.Slideshow />
+          <Fluidbox.Slideshow label={false}>Play</Fluidbox.Slideshow>
           <Fluidbox.Close label={false}>Done</Fluidbox.Close>
         </Fluidbox.Toolbar>
         <Fluidbox.ZoomControls />

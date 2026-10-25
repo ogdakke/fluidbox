@@ -317,6 +317,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   const dismiss = createMemo(() => props.dismiss && { ...props.dismiss }, undefined, {
     equals: sameJson,
   });
+  const slideshow = createMemo(() => props.slideshow && { ...props.slideshow }, undefined, {
+    equals: sameJson,
+  });
 
   // Content the viewer asks for renders under an owner inside the Provider, so
   // it reaches both the app's context and the fluidbox's.
@@ -355,6 +358,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
         preload: untrack(() => props.preload),
         dismiss: untrack(dismiss),
         wheel: untrack(() => props.wheel),
+        slideshow: untrack(slideshow),
         // Share shares the item's href unless shareUrl says otherwise.
         shareUrl: (item) => (props.shareUrl ? props.shareUrl(item) : props.href?.(idOf(item))),
         // Slides are looked up by type as one mounts, so the Slides part's
@@ -410,9 +414,25 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
 
   createEffect(
     on(
-      [labelsKey, zoom, dismiss, () => props.loop, () => props.preload, () => props.wheel],
-      ([, zoom, dismiss, loop, preload, wheel]) =>
-        fluidbox.update({ labels: untrack(labelOptions), zoom, dismiss, loop, preload, wheel }),
+      [
+        labelsKey,
+        zoom,
+        dismiss,
+        () => props.loop,
+        () => props.preload,
+        () => props.wheel,
+        slideshow,
+      ],
+      ([, zoom, dismiss, loop, preload, wheel, slideshow]) =>
+        fluidbox.update({
+          labels: untrack(labelOptions),
+          zoom,
+          dismiss,
+          loop,
+          preload,
+          wheel,
+          slideshow,
+        }),
       { defer: true },
     ),
   );
@@ -495,6 +515,8 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     setFullscreen: (on) => fluidbox.setFullscreen(on),
     download: () => fluidbox.download(),
     share: () => fluidbox.share(),
+    play: () => fluidbox.play(),
+    pause: () => fluidbox.pause(),
     setItems: (next) => fluidbox.setItems(next),
     preload: (target) => fluidbox.preload(target),
     load: () => fluidbox.load(),
@@ -996,6 +1018,7 @@ function useControl(name: FluidboxControlName) {
     disabled: createMemo(() => control.disabled(context.state())),
     hidden: createMemo(() => !!control.hidden?.(context.fluidbox, context.state())),
     label: createMemo(() => control.label(context.labels(), context.state())),
+    active: createMemo(() => !!control.active?.(context.state())),
     link: createMemo(
       () => (name === "download" ? downloadLink(context.state().item) : null),
       undefined,
@@ -1036,7 +1059,7 @@ function useNaming(
 function control(name: Exclude<FluidboxControlName, "download" | "counter">) {
   return function FluidboxControl(props: FluidboxControlProps): JSX.Element {
     const [local, attributes] = splitProps(props, ["children", "label", "onClick"]);
-    const { context, control, disabled, hidden, label } = useControl(name);
+    const { context, control, disabled, hidden, label, active } = useControl(name);
     const naming = useNaming(local, label);
     return createComponent(
       Dynamic,
@@ -1060,6 +1083,9 @@ function control(name: Exclude<FluidboxControlName, "download" | "counter">) {
           "data-fluidbox-managed": "",
           get "data-fluidbox-default"() {
             return naming["data-fluidbox-default"];
+          },
+          get "data-active"() {
+            return active() ? "" : undefined;
           },
           // On the button itself, so your onClick runs before the viewer sees the click.
           "on:click"(event: MouseEvent) {
@@ -1086,6 +1112,8 @@ const ZoomOut = control("zoomOut");
 const ZoomReset = control("zoomReset");
 const Fullscreen = control("fullscreen");
 const Share = control("share");
+/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option. */
+const Slideshow = control("slideshow");
 const Retry = control("retry");
 const parts = {
   previous: Previous,
@@ -1635,6 +1663,7 @@ export const Fluidbox = {
   Fullscreen,
   Download,
   Share,
+  Slideshow,
   Counter,
   Caption,
   Loading,

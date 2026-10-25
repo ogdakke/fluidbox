@@ -228,6 +228,17 @@ function App() {
       <Fluidbox.Root items={photos}>
         <Grid items={photos} id="builtin" />
       </Fluidbox.Root>
+      <h2>A slideshow, with a Slideshow of text and one with an icon</h2>
+      <Fluidbox.Root items={photos} slideshow={{ interval: 60_000 }}>
+        <Grid items={photos} id="slideshow" />
+        <Fluidbox.Viewer>
+          <Fluidbox.Slideshow data-test="slideshow-text" />
+          <Fluidbox.Slideshow data-test="slideshow-icon">
+            <svg aria-hidden="true" />
+          </Fluidbox.Slideshow>
+          <Fluidbox.Close />
+        </Fluidbox.Viewer>
+      </Fluidbox.Root>
       <Fluidbox.Root items={photos}>
         <Grid items={photos} id="custom" />
         <Fluidbox.Slides image={() => <Fluidbox.Image />} />

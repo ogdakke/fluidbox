@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectSlideshowPart } from "./support/slideshow-part";
 
 declare global {
   interface Window {
@@ -311,4 +312,9 @@ test("thumbnails switch between yours and the default ones as the children chang
   await page.evaluate(() => window.solidSlides.setCustomThumbnails(false));
   await expect(buttons.locator("img")).toHaveCount(2);
   await expect(buttons.locator('[data-test="thumb"]')).toHaveCount(0);
+});
+
+test("Slideshow plays and pauses, and is named for what it does next", async ({ page }) => {
+  await load(page);
+  await expectSlideshowPart(page, "#slideshow");
 });
