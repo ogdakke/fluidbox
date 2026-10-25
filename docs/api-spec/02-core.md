@@ -461,6 +461,12 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
   /**
+   * Called once as a close starts from the slide on show, before the closing
+   * flight measures, with the origin of the trigger the close lands on. Fires
+   * on every close path. Returns a function that unsubscribes. (§4.4)
+   */
+  onClose(this: void, listener: (landing: FluidboxSlideOrigin | null) => void): () => void;
+  /**
    * Let the media box zoom (pinch, double-tap, wheel, the zoom controls).
    * Off by default for your own media; on for drawImage.
    */
@@ -1125,6 +1131,11 @@ seeks the trigger's video to the player's time and plays it if the player was pl
 export interface FluidboxSlideOrigin {
   /** The trigger's `<video>`, when that is what the trigger showed. */
   readonly video?: FluidboxPlayback;
+  /**
+   * The trigger's live model element itself, not a reading of it: its camera
+   * is live WebGL state. Never move or reattach it. (§4.4)
+   */
+  readonly model?: HTMLElement;
 }
 
 export interface FluidboxPlayback {
