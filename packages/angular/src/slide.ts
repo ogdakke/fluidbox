@@ -308,9 +308,7 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
 
 /** Draw one of the built-in media into the slide's box, again as its item changes. */
 @Directive({ standalone: true })
-abstract class FluidboxDrawDirective<TDrawn extends FluidboxItem>
-  implements OnChanges, OnInit, OnDestroy
-{
+abstract class DrawDirective<TDrawn extends FluidboxItem> implements OnChanges, OnInit, OnDestroy {
   abstract readonly item: Signal<TDrawn | undefined>;
   protected abstract readonly slide: FluidboxSlide<any>;
   #key: string | undefined;
@@ -348,7 +346,7 @@ abstract class FluidboxDrawDirective<TDrawn extends FluidboxItem>
  * photo's does, and makes the box zoom. Renders nothing itself.
  */
 @Component({ selector: "fluidbox-image", standalone: true, template: "", host: { hidden: "" } })
-export class FluidboxImageComponent extends FluidboxDrawDirective<FluidboxImageItem> {
+export class FluidboxImageComponent extends DrawDirective<FluidboxImageItem> {
   /** @default the slide's item */
   readonly item = input<FluidboxImageItem | undefined>(undefined);
   protected readonly slide = requireSlide("fluidbox-image").slide;
@@ -359,7 +357,7 @@ export class FluidboxImageComponent extends FluidboxDrawDirective<FluidboxImageI
 
 /** The built-in video in the slide's box. `attach` loads the media yourself; pass a stable function. */
 @Component({ selector: "fluidbox-video", standalone: true, template: "", host: { hidden: "" } })
-export class FluidboxVideoComponent extends FluidboxDrawDirective<FluidboxVideoItem> {
+export class FluidboxVideoComponent extends DrawDirective<FluidboxVideoItem> {
   /** @default the slide's item */
   readonly item = input<FluidboxVideoItem | undefined>(undefined);
   /** Load the media into the runtime's `<video>` yourself, as a streaming engine does. A new one loads the video again. */
@@ -376,7 +374,7 @@ export class FluidboxVideoComponent extends FluidboxDrawDirective<FluidboxVideoI
 
 /** The built-in iframe in the slide's box. */
 @Component({ selector: "fluidbox-iframe", standalone: true, template: "", host: { hidden: "" } })
-export class FluidboxIframeComponent extends FluidboxDrawDirective<FluidboxIframeItem> {
+export class FluidboxIframeComponent extends DrawDirective<FluidboxIframeItem> {
   /** @default the slide's item */
   readonly item = input<FluidboxIframeItem | undefined>(undefined);
   protected readonly slide = requireSlide("fluidbox-iframe").slide;

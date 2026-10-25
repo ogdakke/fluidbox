@@ -58,6 +58,12 @@ const photo = (id: string, src: string): FluidboxImageItem => ({
 });
 const photos = [photo("one", "/photo-square.svg"), photo("two", "/photo-portrait.svg")];
 
+/** A viewer of parts: the second photo's file is missing. */
+const parted: FluidboxImageItem[] = [
+  { ...photo("ok", "/photo-square.svg"), caption: "A square photo" },
+  { ...photo("missing", "/missing-photo.svg"), caption: "A photo that is not there" },
+];
+
 const custom = (type: "lazy" | "held" | "reel", id: string): FluidboxItem => ({
   type,
   id,
@@ -155,6 +161,22 @@ class Reel implements OnInit {
       <app-grid [items]="photos" id="custom" />
       <ng-template fluidboxSlide="image"><fluidbox-image /></ng-template>
     </div>
+    <h2>A viewer of parts</h2>
+    <div fluidboxRoot [items]="parted">
+      <app-grid [items]="parted" id="parts" />
+      <ng-template fluidboxViewer>
+        <div fluidboxToolbar></div>
+        <button fluidboxFullscreen data-test="fullscreen"></button>
+        <a fluidboxDownload data-test="download"></a>
+        <button fluidboxShare data-test="share">Pass it on</button>
+        <span fluidboxCounter data-test="counter"></span>
+        <p fluidboxCaption data-test="caption"></p>
+        <ng-template fluidboxError let-item>
+          <p data-test="error">{{ item.alt }} didn't load.</p>
+          <button fluidboxRetry data-test="retry"></button>
+        </ng-template>
+      </ng-template>
+    </div>
     <h2>A slide that defers</h2>
     <div fluidboxRoot [items]="lazy">
       <app-grid [items]="lazy" id="lazy" />
@@ -194,6 +216,7 @@ class Reel implements OnInit {
 })
 class Slides {
   readonly photos = photos;
+  readonly parted = parted;
   readonly lazy = [custom("lazy", "lazy")];
   readonly lazyReady = lazyReady;
   readonly reels = reels;

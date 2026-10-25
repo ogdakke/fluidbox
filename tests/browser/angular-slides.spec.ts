@@ -162,3 +162,47 @@ test("closing hands the trigger's video the time a slide registered with returnP
   expect(back.time).toBeGreaterThanOrEqual(2.49);
   expect(back.time).toBeLessThan(3.5);
 });
+
+test("the viewer's parts name themselves, follow the item on show, and show your error content", async ({
+  page,
+}) => {
+  await load(page);
+  await page.locator('#parts [data-item="ok"]').click();
+  const viewer = page.locator(dialog);
+  await expect(viewer).toHaveAttribute("data-fluidbox-status", "open");
+  // Empty, the toolbar holds Previous, Next and Close, each named by a default label.
+  const toolbar = viewer.locator("[data-fluidbox-toolbar]");
+  await expect(toolbar.locator("button")).toHaveCount(3);
+  await expect(toolbar.locator("[data-fluidbox-close]")).toHaveText("Close");
+  await expect(toolbar.locator("[data-fluidbox-close]")).toHaveAttribute(
+    "data-fluidbox-default",
+    "",
+  );
+  await expect(viewer.locator('[data-test="fullscreen"]')).toHaveAttribute("type", "button");
+  // Content you give names a control; the label then names it for assistive technology.
+  await expect(viewer.locator('[data-test="share"]')).toHaveText("Pass it on");
+  await expect(viewer.locator('[data-test="share"]')).not.toHaveAttribute(
+    "data-fluidbox-default",
+    "",
+  );
+  const download = viewer.locator('[data-test="download"]');
+  await expect(download).toHaveAttribute("href", /\/photo-square\.svg$/);
+  await expect(download).toHaveAttribute("download", /.*/);
+  await expect(download).not.toHaveAttribute("disabled", /.*/);
+  await expect(viewer.locator('[data-test="counter"]')).toHaveText("1 / 2");
+  await expect(viewer.locator('[data-test="caption"]')).toHaveText("A square photo");
+  await expect(viewer.locator('[data-test="error"]')).toHaveCount(0);
+
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer.locator('[data-test="counter"]')).toHaveText("2 / 2");
+  await expect(viewer.locator('[data-test="caption"]')).toHaveText("A photo that is not there");
+  await expect(download).toHaveAttribute("href", /\/missing-photo\.svg$/);
+  // The file is missing: your error content shows in place of the default one.
+  await expect(viewer.locator('[data-test="error"]')).toHaveText("Photo missing didn't load.");
+  await expect(viewer.locator('[data-test="retry"]')).toHaveText("Retry");
+
+  await page.keyboard.press("ArrowLeft");
+  await expect(viewer.locator('[data-test="error"]')).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+});

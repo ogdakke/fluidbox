@@ -323,7 +323,7 @@ function isEmpty(element: Element): boolean {
     "[attr.data-fluidbox-default]": "naming().text === null ? null : ''",
   },
 })
-abstract class FluidboxNamedDirective implements AfterContentInit, AfterContentChecked {
+abstract class NamedDirective implements AfterContentInit, AfterContentChecked {
   /**
    * A string names it instead of the labels. `false` names it by its content:
    * use it when that is visible text.
@@ -382,10 +382,7 @@ abstract class FluidboxNamedDirective implements AfterContentInit, AfterContentC
     "data-fluidbox-managed": "",
   },
 })
-abstract class FluidboxControlDirective
-  extends FluidboxNamedDirective
-  implements OnInit, OnDestroy
-{
+abstract class ControlDirective extends NamedDirective implements OnInit, OnDestroy {
   /** Overrides the disabled state the viewer gives the control. */
   readonly disabled = input<boolean | undefined>(undefined);
   protected abstract readonly control: FluidboxControlName;
@@ -396,7 +393,8 @@ abstract class FluidboxControlDirective
     const control = fluidboxControls[this.control];
     const state = this.root.state();
     return {
-      disabled: this.disabled() ?? control.disabled(state),
+      // A link has no disabled state; Download hides instead.
+      disabled: this.control !== "download" && (this.disabled() ?? control.disabled(state)),
       hidden: !!control.hidden?.(this.root.fluidbox, state),
     };
   });
@@ -428,55 +426,55 @@ abstract class FluidboxControlDirective
 
 /** Closes the viewer. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxClose]", standalone: true })
-export class FluidboxCloseDirective extends FluidboxControlDirective {
+export class FluidboxCloseDirective extends ControlDirective {
   protected readonly control = "close";
 }
 
 /** Goes to the previous item. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxPrevious]", standalone: true })
-export class FluidboxPreviousDirective extends FluidboxControlDirective {
+export class FluidboxPreviousDirective extends ControlDirective {
   protected readonly control = "previous";
 }
 
 /** Goes to the next item. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxNext]", standalone: true })
-export class FluidboxNextDirective extends FluidboxControlDirective {
+export class FluidboxNextDirective extends ControlDirective {
   protected readonly control = "next";
 }
 
 /** Zooms the image in by 1.5. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxZoomIn]", standalone: true })
-export class FluidboxZoomInDirective extends FluidboxControlDirective {
+export class FluidboxZoomInDirective extends ControlDirective {
   protected readonly control = "zoomIn";
 }
 
 /** Zooms the image out by 1.5. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxZoomOut]", standalone: true })
-export class FluidboxZoomOutDirective extends FluidboxControlDirective {
+export class FluidboxZoomOutDirective extends ControlDirective {
   protected readonly control = "zoomOut";
 }
 
 /** Zooms the image back out to fit. Shows its label when empty. */
 @Directive({ selector: "button[fluidboxZoomReset]", standalone: true })
-export class FluidboxZoomResetDirective extends FluidboxControlDirective {
+export class FluidboxZoomResetDirective extends ControlDirective {
   protected readonly control = "zoomReset";
 }
 
 /** Makes the open viewer fullscreen, and back. Hidden where fullscreen isn't available. */
 @Directive({ selector: "button[fluidboxFullscreen]", standalone: true })
-export class FluidboxFullscreenDirective extends FluidboxControlDirective {
+export class FluidboxFullscreenDirective extends ControlDirective {
   protected readonly control = "fullscreen";
 }
 
 /** Shares the item's link, or copies it. Hidden without a link, or a way to share it. */
 @Directive({ selector: "button[fluidboxShare]", standalone: true })
-export class FluidboxShareDirective extends FluidboxControlDirective {
+export class FluidboxShareDirective extends ControlDirective {
   protected readonly control = "share";
 }
 
 /** Loads the failed media on show again, for an error of your own. */
 @Directive({ selector: "button[fluidboxRetry]", standalone: true })
-export class FluidboxRetryDirective extends FluidboxControlDirective {
+export class FluidboxRetryDirective extends ControlDirective {
   protected readonly control = "retry";
 }
 
@@ -492,7 +490,7 @@ export class FluidboxRetryDirective extends FluidboxControlDirective {
     "[attr.download]": "link()?.download ?? null",
   },
 })
-export class FluidboxDownloadDirective extends FluidboxControlDirective {
+export class FluidboxDownloadDirective extends ControlDirective {
   protected readonly control = "download";
   protected readonly link = computed(() => downloadLink(this.root.state().item));
 
@@ -511,7 +509,7 @@ export class FluidboxDownloadDirective extends FluidboxControlDirective {
   standalone: true,
   host: { "[attr.data-fluidbox-sheet-snap]": "fluidboxSheetSnap()", type: "button" },
 })
-export class FluidboxSheetSnapDirective extends FluidboxNamedDirective {
+export class FluidboxSheetSnapDirective extends NamedDirective {
   /** The snap it moves the sheet to. */
   readonly fluidboxSheetSnap = input.required({ transform: numberAttribute });
   protected readonly name = computed(() => this.root.resolvedLabels().sheet);
@@ -530,7 +528,7 @@ const groupControls = [
 
 /** A group that renders its defaults when it is empty. */
 @Directive({ standalone: true })
-abstract class FluidboxGroupDirective implements AfterContentInit {
+abstract class GroupDirective implements AfterContentInit {
   readonly #element = inject<ElementRef<HTMLElement>>(ElementRef);
   /** Empty, it shows the default controls. */
   protected empty = false;
@@ -557,7 +555,7 @@ abstract class FluidboxGroupDirective implements AfterContentInit {
       ><button fluidboxClose></button>
     }`,
 })
-export class FluidboxToolbarComponent extends FluidboxGroupDirective {}
+export class FluidboxToolbarComponent extends GroupDirective {}
 
 /**
  * The zoom controls' group, named like the zoomed image:
@@ -574,7 +572,7 @@ export class FluidboxToolbarComponent extends FluidboxGroupDirective {}
       ><button fluidboxZoomReset></button>
     }`,
 })
-export class FluidboxZoomControlsComponent extends FluidboxGroupDirective {
+export class FluidboxZoomControlsComponent extends GroupDirective {
   readonly #root = injectRoot("fluidboxZoomControls");
   protected readonly label = computed(() => this.#root.resolvedLabels().zoomed);
 }
@@ -653,7 +651,7 @@ interface SlideStatus {
  * says so: its own slide's in a slide, else the one on show.
  */
 @Directive({ standalone: true })
-abstract class FluidboxStatusDirective<C extends object> implements OnInit, OnDestroy {
+abstract class StatusDirective<C extends object> implements OnInit, OnDestroy {
   protected readonly root = injectRoot("A fluidbox status part");
   protected readonly slide = injectSlideScope()?.slide;
   readonly #viewer = inject(VIEWER, { optional: true });
@@ -740,7 +738,7 @@ abstract class FluidboxStatusDirective<C extends object> implements OnInit, OnDe
  * the slide's `aria-busy` already says it.
  */
 @Directive({ selector: "ng-template[fluidboxLoading]", standalone: true })
-export class FluidboxLoadingDirective extends FluidboxStatusDirective<object> {
+export class FluidboxLoadingDirective extends StatusDirective<object> {
   protected readonly attribute = "data-fluidbox-loading";
   protected contextFor({ busy }: SlideStatus) {
     return busy ? {} : null;
@@ -762,7 +760,7 @@ export interface FluidboxErrorContext<TItem extends FluidboxItem = FluidboxItem>
 @Directive({ selector: "ng-template[fluidboxError]", standalone: true })
 export class FluidboxErrorDirective<
   TItem extends FluidboxItem = FluidboxItem,
-> extends FluidboxStatusDirective<FluidboxErrorContext<TItem>> {
+> extends StatusDirective<FluidboxErrorContext<TItem>> {
   protected readonly attribute = "data-fluidbox-error-content";
   protected contextFor({ error, cause }: SlideStatus): FluidboxErrorContext<TItem> | null {
     const item = (this.slide ? this.slide.item : this.root.fluidbox.state.item) as TItem | null;
