@@ -226,6 +226,23 @@ test("a slide drawing the built-in image zooms its box", async ({ page }) => {
   await expect.poll(() => page.evaluate(() => window.slidesFixture.fluidbox.state.zoom)).toBeNull();
 });
 
+test("a slide's drawn image stays in its box while zoomed, preview and all", async ({ page }) => {
+  await load(page);
+  await open(page, "#slides", "product");
+  expect(await page.evaluate(() => window.slidesFixture.fluidbox.zoomTo(2))).toBe(true);
+  // The zoom carries the box out of its frame; its preview stays out of flow,
+  // so the image fills the box rather than sitting under the preview.
+  const [image, box] = await page.evaluate(() =>
+    ["[data-fluidbox-drawn]", "[data-fluidbox-item-content]"].map((selector) => {
+      const { left, top, width, height } = document
+        .querySelector(`[data-fluidbox-zoom-viewport] ${selector}`)!
+        .getBoundingClientRect();
+      return [left, top, width, height];
+    }),
+  );
+  for (const [index, value] of image!.entries()) expect(value).toBeCloseTo(box![index]!, 0);
+});
+
 test("a slide's own box zooms once it says so, to its own max, and reports its pose", async ({
   page,
 }) => {

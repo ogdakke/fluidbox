@@ -457,8 +457,9 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   z-index: 3;
   transform-origin: top left;
 }
+/* A custom box's own, too, as the zoom carries the box out of its frame. */
 :where([data-fluidbox-viewer], [data-fluidbox-flight])
-  [data-fluidbox-frame]
+  :is([data-fluidbox-frame], [data-fluidbox-item-content])
   :is([data-fluidbox-slide-placeholder], [data-fluidbox-slide-preview]) {
   position: absolute;
   inset: 0;
