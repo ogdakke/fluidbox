@@ -8,7 +8,7 @@ export interface SlideshowViewer {
   loops(): boolean;
   /** Settles once the slide for an item is ready, or after `cap` ms. */
   ready(index: number, cap: number): Promise<void> | undefined;
-  /** The slide on show, whose videos pause the slideshow while they play. */
+  /** The slide on show, whose videos hold the slideshow while they play. */
   slide(): Element | undefined;
   /** The dialog, where its videos' events pass. */
   readonly dialog: HTMLElement;
@@ -19,21 +19,22 @@ export interface SlideshowViewer {
 /**
  * The slideshow's timer: after `interval` on a slide, it waits for the next
  * one to be ready, as long again at most, then moves to it with the reason
- * "slideshow". Any input pauses it for good; a hidden tab or a playing video
- * pause it until they end. Nothing runs while it is paused or the viewer is
- * closed.
+ * "slideshow". Any input pauses it, until `play()` or the control. A hidden
+ * tab or a video playing in the slide only hold it: it stays playing, and its
+ * interval starts again once they end. Nothing runs while it is paused or the
+ * viewer is closed.
  */
 export class ViewerSlideshow {
   #options: FluidboxSlideshowOptions | undefined;
-  #playing = false;
-  /** The tab or a video paused it, so their ending plays it again. */
-  #resume = false;
+  /** Whether it plays: the person's choice, which a hold leaves alone. */
+  playing = false;
   /** The open has played once by `autoplay`. */
   #autoplayed = false;
+  /** The interval under way, and then the wait and the move it ends in; undefined while none is. */
   #timer: ReturnType<typeof setTimeout> | undefined;
-  /** Counts the timer's runs, so a wait that a pause or a move overtook moves nothing. */
+  /** Counts the timer's runs, so a wait that a pause, a hold or a move overtook moves nothing. */
   #run = 0;
-  /** The listeners for the tab and the videos, while playing or paused by them. */
+  /** The listeners for the tab and the videos, while it plays. */
   #watching: AbortController | undefined;
   readonly #viewer: SlideshowViewer;
 
@@ -45,17 +46,14 @@ export class ViewerSlideshow {
     this.#options = options;
   }
 
-  /** Play on an open or opening viewer, even over a video playing now: the person asked. */
+  /** Play on an open or opening viewer. A hidden tab or a playing video holds it from the start. */
   play() {
     const status = this.#viewer.controller()?.state.status;
-    if (status !== "open" && status !== "opening") return;
-    this.#resume = false;
-    this.#set(true);
+    if (status === "open" || status === "opening") this.#set(true);
   }
 
   /** A pause that sticks: a person's input, `pause()` or the control. */
   pause() {
-    this.#resume = false;
     this.#set(false);
   }
 
@@ -66,7 +64,7 @@ export class ViewerSlideshow {
   interaction(event?: Event) {
     const target = event?.target;
     if (target instanceof Element && target.closest("[data-fluidbox-slideshow]")) return;
-    if (this.#playing || this.#resume) this.pause();
+    this.pause();
   }
 
   /** The viewer's status changed: opening, it may autoplay; closing stops it. */
@@ -84,9 +82,7 @@ export class ViewerSlideshow {
 
   /** The viewer settled on another slide, by the slideshow or not: the interval starts again. */
   moved() {
-    if (!this.#playing) return;
-    if (this.#videoPlaying()) this.#suspend();
-    else this.#arm();
+    this.#arm();
   }
 
   destroy() {
@@ -94,40 +90,30 @@ export class ViewerSlideshow {
   }
 
   #set(playing: boolean) {
-    if (playing || this.#resume) this.#watch();
-    else this.#unwatch();
+    if (playing) this.#watch();
+    else {
+      this.#watching?.abort();
+      this.#watching = undefined;
+    }
     // Quiet while it plays, so a screen reader isn't interrupted at every slide.
     this.#viewer.status.setAttribute("aria-live", playing ? "off" : "polite");
-    const changed = playing !== this.#playing;
-    this.#playing = playing;
-    if (playing) this.#arm();
-    else {
-      clearTimeout(this.#timer);
-      this.#run += 1;
-    }
-    if (changed) this.#viewer.controller()?.playingChanged?.(playing);
+    const changed = playing !== this.playing;
+    this.playing = playing;
+    this.#arm();
+    if (changed) this.#viewer.controller()?.changed?.();
   }
 
-  /** Paused by the tab or a video, until they end. */
-  #suspend() {
-    this.#resume = true;
-    this.#set(false);
-  }
-
-  #wake() {
-    if (!this.#resume || this.#hidden() || this.#videoPlaying()) return;
-    this.#resume = false;
-    this.#set(true);
-  }
-
+  /** Start the interval on the slide on show, unless paused or held. */
   #arm() {
-    clearTimeout(this.#timer);
-    const run = ++this.#run;
+    this.#stop();
+    if (!this.playing || this.#held()) return;
+    const run = this.#run;
     const interval = this.#options?.interval ?? 5000;
     this.#timer = setTimeout(async () => {
       const controller = this.#viewer.controller();
       const state = controller?.state;
-      if (!state || state.status !== "open" || state.index === null) return;
+      // Still opening: another interval.
+      if (!state || state.status !== "open" || state.index === null) return this.#arm();
       const { index, count } = state;
       const loop = this.#options?.loop ?? this.#viewer.loops();
       const next = index + 1 < count ? index + 1 : loop && count > 1 ? 0 : null;
@@ -137,47 +123,45 @@ export class ViewerSlideshow {
       if (run !== this.#run) return;
       await controller.goTo({ index: next }, { reason: "slideshow" });
       // A move a listener prevented, or one that settled nowhere new, waits another interval.
-      if (run === this.#run && this.#playing) this.#arm();
+      if (run === this.#run) this.#arm();
     }, interval);
   }
 
+  #stop() {
+    clearTimeout(this.#timer);
+    this.#timer = undefined;
+    this.#run += 1;
+  }
+
+  /** A hidden tab, or a video playing in the slide on show. */
+  #held() {
+    const slide = this.#viewer.slide();
+    return (
+      this.#viewer.dialog.ownerDocument.visibilityState === "hidden" ||
+      (!!slide && [...slide.querySelectorAll("video")].some((video) => !video.paused))
+    );
+  }
+
+  /** Hold and release as the tab hides and shows, and as a video in the slide plays and stops. */
   #watch() {
     if (this.#watching) return;
     const watching = (this.#watching = new AbortController());
     const { signal } = watching;
-    const ownerDocument = this.#viewer.dialog.ownerDocument;
-    ownerDocument.addEventListener(
-      "visibilitychange",
-      () => {
-        if (!this.#hidden()) this.#wake();
-        else if (this.#playing) this.#suspend();
-      },
-      { signal },
-    );
-    // Media events don't bubble, so the dialog catches them on their way down.
-    const media = (event: Event) => {
-      const slide = this.#viewer.slide();
-      if (!(event.target instanceof HTMLVideoElement) || !slide?.contains(event.target)) return;
-      if (event.type === "play") {
-        if (this.#playing) this.#suspend();
-      } else this.#wake();
+    // A hold stops the interval; its end starts it again.
+    const check = () => {
+      if (this.#held()) this.#stop();
+      else if (!this.#timer) this.#arm();
     };
+    this.#viewer.dialog.ownerDocument.addEventListener("visibilitychange", check, { signal });
+    // Media events don't bubble, so the dialog catches them on their way down.
     for (const type of ["play", "pause", "ended"]) {
-      this.#viewer.dialog.addEventListener(type, media, { capture: true, signal });
+      this.#viewer.dialog.addEventListener(
+        type,
+        (event) => {
+          if (this.#viewer.slide()?.contains(event.target as Node)) check();
+        },
+        { capture: true, signal },
+      );
     }
-  }
-
-  #unwatch() {
-    this.#watching?.abort();
-    this.#watching = undefined;
-  }
-
-  #hidden() {
-    return this.#viewer.dialog.ownerDocument.visibilityState === "hidden";
-  }
-
-  #videoPlaying() {
-    const slide = this.#viewer.slide();
-    return !!slide && [...slide.querySelectorAll("video")].some((video) => !video.paused);
   }
 }

@@ -431,7 +431,7 @@ export class DomViewerDriver<
     const on = this.#isFullscreen();
     if (!on) this.#actions?.raiseAgain(this.#portal.overlay);
     this.#portal.overlay.toggleAttribute("data-fullscreen", on);
-    this.#controller?.fullscreenChanged?.(on);
+    this.#controller?.changed?.();
   };
 
   /** The controls marked `name` in the viewer, default or your own. */
@@ -524,6 +524,7 @@ export class DomViewerDriver<
 
   /** Draw the portal layer again, as after its controls or content changed. */
   setPortal(layer: FluidboxViewerLayer | undefined) {
+    this.#slideshow.options = layer?.slideshow;
     this.#portalDispose?.();
     this.#portalDispose = layer
       ? drawViewerLayer(layer, this.#portal.portalTarget, this.#lifetime.signal)
@@ -639,9 +640,14 @@ export class DomViewerDriver<
     for (const listener of this.#interactions) listener(event);
   }
 
-  /** The slideshow's interval, loop and autoplay. */
-  setSlideshow(options: FluidboxOptions["slideshow"]) {
-    this.#slideshow.options = options;
+  /** Whether the viewer is the document's fullscreen element. */
+  get fullscreen() {
+    return this.#isFullscreen();
+  }
+
+  /** Whether the slideshow plays, held or not. */
+  get playing() {
+    return this.#slideshow.playing;
   }
 
   /** Start the slideshow on the open viewer. */

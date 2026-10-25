@@ -199,7 +199,9 @@ test.describe("slideshow", () => {
       expect(await playing(page)).toBe(false);
     });
 
-    test("while the tab is hidden, and plays again as it comes back", async ({ page }) => {
+    test("while the tab is hidden, holding it, and starts the interval again as it comes back", async ({
+      page,
+    }) => {
       await load(page);
       await open(page);
       await play(page);
@@ -208,13 +210,17 @@ test.describe("slideshow", () => {
           Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
           document.dispatchEvent(new Event("visibilitychange"));
         }, state);
+      await tick(page, 4000);
       await visibility("hidden");
-      expect(await playing(page)).toBe(false);
+      // A hold, not a pause: it still plays, and the control still says Pause.
+      expect(await playing(page)).toBe(true);
+      await expect(page.locator(control)).toHaveText("Pause slideshow");
       await tick(page, 20_000);
       expect(await value(page)).toBe("one");
       await visibility("visible");
-      expect(await playing(page)).toBe(true);
-      await tick(page);
+      await tick(page, 4500);
+      expect(await value(page)).toBe("one");
+      await tick(page, 600);
       await expect.poll(() => value(page)).toBe("two");
 
       // A pause of the person's own sticks when the tab comes back.
@@ -222,25 +228,41 @@ test.describe("slideshow", () => {
       await visibility("hidden");
       await visibility("visible");
       expect(await playing(page)).toBe(false);
+      await tick(page, 20_000);
+      expect(await value(page)).toBe("two");
     });
 
-    test("while a video in the slide plays, and plays again as it ends", async ({ page }) => {
+    test("while a video in the slide plays, holding it until the video ends", async ({ page }) => {
       await load(page, "?video");
       await open(page, "clip");
       await play(page);
       const video = page.locator(`${dialog} [data-fluidbox-slide][data-active] video`);
       await video.evaluate((video: HTMLVideoElement) => video.play());
-      await expect.poll(() => playing(page)).toBe(false);
       await tick(page, 20_000);
       expect(await value(page)).toBe("clip");
+      expect(await playing(page)).toBe(true);
+      await expect(page.locator(control)).toHaveText("Pause slideshow");
       // It ends.
       await video.evaluate(async (video: HTMLVideoElement) => {
         video.currentTime = Math.max(0, video.duration - 0.1);
         await new Promise((resolve) => video.addEventListener("ended", resolve, { once: true }));
       });
-      await expect.poll(() => playing(page)).toBe(true);
       await tick(page);
       await expect.poll(() => value(page)).toBe("three");
+    });
+
+    test("for good when the control is pressed during a video", async ({ page }) => {
+      await load(page, "?video");
+      await open(page, "clip");
+      await play(page);
+      const video = page.locator(`${dialog} [data-fluidbox-slide][data-active] video`);
+      await video.evaluate((video: HTMLVideoElement) => video.play());
+      await page.locator(control).evaluate((button: HTMLElement) => button.click());
+      await expect.poll(() => playing(page)).toBe(false);
+      await expect(page.locator(control)).toHaveText("Play slideshow");
+      await video.evaluate((video: HTMLVideoElement) => video.pause());
+      await tick(page, 20_000);
+      expect(await value(page)).toBe("clip");
     });
   });
 

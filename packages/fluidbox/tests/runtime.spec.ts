@@ -69,7 +69,8 @@ class TestDriver {
   setZoom() {}
   setLoop() {}
   setGestures() {}
-  setSlideshow() {}
+  playing = false;
+  fullscreen = false;
   play() {}
   pause() {}
   setFullscreen() {

@@ -96,7 +96,11 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
   ),
   slideshow: {
     attribute: "data-fluidbox-slideshow",
-    label: (labels, state) => (state?.playing ? labels.pauseSlideshow : labels.playSlideshow),
+    // The defaults live here, so only a page with the control carries them.
+    label: (labels, state) =>
+      state?.playing
+        ? (labels.pauseSlideshow ?? "Pause slideshow")
+        : (labels.playSlideshow ?? "Play slideshow"),
     disabled: closed,
     hidden: (fluidbox) => !hostOf(fluidbox).slideshow(),
     active: (state) => state.playing,

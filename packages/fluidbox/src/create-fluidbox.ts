@@ -19,7 +19,6 @@ import {
   type FluidboxOverlayOptions,
   type FluidboxReason,
   type FluidboxSheet,
-  type FluidboxSlideshowOptions,
   type FluidboxState,
   type FluidboxStatus,
   type FluidboxTarget,
@@ -130,7 +129,7 @@ function sameOptions(a: unknown, b: unknown): boolean {
 
 type Settings<TItem extends FluidboxItem> = Pick<
   FluidboxOptions<TItem>,
-  "controls" | "icons" | "viewer" | "thumbnails" | "sheet"
+  "controls" | "icons" | "viewer" | "thumbnails" | "sheet" | "slideshow"
 >;
 
 /**
@@ -197,13 +196,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** The scale the zoom last rested at, and the item it belongs to. */
   #zoomScale = 1;
   #zoomId: string | null = null;
-  /** Whether the viewer is the document's fullscreen element, as it last said. */
-  #fullscreen = false;
   #gestures: Pick<FluidboxOptions, "dismiss" | "wheel">;
   #shareUrl: FluidboxOptions<TItem>["shareUrl"];
-  #slideshow: FluidboxSlideshowOptions | undefined;
-  /** Whether the slideshow advances, as the viewer last said. */
-  #playing = false;
   readonly [hostKey]: FluidboxHost;
 
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
@@ -214,15 +208,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       : undefined;
     this.#source = toSource(this.#list);
     this.#labels = { ...resolveLabels(options.labels) };
-    const { sheet, thumbnails, controls, icons, viewer } = options;
-    this.#settings = { sheet, thumbnails, controls, icons, viewer };
+    const { sheet, thumbnails, controls, icons, viewer, slideshow } = options;
+    this.#settings = { sheet, thumbnails, controls, icons, viewer, slideshow };
     this.#origins = new OriginRegistry(this.#triggerAdapter(options));
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
     this.#slides = options.slides;
     this.#gestures = { dismiss: options.dismiss, wheel: options.wheel };
     this.#shareUrl = options.shareUrl;
-    this.#slideshow = options.slideshow;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
     this.#makeAddons();
@@ -247,7 +240,6 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #attach(viewer: FluidboxRuntimeDriver<TItem>) {
     viewer.setLoop(this.#loop);
     viewer.setGestures(this.#gestures);
-    viewer.setSlideshow(this.#slideshow);
     viewer.setSource(this.#source);
     viewer.connect(this.#controls, this.#portal(), this.#extensions());
     for (const overlay of this.#overlays) {
@@ -317,12 +309,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   /** The viewer's layer: the default controls, then your viewer content. */
   #portal(): FluidboxViewerLayer {
-    const { controls, icons, viewer } = this.#settings;
+    const { controls, icons, viewer, slideshow } = this.#settings;
     // The defaults until you draw your own viewer, and Close after, until it
     // draws its own: the one way out a screen reader's touch can count on.
     const shown = controls ?? (viewer ? (["close"] as const) : true);
     const names = shown === true ? defaultControls : shown || [];
-    return { fluidbox: this, controls: names, viewer, labels: this.#labels, icons };
+    return { fluidbox: this, controls: names, viewer, labels: this.#labels, icons, slideshow };
   }
 
   /** What the viewer and its add-ons drive this fluidbox with. */
@@ -344,16 +336,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         const next = this.#zoomFor(status, index, item);
         if (next?.max !== zoom?.max || !next !== !zoom) this.#publish(status, index);
       },
-      fullscreenChanged: (on) => {
-        if (on === this.#fullscreen) return;
-        this.#fullscreen = on;
-        this.#publish(this.#state.status, this.#state.index);
-      },
-      playingChanged: (on) => {
-        if (on === this.#playing) return;
-        this.#playing = on;
-        this.#publish(this.#state.status, this.#state.index);
-      },
+      changed: () => this.#publish(this.#state.status, this.#state.index),
       mediaError: (event) => void this.dispatchEvent(event),
     };
   }
@@ -411,16 +394,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       viewer: has("viewer") ? options.viewer : previous.viewer,
       thumbnails: has("thumbnails") ? options.thumbnails : previous.thumbnails,
       sheet: has("sheet") ? options.sheet : previous.sheet,
+      slideshow: has("slideshow") ? options.slideshow : previous.slideshow,
     };
     this.#settings = next;
     if (has("preload")) this.#setPreload(options.preload);
     if (has("shareUrl")) this.#shareUrl = options.shareUrl;
-    if (has("slideshow") && !sameOptions(options.slideshow, this.#slideshow)) {
-      this.#slideshow = options.slideshow;
-      this.#viewer?.setSlideshow(options.slideshow);
-      // The Slideshow control may show or hide.
-      this.#publish(this.#state.status, this.#state.index);
-    }
     if (has("dismiss") || has("wheel")) {
       this.#gestures = {
         dismiss: has("dismiss") ? options.dismiss : this.#gestures.dismiss,
@@ -445,22 +423,26 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     }
     let relabeled = false;
     if (has("labels")) {
-      const labels = resolveLabels(options.labels);
-      relabeled = Object.entries(labels).some(
-        ([key, value]) => this.#labels[key as keyof FluidboxLabels] !== value,
-      );
-      if (relabeled) {
-        Object.assign(this.#labels, labels);
-        this.#viewer?.relabel();
+      const labels = resolveLabels(options.labels) as unknown as Record<string, unknown>;
+      const own = this.#labels as unknown as Record<string, unknown>;
+      // Both sides' keys, so a label without a default goes back to its fallback.
+      for (const key in { ...own, ...labels }) {
+        if (own[key] === labels[key]) continue;
+        own[key] = labels[key];
+        relabeled = true;
       }
+      if (relabeled) this.#viewer?.relabel();
     }
     if (
       relabeled ||
       !sameOptions(next.controls, previous.controls) ||
       !sameOptions(next.icons, previous.icons) ||
+      !sameOptions(next.slideshow, previous.slideshow) ||
       next.viewer !== previous.viewer
     ) {
       this.#viewer?.setPortal(this.#portal());
+      // The Slideshow control may show or hide.
+      this.#publish(this.#state.status, this.#state.index);
     }
     if (
       !sameOptions(next.thumbnails, previous.thumbnails) ||
@@ -566,7 +548,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   setFullscreen(on?: boolean) {
-    return this.#onShow((viewer) => viewer.setFullscreen(on ?? !this.#fullscreen));
+    return this.#onShow((viewer) => viewer.setFullscreen(on ?? !this.#state.fullscreen));
   }
 
   download() {
@@ -581,9 +563,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   play() {
     // An opening viewer may still be loading; it plays once it has, unless it closed.
-    if (this.#state.status === "closed") return;
-    if (this.#viewer) this.#viewer.play();
-    else void this.#loadViewer().then((viewer) => viewer?.play());
+    if (this.#state.status !== "closed") void this.#loadViewer().then((viewer) => viewer?.play());
   }
 
   pause() {
@@ -884,7 +864,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         this.#command(name, target, reason === "items" ? "api" : reason),
       takeOver: (value) => this.#command("open", value, "api", { instant: true }),
       shareLink: (item) => this.#shareLink(item as TItem),
-      slideshow: () => !!this.#slideshow,
+      slideshow: () => !!this.#settings.slideshow,
       retry: () => Promise.resolve(this.#state.status === "open" && !!this.#viewer?.retry()),
       labels: this.#labels,
       zoom: (name, reason) =>
@@ -1454,8 +1434,6 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   #stateFor(status: FluidboxStatus, index: number | null): FluidboxState<TItem> {
     const item = index === null ? null : this.#source.getItem(index);
-    // Closing stops the slideshow.
-    if (status === "closing" || status === "closed") this.#playing = false;
     return Object.freeze({
       status,
       value: item ? idOf(item) : null,
@@ -1465,8 +1443,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       hasPrevious: index !== null && (index > 0 || this.#loops),
       hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
       zoom: this.#zoomFor(status, index, item),
-      fullscreen: this.#fullscreen,
-      playing: this.#playing,
+      fullscreen: !!this.#viewer?.fullscreen,
+      // Closing stops it, before the viewer says so.
+      playing: status === "open" && !!this.#viewer?.playing,
     });
   }
 
