@@ -77,6 +77,9 @@ type DrawnItem = FluidboxImageItem | FluidboxVideoItem | FluidboxIframeItem;
 /** Item types without a slide, warned about once. */
 const unknownTypes = new Set<string>();
 
+/** Image files whose shape differs from their item's width and height, warned about once. */
+const misshapen = new Set<string>();
+
 const builtIn = (type: string): type is DrawnItem["type"] =>
   type === "image" || type === "video" || type === "iframe";
 
@@ -1828,6 +1831,30 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     if (slide.imageVersion !== version) return;
     delete image.dataset.fluidboxImagePending;
+    // The viewer frames an image by its item's width and height before it loads. A file of
+    // another shape letterboxes inside that frame, and the close lands on its thumbnail
+    // askew, so a shop feed with wrong sizes is worth hearing about.
+    try {
+      if (process.env.NODE_ENV !== "production") {
+        const drawn = slide.drawn;
+        const file = image.currentSrc || image.src;
+        if (
+          drawn?.type === "image" &&
+          drawn.width &&
+          drawn.height &&
+          image.naturalWidth &&
+          image.naturalHeight &&
+          !misshapen.has(file) &&
+          Math.abs(image.naturalWidth / image.naturalHeight / (drawn.width / drawn.height) - 1) >
+            0.02
+        ) {
+          misshapen.add(file);
+          console.warn(
+            `Fluidbox: ${itemLabel(drawn)} declares ${drawn.width}×${drawn.height}, but ${file} is ${image.naturalWidth}×${image.naturalHeight}. The viewer frames the declared shape, so the image letterboxes and its close lands off the thumbnail. Give the item the file's width and height.`,
+          );
+        }
+      }
+    } catch {}
     if (slide.fullApplied) {
       this.#showError(slide, false);
       this.#busy(slide, false);

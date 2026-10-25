@@ -52,6 +52,49 @@ async function open(page: Page, grid: string, id: string) {
   await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
 }
 
+test("an image whose file has another shape than its item declares warns once in development", async ({
+  page,
+}) => {
+  const warnings = await load(page);
+  const misshapen = (items: string[]) => items.filter((text) => text.includes("declares"));
+  await page.evaluate(async () => {
+    const { fluidbox } = window.slidesFixture;
+    // A 16:9 file declared square, and one declared at its own shape.
+    await fluidbox.setItems([
+      {
+        type: "image",
+        id: "square",
+        src: "/photos/1016.webp",
+        alt: "Canyon",
+        width: 800,
+        height: 800,
+      },
+      {
+        type: "image",
+        id: "true",
+        src: "/photos/1016-1280.webp",
+        alt: "Canyon",
+        width: 1280,
+        height: 720,
+      },
+    ]);
+    await fluidbox.open("square");
+  });
+  await expect
+    .poll(() => misshapen(warnings))
+    .toEqual([
+      expect.stringMatching(/Canyon declares 800×800, but \S*\/photos\/1016\.webp is 1920×1080/),
+    ]);
+  // The one declared at its own shape doesn't warn.
+  await page.evaluate(() => window.slidesFixture.fluidbox.next());
+  await expect(page.locator(`${shown} img`).first()).toHaveJSProperty("complete", true);
+  await page.waitForTimeout(200);
+  // Back to the misshapen one: still one warning.
+  await page.evaluate(() => window.slidesFixture.fluidbox.previous());
+  await page.waitForTimeout(200);
+  expect(misshapen(warnings)).toHaveLength(1);
+});
+
 test("a slide of your own draws the built-in image into its box", async ({ page }) => {
   await load(page);
   await open(page, "#slides", "product");
