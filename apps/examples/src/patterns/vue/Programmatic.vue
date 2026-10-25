@@ -2,19 +2,22 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { itemLabel } from "@ogdakke/fluidbox";
-import { Fluidbox, type FluidboxValueChangeEvent } from "@ogdakke/fluidbox/vue";
+import {
+  Fluidbox,
+  type FluidboxValue,
+  type FluidboxValueChangeDetails,
+} from "@ogdakke/fluidbox/vue";
 import { photos } from "../shared";
 
 const locked = ref(false);
 const log = ref<string[]>([]);
-
 const record = (type: string) => {
   log.value = [...log.value, type].slice(-20);
 };
 
-// beforevaluechange comes before every open, move and close; canceling a move keeps the viewer still.
-function onBeforeValueChange(event: FluidboxValueChangeEvent) {
-  if (locked.value && event.action === "move") event.preventDefault();
+// Called before every open, move and close; canceling a move keeps the viewer still.
+function onValueChange(_: FluidboxValue, details: FluidboxValueChangeDetails) {
+  if (locked.value && details.action === "move") details.cancel();
   record("valuechange");
 }
 </script>
@@ -23,8 +26,8 @@ function onBeforeValueChange(event: FluidboxValueChangeEvent) {
   <Fluidbox.Root
     v-slot="{ status, index, open }"
     :items="photos"
-    @beforevaluechange="onBeforeValueChange"
-    @valuechangecomplete="record('valuechangecomplete')"
+    @update:model-value="onValueChange"
+    @value-change-complete="record('valuechangecomplete')"
   >
     <div class="pattern-toolbar">
       <button type="button" data-test="open-third" @click="open(2)">Open the third photo</button>
@@ -37,7 +40,7 @@ function onBeforeValueChange(event: FluidboxValueChangeEvent) {
       <Fluidbox.Trigger
         v-for="photo in photos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >

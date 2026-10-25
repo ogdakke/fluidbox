@@ -218,7 +218,10 @@ test("the parts draw the viewer's controls, caption and error, with labels as te
   const error = page.locator(`${dialog} [data-test="error"]`);
   await expect(error).toHaveText(/broken didn't load\./);
   await expect.poll(() => page.evaluate(() => window.vueSlides.mediaErrors())).toBe(1);
-  await error.locator('[data-test="retry"]').click();
+  // The fixture leaves the parts unstyled, so the button may sit outside the view.
+  await error
+    .locator('[data-test="retry"]')
+    .evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => page.evaluate(() => window.vueSlides.mediaErrors())).toBe(2);
   await expect(error.locator('[data-test="retry"]')).toHaveText("Retry");
 });

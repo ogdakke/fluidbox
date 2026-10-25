@@ -7,19 +7,18 @@ import { album } from "../shared";
 
 <template>
   <Fluidbox.Root :items="album">
-    <!-- The cover opens the first photo; every album item closes back onto it. -->
+    <!-- The first item opens; every album item closes back onto this trigger. -->
     <Fluidbox.Trigger
       v-slot="{ item }"
-      :item="album[0]"
-      :returns="album"
+      :value="album"
       class="pattern-thumb pattern-album"
       data-test="trigger"
     >
-      <!-- Shows the item the viewer last showed. -->
+      <!-- Shows the item the viewer last showed. Keep the img mounted. -->
       <img :src="item?.src" :alt="item ? itemLabel(item) : ''" data-test="preview" />
-      <Fluidbox.ThumbnailOverlay travel class="pattern-overlay" data-test="count">
+      <Fluidbox.Overlay flight="live" class="pattern-overlay" data-test="count">
         +{{ album.length - 1 }}
-      </Fluidbox.ThumbnailOverlay>
+      </Fluidbox.Overlay>
     </Fluidbox.Trigger>
   </Fluidbox.Root>
 </template>

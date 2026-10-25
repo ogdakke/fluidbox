@@ -12,7 +12,7 @@ import { photos, thumbnailSrc, zoomPhotos } from "../shared";
       <Fluidbox.Trigger
         v-for="photo in zoomPhotos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >
@@ -21,7 +21,8 @@ import { photos, thumbnailSrc, zoomPhotos } from "../shared";
     </div>
     <Fluidbox.Viewer>
       <!-- Previous, Next and Close, then Zoom in, Zoom out and Fit. -->
-      <Fluidbox.Controls zoom />
+      <Fluidbox.Toolbar />
+      <Fluidbox.ZoomControls />
       <!-- The zoom the image on show rests at, from the viewer's state. -->
       <output class="pattern-zoom-level" data-test="zoom-level">
         {{ fluidbox.zoom ? `${Math.round(fluidbox.zoom.scale * 100)}%` : "" }}
@@ -34,7 +35,7 @@ import { photos, thumbnailSrc, zoomPhotos } from "../shared";
       <Fluidbox.Trigger
         v-for="photo in photos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >
