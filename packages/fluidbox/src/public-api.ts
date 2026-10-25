@@ -209,6 +209,18 @@ export interface FluidboxItemList<TItem extends FluidboxItem = FluidboxItem> {
   indexOf?(id: string): number;
 }
 
+/** A list `createItemList` makes. */
+export interface FluidboxLazyItemList<
+  TItem extends FluidboxItem = FluidboxItem,
+> extends FluidboxItemList<TItem> {
+  indexOf(id: string): number;
+  /**
+   * The same list with another count: it makes items with the same `item` and
+   * `index`, and keeps the items already made. Pass it to `setItems` to grow.
+   */
+  withCount(count: number): FluidboxLazyItemList<TItem>;
+}
+
 /** What `createItemList` makes a list from. */
 export interface FluidboxItemListOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly count: number;
@@ -630,6 +642,23 @@ export class FluidboxMediaErrorEvent<TItem extends FluidboxItem = FluidboxItem> 
   }
 }
 
+// The item type keeps it in step with the other events, which carry the item.
+/** The open item came within `reachEndThreshold` of the last: time to load more. */
+export class FluidboxReachEndEvent<_TItem extends FluidboxItem = FluidboxItem> extends Event {
+  // Declared, as the constructor sets them: a field would cost bytes in every entry.
+  declare readonly value: string;
+  declare readonly index: number;
+  /** The item count it fired for. It fires once per count. */
+  declare readonly count: number;
+
+  constructor(type: "reachend", init: EventInit & { value: string; index: number; count: number }) {
+    super(type, init);
+    this.value = init.value;
+    this.index = init.index;
+    this.count = init.count;
+  }
+}
+
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   /** Before an open, a move or a close. Cancelable: the command resolves false. */
   beforevaluechange: FluidboxValueChangeEvent<TItem>;
@@ -643,6 +672,8 @@ export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   zoomchange: FluidboxZoomEvent;
   /** A slide's media failed, or a zoom image did. */
   mediaerror: FluidboxMediaErrorEvent<TItem>;
+  /** The open item came within `reachEndThreshold` of the last. Never fires with `loop`. */
+  reachend: FluidboxReachEndEvent<TItem>;
 }
 
 // Add-ons. Each needs its entry imported once: `import "@ogdakke/fluidbox/sheet"`.
@@ -817,6 +848,12 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly wheel?: "dismiss" | "zoom" | "navigate" | "none";
   /** The link Share shares for an item. Without one, Share hides. */
   readonly shareUrl?: (item: TItem) => string | undefined;
+  /**
+   * How near the end `reachend` fires: when the open item is this many items
+   * from the last, or nearer.
+   * @default 2
+   */
+  readonly reachEndThreshold?: number;
 }
 
 /**
@@ -836,7 +873,8 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
     | "preload"
     | "dismiss"
     | "wheel"
-    | "shareUrl"]?: FluidboxOptions<TItem>[K] | undefined;
+    | "shareUrl"
+    | "reachEndThreshold"]?: FluidboxOptions<TItem>[K] | undefined;
 };
 
 export interface FluidboxCommandOptions {

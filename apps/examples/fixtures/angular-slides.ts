@@ -13,6 +13,7 @@ import type {
   FluidboxCustomItemBase,
   FluidboxImageItem,
   FluidboxItem,
+  FluidboxReachEndEvent,
   FluidboxSlideOrigin,
 } from "@ogdakke/fluidbox";
 import { FluidboxModule, injectFluidboxSlide } from "@ogdakke/fluidbox/angular";
@@ -65,7 +66,9 @@ const fixture = {
   /** The items of the held viewer, which the test can change. */
   setHeldItems: undefined as ((items: FluidboxItem[]) => void) | undefined,
 };
-Object.assign(window, { angularSlides: fixture });
+/** Each reachend the growing gallery heard: its value, index and count. */
+const reachEnds: [string, number, number][] = [];
+Object.assign(window, { angularSlides: fixture, reachEnds });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -76,6 +79,15 @@ const photo = (id: string, src: string): FluidboxImageItem => ({
   height: 800,
 });
 const photos = [photo("one", "/photo-square.svg"), photo("two", "/photo-portrait.svg")];
+
+/** The first `count` photos of a gallery that grows, the same objects each time. */
+const grown: FluidboxImageItem[] = [];
+const growing = (count: number) => {
+  for (let index = grown.length; index < count; index++) {
+    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
+  }
+  return grown.slice(0, count);
+};
 
 /** A viewer of parts: the second photo's file is missing. */
 const parted: FluidboxImageItem[] = [
@@ -253,6 +265,10 @@ class Reel implements OnInit {
         </ng-template>
       </ng-template>
     </div>
+    <h2>A gallery that grows as the viewer nears its end</h2>
+    <div fluidboxRoot [items]="growing()" reachEndThreshold="1" (reachEnd)="grow($event)">
+      <app-grid [items]="growing()" id="growing" />
+    </div>
     <h2>A slide that holds the open</h2>
     <div fluidboxRoot [items]="held()">
       <app-grid [items]="held()" id="held" />
@@ -291,8 +307,16 @@ class Slides {
   readonly reels = reels;
   readonly held = signal<FluidboxItem[]>([custom("held", "held-a"), custom("held", "held-b")]);
 
+  readonly growing = signal(growing(4));
+
   constructor() {
     fixture.setHeldItems = (items) => this.held.set(items);
+  }
+
+  /** Append four photos as the viewer nears the end. */
+  grow({ value, index, count }: FluidboxReachEndEvent): void {
+    reachEnds.push([value, index, count]);
+    this.growing.set(growing(count + 4));
   }
 }
 

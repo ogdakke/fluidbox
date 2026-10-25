@@ -52,7 +52,9 @@ const fixture = {
   /** The controlled value of the model viewer, which the test can set. */
   setModelValue: undefined as ((value: string | null) => void) | undefined,
 };
-Object.assign(window, { reactSlides: fixture });
+/** Each reachend the growing gallery heard: its value, index and count. */
+const reachEnds: [string, number, number][] = [];
+Object.assign(window, { reactSlides: fixture, reachEnds });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -177,6 +179,32 @@ function ControlledModel() {
   );
 }
 
+/** The first `count` photos of a gallery that grows, the same objects each time. */
+const grown: FluidboxImageItem[] = [];
+const growing = (count: number) => {
+  for (let index = grown.length; index < count; index++) {
+    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
+  }
+  return grown.slice(0, count);
+};
+
+/** A gallery that appends four photos each time the viewer nears its end. */
+function Growing() {
+  const [items, setItems] = useState(() => growing(4));
+  return (
+    <Fluidbox.Root
+      items={items}
+      reachEndThreshold={1}
+      onReachEnd={({ value, index, count }) => {
+        reachEnds.push([value, index, count]);
+        setItems(growing(count + 4));
+      }}
+    >
+      <Grid items={items} id="growing" />
+    </Fluidbox.Root>
+  );
+}
+
 function App() {
   return (
     <>
@@ -222,6 +250,8 @@ function App() {
         </div>
         <Fluidbox.Slides reel={() => <Reel />} />
       </Fluidbox.Root>
+      <h2>A gallery that grows as the viewer nears its end</h2>
+      <Growing />
       <h2>A live 3D model card, with the value in the page's state</h2>
       <ControlledModel />
       <p className="fb-muted">

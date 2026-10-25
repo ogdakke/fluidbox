@@ -67,7 +67,9 @@ const fixture = {
   /** How many times each slide reported mounting its content. */
   mounted: {} as Record<string, number>,
 };
-Object.assign(window, { solidSlides: fixture });
+/** Each reachend the growing gallery heard: its value, index and count. */
+const reachEnds: [string, number, number][] = [];
+Object.assign(window, { solidSlides: fixture, reachEnds });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -220,6 +222,32 @@ function HeldViewer() {
   );
 }
 
+/** The first `count` photos of a gallery that grows, the same objects each time. */
+const grown: FluidboxImageItem[] = [];
+const growing = (count: number) => {
+  for (let index = grown.length; index < count; index++) {
+    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
+  }
+  return grown.slice(0, count);
+};
+
+/** A gallery that appends four photos each time the viewer nears its end. */
+function Growing() {
+  const [items, setItems] = createSignal(growing(4));
+  return (
+    <Fluidbox.Root
+      items={items()}
+      reachEndThreshold={1}
+      onReachEnd={({ value, index, count }) => {
+        reachEnds.push([value, index, count]);
+        setItems(growing(count + 4));
+      }}
+    >
+      <Grid items={items()} id="growing" />
+    </Fluidbox.Root>
+  );
+}
+
 function App() {
   return (
     <>
@@ -241,6 +269,8 @@ function App() {
         <Grid items={[custom("fetched", "fetched")]} id="fetched" />
         <Fluidbox.Slides fetched={() => <Fetched />} />
       </Fluidbox.Root>
+      <h2>A gallery that grows as the viewer nears its end</h2>
+      <Growing />
       <h2>A controlled value</h2>
       <ControlledViewer />
       <h2>Thumbnails that switch between yours and the default ones</h2>

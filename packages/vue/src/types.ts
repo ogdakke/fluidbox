@@ -84,6 +84,8 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly wheel?: FluidboxOptions<TItem>["wheel"];
   /** The link Share shares for an item. @default the `href` of its id */
   readonly shareUrl?: FluidboxOptions<TItem>["shareUrl"];
+  /** How near the end `@reach-end` fires. @default 2 */
+  readonly reachEndThreshold?: number;
 }
 
 export interface FluidboxTriggerProps<TItem extends FluidboxItem = FluidboxItem> {

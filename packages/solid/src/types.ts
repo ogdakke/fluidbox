@@ -7,6 +7,7 @@ import type {
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxOptions,
   FluidboxPlaybackSource,
   FluidboxSheetEvent,
@@ -100,6 +101,10 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly onZoomChange?: (event: FluidboxZoomEvent) => void;
   /** When a slide's media fails to load, as it shows its error. */
   readonly onMediaError?: (event: FluidboxMediaErrorEvent<TItem>) => void;
+  /** How near the end `onReachEnd` fires. @default 2 */
+  readonly reachEndThreshold?: number;
+  /** When the open item comes within `reachEndThreshold` of the last, once per count: load more. */
+  readonly onReachEnd?: (event: FluidboxReachEndEvent<TItem>) => void;
   readonly children?: JSX.Element;
 }
 

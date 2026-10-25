@@ -6,6 +6,7 @@ import type { DomViewerDriver } from "./dom-viewer-driver";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 import { OriginRegistry } from "./origin-registry";
 import {
+  FluidboxReachEndEvent,
   FluidboxValueChangeEvent,
   type Fluidbox,
   type FluidboxBindOptions,
@@ -198,6 +199,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #fullscreen = false;
   #gestures: Pick<FluidboxOptions, "dismiss" | "wheel">;
   #shareUrl: FluidboxOptions<TItem>["shareUrl"];
+  #reachEndThreshold: number;
+  /** The count `reachend` last fired for. It fires once per count. */
+  #reachedCount = -1;
   readonly [hostKey]: FluidboxHost;
 
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
@@ -216,6 +220,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#slides = options.slides;
     this.#gestures = { dismiss: options.dismiss, wheel: options.wheel };
     this.#shareUrl = options.shareUrl;
+    this.#reachEndThreshold = options.reachEndThreshold ?? 2;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
     this.#makeAddons();
@@ -402,6 +407,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#settings = next;
     if (has("preload")) this.#setPreload(options.preload);
     if (has("shareUrl")) this.#shareUrl = options.shareUrl;
+    if (has("reachEndThreshold")) this.#reachEndThreshold = options.reachEndThreshold ?? 2;
     if (has("dismiss") || has("wheel")) {
       this.#gestures = {
         dismiss: has("dismiss") ? options.dismiss : this.#gestures.dismiss,
@@ -1033,7 +1039,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       this.#before(value, index, "source-update", false);
     }
     this.#publish(status, index);
-    if (status !== "closed") this.#announce(value, "source-update");
+    if (status !== "closed") {
+      this.#announce(value, "source-update");
+      // New items re-arm it: a longer list may put the open item near its end again.
+      this.#reachEnd();
+    }
 
     if (status === "closed") return Promise.resolve(completed(changed));
     return this.#reconcileSelection(index, changed, previousId);
@@ -1340,6 +1350,24 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#announced = value;
     const index = value === null ? null : this.#state.index;
     this.dispatchEvent(this.#valueEvent("valuechange", value, previousValue, index, reason));
+    this.#reachEnd();
+  }
+
+  /** Fire `reachend` once per count, as the open item comes within the threshold of the end. */
+  #reachEnd() {
+    const { value, index } = this.#state;
+    const count = this.#source.count;
+    if (
+      this.#loop ||
+      value === null ||
+      index === null ||
+      count === this.#reachedCount ||
+      index < count - 1 - this.#reachEndThreshold
+    ) {
+      return;
+    }
+    this.#reachedCount = count;
+    this.dispatchEvent(new FluidboxReachEndEvent("reachend", { value, index, count }));
   }
 
   /** Fire `valuechangecomplete` once the motion to `value` settled. */

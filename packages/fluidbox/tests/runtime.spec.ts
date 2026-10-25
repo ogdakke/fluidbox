@@ -6,8 +6,11 @@ import {
   type FluidboxRuntimeDriver,
 } from "../src/create-fluidbox";
 import { hostOf } from "../src/host";
+import { createItemList } from "../src/items";
 import type {
+  FluidboxImageItem,
   FluidboxItem,
+  FluidboxReachEndEvent,
   FluidboxValueChangeEvent,
   FluidboxZoomEvent,
   FluidboxOptions,
@@ -688,5 +691,92 @@ describe("zoom", () => {
     fluidbox.destroy();
     await expect(fluidbox.zoomIn()).resolves.toBe(false);
     expect(driver.zooms).toEqual([]);
+  });
+});
+
+describe("reachend", () => {
+  const photo = (index: number): FluidboxImageItem => ({
+    type: "image",
+    id: `photo-${index}`,
+    src: `/photos/${index}.jpg`,
+    alt: `Photo ${index + 1}`,
+    width: 4,
+    height: 3,
+  });
+
+  /** A fluidbox over a lazy list whose motions finish at once, and the reachend events it fires. */
+  function lazy(count: number, options: Partial<FluidboxOptions<FluidboxImageItem>> = {}) {
+    const list = createItemList({ count, item: photo, index: (id) => Number(id.slice(6)) });
+    const driver = new TestDriver();
+    const step = driver.steps.push.bind(driver.steps);
+    // Every motion lands at once.
+    driver.steps.push = (...steps) => {
+      for (const deferred of steps) deferred.resolve();
+      return step(...steps);
+    };
+    const fluidbox = new FluidboxRuntime<FluidboxImageItem>(
+      { items: list, ...options },
+      driver as unknown as FluidboxRuntimeDriver<FluidboxImageItem>,
+    );
+    const reached: Array<[string, number, number]> = [];
+    fluidbox.addEventListener("reachend", (event) => {
+      const { value, index, count } = event as FluidboxReachEndEvent;
+      reached.push([value, index, count]);
+    });
+    return { list, fluidbox, reached };
+  }
+
+  it("fires as the open item comes within the threshold, once per count", async () => {
+    const { fluidbox, reached } = lazy(10);
+    await fluidbox.open(5);
+    expect(reached).toEqual([]);
+    await fluidbox.open(7);
+    expect(reached).toEqual([["photo-7", 7, 10]]);
+    await fluidbox.open(9);
+    await fluidbox.open(6);
+    await fluidbox.open(8);
+    await fluidbox.close();
+    await fluidbox.open(9);
+    expect(reached).toHaveLength(1);
+  });
+
+  it("fires on an open that starts near the end", async () => {
+    const { fluidbox, reached } = lazy(10);
+    await fluidbox.open(8);
+    expect(reached).toEqual([["photo-8", 8, 10]]);
+  });
+
+  it("re-arms when setItems changes the count, keeping the open value", async () => {
+    const { list, fluidbox, reached } = lazy(10);
+    await fluidbox.open(9);
+    const changes: string[] = [];
+    record(fluidbox, changes);
+    await fluidbox.setItems(list.withCount(20));
+    expect(fluidbox.state).toMatchObject({ status: "open", value: "photo-9", index: 9 });
+    expect(changes).toEqual([]);
+    expect(reached).toEqual([["photo-9", 9, 10]]);
+    await fluidbox.open(17);
+    expect(reached.at(-1)).toEqual(["photo-17", 17, 20]);
+    // Already within the threshold of the new end: it fires at once.
+    await fluidbox.setItems(list.withCount(19));
+    expect(reached.at(-1)).toEqual(["photo-17", 17, 19]);
+    expect(reached).toHaveLength(3);
+  });
+
+  it("never fires with loop", async () => {
+    const { fluidbox, reached } = lazy(10, { loop: true });
+    await fluidbox.open(9);
+    await fluidbox.next();
+    await fluidbox.previous();
+    expect(reached).toEqual([]);
+  });
+
+  it("follows reachEndThreshold, and its update", async () => {
+    const { fluidbox, reached } = lazy(10, { reachEndThreshold: 0 });
+    await fluidbox.open(8);
+    expect(reached).toEqual([]);
+    fluidbox.update({ reachEndThreshold: 4 });
+    await fluidbox.open(5);
+    expect(reached).toEqual([["photo-5", 5, 10]]);
   });
 });

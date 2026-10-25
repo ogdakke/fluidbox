@@ -14,6 +14,7 @@ import type {
   FluidboxCustomItemBase,
   FluidboxImageItem,
   FluidboxItem,
+  FluidboxReachEndEvent,
   FluidboxSlideOrigin,
   FluidboxValueChangeDetails,
 } from "@ogdakke/fluidbox";
@@ -54,7 +55,9 @@ const fixture = {
   /** The v-model of the viewer that cancels swipes. */
   model: () => null as string | null,
 };
-Object.assign(window, { vueSlides: fixture });
+/** Each reachend the growing gallery heard: its value, index and count. */
+const reachEnds: [string, number, number][] = [];
+Object.assign(window, { vueSlides: fixture, reachEnds });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -218,6 +221,34 @@ const Guarded = defineComponent(() => {
     );
 });
 
+/** The first `count` photos of a gallery that grows, the same objects each time. */
+const grown: FluidboxImageItem[] = [];
+const growing = (count: number) => {
+  for (let index = grown.length; index < count; index++) {
+    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
+  }
+  return grown.slice(0, count);
+};
+
+// A gallery that appends four photos each time the viewer nears its end, as
+// `<Fluidbox.Root :reach-end-threshold="1" @reach-end="more">` compiles.
+const Growing = defineComponent(() => {
+  const items = shallowRef(growing(4));
+  return () =>
+    h(
+      Fluidbox.Root,
+      {
+        items: items.value,
+        reachEndThreshold: 1,
+        onReachEnd: ({ value, index, count }: FluidboxReachEndEvent) => {
+          reachEnds.push([value, index, count]);
+          items.value = growing(count + 4);
+        },
+      },
+      () => h(Grid, { items: items.value, id: "growing" }),
+    );
+});
+
 const App = defineComponent(() => {
   const generation = shallowRef(0);
   fixture.remount = () => generation.value++;
@@ -247,6 +278,8 @@ const App = defineComponent(() => {
     h(Guarded),
     h("h2", "The viewer's parts"),
     h(Parts),
+    h("h2", "A gallery that grows as the viewer nears its end"),
+    h(Growing),
     h("h2", "A slide that suspends"),
     h(Fluidbox.Root, { items: lazyItems }, () => [
       h(Grid, { items: lazyItems, id: "lazy" }),

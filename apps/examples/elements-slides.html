@@ -152,6 +152,15 @@
           </template>
         </fluidbox-item>
       </fluidbox-gallery>
+
+      <h2>A gallery that grows as the viewer nears its end</h2>
+      <!-- The fixture adds four items, and four more on each reachend. -->
+      <fluidbox-gallery
+        id="growing"
+        class="media-grid"
+        aria-label="Growing gallery"
+        reach-end-threshold="1"
+      ></fluidbox-gallery>
     </main>
   </body>
 </html>
