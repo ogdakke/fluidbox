@@ -31,7 +31,7 @@ export type FluidboxMarkupReader = (
 interface Registry {
   readonly slides: Map<string, FluidboxSlideRenderer<any>>;
   readonly markup: Map<string, FluidboxMarkupReader>;
-  readonly listeners: Set<() => void>;
+  readonly listeners: Set<(kind: "slide" | "markup") => void>;
 }
 
 // One registry per page, however many copies of the entries a bundler makes.
@@ -43,8 +43,8 @@ const registry = (): Registry =>
     listeners: new Set(),
   });
 
-const changed = () => {
-  for (const listener of registry().listeners) listener();
+const changed = (kind: "slide" | "markup") => {
+  for (const listener of registry().listeners) listener(kind);
 };
 
 /**
@@ -59,7 +59,7 @@ export function defineSlide<K extends keyof FluidboxItemTypes>(
 export function defineSlide(type: string, renderer: FluidboxSlideRenderer<any>): void;
 export function defineSlide(type: string, renderer: FluidboxSlideRenderer<any>) {
   registry().slides.set(type, renderer);
-  changed();
+  changed("slide");
 }
 
 /**
@@ -70,7 +70,7 @@ export function defineSlide(type: string, renderer: FluidboxSlideRenderer<any>) 
  */
 export function defineMarkup(selector: string, read: FluidboxMarkupReader): void {
   registry().markup.set(selector, read);
-  changed();
+  changed("markup");
 }
 
 /** @internal The registered slide for `type`. */
@@ -87,7 +87,7 @@ export function readMarkup(content: Element, context: FluidboxMarkupContext) {
 }
 
 /** @internal Hear of slides and readers registered from now on. */
-export function onDefine(listener: () => void): () => void {
+export function onDefine(listener: (kind: "slide" | "markup") => void): () => void {
   registry().listeners.add(listener);
   return () => {
     registry().listeners.delete(listener);

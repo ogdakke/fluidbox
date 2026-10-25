@@ -260,6 +260,8 @@ export class FluidboxGalleryElement extends HTMLElement {
   #viewerTemplate: HTMLTemplateElement | null = null;
   /** The viewer was drawn before the parts arrived, so it draws again once they do. */
   #drawnWithoutParts = false;
+  /** The slides changed while the viewer was open. */
+  #rebuildOnClose = false;
 
   connectedCallback() {
     if (!this.hasAttribute("tabindex")) this.tabIndex = -1;
@@ -267,10 +269,10 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.addEventListener("fluidbox-addon-change", () => this.#queueUpdate(), {
       signal: this.#lifetime.signal,
     });
-    // A markup reader registered later reads the items again.
+    // A markup reader registered later reads the items again; a slide draws them anew.
     this.#lifetime.signal.addEventListener(
       "abort",
-      onDefine(() => this.#queueRefresh()),
+      onDefine((kind) => (kind === "slide" ? this.#slidesChanged() : this.#queueRefresh())),
       {
         once: true,
       },
@@ -289,6 +291,12 @@ export class FluidboxGalleryElement extends HTMLElement {
         ) {
           this.#queueUpdate();
         }
+        if (
+          nodes.some(
+            (node) => node instanceof Element && node.matches("template[data-fluidbox-slide]"),
+          )
+        )
+          this.#slidesChanged();
         // The gallery's own attributes are its options and value.
         if (record.target === this && record.type === "attributes") continue;
         const trigger = triggerOf(record.target);
@@ -421,6 +429,7 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   set slides(slides: Readonly<Record<string, FluidboxSlideRenderer<any>>>) {
     this.#slides = slides;
+    this.#slidesChanged();
   }
 
   /** Turn off dragging to dismiss, or closing on a backdrop tap. */
@@ -701,6 +710,22 @@ export class FluidboxGalleryElement extends HTMLElement {
     } satisfies FluidboxUpdateOptions;
   }
 
+  /**
+   * The viewer keeps the slides it drew, so new ones take a new viewer: at
+   * once while closed, else as it closes. It keeps the value it had.
+   */
+  #slidesChanged() {
+    const fluidbox = this.#fluidbox;
+    if (!fluidbox) return;
+    if (fluidbox.state.status !== "closed") {
+      this.#rebuildOnClose = true;
+      return;
+    }
+    this.#rebuildOnClose = false;
+    this.#teardown();
+    this.#queueRefresh();
+  }
+
   #teardown() {
     // Whoever follows the gallery hears the viewer it drops close.
     const dropped = this.#fluidbox?.state;
@@ -878,6 +903,8 @@ export class FluidboxGalleryElement extends HTMLElement {
     forwardEvents(fluidbox, this, this.#events.signal);
     this.#unsubscribe = fluidbox.subscribe((state) => {
       this.#keepFocus(state);
+      if (this.#rebuildOnClose && state.status === "closed")
+        queueMicrotask(() => this.#slidesChanged());
       for (const listener of this.#listeners) listener(state);
     });
   }

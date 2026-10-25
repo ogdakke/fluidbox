@@ -400,6 +400,120 @@ test.describe("slides and parts", () => {
     expect((await made()).clicks).toBe(1);
   });
 
+  test("a typed item takes its type's slide, which draws the content's image", async ({ page }) => {
+    await load(page);
+    await page.locator('[data-test="print"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator(`${shown} [data-test="slide-from"]`)).toHaveText("template");
+    await expect(page.locator(`${shown} img[data-fluidbox-drawn]`)).toHaveAttribute(
+      "src",
+      /\/art\/meadow\.svg$/,
+    );
+  });
+
+  test("<fluidbox-image field> draws the item's field", async ({ page }) => {
+    await load(page);
+    await page.evaluate(() => {
+      const gallery = document.createElement("fluidbox-gallery");
+      gallery.innerHTML = `<template data-fluidbox-slide="product">
+        <fluidbox-media><fluidbox-image field="photo"></fluidbox-image></fluidbox-media>
+        <p data-test="product-title" data-fluidbox-text="title"></p>
+      </template>`;
+      gallery.items = [
+        {
+          type: "product",
+          id: "chair",
+          title: "Fjord chair",
+          width: 800,
+          height: 800,
+          photo: {
+            type: "image",
+            id: "chair-photo",
+            src: "/art/fjord.svg",
+            alt: "Fjord chair",
+            width: 800,
+            height: 800,
+          },
+        } as never,
+      ];
+      gallery.value = "chair";
+      document.querySelector("main")!.append(gallery);
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator(`${shown} img[data-fluidbox-drawn]`)).toHaveAttribute(
+      "src",
+      /\/art\/fjord\.svg$/,
+    );
+    await expect(page.locator(`${shown} [data-test="product-title"]`)).toHaveText("Fjord chair");
+  });
+
+  test("the slides property comes before a template, and a template before the registry", async ({
+    page,
+  }) => {
+    await load(page);
+    const gallery = page.locator("#typed");
+    const from = async () => {
+      await page.locator('[data-test="print"]').click();
+      await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+      const text = await page.locator(`${shown} [data-test="slide-from"]`).textContent();
+      await page.keyboard.press("Escape");
+      await expect.poll(() => status(page)).toBe("closed");
+      return text?.trim();
+    };
+    const slideFrom = (label: string) =>
+      `({ layer }) => { const p = document.createElement("p"); p.dataset.test = "slide-from"; p.textContent = "${label}"; layer.append(p); }`;
+    // Registered after the gallery connected.
+    await page.evaluate(async (renderer) => {
+      const { defineSlide } = await import("/@id/@ogdakke/fluidbox/elements" as string);
+      defineSlide("print", eval(renderer));
+    }, slideFrom("registry"));
+    expect(await from()).toBe("template");
+    await gallery.evaluate(
+      (element, renderer) =>
+        ((element as HTMLElement & { slides: object }).slides = { print: eval(renderer) }),
+      slideFrom("property"),
+    );
+    expect(await from()).toBe("property");
+    await gallery.evaluate(
+      (element) => ((element as HTMLElement & { slides: object }).slides = {}),
+    );
+    await gallery.evaluate((element) =>
+      element.querySelector("template[data-fluidbox-slide]")!.remove(),
+    );
+    expect(await from()).toBe("registry");
+  });
+
+  test("a markup reader registered after the gallery connected reads its items again", async ({
+    page,
+  }) => {
+    await load(page);
+    await page.evaluate(() => {
+      const item = document.createElement("fluidbox-item");
+      item.setAttribute("value", "aside");
+      item.innerHTML = `<button slot="trigger" type="button" data-test="aside">Aside</button>
+        <template slot="content"><aside data-kind="print" data-src="/art/coast.svg" width="800" height="600">Coast</aside></template>`;
+      document.querySelector("#typed")!.append(item);
+    });
+    await page.evaluate(async () => {
+      const { defineMarkup } = await import("/@id/@ogdakke/fluidbox/elements" as string);
+      defineMarkup("aside[data-kind]", (content: HTMLElement, { id }: { id: string }) => ({
+        type: content.dataset.kind,
+        id,
+        src: content.dataset.src,
+        alt: content.textContent,
+        width: 800,
+        height: 600,
+      }));
+    });
+    await page.locator('[data-test="aside"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator(`${shown} [data-test="slide-from"]`)).toHaveText("template");
+    await expect(page.locator(`${shown} img[data-fluidbox-drawn]`)).toHaveAttribute(
+      "src",
+      /\/art\/coast\.svg$/,
+    );
+  });
+
   test("a caption of your own shows without an item caption, and an icon keeps its control's label", async ({
     page,
   }) => {

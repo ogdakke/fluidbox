@@ -313,7 +313,14 @@ export function templateSlide(
     for (const image of content.querySelectorAll("fluidbox-image")) {
       const field = image.getAttribute("field");
       image.remove();
-      disposers.push(slide.drawImage(field ? (slide.item as never)[field] : undefined));
+      const { item } = slide;
+      // Without a field, the item's own image: a typed item keeps its content's.
+      const source = field
+        ? (item as never)[field]
+        : item.type === "image"
+          ? undefined
+          : ({ ...item, type: "image" } as never);
+      disposers.push(slide.drawImage(source));
     }
     expandParts(content, { ...context(), signal, slide });
     if (box) {

@@ -75,4 +75,6 @@ The custom elements' add-ons are entries of their own, `elements/embed`, `elemen
 
 After review, a starting `value` that waits for its items, as server HTML whose items arrive later has, and a gallery moved in the page that keeps the viewer's value instead of asking it again, added about 70 B to the custom elements' initial chunk.
 
+A `type` that wins over what an item's content reads as, and a gallery that makes a new viewer when its slides change (the `slides` property, a slide template added or removed, or `defineSlide`), added about 90 B to the custom elements' initial chunk.
+
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

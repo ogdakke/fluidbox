@@ -83,8 +83,9 @@ export type FluidboxPreviewChangeEvent = CustomEvent<{
  * update the trigger's preview synchronously there. The gallery doesn't read
  * changes inside a trigger as changes to its items.
  *
- * Other markup is an item of the `type` attribute's slide, or without one, a
- * slide of its own that shows the markup.
+ * A `type` attribute makes the item one of that type's slide, keeping what
+ * its content reads as, an image's `src` and `alt` say. Other markup without
+ * one gets a slide of its own that shows the markup.
  */
 export class FluidboxItemElement extends HTMLElement {
   /** The item's id, then the ids of the items that close back onto its trigger. */
@@ -145,7 +146,18 @@ export class FluidboxItemElement extends HTMLElement {
       ...(placeholder ? { placeholder } : {}),
       ...(caption ? { caption } : {}),
     };
-    const done = (item: FluidboxItem): DeclarativeFluidboxDefinition => {
+    const type = this.getAttribute("type");
+    const done = (read: FluidboxItem): DeclarativeFluidboxDefinition => {
+      // Your type wins: the content's fields go to the slide of that type.
+      const item =
+        type && read.type !== type
+          ? ({
+              ...read,
+              type,
+              title:
+                (read as { title?: string }).title || (read as { alt?: string }).alt || named(null),
+            } as unknown as FluidboxItem)
+          : read;
       checkItemUrls(item);
       return { item, trigger, ...(sheet ? { sheet } : {}) };
     };
@@ -259,7 +271,6 @@ export class FluidboxItemElement extends HTMLElement {
 
     // Markup is an item of its type's slide, or has a slide of its own, which
     // the gallery registers under the item's type.
-    const type = this.getAttribute("type");
     const key = type || `fluidbox-item:${id}`;
     const markup = {
       ...base,
