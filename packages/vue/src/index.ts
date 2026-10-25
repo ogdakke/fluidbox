@@ -1263,7 +1263,13 @@ const Counter = defineComponent({
       const { index, count } = state.value;
       return h(
         "span",
-        { "aria-hidden": "true", hidden: index === null || undefined, "data-fluidbox-counter": "" },
+        {
+          "aria-hidden": "true",
+          hidden: index === null || undefined,
+          "data-fluidbox-counter": "",
+          // The binding renders it; the core's painting would replace its slot.
+          "data-fluidbox-managed": "",
+        },
         index === null
           ? undefined
           : slots.default

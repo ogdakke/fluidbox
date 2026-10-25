@@ -153,6 +153,20 @@ function App() {
         <Grid items={photos} id="custom" />
         <Fluidbox.Slides image={() => <Fluidbox.Image />} />
       </Fluidbox.Root>
+      <h2>A counter of your own</h2>
+      <Fluidbox.Root items={photos}>
+        <Grid items={photos} id="counter" />
+        <Fluidbox.Viewer>
+          <Fluidbox.Counter>
+            {({ index, count }) => (
+              <b data-test="counter">
+                {index + 1} of {count}
+              </b>
+            )}
+          </Fluidbox.Counter>
+          <Fluidbox.Next />
+        </Fluidbox.Viewer>
+      </Fluidbox.Root>
       <h2>A slide that suspends</h2>
       <Fluidbox.Root items={[custom("lazy", "lazy")]}>
         <Grid items={[custom("lazy", "lazy")]} id="lazy" />

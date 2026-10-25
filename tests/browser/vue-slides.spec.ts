@@ -213,8 +213,12 @@ test("the parts draw the viewer's controls, caption and error, with labels as te
     "",
   );
 
+  // A Counter's slot stays the binding's: the core never paints over it.
+  const own = page.locator(`${dialog} [data-test="counter"]`);
+  await expect(own).toHaveText("1 of 2");
   await page.locator(`${dialog} [data-fluidbox-next]`).click();
   await expect(counter).toHaveText("2 / 2");
+  await expect(own).toHaveText("2 of 2");
   await expect(page.locator(`${dialog} [data-test="caption"]`)).toHaveCount(0);
   // The error of your own replaces the default one, with a Retry that loads it again.
   const error = page.locator(`${dialog} [data-test="error"]`);

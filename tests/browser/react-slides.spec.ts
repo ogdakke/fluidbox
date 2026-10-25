@@ -159,3 +159,15 @@ test("closing hands the trigger's video the time a slide registered with returnP
   expect(back.time).toBeGreaterThanOrEqual(2.49);
   expect(back.time).toBeLessThan(3.5);
 });
+
+test("a Counter's render child stays the binding's as the viewer moves", async ({ page }) => {
+  await load(page);
+  await page.locator('#counter [data-item="one"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const own = page.locator(`${dialog} [data-test="counter"]`);
+  await expect(own).toHaveText("1 of 2");
+  await page.locator(`${dialog} [data-fluidbox-next]`).click();
+  // The core paints a counter it doesn't own as "2 / 2", over React's node.
+  await expect(own).toHaveText("2 of 2");
+  await expect(page.locator(`${dialog} [data-fluidbox-counter]`)).toHaveText("2 of 2");
+});

@@ -1142,6 +1142,8 @@ const Counter = forwardRef<HTMLSpanElement, FluidboxCounterProps>(function Count
       ref,
       hidden: attributes.hidden ?? (index === null || undefined),
       "data-fluidbox-counter": "",
+      // The binding renders it; the core's painting would replace its children.
+      "data-fluidbox-managed": "",
     },
     index === null ? null : children ? children({ index, count }) : labels.counter(index, count),
   );

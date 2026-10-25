@@ -180,6 +180,10 @@ const Parts = defineComponent(
             // Your icon, named by the label.
             h(Fluidbox.Close, null, () => h("svg", { "data-test": "close-icon" })),
           ]),
+          h(Fluidbox.Counter, null, {
+            default: ({ index, count }: { index: number; count: number }) =>
+              h("b", { "data-test": "counter" }, `${index + 1} of ${count}`),
+          }),
           h(Fluidbox.Previous, { label: false }, () => "Back"),
           h(Fluidbox.Next),
           h(Fluidbox.Caption, { "data-test": "caption" }),
