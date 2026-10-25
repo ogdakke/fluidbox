@@ -53,19 +53,4 @@ export function Media() {
     </Fluidbox.Root>
   );
 }
-
-// <model-viewer>'s attributes, for JSX.
-declare module "react" {
-  namespace JSX {
-    interface IntrinsicElements {
-      "model-viewer": import("react").HTMLAttributes<HTMLElement> & {
-        src?: string;
-        poster?: string;
-        "camera-controls"?: string;
-        "touch-action"?: string;
-        "interaction-prompt"?: string;
-      };
-    }
-  }
-}
 // #endregion example
