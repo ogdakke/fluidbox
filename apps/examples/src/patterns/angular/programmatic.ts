@@ -34,7 +34,7 @@ import { photos } from "../shared";
       (valueChangeComplete)="log('valuechangecomplete')"
     >
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }

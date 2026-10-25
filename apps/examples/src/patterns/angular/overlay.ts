@@ -12,19 +12,15 @@ import { album } from "../shared";
     <div fluidboxRoot [items]="album">
       <!-- The cover opens the first photo; every one of them closes back onto it. -->
       <button
-        [fluidboxTrigger]="album[0]"
-        [fluidboxReturns]="album"
+        [fluidboxTrigger]="albumIds"
         #trigger="fluidboxTrigger"
         class="pattern-thumb pattern-album"
         data-test="trigger"
       >
-        <img
-          [src]="(trigger.preview().item ?? album[0]).src"
-          [alt]="label(trigger.preview().item ?? album[0])"
-          data-test="preview"
-        />
+        @let shown = trigger.preview().item ?? album[0];
+        <img [src]="shown.src" [alt]="label(shown)" data-test="preview" />
         <!-- The count flies with the photo, rendered live from its template. -->
-        <span fluidboxThumbnailOverlay travel class="pattern-overlay" data-test="count">
+        <span fluidboxOverlay flight="live" class="pattern-overlay" data-test="count">
           <ng-template>+{{ album.length - 1 }}</ng-template>
         </span>
       </button>
@@ -33,6 +29,7 @@ import { album } from "../shared";
 })
 export class Overlay {
   readonly album = album;
+  readonly albumIds = album.map((photo) => photo.id);
   readonly label = itemLabel;
 }
 // #endregion example

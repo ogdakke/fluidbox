@@ -6,7 +6,7 @@ import { media, theme, thumbnailSrc } from "../shared";
 
 export const THEME = new InjectionToken<string>("THEME");
 
-/** Custom content renders inside the root, so it injects from the app. */
+/** Slide content renders inside the root, so it injects from the app. */
 @Component({
   selector: "article[appNote]",
   standalone: true,
@@ -20,22 +20,24 @@ export class Note {
 @Component({
   selector: "pattern-renderers",
   standalone: true,
-  imports: [FluidboxModule],
+  imports: [FluidboxModule, Note],
   providers: [{ provide: THEME, useValue: theme }],
   template: `
-    <!-- Items of type "note" render <article appNote>. -->
-    <div fluidboxRoot [items]="media" [renderers]="renderers" class="pattern-grid">
+    <div fluidboxRoot [items]="media" class="pattern-grid">
       @for (item of media; track item.id) {
-        <button [fluidboxTrigger]="item" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="item.id" class="pattern-thumb" data-test="trigger">
           <img [src]="thumbnailSrc(item)" [alt]="label(item)" />
         </button>
       }
+      <!-- Items of type "note" render <article appNote> in their media box. -->
+      <ng-template fluidboxSlide="note">
+        <ng-template fluidboxMedia><article appNote></article></ng-template>
+      </ng-template>
     </div>
   `,
 })
 export class Renderers {
   readonly media = media;
-  readonly renderers = { note: Note };
   readonly label = itemLabel;
   readonly thumbnailSrc = thumbnailSrc;
 }

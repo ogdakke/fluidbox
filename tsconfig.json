@@ -34,7 +34,10 @@
       "@ogdakke/fluidbox/vue/embed": ["./packages/vue/src/embed.ts"],
       "@ogdakke/fluidbox/vue/model": ["./packages/vue/src/model.ts"],
       "@ogdakke/fluidbox/vue/spin": ["./packages/vue/src/spin.ts"],
-      "@ogdakke/fluidbox/angular": ["./packages/angular/src/index.ts"]
+      "@ogdakke/fluidbox/angular": ["./packages/angular/src/index.ts"],
+      "@ogdakke/fluidbox/angular/embed": ["./packages/angular/src/embed.ts"],
+      "@ogdakke/fluidbox/angular/model": ["./packages/angular/src/model.ts"],
+      "@ogdakke/fluidbox/angular/spin": ["./packages/angular/src/spin.ts"]
     }
   },
   "include": [

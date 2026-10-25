@@ -5,23 +5,23 @@ import { FluidboxModule } from "@ogdakke/fluidbox/angular";
 import { photos } from "../shared";
 
 /** The photo in the address: `?photo=2` is the second. */
-function photoInUrl(): number | null {
+function photoInUrl(): string | null {
   const photo = Number(new URLSearchParams(location.search).get("photo")) - 1;
-  return Number.isInteger(photo) && photo >= 0 && photo < photos.length ? photo : null;
+  return photos[photo]?.id ?? null;
 }
 
 /** Put the photo on show in the address. Opening adds an entry, so Back closes the viewer. */
-function followInUrl(photo: number | null) {
+function followInUrl(id: string | null) {
   const shown = photoInUrl();
-  if (photo === shown) return;
+  if (id === shown) return;
   const url = new URL(location.href);
-  if (photo === null) {
+  if (id === null) {
     // Go back past the entry opening added, or drop the photo from a link you came in on.
     if (history.state?.photo) return history.back();
     url.searchParams.delete("photo");
     return history.replaceState(null, "", url);
   }
-  url.searchParams.set("photo", String(photo + 1));
+  url.searchParams.set("photo", String(photos.findIndex((photo) => photo.id === id) + 1));
   if (shown === null) history.pushState({ photo: true }, "", url);
   else history.replaceState(history.state, "", url);
 }
@@ -34,14 +34,12 @@ function followInUrl(photo: number | null) {
     <div
       fluidboxRoot
       [items]="photos"
-      [open]="photo() !== null"
-      [index]="photo() ?? undefined"
-      (openChange)="onOpenChange($event)"
-      (indexChange)="onIndexChange($event)"
+      [value]="photo()"
+      (valueChange)="follow($event)"
       class="pattern-grid"
     >
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }
@@ -52,7 +50,7 @@ export class Url {
   readonly photos = photos;
   readonly label = itemLabel;
   // Read the address once rendered, so the server and the browser render the same.
-  readonly photo = signal<number | null>(null);
+  readonly photo = signal<string | null>(null);
 
   constructor() {
     afterNextRender(() => this.onPopState());
@@ -63,15 +61,9 @@ export class Url {
     this.photo.set(photoInUrl());
   }
 
-  onOpenChange(open: boolean) {
-    if (open) return;
-    followInUrl(null);
-    this.photo.set(null);
-  }
-
-  onIndexChange(index: number) {
-    followInUrl(index);
-    this.photo.set(index);
+  follow(value: string | null) {
+    followInUrl(value);
+    this.photo.set(value);
   }
 }
 // #endregion example

@@ -11,11 +11,15 @@ import { album, countText, coverAlt, customViewerText, type MountLive } from "./
   imports: [FluidboxModule],
   template: `
     <div fluidboxRoot [items]="album" [labels]="labels()" [loop]="loop()">
-      <button [fluidboxTrigger]="album[0]" class="pattern-thumb pattern-album" data-test="trigger">
+      <button
+        [fluidboxTrigger]="album[0].id"
+        class="pattern-thumb pattern-album"
+        data-test="trigger"
+      >
         <img [src]="album[0].src" [alt]="coverAlt" />
-        <span fluidboxThumbnailOverlay travel class="pattern-overlay" data-test="count">
+        <span fluidboxOverlay flight="live" class="pattern-overlay" data-test="count">
           <ng-template
-            ><span fluidboxFrameLayer class="live-layer" data-test="layer"></span
+            ><span fluidboxOverlay flight="frame" class="live-layer" data-test="layer"></span
             >{{ countText }}</ng-template
           >
         </span>

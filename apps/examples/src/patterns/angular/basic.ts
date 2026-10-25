@@ -11,7 +11,7 @@ import { photos } from "../shared";
   template: `
     <div fluidboxRoot [items]="photos" class="pattern-grid">
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }

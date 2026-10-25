@@ -23,19 +23,20 @@ export class ZoomLevel {
     <!-- Double-click zooms to 3x; pinch, wheel and the controls stop at 6x. -->
     <div fluidboxRoot [items]="zoomPhotos" [zoom]="{ step: 3, max: 6 }" class="pattern-grid">
       @for (photo of zoomPhotos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="thumbnailSrc(photo)" [alt]="label(photo)" />
         </button>
       }
       <ng-template fluidboxViewer>
         <!-- Previous, Next and Close, then Zoom in, Zoom out and Fit. -->
-        <div fluidboxControls zoom></div>
+        <div fluidboxToolbar></div>
+        <div fluidboxZoomControls></div>
         <output appZoomLevel></output>
       </ng-template>
     </div>
     <div fluidboxRoot [items]="photos" [zoom]="false" class="pattern-grid">
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }

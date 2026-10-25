@@ -15,7 +15,7 @@ import { arabic, photos } from "../shared";
     <div dir="rtl" lang="ar">
       <div fluidboxRoot [items]="photos" [labels]="labels" class="pattern-grid">
         @for (photo of photos; track photo.id) {
-          <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+          <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
             <img [src]="photo.src" [alt]="label(photo)" />
           </button>
         }

@@ -23,6 +23,8 @@ The current baseline is documented in [`baseline/README.md`](../baseline/README.
 | `FLUIDBOX_SERVER`  | `dev`, `preview` (run `build:examples` first)   | `dev`                                         |
 | `BASELINE_CAPTURE` | set by `test:browser:baseline`                  | unset, so `baseline.spec.ts` is not collected |
 
+The `dev` server loads the package and the React, Solid and Vue bindings from source. The Angular binding is the exception: the pages compile Angular in the browser, which can't read signal inputs, models and outputs from source, so it serves `packages/angular/dist`. Run `bun run build` before `playwright test` or `bun run --cwd apps/examples dev`, and again after changing the Angular binding; `test:browser` builds first.
+
 Six workers stay reliable when other runs share the machine. Eight is the fastest setting on an idle 16-core machine; at twelve the WebKit motion checks start to fail. Only `baseline` records every run regardless of `FLUIDBOX_RECORD`; the other specs attach what they assert on (motion and collapsed geometry as JSON). To keep a failure's video locally, use `FLUIDBOX_RECORD=retain-on-failure`, or `FLUIDBOX_RECORD=first-retry` with `--retries=1`.
 
 Several checkouts on one machine each need their own `FLUIDBOX_PORT`. Wrap every run of more than one spec in the shared lock, so suites wait for each other instead of starving each other's timing-sensitive checks:

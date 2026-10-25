@@ -21,6 +21,9 @@ const entrypoints = [
   "vue-embed",
   "vue-model",
   "vue-spin",
+  "angular-embed",
+  "angular-model",
+  "angular-spin",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -43,6 +46,9 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "vue-embed": ["vue"],
   "vue-model": ["vue"],
   "vue-spin": ["vue"],
+  "angular-embed": ["@angular/core"],
+  "angular-model": ["@angular/core"],
+  "angular-spin": ["@angular/core"],
 };
 
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
@@ -65,7 +71,7 @@ const initialGzipLimits: Record<Entry, number> = {
   react: 17_200,
   solid: 13_700,
   vue: 17_700,
-  angular: 14_800,
+  angular: 19_350,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -82,6 +88,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "vue-embed": 20_200,
   "vue-model": 18_900,
   "vue-spin": 19_600,
+  "angular-embed": 22_000,
+  "angular-model": 20_650,
+  "angular-spin": 21_350,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -97,7 +106,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   react: 50_850,
   solid: 47_250,
   vue: 51_250,
-  angular: 48_300,
+  angular: 52_900,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -111,6 +120,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "vue-embed": 53_850,
   "vue-model": 52_450,
   "vue-spin": 53_150,
+  "angular-embed": 55_600,
+  "angular-model": 54_150,
+  "angular-spin": 54_900,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -133,6 +145,9 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
   "vue-embed": 1_200,
   "vue-model": 1_200,
   "vue-spin": 1_200,
+  "angular-embed": 1_200,
+  "angular-model": 1_200,
+  "angular-spin": 1_200,
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
@@ -141,7 +156,7 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   react: 52_000,
   solid: 48_400,
   vue: 52_400,
-  angular: 49_450,
+  angular: 54_050,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -155,6 +170,9 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "vue-embed": 55_000,
   "vue-model": 53_600,
   "vue-spin": 54_300,
+  "angular-embed": 56_750,
+  "angular-model": 55_300,
+  "angular-spin": 56_050,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
@@ -162,7 +180,7 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   react: 53_700,
   solid: 50_050,
   vue: 54_050,
-  angular: 51_150,
+  angular: 55_700,
   thumbnails: 4_900,
   sheet: 8_350,
   kit: 4_350,
@@ -177,6 +195,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "vue-embed": 56_650,
   "vue-model": 55_250,
   "vue-spin": 56_000,
+  "angular-embed": 58_400,
+  "angular-model": 57_000,
+  "angular-spin": 57_700,
 };
 
 const jsonIndex = process.argv.indexOf("--json");

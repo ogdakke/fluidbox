@@ -95,7 +95,7 @@
         "zone.js": "~0.14.10",
       },
       "peerDependencies": {
-        "@angular/core": ">=17",
+        "@angular/core": ">=17.3",
         "@ogdakke/fluidbox": "workspace:*",
       },
     },
@@ -103,7 +103,7 @@
       "name": "@ogdakke/fluidbox",
       "version": "0.0.0",
       "peerDependencies": {
-        "@angular/core": ">=17",
+        "@angular/core": ">=17.3",
         "react": ">=18",
         "react-dom": ">=18",
         "solid-js": ">=1.8",

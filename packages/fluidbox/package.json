@@ -75,6 +75,18 @@
       "types": "./dist/angular/index.d.ts",
       "import": "./dist/angular/index.js"
     },
+    "./angular/embed": {
+      "types": "./dist/angular/embed.d.ts",
+      "import": "./dist/angular/embed.js"
+    },
+    "./angular/model": {
+      "types": "./dist/angular/model.d.ts",
+      "import": "./dist/angular/model.js"
+    },
+    "./angular/spin": {
+      "types": "./dist/angular/spin.d.ts",
+      "import": "./dist/angular/spin.js"
+    },
     "./thumbnails": {
       "types": "./dist/thumbnails.d.ts",
       "import": "./dist/thumbnails.js"
@@ -125,7 +137,7 @@
     "build:core": "tsdown"
   },
   "peerDependencies": {
-    "@angular/core": ">=17",
+    "@angular/core": ">=17.3",
     "react": ">=18",
     "react-dom": ">=18",
     "solid-js": ">=1.8",
