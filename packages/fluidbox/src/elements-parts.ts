@@ -144,6 +144,9 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
     };
   };
 
+  // Read before a part that is hidden for now leaves the tree.
+  const texts = Array.from(root.querySelectorAll<HTMLElement>("[data-fluidbox-text]"));
+
   for (const placeholder of root.querySelectorAll(PARTS)) {
     const tag = placeholder.tagName;
     const own = holds(placeholder) ? Array.from(placeholder.childNodes) : null;
@@ -183,12 +186,16 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
       if (loading) part.setAttribute("aria-hidden", "true");
       part.setAttribute(loading ? "data-fluidbox-loading" : "data-fluidbox-error-content", "");
       if (own) part.append(...own);
+      // Off the page while hidden, so its controls, as Retry, look after themselves.
+      for (const element of part.querySelectorAll<HTMLElement>(CONTROL_SELECTOR)) {
+        fluidbox.bindControl(element, nameOf(element), { signal });
+      }
       const show = present(placeholder, part);
       statuses.push((busy, error) => show(loading ? busy : error));
     }
   }
 
-  for (const element of root.querySelectorAll<HTMLElement>("[data-fluidbox-text]")) {
+  for (const element of texts) {
     const field = element.dataset.fluidboxText!;
     follows.push((item) => (element.textContent = text(item, field)));
   }

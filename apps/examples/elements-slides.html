@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fluidbox custom elements: slide templates, parts and add-ons</title>
+    <link rel="icon" href="/favicon.svg" />
+    <script type="module" src="/fixtures/elements-slides.ts"></script>
+  </head>
+  <body>
+    <main class="lab-page">
+      <h1>Custom elements: slide templates, parts and add-ons</h1>
+
+      <h2>Parts and a slide template</h2>
+      <fluidbox-gallery id="parts" class="media-grid" aria-label="Parts gallery">
+        <template slot="viewer">
+          <fluidbox-toolbar></fluidbox-toolbar>
+          <fluidbox-counter></fluidbox-counter>
+          <fluidbox-zoom-controls></fluidbox-zoom-controls>
+          <fluidbox-fullscreen></fluidbox-fullscreen>
+          <fluidbox-download>Save</fluidbox-download>
+          <fluidbox-share></fluidbox-share>
+          <fluidbox-caption></fluidbox-caption>
+          <fluidbox-loading><span data-test="loading">Loading</span></fluidbox-loading>
+          <fluidbox-error>
+            <p data-test="error">
+              <span data-fluidbox-text="alt"></span> didn't load.
+              <button type="button" data-fluidbox-retry></button>
+            </p>
+          </fluidbox-error>
+        </template>
+        <template data-fluidbox-slide="note">
+          <fluidbox-media class="note-card">
+            <img src="/art/fjord.svg?note" alt="" width="800" height="600" data-test="note-image" />
+          </fluidbox-media>
+          <p class="note-title" data-test="note-title" data-fluidbox-text="title"></p>
+        </template>
+
+        <fluidbox-item value="canyon" caption="Late light on the canyon walls">
+          <button slot="trigger" type="button" data-test="canyon">
+            <img src="/art/canyon.svg" alt="Canyon" width="320" height="240" />
+          </button>
+          <template slot="content">
+            <img src="/art/canyon.svg" alt="Canyon" width="1600" height="1200" />
+          </template>
+        </fluidbox-item>
+        <fluidbox-item value="note" type="note">
+          <button slot="trigger" type="button" data-test="note">Field note</button>
+          <template slot="content">
+            <div aria-label="Field note" width="800" height="600"></div>
+          </template>
+        </fluidbox-item>
+        <fluidbox-item value="broken">
+          <button slot="trigger" type="button" data-test="broken">
+            <img src="/art/dune.svg" alt="Dune" width="320" height="240" />
+          </button>
+          <template slot="content">
+            <img src="/broken/dune.svg" alt="Dune" width="1600" height="1200" />
+          </template>
+        </fluidbox-item>
+      </fluidbox-gallery>
+
+      <h2>Add-ons read from markup</h2>
+      <fluidbox-gallery id="media" class="media-grid" aria-label="Add-ons gallery">
+        <fluidbox-item value="film">
+          <button slot="trigger" type="button" data-test="film">
+            <img
+              src="/products/fjord-detail-thumb.webp"
+              alt="Fjord film"
+              width="160"
+              height="160"
+            />
+          </button>
+          <template slot="content">
+            <iframe
+              src="https://www.youtube.com/watch?v=M7lc1UVf-VE"
+              title="Fjord film"
+              width="1280"
+              height="720"
+            ></iframe>
+          </template>
+        </fluidbox-item>
+        <fluidbox-item value="spin">
+          <button slot="trigger" type="button" data-test="spin">
+            <img
+              src="/products/spin/fjord-00-thumb.webp"
+              alt="Fjord chair"
+              width="160"
+              height="160"
+            />
+          </button>
+          <template slot="content">
+            <img
+              data-spin-frames="/products/spin/fjord-{index}.webp"
+              data-spin-count="36"
+              data-spin-digits="2"
+              alt="Fjord chair, all the way round"
+              width="1200"
+              height="1200"
+            />
+          </template>
+        </fluidbox-item>
+        <fluidbox-item value="model">
+          <button slot="trigger" type="button" data-test="model">
+            <img
+              src="/products/fjord-model-thumb.webp"
+              alt="Fjord chair in 3D"
+              width="160"
+              height="160"
+            />
+          </button>
+          <template slot="content">
+            <model-viewer
+              src="/products/fjord-model.glb"
+              alt="Fjord chair in 3D"
+              exposure="1.2"
+            ></model-viewer>
+          </template>
+        </fluidbox-item>
+      </fluidbox-gallery>
+    </main>
+  </body>
+</html>
