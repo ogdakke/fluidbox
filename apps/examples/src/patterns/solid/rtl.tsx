@@ -15,7 +15,7 @@ export function Rtl() {
         <div class="pattern-grid">
           <For each={photos}>
             {(photo) => (
-              <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+              <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
                 <img src={photo.src} alt={itemLabel(photo)} />
               </Fluidbox.Trigger>
             )}

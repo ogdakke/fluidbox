@@ -23,7 +23,7 @@ export function Zoom() {
         <div class="pattern-grid">
           <For each={zoomPhotos}>
             {(photo) => (
-              <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+              <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
                 <img src={thumbnailSrc(photo)} alt={itemLabel(photo)} />
               </Fluidbox.Trigger>
             )}
@@ -31,7 +31,8 @@ export function Zoom() {
         </div>
         <Fluidbox.Viewer>
           {/* Previous, Next and Close, then Zoom in, Zoom out and Fit. */}
-          <Fluidbox.Controls zoom />
+          <Fluidbox.Toolbar />
+          <Fluidbox.ZoomControls />
           <ZoomLevel />
         </Fluidbox.Viewer>
       </Fluidbox.Root>
@@ -40,7 +41,7 @@ export function Zoom() {
         <div class="pattern-grid">
           <For each={photos}>
             {(photo) => (
-              <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+              <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
                 <img src={photo.src} alt={itemLabel(photo)} />
               </Fluidbox.Trigger>
             )}

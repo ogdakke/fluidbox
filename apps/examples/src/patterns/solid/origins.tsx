@@ -10,7 +10,7 @@ export function Origins() {
     <>
       {/* The photo flies from the element marked data-fluidbox-origin, not the whole card. */}
       <Fluidbox.Root items={[product]}>
-        <Fluidbox.Trigger item={product} class="pattern-card" data-test="product">
+        <Fluidbox.Trigger value={product.id} class="pattern-card" data-test="product">
           <span data-fluidbox-origin>
             <img src={product.src} alt={itemLabel(product)} />
           </span>
@@ -27,7 +27,7 @@ export function Origins() {
         <div class="pattern-scroller" data-test="scroller">
           <For each={strip}>
             {(photo) => (
-              <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+              <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
                 <img src={photo.src} alt={itemLabel(photo)} />
               </Fluidbox.Trigger>
             )}

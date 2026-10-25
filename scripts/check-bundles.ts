@@ -18,6 +18,9 @@ const entrypoints = [
   "react-embed",
   "react-model",
   "react-spin",
+  "solid-embed",
+  "solid-model",
+  "solid-spin",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -37,6 +40,9 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "react-embed": ["react", "react-dom"],
   "react-model": ["react", "react-dom"],
   "react-spin": ["react", "react-dom"],
+  "solid-embed": ["solid-js"],
+  "solid-model": ["solid-js"],
+  "solid-spin": ["solid-js"],
 };
 
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
@@ -50,7 +56,8 @@ const initialGzipLimits: Record<Entry, number> = {
   root: 9_850,
   elements: 14_000,
   react: 17_200,
-  solid: 13_700,
+  // Solid's redesigned parts and the end of its icon code: about 1,910 B more (step 4).
+  solid: 15_600,
   vue: 14_350,
   angular: 14_800,
   thumbnails: 3_850,
@@ -66,6 +73,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-embed": 19_750,
   "react-model": 18_450,
   "react-spin": 19_150,
+  "solid-embed": 17_950,
+  "solid-model": 16_650,
+  "solid-spin": 17_350,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -79,7 +89,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
   elements: 47_400,
   react: 50_850,
-  solid: 47_250,
+  solid: 49_150,
   vue: 47_900,
   angular: 48_250,
   thumbnails: 3_850,
@@ -92,6 +102,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "react-embed": 53_350,
   "react-model": 52_000,
   "react-spin": 52_750,
+  "solid-embed": 51_600,
+  "solid-model": 50_250,
+  "solid-spin": 50_900,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -111,13 +124,16 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
   "react-embed": 1_200,
   "react-model": 1_200,
   "react-spin": 1_200,
+  "solid-embed": 1_200,
+  "solid-model": 1_200,
+  "solid-spin": 1_200,
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
   root: 45_200,
   elements: 48_550,
   react: 52_000,
-  solid: 48_400,
+  solid: 50_300,
   vue: 49_050,
   angular: 49_400,
   thumbnails: 3_850,
@@ -130,12 +146,15 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "react-embed": 54_500,
   "react-model": 53_150,
   "react-spin": 53_900,
+  "solid-embed": 52_750,
+  "solid-model": 51_400,
+  "solid-spin": 52_050,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
   elements: 50_200,
   react: 53_600,
-  solid: 50_050,
+  solid: 52_000,
   vue: 50_750,
   angular: 51_050,
   thumbnails: 4_900,
@@ -149,6 +168,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "react-embed": 56_150,
   "react-model": 54_850,
   "react-spin": 55_550,
+  "solid-embed": 54_400,
+  "solid-model": 53_050,
+  "solid-spin": 53_700,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
@@ -248,7 +270,7 @@ for (const name of entrypoints) {
     ...Object.entries(addonMarkers)
       .filter(
         ([addon, marker]) =>
-          addon !== name.replace(/^react-/, "") && activationCode.includes(marker),
+          addon !== name.replace(/^(react|solid)-/, "") && activationCode.includes(marker),
       )
       .map(([addon]) => `carries the ${addon} add-on`),
   ].filter((error): error is string => typeof error === "string");

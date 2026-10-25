@@ -1,71 +1,64 @@
 import type { Accessor, JSX, ValidComponent } from "solid-js";
 import type {
   FluidboxCommandOptions,
+  FluidboxIframeItem,
+  FluidboxImageItem,
   FluidboxItem,
   FluidboxItems,
   FluidboxLabels,
-  FluidboxPreload,
+  FluidboxMediaErrorEvent,
   FluidboxOptions,
+  FluidboxPlaybackSource,
   FluidboxSheetEvent,
-  FluidboxSheetSnapPoint,
+  FluidboxSheetOptions,
+  FluidboxSlideOrigin,
+  FluidboxSlideRenderer,
   FluidboxState,
   FluidboxTarget,
   FluidboxValue,
   FluidboxValueChangeDetails,
+  FluidboxVideoItem,
+  FluidboxVideoOptions,
   FluidboxZoomCommandOptions,
   FluidboxZoomEvent,
+  FluidboxZoomPose,
 } from "@ogdakke/fluidbox";
-import type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+import type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
-export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
-
-export interface FluidboxSolidRenderContext<TItem extends FluidboxItem = FluidboxItem> {
+/** What the Sheet's, the Caption's and a slide's render functions get: the item they draw. */
+export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {
   readonly item: TItem;
+  /** The item's index. In a slide it is read live, and reactive: new items keep a slide whose item moved. */
   readonly index: number;
-  /** Aborted when the content is no longer shown. */
-  readonly signal: AbortSignal;
-  /** Whether the slide is the one on show. */
-  readonly active: boolean;
-  /**
-   * Call `listener` with the new `active` as the slide comes to be the one on
-   * show or stops being it, to play and pause. Returns a function that stops it.
-   */
-  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
 }
 
-/** Renders a custom item. It runs under Root, so context provided around Root reaches it. */
-export type FluidboxSolidRenderer<TItem extends FluidboxItem = FluidboxItem> = (
-  context: FluidboxSolidRenderContext<TItem>,
+/** What a thumbnail's render function gets: its item, and whether it is the one on show. */
+export interface FluidboxThumbnailContext<
+  TItem extends FluidboxItem = FluidboxItem,
+> extends FluidboxItemContext<TItem> {
+  /** Reactive: read it in JSX or an effect. */
+  readonly active: boolean;
+}
+
+/**
+ * A slide's content: rendered into the slide's layer, with `Media` for its
+ * box. Called once per slide, under the Root, so context reaches it.
+ */
+export type FluidboxSlideContent<TItem extends FluidboxItem = FluidboxItem> = (
+  slide: FluidboxItemContext<TItem>,
 ) => JSX.Element;
 
 export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
-  /** The gallery's items: an array or a lazy list. Tracked: pass a new one to change the gallery. */
+  /** An array, or a list read on demand. A new array equal field by field to the current one changes nothing. */
   readonly items: FluidboxItems<TItem>;
   /**
-   * Whether the viewer is open, when your state owns it. The viewer opens on
-   * `index` and closes when this changes. Leave it out to let triggers own it.
+   * The open item's id, or `null` for closed, when your state owns it. Read
+   * as it changes: pass a signal's value, `value={photo()}`. It is a request:
+   * when it changes, the viewer opens, moves or closes to match.
    */
-  readonly open?: boolean;
-  /** The item the viewer shows, when your state owns it. */
-  readonly index?: number;
-  /** As the viewer opens or closes, from any input. Set `open` to follow it. */
-  readonly onOpenChange?: (open: boolean, details: FluidboxChangeDetails) => void;
-  /** As the viewer moves to another item, opening included. Set `index` to follow it. */
-  readonly onIndexChange?: (index: number, details: FluidboxChangeDetails) => void;
-  /** Go round: past the last item comes the first. A single item never loops. */
-  readonly loop?: boolean;
-  /** Your strings for the viewer. Changes apply to an open viewer. */
-  readonly labels?: Partial<FluidboxLabels>;
-  /** Pinch, double-tap, wheel and keyboard zoom of images. `false` turns it off. Changes apply to an open viewer. */
-  readonly zoom?: false | { readonly step?: number; readonly max?: number };
-  /** Render `custom` items, by the name in their `render`. */
-  readonly renderers?: Readonly<Record<string, FluidboxSolidRenderer<TItem>>>;
-  /** Find the trigger of an item without a mounted Trigger, as in a virtualised grid. */
-  readonly findTrigger?: FluidboxOptions<TItem>["findTrigger"];
-  /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
-  readonly revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
-  /** When the viewer's code loads: on `"intent"` (the default), on `"press"`, or `"eager"`ly. */
-  readonly preload?: FluidboxPreload;
+  readonly value?: FluidboxValue;
+  /** The item to open with, when the viewer owns its value. */
+  readonly defaultValue?: FluidboxValue;
   /**
    * Before every open, move and close, from any input, with the value the
    * viewer goes to: an id, or null for a close. `details.cancel()` stops it.
@@ -79,23 +72,48 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
     value: FluidboxValue,
     details: FluidboxValueChangeDetails<TItem>,
   ) => void;
-  /** When the sheet comes to rest at another stop. */
-  readonly onSheetChange?: (event: FluidboxSheetEvent) => void;
+  /** Go round: past the last item comes the first. A single item never loops. */
+  readonly loop?: boolean;
+  /**
+   * Where the viewer's controls lead before JavaScript runs: `null` for Close,
+   * the previous or next item's id for Previous and Next. Share shares it too,
+   * unless `shareUrl` says otherwise.
+   */
+  readonly href?: (value: string | null) => string | undefined;
+  /** Your strings for the viewer. Compared by value; they change the open viewer in place. */
+  readonly labels?: Partial<FluidboxLabels>;
+  /** Zoom steps, or `false` to turn zoom off. Compared by value. */
+  readonly zoom?: FluidboxOptions<TItem>["zoom"];
+  /** Find the trigger of an item without a mounted Trigger, as in a virtualised grid. */
+  readonly findTrigger?: FluidboxOptions<TItem>["findTrigger"];
+  /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
+  readonly revealTrigger?: FluidboxOptions<TItem>["revealTrigger"];
+  /** When the viewer's code loads: on `"intent"` (the default), on `"press"`, or `"eager"`ly. */
+  readonly preload?: FluidboxOptions<TItem>["preload"];
+  /** Which gestures close the viewer. Compared by value. */
+  readonly dismiss?: FluidboxOptions<TItem>["dismiss"];
+  /** What a vertical wheel or trackpad scroll does on an unzoomed slide. */
+  readonly wheel?: FluidboxOptions<TItem>["wheel"];
+  /** The link Share shares for an item. @default the `href` of its id */
+  readonly shareUrl?: FluidboxOptions<TItem>["shareUrl"];
   /** When the image on show comes to rest at another zoom. */
   readonly onZoomChange?: (event: FluidboxZoomEvent) => void;
+  /** When a slide's media fails to load, as it shows its error. */
+  readonly onMediaError?: (event: FluidboxMediaErrorEvent<TItem>) => void;
   readonly children?: JSX.Element;
 }
 
 export type FluidboxTriggerProps<TItem extends FluidboxItem = FluidboxItem> = Omit<
   JSX.ButtonHTMLAttributes<HTMLButtonElement>,
-  "children" | "ref"
+  "children" | "ref" | "value"
 > & {
   /** The element or component to render instead of a button. It must forward `ref` and events. */
   readonly as?: ValidComponent;
-  /** The item to open: the item, its id or its index. */
-  readonly item: FluidboxTarget<TItem>;
-  /** More items that close back onto this trigger, as for an album cover. */
-  readonly returns?: readonly FluidboxTarget<TItem>[];
+  /**
+   * The item to open: the item, its id or its index. A list opens its first,
+   * and every one closes back onto this trigger, as for an album cover.
+   */
+  readonly value: FluidboxTarget<TItem> | readonly FluidboxTarget<TItem>[];
   readonly ref?: HTMLElement | ((element: HTMLElement) => void);
   /** Content, or a function of the preview, which follows the viewer while it is open. */
   readonly children?:
@@ -106,102 +124,208 @@ export type FluidboxTriggerProps<TItem extends FluidboxItem = FluidboxItem> = Om
 };
 
 export interface FluidboxViewerProps {
-  /** Your controls and captions, rendered into the viewer. */
+  /** Your controls and captions, rendered into the viewer's layer. */
   readonly children?: JSX.Element;
 }
 
-export interface FluidboxActionProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {}
+/**
+ * The slide for each item type: your own types, or the built-in ones. Types
+ * it doesn't list draw the built-in slide, or `default`.
+ */
+export type FluidboxSlidesProps<TItem extends FluidboxItem = FluidboxItem> = {
+  readonly [K in TItem["type"]]?: FluidboxSlideContent<Extract<TItem, { readonly type: K }>>;
+} & {
+  /** Any type without its own prop and without a built-in slide. */
+  readonly default?: FluidboxSlideContent<TItem>;
+};
 
-export interface FluidboxControlsProps {
-  /** Add the zoom-in, zoom-out and fit controls, in their group. */
+/** The attributes a part gives an element the viewer made: no event handlers. */
+type ElementAttributes = Omit<
+  JSX.HTMLAttributes<HTMLElement>,
+  keyof JSX.CustomEventHandlersCamelCase<HTMLElement> | "children" | "ref"
+>;
+
+export interface FluidboxMediaProps extends ElementAttributes {
+  /**
+   * Whether pinch, double-tap, wheel and the zoom controls zoom the box.
+   * @default true when it holds an Image, else false
+   */
   readonly zoom?: boolean;
+  /** Draw into the box with a plain-JS slide renderer, as the add-on parts do. */
+  readonly render?: FluidboxSlideRenderer<any>;
+  /** Inserted into the box. Fill it: the box is sized from the item. */
+  readonly children?: JSX.Element;
 }
 
-export interface FluidboxSheetStopProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
-  /** The stop to move the sheet to. Pressed at that stop, it lowers the sheet to 0. */
-  readonly stop: number;
+export interface FluidboxImageProps {
+  /** @default the slide's item */
+  readonly item?: FluidboxImageItem;
 }
 
-export interface FluidboxThumbnailOverlayProps extends JSX.HTMLAttributes<HTMLSpanElement> {
-  /** Fly with the photo: the children render again, live, in the flying frame. */
-  readonly travel?: boolean;
+export interface FluidboxVideoProps extends Pick<FluidboxVideoOptions, "attach"> {
+  /** @default the slide's item */
+  readonly item?: FluidboxVideoItem;
 }
 
-export interface FluidboxFrameLayerProps extends JSX.HTMLAttributes<HTMLSpanElement> {}
+export interface FluidboxIframeProps {
+  /** @default the slide's item */
+  readonly item?: FluidboxIframeItem;
+}
 
-export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> {
-  readonly item: TItem;
-  readonly index: number;
+/** What every control part takes besides its element's attributes. */
+export interface FluidboxControlLabel {
+  /**
+   * A string names this control instead of the labels. `false` names it by
+   * its children: use it when they hold visible text.
+   */
+  readonly label?: string | false;
+}
+
+export interface FluidboxControlProps
+  extends JSX.ButtonHTMLAttributes<HTMLButtonElement>, FluidboxControlLabel {}
+
+export interface FluidboxDownloadProps
+  extends JSX.AnchorHTMLAttributes<HTMLAnchorElement>, FluidboxControlLabel {}
+
+export interface FluidboxGroupProps extends JSX.HTMLAttributes<HTMLDivElement> {}
+
+export interface FluidboxCounterProps extends Omit<
+  JSX.HTMLAttributes<HTMLSpanElement>,
+  "children"
+> {
+  /** The counter's text. @default labels.counter */
+  readonly children?: (counter: { readonly index: number; readonly count: number }) => JSX.Element;
+}
+
+export interface FluidboxCaptionProps<TItem extends FluidboxItem = FluidboxItem> extends Omit<
+  JSX.HTMLAttributes<HTMLDivElement>,
+  "children"
+> {
+  /** The caption. @default the item's `caption` */
+  readonly children?: (context: FluidboxItemContext<TItem>) => JSX.Element;
+}
+
+export interface FluidboxOverlayProps extends JSX.HTMLAttributes<HTMLSpanElement> {
+  /**
+   * How it goes with the photo's flight: it stays on the card, a still copy
+   * flies, its children render live in the flying frame, or the element itself
+   * moves into the frame and scales with it, as a scrim does.
+   * @default "none"
+   */
+  readonly flight?: "none" | "copy" | "live" | "frame";
 }
 
 export interface FluidboxThumbnailsProps<TItem extends FluidboxItem = FluidboxItem> {
-  /** Renders one thumbnail into its button. Without it, the strip shows the default images. */
-  readonly children?: (thumb: FluidboxItemContext<TItem>) => JSX.Element;
+  /** Fills each thumbnail button. Leave it out for the default images. */
+  readonly children?: (thumbnail: FluidboxThumbnailContext<TItem>) => JSX.Element;
 }
 
-/** Attributes for the sheet's `<section data-fluidbox-sheet>`, and its content. */
-export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem> extends Omit<
-  JSX.HTMLAttributes<HTMLElement>,
-  "children"
-> {
+export interface FluidboxSheetProps<TItem extends FluidboxItem = FluidboxItem>
+  extends ElementAttributes, Pick<FluidboxSheetOptions<TItem>, "snapPoints" | "dismissMotion"> {
+  /** When the sheet comes to rest at another snap. */
+  readonly onSnapChange?: (event: FluidboxSheetEvent) => void;
+  /** The sheet's content for the item on show. */
+  readonly children?: (context: FluidboxItemContext<TItem>) => JSX.Element;
+}
+
+export interface FluidboxSheetSnapProps extends FluidboxControlProps {
+  /** The snap the button moves the sheet to. */
+  readonly to: number;
+}
+
+export interface FluidboxLoadingProps {
+  /** Shown while the item on show is loading. */
+  readonly children?: JSX.Element;
+}
+
+export interface FluidboxErrorProps<TItem extends FluidboxItem = FluidboxItem> {
   /**
-   * The stops above the resting one, lowest first.
-   * @default ["60%", "content"]
+   * Shown while the item on show failed, in place of the default error. A
+   * function gets the item and the `cause` of its last `mediaerror`.
    */
-  readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
-  /** What a swipe down on the photo does with the sheet down. @default "flight" */
-  readonly dismissMotion?: "flight" | "scroll";
-  /** Renders the sheet's content for the active item. */
-  readonly children?: (active: FluidboxItemContext<TItem>) => JSX.Element;
+  readonly children?:
+    | JSX.Element
+    | ((failed: { readonly item: TItem; readonly error: unknown }) => JSX.Element);
+}
+
+/** The commands `useFluidbox` hands back with the state. */
+export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
+  readonly open: (
+    target?: FluidboxTarget<TItem>,
+    options?: FluidboxCommandOptions,
+  ) => Promise<boolean>;
+  readonly close: (options?: FluidboxCommandOptions) => Promise<boolean>;
+  readonly next: (options?: FluidboxCommandOptions) => Promise<boolean>;
+  readonly previous: (options?: FluidboxCommandOptions) => Promise<boolean>;
+  /** Zoom the image on show to a scale between 1 and the zoom's `max`. */
+  readonly zoomTo: (scale: number, options?: FluidboxZoomCommandOptions) => Promise<boolean>;
+  /** Zoom in by 1.5. */
+  readonly zoomIn: (options?: FluidboxZoomCommandOptions) => Promise<boolean>;
+  /** Zoom out by 1.5. */
+  readonly zoomOut: (options?: FluidboxZoomCommandOptions) => Promise<boolean>;
+  /** Zoom back out to fit. */
+  readonly zoomReset: (options?: Pick<FluidboxZoomCommandOptions, "signal">) => Promise<boolean>;
+  /** Make the open viewer fullscreen, or leave it; without an argument, toggle. */
+  readonly setFullscreen: (on?: boolean) => Promise<boolean>;
+  /** Download the open item's file. */
+  readonly download: () => Promise<boolean>;
+  /** Share the open item's link, or copy it. */
+  readonly share: () => Promise<boolean>;
+  readonly setItems: (items: FluidboxItems<TItem>) => Promise<boolean>;
+  /** Start loading an item a press is likely to open. Call the result to let go. */
+  readonly preload: (target: FluidboxTarget<TItem>) => () => void;
+  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
+  readonly load: () => Promise<boolean>;
 }
 
 /**
- * The viewer's state and commands. The state fields are reactive getters:
+ * The viewer state and its commands. The state fields are reactive getters:
  * read them in JSX or an effect, and don't destructure them.
  */
-export interface FluidboxApi<
-  TItem extends FluidboxItem = FluidboxItem,
-> extends FluidboxState<TItem> {
-  open(target?: FluidboxTarget<TItem>, options?: FluidboxCommandOptions): Promise<boolean>;
-  close(options?: FluidboxCommandOptions): Promise<boolean>;
-  next(options?: FluidboxCommandOptions): Promise<boolean>;
-  previous(options?: FluidboxCommandOptions): Promise<boolean>;
-  /** Zoom the image on show to a scale between 1 and the zoom's `max`. */
-  zoomTo(scale: number, options?: FluidboxZoomCommandOptions): Promise<boolean>;
-  /** Zoom in by 1.5. */
-  zoomIn(options?: FluidboxZoomCommandOptions): Promise<boolean>;
-  /** Zoom out by 1.5. */
-  zoomOut(options?: FluidboxZoomCommandOptions): Promise<boolean>;
-  /** Zoom back out to fit. */
-  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean>;
-  setItems(items: FluidboxItems<TItem>): Promise<boolean>;
-  /** Start loading an item a press is likely to open. Call the result to let go. */
-  preload(target: FluidboxTarget<TItem>): () => void;
-  /** Load the viewer's code now. Resolves to true once it has loaded, false if it failed. */
-  load(): Promise<boolean>;
+export type FluidboxApi<TItem extends FluidboxItem = FluidboxItem> = FluidboxState<TItem> &
+  FluidboxCommands<TItem>;
+
+export interface UseFluidbox {
+  <TItem extends FluidboxItem = FluidboxItem>(): FluidboxApi<TItem>;
+  <TSelected, TItem extends FluidboxItem = FluidboxItem>(
+    selector: (value: FluidboxApi<TItem>) => TSelected,
+  ): Accessor<TSelected>;
 }
 
+/** The sheet's snap as a signal, and a function that moves it. */
 export interface FluidboxSheetApi {
-  /** The stop the sheet rests at: 0 at rest, then one per snap point. Follows `sheetchange`. */
-  readonly stop: Accessor<number>;
-  /** Move the sheet to a stop. Ignored while the viewer is not open. */
-  set(stop: number, options?: { readonly animate?: boolean }): void;
+  /** 0 at rest, then one per snap point. 0 while the sheet is not there. */
+  readonly snap: Accessor<number>;
+  readonly setSnap: (snap: number, options?: { readonly animate?: boolean }) => void;
 }
 
-export interface FluidboxSolidParts {
-  Root: <TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>) => JSX.Element;
-  Trigger: <TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>) => JSX.Element;
-  Viewer: (props: FluidboxViewerProps) => JSX.Element;
-  Controls: (props?: FluidboxControlsProps) => JSX.Element;
-  Close: (props: FluidboxActionProps) => JSX.Element;
-  Previous: (props: FluidboxActionProps) => JSX.Element;
-  Next: (props: FluidboxActionProps) => JSX.Element;
-  ZoomIn: (props: FluidboxActionProps) => JSX.Element;
-  ZoomOut: (props: FluidboxActionProps) => JSX.Element;
-  ZoomReset: (props: FluidboxActionProps) => JSX.Element;
-  Thumbnails: <TItem extends FluidboxItem>(props: FluidboxThumbnailsProps<TItem>) => JSX.Element;
-  Sheet: <TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>) => JSX.Element;
-  SheetStop: (props: FluidboxSheetStopProps) => JSX.Element;
-  ThumbnailOverlay: (props: FluidboxThumbnailOverlayProps) => JSX.Element;
-  FrameLayer: (props: FluidboxFrameLayerProps) => JSX.Element;
+/** The slide a part is inside, from `useFluidboxSlide`. Its fields are getters: don't destructure them. */
+export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
+  readonly item: TItem;
+  /** The item's index, read live, and reactive: new items keep a slide whose item moved. */
+  readonly index: number;
+  /** Whether the slide is the one on show. Reactive: read it in JSX or an effect. */
+  readonly active: boolean;
+  /** True while an open waits for this slide. */
+  readonly opening: boolean;
+  /** Aborted when the slide unloads. */
+  readonly signal: AbortSignal;
+  onActiveChange(this: void, listener: (active: boolean) => void): () => void;
+  /**
+   * What the trigger showed, on the slide an open started from it: `video`
+   * reads the trigger's `<video>` live. Null on the other slides. Read live,
+   * as an open can start from a trigger after the slide rendered.
+   */
+  readonly origin: FluidboxSlideOrigin | null;
+  /**
+   * Hand the playback back to the trigger's video as the viewer closes from
+   * this slide. Pass what it returns to `onCleanup`.
+   */
+  returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
+  /** Make the opening flight also wait for this promise. Call it in the component's body or `onMount`. */
+  waitUntil(this: void, promise: Promise<unknown>): void;
+  /** Put the slide in its error state, with `error` as the `mediaerror`'s cause. */
+  fail(this: void, error?: unknown): void;
+  /** Follow the box's zoom pose. Returns a function that stops listening. */
+  onZoom(this: void, listener: (pose: FluidboxZoomPose) => void): () => void;
 }
