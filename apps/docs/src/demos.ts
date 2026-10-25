@@ -14,7 +14,7 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       const scene = scenes.find((candidate) => candidate.id === id);
       if (!scene) continue;
       const item = document.createElement("fluidbox-item");
-      item.setAttribute("item-id", `doc-${scene.id}`);
+      item.setAttribute("value", `doc-${scene.id}`);
       item.style.setProperty("--ratio", String(scene.width / scene.height));
       const image = () =>
         Object.assign(document.createElement("img"), {

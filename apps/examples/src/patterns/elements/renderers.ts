@@ -5,7 +5,7 @@ export function renderers(root: HTMLElement) {
   const gallery = root.querySelector("fluidbox-gallery")!;
   // Items from JS; the buttons marked data-fluidbox-value open them.
   gallery.items = media;
-  gallery.renderers = {
+  gallery.slides = {
     note({ media }) {
       const note = document.createElement("article");
       note.className = "pattern-note";

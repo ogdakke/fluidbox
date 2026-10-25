@@ -81,7 +81,7 @@ if (params.has("virtual")) {
   if (params.has("rtl")) root.dir = "rtl";
   for (let index = 0; index < count; index++) {
     const lightbox = document.createElement("fluidbox-item");
-    lightbox.setAttribute("item-id", String(index));
+    lightbox.setAttribute("value", String(index));
     lightbox.dataset.testIndex = String(index);
     const trigger = document.createElement("button");
     trigger.type = "button";

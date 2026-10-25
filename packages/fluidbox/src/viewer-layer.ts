@@ -1,4 +1,4 @@
-import { allControlNames, controlNames, fluidboxControls, zoomControlNames } from "./controls";
+import { allControlNames, fluidboxControls, zoomControlNames } from "./controls";
 import {
   boundControls,
   namingOf,
@@ -98,16 +98,6 @@ export function drawViewerLayer(
     observer.observe(target, { childList: true, subtree: true });
     signal.addEventListener("abort", () => observer.disconnect(), { once: true });
     place();
-  }
-  // A <fluidbox-controls> the content left, as a gallery's template does, stands
-  // for the defaults, and with `zoom` for the zoom controls too.
-  for (const placeholder of target.querySelectorAll("fluidbox-controls")) {
-    const names = placeholder.hasAttribute("zoom")
-      ? [...controlNames, ...zoomControlNames]
-      : controlNames;
-    const expanded = controlNodes(target.ownerDocument, names, labels, icons);
-    placeholder.replaceWith(...expanded);
-    buttons.push(...expanded);
   }
   // Buttons marked as controls work wherever the viewer content puts them.
   wireControls(target, fluidbox, labels, signal);

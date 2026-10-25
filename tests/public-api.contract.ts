@@ -544,7 +544,20 @@ void [latestOptions, resolved];
 const gallery = document.createElement("fluidbox-gallery");
 assert<Equal<typeof gallery, FluidboxGalleryElement>>();
 gallery.items = photos;
+gallery.slides = { note: note2 };
+// @ts-expect-error the renderers property is now slides
 gallery.renderers = { note: note2 };
+gallery.value = "one";
+gallery.value = null;
+const galleryValue: string | null = gallery.value;
+void galleryValue;
+gallery.dismiss = { drag: false, backdrop: false };
+gallery.wheel = "navigate";
+gallery.shareUrl = (shared) => `/photos/${shared.id}`;
+gallery.addEventListener("mediaerror", (event) => void [event.kind, event.cause]);
+void gallery.setFullscreen();
+void gallery.download();
+void gallery.share();
 gallery.viewer = ({ target }) => {
   target.append("Caption");
 };
@@ -558,6 +571,7 @@ const galleryFluidbox: Fluidbox | null = gallery.fluidbox;
 void [galleryState, gallerySheet, galleryFluidbox];
 gallery.preload(photo)();
 void gallery.load().then((loaded: boolean) => loaded);
+// @ts-expect-error preload is the attribute; preload() is the command
 gallery.loading = "press";
 void gallery.setItems(photos).then((applied: boolean) => applied);
 gallery.addEventListener("sheetchange", (event) => void event.snap);
@@ -585,7 +599,10 @@ gallery.source = photos;
 gallery.portal = viewer;
 
 const item: FluidboxItemElement = document.createElement("fluidbox-item");
-void [item.itemId, item.returns, item.trigger];
+const itemValue: string = item.value;
+void [itemValue, item.trigger];
+// @ts-expect-error the id is the value
+void item.itemId;
 item.addEventListener("fluidbox-preview-change", (event: FluidboxPreviewChangeEvent) => {
   void [event.detail.id, event.detail.item];
 });

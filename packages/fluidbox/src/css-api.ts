@@ -66,7 +66,11 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-dialog"] },
   /** The horizontal scroller of slides. */
   { names: ["data-fluidbox-slides"] },
-  /** A slide. `aria-hidden="false"` on the current one. */
+  /**
+   * A slide. `aria-hidden="false"` on the current one. On a `<template>` in a
+   * `<fluidbox-gallery>`, each slide of the item type its value names gets a
+   * copy of its content.
+   */
   { names: ["data-fluidbox-slide"] },
   /** The box that crops and rounds the media. */
   { names: ["data-fluidbox-frame"] },
@@ -192,6 +196,8 @@ export const parts: readonly CssName[] = [
    * and every one closes back onto it.
    */
   { names: ["data-fluidbox-value"] },
+  /** In a gallery's slide or viewer template: the element shows that field of the item as text. */
+  { names: ["data-fluidbox-text"] },
   /** A media add-on's box in a custom slide: a video's, a spin's or a model's. */
   { names: ["data-fluidbox-media-addon"] },
   /** A media add-on's poster layers: `thumbnail`, then the sharper `poster` over it. */

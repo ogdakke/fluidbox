@@ -1,3 +1,4 @@
+import { readMarkup, type FluidboxMarkupContext } from "./elements-registry";
 import { checkItemUrls } from "./media-url";
 import type {
   FluidboxCustomItemBase,
@@ -64,7 +65,7 @@ function slotted<TElement extends Element>(
   );
 }
 
-/** What `<fluidbox-item>` dispatches before a close flight lands on a different item of its `returns`. */
+/** What `<fluidbox-item>` dispatches before a close flight lands on another item of its `value`. */
 export type FluidboxPreviewChangeEvent = CustomEvent<{
   readonly id: string;
   readonly item: FluidboxItem;
@@ -75,23 +76,31 @@ export type FluidboxPreviewChangeEvent = CustomEvent<{
  * it, and a `<template slot="content">` holding the `<img>`, `<picture>`,
  * `<video>`, `<iframe>` or other markup the viewer shows.
  *
- * `returns="b c"` lists more items whose close flight returns to this trigger,
- * as a "+3" teaser does for an album; the item's own id may be among them. The
+ * `value` is the item's id. `value="a b c"` adds more items whose close
+ * flight returns to this trigger, as a "+3" teaser does for an album. The
  * trigger opens the item it last showed. Before such a flight, the item
  * dispatches `fluidbox-preview-change` with the id and item it lands on;
  * update the trigger's preview synchronously there. The gallery doesn't read
  * changes inside a trigger as changes to its items.
+ *
+ * Other markup is an item of the `type` attribute's slide, or without one, a
+ * slide of its own that shows the markup.
  */
 export class FluidboxItemElement extends HTMLElement {
-  get itemId(): string {
-    const id = this.getAttribute("item-id")?.trim();
-    if (!id) throw new TypeError("<fluidbox-item> requires a non-empty item-id attribute.");
-    return id;
+  /** The item's id, then the ids of the items that close back onto its trigger. */
+  get value(): string {
+    return this.getAttribute("value") ?? "";
   }
 
-  /** The ids in `returns`. */
-  get returns(): readonly string[] {
-    return this.getAttribute("returns")?.split(/\s+/).filter(Boolean) ?? [];
+  set value(value: string) {
+    this.setAttribute("value", value);
+  }
+
+  /** @internal The ids in `value`: the item's own first. */
+  get ids(): readonly string[] {
+    const ids = this.value.split(/\s+/).filter(Boolean);
+    if (!ids.length) throw new TypeError("<fluidbox-item> requires a value: the item's id.");
+    return ids;
   }
 
   /** @internal Called by the gallery before a close flight measures this trigger. */
@@ -118,7 +127,7 @@ export class FluidboxItemElement extends HTMLElement {
 
   /** @internal Called by the gallery to read the item. */
   compile(): DeclarativeFluidboxDefinition {
-    const id = this.itemId;
+    const id = this.ids[0]!;
     const trigger = this.trigger;
     const triggerImage = trigger?.querySelector<HTMLImageElement>("img");
     const template = this.contentTemplate;
@@ -129,10 +138,12 @@ export class FluidboxItemElement extends HTMLElement {
     const sheet = slotted(this, "sheet", HTMLTemplateElement) ?? undefined;
     const thumbnail = triggerImage ? thumbnailOf(triggerImage) : undefined;
     const placeholder = this.getAttribute("placeholder");
+    const caption = this.getAttribute("caption");
     const base = {
       id,
       ...(thumbnail ? { thumbnail } : {}),
       ...(placeholder ? { placeholder } : {}),
+      ...(caption ? { caption } : {}),
     };
     const done = (item: FluidboxItem): DeclarativeFluidboxDefinition => {
       checkItemUrls(item);
@@ -147,9 +158,9 @@ export class FluidboxItemElement extends HTMLElement {
       return { width, height };
     };
     // Without a name of its own, content takes its trigger's, and the id only as a last resort.
+    const fallback =
+      trigger?.getAttribute("aria-label") || triggerImage?.alt || trigger?.textContent?.trim();
     const named = (name: string | null) => {
-      const fallback =
-        trigger?.getAttribute("aria-label") || triggerImage?.alt || trigger?.textContent?.trim();
       if (name || fallback) return name || fallback!;
       console.warn(`Fluidbox item ${id} has no accessible name; give its content an aria-label.`);
       return id;
@@ -159,6 +170,14 @@ export class FluidboxItemElement extends HTMLElement {
       if (!src) throw new TypeError(`The ${kind} of item ${id} needs a src attribute.`);
       return src;
     };
+
+    // An add-on's reading comes first, as a YouTube iframe is an embed.
+    const context: FluidboxMarkupContext = {
+      ...base,
+      title: content.getAttribute("aria-label") || content.title || fallback || id,
+    };
+    const read = readMarkup(content, context);
+    if (read) return done(read);
 
     const image =
       content instanceof HTMLPictureElement
@@ -170,6 +189,8 @@ export class FluidboxItemElement extends HTMLElement {
       const sources = pictureSources(content instanceof HTMLPictureElement ? content : null);
       const srcset = image.getAttribute("srcset");
       const sizes = image.getAttribute("sizes");
+      const zoomSrc = image.dataset.zoomSrc;
+      const zoomSrcset = image.dataset.zoomSrcset;
       return done({
         ...base,
         type: "image",
@@ -179,6 +200,14 @@ export class FluidboxItemElement extends HTMLElement {
         ...(srcset ? { srcset } : {}),
         ...(sizes ? { sizes } : {}),
         ...(sources ? { sources } : {}),
+        ...(zoomSrc || zoomSrcset
+          ? {
+              zoom: {
+                ...(zoomSrc ? { src: zoomSrc } : {}),
+                ...(zoomSrcset ? { srcset: zoomSrcset } : {}),
+              },
+            }
+          : {}),
       });
     }
 
@@ -228,16 +257,20 @@ export class FluidboxItemElement extends HTMLElement {
       });
     }
 
-    // Markup has a slide of its own, which the gallery registers under the item's type.
-    const key = `fluidbox-item:${id}`;
+    // Markup is an item of its type's slide, or has a slide of its own, which
+    // the gallery registers under the item's type.
+    const type = this.getAttribute("type");
+    const key = type || `fluidbox-item:${id}`;
+    const markup = {
+      ...base,
+      type: key,
+      title: named(this.getAttribute("aria-label") || content.getAttribute("aria-label")),
+      width: dimension(content, "width") || thumbnail?.width || 1,
+      height: dimension(content, "height") || thumbnail?.height || 1,
+    } satisfies FluidboxCustomItemBase<string> as unknown as FluidboxItem;
+    if (type) return done(markup);
     return {
-      ...done({
-        ...base,
-        type: key,
-        title: named(this.getAttribute("aria-label") || content.getAttribute("aria-label")),
-        width: dimension(content, "width") || thumbnail?.width || 1,
-        height: dimension(content, "height") || thumbnail?.height || 1,
-      } satisfies FluidboxCustomItemBase<string> as unknown as FluidboxItem),
+      ...done(markup),
       renderer: [
         key,
         ({ media }) => {

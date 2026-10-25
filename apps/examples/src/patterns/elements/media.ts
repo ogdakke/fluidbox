@@ -9,7 +9,7 @@ export function media(root: HTMLElement) {
   // Items from JS; the buttons marked data-fluidbox-value open them.
   gallery.items = productMedia;
   // The items' types name these slides: "embed", "spin" and "model".
-  gallery.renderers = {
+  gallery.slides = {
     embed: embedSlide,
     spin: createSpinSlide(),
     // <model-viewer> loads when a model first comes on show.
