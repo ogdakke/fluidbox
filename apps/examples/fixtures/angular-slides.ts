@@ -5,6 +5,7 @@ import {
   Input,
   provideZonelessChangeDetection,
   signal,
+  ɵDEFER_BLOCK_DEPENDENCY_INTERCEPTOR as DEFER_BLOCK_DEPENDENCY_INTERCEPTOR,
   type OnInit,
 } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
@@ -25,18 +26,33 @@ mountSite("fixtures", {
 declare module "@ogdakke/fluidbox" {
   interface FluidboxItemTypes {
     lazy: FluidboxCustomItemBase<"lazy">;
+    layered: FluidboxCustomItemBase<"layered">;
+    tap: FluidboxCustomItemBase<"tap">;
     held: FluidboxCustomItemBase<"held">;
     reel: FluidboxCustomItemBase<"reel">;
   }
 }
 
-/** Whether the lazy slide's @defer block may show. */
-const lazyReady = signal(false);
+/**
+ * Until the test lets them, every @defer block's dependencies stay loading,
+ * as a slow chunk would: the page compiles in the browser, where a block has
+ * nothing of its own to load. Angular's development builds take this hook.
+ */
+let openLoads!: () => void;
+const loads = new Promise<void>((resolve) => (openLoads = resolve));
+const slowLoads = {
+  intercept: (load: (() => Promise<unknown>[]) | null) => (): Promise<unknown>[] => [
+    // A loaded dependency is a component, as an import of its chunk gives.
+    loads.then(() => LazyCard),
+    ...(load?.() ?? []),
+  ],
+  setInterceptor: () => {},
+};
 
 /** What the slides saw, and the gates the tests open. */
 const fixture = {
-  /** Lets the lazy slide's @defer block show. */
-  resolveLazy: () => lazyReady.set(true),
+  /** Lets the @defer blocks' dependencies finish loading. */
+  resolveLazy: () => openLoads(),
   /** Settles the held slide's waitUntil promise. */
   openGate: undefined as (() => void) | undefined,
   /** Each reel slide's origin, read again whenever the test asks. */
@@ -67,7 +83,7 @@ const parted: FluidboxImageItem[] = [
   { ...photo("missing", "/missing-photo.svg"), caption: "A photo that is not there" },
 ];
 
-const custom = (type: "lazy" | "held" | "reel", id: string): FluidboxItem => ({
+const custom = (type: "lazy" | "layered" | "tap" | "held" | "reel", id: string): FluidboxItem => ({
   type,
   id,
   title: `${type} ${id}`,
@@ -95,16 +111,12 @@ class Grid {
   @Input({ required: true }) items!: readonly FluidboxItem[];
 }
 
-/** The content a @defer block shows once the test lets it. */
+/** The content a @defer block shows once its dependencies have loaded. */
 @Component({
   selector: "app-lazy-card",
   standalone: true,
-  imports: [FluidboxModule],
-  template: `
-    <ng-template fluidboxMedia>
-      <div class="media-probe" data-test="lazy-card">Loaded</div>
-    </ng-template>
-  `,
+  host: { class: "media-probe", "data-test": "lazy-card" },
+  template: `Loaded`,
 })
 class LazyCard {}
 
@@ -206,15 +218,39 @@ class Reel implements OnInit {
         </ng-template>
       </ng-template>
     </div>
-    <h2>A slide that defers</h2>
+    <h2>Slides that defer</h2>
     <div fluidboxRoot [items]="lazy">
       <app-grid [items]="lazy" id="lazy" />
+      <!-- Loading in the media: the open waits for it. -->
       <ng-template fluidboxSlide="lazy">
-        @defer (when lazyReady()) {
-          <app-lazy-card />
+        <ng-template fluidboxMedia>
+          @defer (on immediate) {
+            <app-lazy-card />
+          } @placeholder {
+            <p data-test="lazy-placeholder">Waiting</p>
+          }
+        </ng-template>
+      </ng-template>
+      <!-- Loading in the layer around the media: the open doesn't wait. -->
+      <ng-template fluidboxSlide="layered">
+        <ng-template fluidboxMedia>
+          <div class="media-probe" data-test="layered-card">In the box</div>
+        </ng-template>
+        @defer (on immediate) {
+          <p data-test="layered-note">Beside the box</p>
         } @placeholder {
-          <p data-test="lazy-placeholder">Waiting</p>
+          <p data-test="layered-placeholder">Waiting</p>
         }
+      </ng-template>
+      <!-- Waiting for a press: the open doesn't wait either. -->
+      <ng-template fluidboxSlide="tap">
+        <ng-template fluidboxMedia>
+          @defer (on interaction) {
+            <app-lazy-card />
+          } @placeholder {
+            <button type="button" class="media-probe" data-test="tap">Load</button>
+          }
+        </ng-template>
       </ng-template>
     </div>
     <h2>A slide that holds the open</h2>
@@ -251,8 +287,7 @@ class Slides {
   bound: string | null = null;
   readonly values = fixture.values;
   readonly cancel = fixture.cancel;
-  readonly lazy = [custom("lazy", "lazy")];
-  readonly lazyReady = lazyReady;
+  readonly lazy = [custom("lazy", "lazy"), custom("layered", "layered"), custom("tap", "tap")];
   readonly reels = reels;
   readonly held = signal<FluidboxItem[]>([custom("held", "held-a"), custom("held", "held-b")]);
 
@@ -262,4 +297,9 @@ class Slides {
 }
 
 document.querySelector("#root")!.append(document.createElement("angular-slides"));
-void bootstrapApplication(Slides, { providers: [provideZonelessChangeDetection()] });
+void bootstrapApplication(Slides, {
+  providers: [
+    provideZonelessChangeDetection(),
+    { provide: DEFER_BLOCK_DEPENDENCY_INTERCEPTOR, useValue: slowLoads },
+  ],
+});

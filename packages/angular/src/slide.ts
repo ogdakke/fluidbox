@@ -10,6 +10,7 @@ import {
   inject,
   input,
   signal,
+  type EmbeddedViewRef,
   type OnChanges,
   type OnDestroy,
   type OnInit,
@@ -67,7 +68,7 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Make the opening flight also wait for this promise, at most three seconds
    * in all. Call it in the constructor or ngOnInit. The slide already waits
-   * for a `@defer` block in it to show. If a later Angular hides that from
+   * for a `@defer` block in its media content that is loading. If a later Angular hides that from
    * the binding (a development warning says so), hold the open with this:
    * from a component in the slide outside the block, with a promise the
    * deferred content settles as it initialises.
@@ -83,6 +84,8 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
 export interface SlideScope<TItem extends FluidboxItem = FluidboxItem> {
   readonly slide: FluidboxSlide<TItem>;
   readonly api: FluidboxSlideApi<TItem>;
+  /** The slide's media content, whose loading `@defer` blocks hold the open. */
+  readonly media: Set<EmbeddedViewRef<unknown>>;
 }
 
 export const SLIDE = new InjectionToken<SlideScope<any>>("fluidbox slide");
@@ -128,9 +131,11 @@ type SlideContext<TItem extends FluidboxItem> = FluidboxItemContext<TItem> & { a
  * template for its box. Components inside reach the slide with
  * `injectFluidboxSlide()`.
  *
- * The open waits for the slide: for its first check, for `@defer` blocks in it
- * to show their content, then for the images and videos in its box and any
- * `waitUntil`, at most three seconds in all. Angular has no public way to see
+ * The open waits for the slide: for its first check, for `@defer` blocks in
+ * its `fluidboxMedia` content that are loading, then for the images and
+ * videos in its box and any `waitUntil`, at most three seconds in all. A block
+ * that waits on its placeholder for an interaction, a timer or a condition
+ * doesn't hold it, nor does one in the layer around the media. Angular has no public way to see
  * a `@defer` block's state, so the binding reads Angular's view data. Should
  * that fail, hold the open with `injectFluidboxSlide().waitUntil(promise)`
  * from outside the block, with a promise the deferred content settles.
@@ -197,8 +202,9 @@ export class FluidboxSlideDirective<TItem extends FluidboxItem = FluidboxItem>
       },
       active: slide.active,
     };
+    const scope: SlideScope<TItem> = { slide, api, media: new Set() };
     const injector = Injector.create({
-      providers: [{ provide: SLIDE, useValue: { slide, api } satisfies SlideScope<TItem> }],
+      providers: [{ provide: SLIDE, useValue: scope }],
       parent: this.#injector,
     });
     const mounted: Mounted<SlideContext<TItem>> = mountView(
@@ -224,8 +230,10 @@ export class FluidboxSlideDirective<TItem extends FluidboxItem = FluidboxItem>
       mounted.check();
     });
     // The view has rendered, and the parts in it have drawn into the box and
-    // called waitUntil. A @defer block that hasn't shown holds the open too.
-    holdForDeferred(mounted.view, slide, mounted.check);
+    // called waitUntil. A @defer block loading in the media holds the open too.
+    // Only the media content holds the open: what the layer shows around it
+    // is not what the open flies onto.
+    holdForDeferred(this.#zone, () => scope.media, slide);
     release();
     return () => {
       stopActive();
@@ -301,12 +309,14 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
       this.#scope.slide.media,
       this.#injector,
     );
+    this.#scope.media.add(this.#content.view);
     // After the content's, so an explicit zoom wins over fluidbox-image's.
     this.#zoomable();
   }
 
   ngOnDestroy(): void {
     this.#drawn?.();
+    if (this.#content) this.#scope.media.delete(this.#content.view);
     this.#content?.dispose();
     this.#restore?.();
   }

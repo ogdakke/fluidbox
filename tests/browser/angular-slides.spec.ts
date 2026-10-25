@@ -20,7 +20,7 @@ const shown = '[data-fluidbox-slide][aria-hidden="false"]';
 
 async function load(page: Page) {
   await page.goto("/angular-slides.html");
-  await expect(page.locator("#lazy [data-item]")).toHaveCount(1);
+  await expect(page.locator("#lazy [data-item]")).toHaveCount(3);
 }
 
 /** Whether the open is still waiting for its slide: mounted but not yet shown. */
@@ -45,7 +45,7 @@ const inSlideAtFlight = (page: Page, selector: string) =>
     { shown, selector },
   );
 
-test("a slide whose @defer block has not shown waits inside the viewer, and the open flies onto what it renders", async ({
+test("a @defer loading in a slide's media holds the open inside the viewer, and the open flies onto what it renders", async ({
   page,
 }) => {
   // On the Angular the repo builds with, the binding reads the block's state.
@@ -67,6 +67,61 @@ test("a slide whose @defer block has not shown waits inside the viewer, and the 
   await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   await expect(page.locator(`${shown} [data-test="lazy-card"]`)).toBeVisible();
   expect(warnings.filter((text) => text.includes("view data"))).toEqual([]);
+});
+
+/** Frames from a press to the start of the opening flight. */
+const framesToFlight = (page: Page, selector: string) =>
+  page.locator(selector).evaluate(
+    (button: HTMLElement) =>
+      new Promise<number>((resolve) => {
+        let frames = 0;
+        const count = () => {
+          const viewer = document.querySelector("[data-fluidbox-viewer]");
+          if (viewer && !viewer.hasAttribute("data-fluidbox-prepared")) return resolve(frames);
+          frames += 1;
+          requestAnimationFrame(count);
+        };
+        button.click();
+        requestAnimationFrame(count);
+      }),
+  );
+
+test("a @defer in the layer around a slide's media doesn't hold the open", async ({ page }) => {
+  await load(page);
+  // Its dependencies never finish loading here; the cap would be 180 frames.
+  const frames = await framesToFlight(page, '#lazy [data-item="layered"]');
+  expect(frames).toBeLessThan(30);
+  await expect(page.locator(`${shown} [data-test="layered-card"]`)).toBeVisible();
+  await expect(page.locator(`${shown} [data-test="layered-placeholder"]`)).toBeAttached();
+});
+
+test("a @defer that waits for a press doesn't hold the open, and the slide stops checking it", async ({
+  page,
+}) => {
+  // Count every frame callback the page asks for.
+  await page.addInitScript(() => {
+    const request = window.requestAnimationFrame.bind(window);
+    const counter = { calls: 0 };
+    Object.assign(window, { frameRequests: counter });
+    window.requestAnimationFrame = (callback) => {
+      counter.calls += 1;
+      return request(callback);
+    };
+  });
+  await load(page);
+  const frames = await framesToFlight(page, '#lazy [data-item="tap"]');
+  expect(frames).toBeLessThan(30);
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(page.locator(`${shown} [data-test="tap"]`)).toBeVisible();
+  // At rest, the open viewer asks for no frames: nothing walks the slide's view.
+  await page.waitForTimeout(300);
+  const calls = () =>
+    page.evaluate(
+      () => (window as unknown as { frameRequests: { calls: number } }).frameRequests.calls,
+    );
+  const before = await calls();
+  await page.waitForTimeout(500);
+  expect((await calls()) - before).toBe(0);
 });
 
 test("a slide reads its index and its origin live", async ({ page }) => {
