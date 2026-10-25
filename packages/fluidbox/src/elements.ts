@@ -10,3 +10,9 @@ export { FluidboxGalleryElement };
 export type { FluidboxGalleryEventMap } from "./gallery";
 export { FluidboxThumbnailsElement, FluidboxSheetElement } from "./thumbnails";
 export { FluidboxItemElement, type FluidboxPreviewChangeEvent } from "./item";
+export {
+  defineMarkup,
+  defineSlide,
+  type FluidboxMarkupContext,
+  type FluidboxMarkupReader,
+} from "./elements-registry";

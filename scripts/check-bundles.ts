@@ -27,6 +27,9 @@ const entrypoints = [
   "angular-embed",
   "angular-model",
   "angular-spin",
+  "elements-embed",
+  "elements-model",
+  "elements-spin",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -55,6 +58,9 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "angular-embed": ["@angular/core"],
   "angular-model": ["@angular/core"],
   "angular-spin": ["@angular/core"],
+  "elements-embed": [],
+  "elements-model": [],
+  "elements-spin": [],
 };
 
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
@@ -70,10 +76,11 @@ const bindingPrefix = new RegExp(
 // baseline/bundle-budget.md records the measurements behind them and why they moved.
 // The React binding's redesigned parts added about 1,430 B to its initial chunk; the size
 // pass after step 3 took 634 B back, mostly development-only checks and messages. The Vue
-// binding's added about 1,850 B to its own.
+// binding's added about 1,850 B to its own. The custom elements' value, slide templates and
+// registry added about 740 B to theirs; their parts load only for a gallery with templates.
 const initialGzipLimits: Record<Entry, number> = {
   root: 9_850,
-  elements: 14_000,
+  elements: 14_900,
   react: 17_200,
   // Solid's redesigned parts, the end of its icon code and the server viewer: about 3,280 B more (step 4).
   solid: 17_000,
@@ -101,6 +108,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "angular-embed": 22_000,
   "angular-model": 20_650,
   "angular-spin": 21_350,
+  "elements-embed": 17_700,
+  "elements-model": 16_450,
+  "elements-spin": 17_200,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -112,7 +122,7 @@ const baselineCssGzipLimit = 3_300;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 44_150,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 47_450,
+  elements: 50_250,
   react: 50_850,
   solid: 50_600,
   vue: 51_250,
@@ -136,6 +146,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "angular-embed": 55_600,
   "angular-model": 54_150,
   "angular-spin": 54_900,
+  "elements-embed": 53_050,
+  "elements-model": 51_800,
+  "elements-spin": 52_550,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -164,11 +177,14 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
   "angular-embed": 1_200,
   "angular-model": 1_200,
   "angular-spin": 1_200,
+  "elements-embed": 1_200,
+  "elements-model": 1_200,
+  "elements-spin": 1_200,
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
   root: 45_300,
-  elements: 48_600,
+  elements: 51_400,
   react: 52_000,
   solid: 51_750,
   vue: 52_400,
@@ -192,10 +208,13 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "angular-embed": 56_750,
   "angular-model": 55_300,
   "angular-spin": 56_050,
+  "elements-embed": 54_200,
+  "elements-model": 52_950,
+  "elements-spin": 53_700,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
-  elements: 50_300,
+  elements: 53_050,
   react: 53_700,
   solid: 53_450,
   vue: 54_050,
@@ -220,6 +239,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "angular-embed": 58_400,
   "angular-model": 57_000,
   "angular-spin": 57_700,
+  "elements-embed": 55_850,
+  "elements-model": 54_600,
+  "elements-spin": 55_350,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
@@ -313,8 +335,8 @@ for (const name of entrypoints) {
       `reachable JS gzip budget exceeded (${reachableJsGzipLimits[name]} B)`,
     activationWithCss.gzipBytes > activationWithCssGzipLimits[name] &&
       `activation with CSS gzip budget exceeded (${activationWithCssGzipLimits[name]} B)`,
-    name !== "elements" && registersFluidbox && "custom elements loaded eagerly",
-    name === "elements" && !registersFluidbox && "custom element registration missing",
+    !name.startsWith("elements") && registersFluidbox && "custom elements loaded eagerly",
+    name.startsWith("elements") && !registersFluidbox && "custom element registration missing",
     carriesExtension && "sheet extension bundled into a core entry",
     ...Object.entries(addonMarkers)
       .filter(

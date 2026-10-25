@@ -11,12 +11,18 @@ import { fluidboxControls } from "./controls";
 export type ControlNaming = "text" | "label" | false;
 
 /**
- * How a control the page made is named: the counter by its text, one with an
- * `aria-label`, `aria-labelledby` or `data-fluidbox-label="content"` by what it
- * has, and the rest by `aria-label` from the labels.
+ * How a control the page made is named: the counter, and a control marked
+ * `data-fluidbox-default` that holds no element, as an icon, by its text; one with an `aria-label`,
+ * `aria-labelledby` or `data-fluidbox-label="content"` by what it has; and
+ * the rest by `aria-label` from the labels.
  */
 export function namingOf(element: Element, name: FluidboxControlName): ControlNaming {
-  if (name === "counter") return "text";
+  // An icon inside keeps the control named by its label.
+  if (
+    name === "counter" ||
+    (element.hasAttribute("data-fluidbox-default") && !element.childElementCount)
+  )
+    return "text";
   return element.hasAttribute("aria-label") ||
     element.hasAttribute("aria-labelledby") ||
     element.getAttribute("data-fluidbox-label") === "content"

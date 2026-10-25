@@ -9,6 +9,9 @@
   "type": "module",
   "sideEffects": [
     "./src/elements.ts",
+    "./src/elements-embed.ts",
+    "./src/elements-model.ts",
+    "./src/elements-spin.ts",
     "./src/item.ts",
     "./src/gallery.ts",
     "./src/thumbnails.ts",
@@ -19,6 +22,9 @@
     "./src/thumbnails.css",
     "./src/baseline.css",
     "./dist/elements.js",
+    "./dist/elements/embed.js",
+    "./dist/elements/model.js",
+    "./dist/elements/spin.js",
     "./dist/thumbnails.js",
     "./dist/sheet.js",
     "./dist/styles.css",
@@ -34,6 +40,18 @@
     "./elements": {
       "types": "./dist/elements.d.ts",
       "import": "./dist/elements.js"
+    },
+    "./elements/embed": {
+      "types": "./dist/elements/embed.d.ts",
+      "import": "./dist/elements/embed.js"
+    },
+    "./elements/model": {
+      "types": "./dist/elements/model.d.ts",
+      "import": "./dist/elements/model.js"
+    },
+    "./elements/spin": {
+      "types": "./dist/elements/spin.d.ts",
+      "import": "./dist/elements/spin.js"
     },
     "./react": {
       "types": "./dist/react/index.d.ts",

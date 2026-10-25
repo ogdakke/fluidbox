@@ -38,7 +38,7 @@ function sheetTemplate(photo: Photo): HTMLTemplateElement {
 export function mountElements(gallery: HTMLElement): void {
   for (const photo of photos) {
     const item = document.createElement("fluidbox-item");
-    item.setAttribute("item-id", photo.id);
+    item.setAttribute("value", photo.id);
     item.style.setProperty("--ratio", String(photo.width / photo.height));
 
     const trigger = document.createElement("button");
@@ -119,7 +119,7 @@ export function mountControls(gallery: HTMLElement, form: HTMLFormElement): void
   sheet.setAttribute("snap-points", "content");
   const viewer = document.createElement("template");
   viewer.setAttribute("slot", "viewer");
-  viewer.innerHTML = `<fluidbox-controls></fluidbox-controls>
+  viewer.innerHTML = `<fluidbox-toolbar></fluidbox-toolbar>
     <button type="button" class="info-toggle" data-fluidbox-sheet-snap="1">Info</button>`;
 
   // Adding or removing an add-on rebuilds the viewer, so only touch the ones that changed.

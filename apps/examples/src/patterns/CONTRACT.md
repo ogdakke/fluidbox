@@ -48,7 +48,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
 
 1. **basic** — one gallery of `photos` (4). One `button.pattern-thumb[data-test="trigger"]` per
    photo holding its thumbnail `<img>`. Previous, Next and Close controls in the viewer (framework
-   control parts; elements and JS use the defaults). Test: click trigger 1 → "Item 1 of 4"; click
+   control parts, `<fluidbox-toolbar>` in the elements' viewer template; JS uses the defaults). Test: click trigger 1 → "Item 1 of 4"; click
    `[data-fluidbox-next]` → "Item 2 of 4"; Escape closes; focus is on trigger 2.
 2. **overlay** — one trigger `[data-test="trigger"]` for the whole `album` (5): it opens
    `album[0]`, every album item returns to it (`returns`), and its `<img data-test="preview">` shows the item
@@ -64,7 +64,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
 4. **renderers** — a gallery of `media` (custom note, map iframe, video, YouTube iframe) with a trigger per item.
    The `note` renderer is a framework component that reads `theme` from the framework's own
    context mechanism (React context, Solid context, Vue provide/inject, Angular DI token; elements
-   and JS read it from a variable) and renders `<article class="pattern-note">Theme: dusk</article>`. Test: click trigger 1 → dialog
+   fill the note's `<template data-fluidbox-slide="note">` from a variable, and JS reads it from one) and renders `<article class="pattern-note">Theme: dusk</article>`. Test: click trigger 1 → dialog
    contains `.pattern-note` with text `Theme: dusk`; ArrowRight → an `iframe` slide; ArrowRight → "Item 3 of 4"
    (the video); ArrowRight → a YouTube `iframe` with `referrerpolicy` set.
 5. **programmatic** — a gallery of `photos` with a `.pattern-toolbar` holding:
@@ -80,7 +80,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    `zoom.src`; the triggers show `thumbnailSrc`) with zoom `{ step: 3, max: 6 }`, the second of
    `photos` with zoom off. The first gallery's viewer has the default controls and the zoom
    controls (`controls` with `zoomIn`, `zoomOut`, `zoomReset`; the framework Controls part with
-   `zoom`; `<fluidbox-controls zoom>` for elements), and an
+   `zoom`; `<fluidbox-toolbar>` and `<fluidbox-zoom-controls>` for elements), and an
    `output.pattern-zoom-level[data-test="zoom-level"]` showing `state.zoom.scale` as a rounded
    percentage (`100%`), empty without a zoom, read the framework's way (selector hook, signal,
    the Root's slot, an injected signal; `subscribe` in elements and JS). Test: open trigger 1 →
@@ -114,7 +114,8 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    `.pattern-caption` (the `viewer` option, the gallery's `<template slot="viewer">`, or the framework Viewer part) holding
    the active title `[data-test="title"]`, a counter `[data-test="counter"]` (`1 / 4`), and its
    own `button[data-test="prev"]`, `button[data-test="next"]`, `button[data-test="close"]` that
-   call `close()`, `previous()` and `next()`. Test: open trigger 1 → counter `1 / 4`; click next → `2 / 4`; click
+   call `close()`, `previous()` and `next()` (in elements, buttons marked `data-fluidbox-previous`,
+   `-next` and `-close`, with `<fluidbox-counter>` and a title from `data-fluidbox-text`). Test: open trigger 1 → counter `1 / 4`; click next → `2 / 4`; click
    close → dialog gone.
 10. **rtl** — a gallery of `photos` with the default thumbnails inside `<div dir="rtl" lang="ar">`,
     with `labels` set to `arabic` from shared.ts (a property on the gallery for elements). One
@@ -127,7 +128,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
 11. **url** — a gallery of `photos` whose open photo lives in the address as `?photo=N` (N =
     index + 1). Frameworks pass `open` and `index` from their own state and update it from the
     change callbacks (`onOpenChange`/`onIndexChange`, `v-model`-style `update:` events,
-    `[(open)]`/`[(index)]`); elements set the gallery's `open` and `index` attributes; JS calls
+    `[(open)]`/`[(index)]`); elements set the gallery's `value` and follow `valuechange`; JS calls
     `open()` and `close()`. Opening pushes a history entry, moving replaces it, closing goes back
     over it (or drops `photo` from an address the page loaded with), and `popstate` brings the
     viewer to the address. Thumbnails as in basic. Test: click trigger 2 → "Item 2 of 4" and
@@ -144,8 +145,10 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
 13. **media** — a gallery of `productMedia` (a photo, a YouTube facade from `youtubeItem`, a spin
     from `spinItem`, a model from `modelItem`) with a trigger per item (`thumbnailSrc`). The
     slides are the add-ons' own: `embedSlide`, `createSpinSlide()` and
-    `createModelSlide({ load })` loading `modelViewerUrl`. Elements and JS pass them as they
-    are; React, Vue, Solid and Angular wrap each in the framework's renderer API (a component, or
+    `createModelSlide({ load })` loading `modelViewerUrl`. JS passes them as they are; elements
+    import `elements/embed`, `elements/spin` and `elements/model`, which read a YouTube `<iframe>`,
+    `<img data-spin-frames>` and `<model-viewer>` in the items' markup, and set `slides.model` to
+    the slide with `load`; React, Vue, Solid and Angular wrap each in the framework's renderer API (a component, or
     in Solid a returned element, that calls the add-on on an element of its own with the slide's
     item, index, signal and activity). The spec stubs YouTube, its stills and the CDN
     `<model-viewer>` (`tests/browser/support/media.ts`). Test: open trigger 1 → "Item 1 of 4",

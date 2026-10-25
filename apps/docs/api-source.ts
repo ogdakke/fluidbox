@@ -40,11 +40,13 @@ function readEntries(): Map<string, Entry> {
   for (const [subpath, target] of Object.entries<Record<string, string>>(manifest.exports)) {
     const file = target.import ?? target.default;
     const name = subpath === "." ? "root" : subpath.slice(2);
-    const own = /^\.\/dist\/([\w.-]+?)(?:\.js)?$/.exec(file ?? "");
+    const own = /^\.\/dist\/([\w./-]+?)(?:\.js)?$/.exec(file ?? "");
     const binding = /^\.\/dist\/([\w-]+)\/([\w-]+)\.js$/.exec(file ?? "");
-    const source = binding
-      ? join(root, "packages", binding[1]!, `src/${binding[2]}.ts`)
-      : own && built.get(own[1]!) && join(packageDir, built.get(own[1]!)!);
+    // The core's own entries first: elements/embed is a tsdown entry, not a binding's.
+    const source =
+      own && built.get(own[1]!)
+        ? join(packageDir, built.get(own[1]!)!)
+        : binding && join(root, "packages", binding[1]!, `src/${binding[2]}.ts`);
     if (!source) throw new Error(`Can't tell which source builds ${subpath} (${file}).`);
     result.set(name, {
       path: subpath === "." ? manifest.name : `${manifest.name}/${name}`,

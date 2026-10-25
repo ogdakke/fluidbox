@@ -14,12 +14,12 @@ const imageSource = (index: number) =>
 
 for (let index = 0; index < 10; index++) {
   const item = document.createElement("fluidbox-item") as FluidboxItemElement;
-  item.setAttribute("item-id", `item-${index}`);
+  item.value = `item-${index}`;
   item.dataset.index = String(index);
   // The teaser stands in for the items behind it, which have no trigger of their own.
   if (index === 2) {
     item.dataset.previewMore = "";
-    item.setAttribute("returns", Array.from({ length: 7 }, (_, i) => `item-${i + 3}`).join(" "));
+    item.value = Array.from({ length: 8 }, (_, i) => `item-${i + 2}`).join(" ");
   }
   if (index > 2) item.dataset.previewHidden = "";
   const trigger = document.createElement("button");
@@ -71,7 +71,7 @@ void gallery.whenReady().then((fluidbox) => {
   const initialSrc = preview.src;
   const hidden = [...gallery.querySelectorAll<FluidboxItemElement>("[data-preview-hidden]")];
   const hiddenSources = new Map(
-    hidden.map((item) => [item.itemId, imageSource(Number(item.dataset.index))]),
+    hidden.map((item) => [item.value, imageSource(Number(item.dataset.index))]),
   );
   const hiddenIds = new Set(hiddenSources.keys());
   const showPreview = (id: string) => {
@@ -79,7 +79,8 @@ void gallery.whenReady().then((fluidbox) => {
   };
   teaser.addEventListener("fluidbox-preview-change", (event) => showPreview(event.detail.id));
   const overlay = teaser.querySelector<HTMLElement>("[data-fluidbox-transition-layer]")!;
-  const value = [teaser.itemId, ...hiddenIds];
+  const teaserId = "item-2";
+  const value = [teaserId, ...hiddenIds];
   // The overlay itself moves into the flying frame, and its label rides live on it.
   fluidbox.bindOverlay(overlay, value, { flight: "frame" });
   fluidbox.bindOverlay(overlay, value, {
@@ -99,7 +100,7 @@ void gallery.whenReady().then((fluidbox) => {
     },
   });
   let closingId: string | null = null;
-  let lastClosedId = teaser.itemId;
+  let lastClosedId = teaserId;
   fluidbox.subscribe((state) => {
     const id = state.value;
     if (state.status === "closing" && id && hiddenIds.has(id)) closingId = id;
@@ -112,7 +113,7 @@ void gallery.whenReady().then((fluidbox) => {
     } else if (closingId && state.status !== "closing") {
       closingId = null;
       showPreview(lastClosedId);
-    } else if (id === teaser.itemId || (id && hiddenIds.has(id))) {
+    } else if (id === teaserId || (id && hiddenIds.has(id))) {
       teaser.dataset.previewConcealed = "";
     }
   });

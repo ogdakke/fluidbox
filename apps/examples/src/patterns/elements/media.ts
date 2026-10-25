@@ -1,18 +1,15 @@
 // #region example
-import { embedSlide } from "@ogdakke/fluidbox/embed";
+import "@ogdakke/fluidbox/elements/embed";
+import "@ogdakke/fluidbox/elements/model";
+import "@ogdakke/fluidbox/elements/spin";
 import { createModelSlide } from "@ogdakke/fluidbox/model";
-import { createSpinSlide } from "@ogdakke/fluidbox/spin";
-import { modelViewerUrl, productMedia } from "../shared";
+import { modelViewerUrl } from "../shared";
 
 export function media(root: HTMLElement) {
   const gallery = root.querySelector("fluidbox-gallery")!;
-  // Items from JS; the buttons marked data-fluidbox-value open them.
-  gallery.items = productMedia;
-  // The items' types name these slides: "embed", "spin" and "model".
-  gallery.renderers = {
-    embed: embedSlide,
-    spin: createSpinSlide(),
-    // <model-viewer> loads when a model first comes on show.
+  // <model-viewer> loads when a model first comes on show. A page that loads
+  // it with its own <script> needs no slide of its own.
+  gallery.slides = {
     model: createModelSlide({ load: () => import(/* @vite-ignore */ modelViewerUrl) }),
   };
 }
