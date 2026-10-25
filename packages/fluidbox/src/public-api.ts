@@ -330,7 +330,9 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Hand the playback position back to the trigger's video on close. Read
    * once, when a close starts from this slide, before the closing flight.
-   * Returns a function that unregisters it.
+   * Returns a function that unregisters it. The helper for video: read just
+   * after `onClose` listeners run, on a close that flies, and written to the
+   * landing trigger's `<video>` for you.
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
   /**
@@ -338,7 +340,9 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    * flight measures the trigger, with what the trigger the close lands on
    * shows: null when it lands on none. That trigger may not be the one the
    * open started from, as after moving to another item. Returns a function
-   * that stops listening; `signal` stops it too.
+   * that stops listening; `signal` stops it too. The general form of
+   * `returnPlayback`, on every close, flown or not: hand any state home, as a
+   * model slide turns the trigger's live `<model-viewer>` to its view.
    */
   onClose(this: void, listener: (landing: FluidboxSlideOrigin | null) => void): () => void;
   /**

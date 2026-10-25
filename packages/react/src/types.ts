@@ -310,6 +310,7 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Hand the playback back to the trigger's video as the viewer closes from
    * this slide. Call it in an effect, and return what it returns as the cleanup.
+   * The video helper for `onClose`, read just after its listeners on a close that flies.
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
   /**
