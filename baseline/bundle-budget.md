@@ -37,7 +37,7 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | Elements model |        17,781 B |           53,335 B |           1,151 B |          54,486 B |                 56,145 B |
 | Elements spin  |        17,409 B |           52,964 B |           1,151 B |          54,115 B |                 55,774 B |
 
-`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
+`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,256 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
 The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each core entry, record the hardening and product-media work merged together:
 
