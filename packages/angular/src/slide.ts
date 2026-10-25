@@ -28,7 +28,13 @@ import type {
   FluidboxVideoOptions,
   FluidboxZoomPose,
 } from "@ogdakke/fluidbox";
-import { mountView, whenDeferred, type FluidboxItemContext, type Mounted } from "./mount.js";
+import {
+  holdForDeferred,
+  mountView,
+  optionalBoolean,
+  type FluidboxItemContext,
+  type Mounted,
+} from "./mount.js";
 import { injectRoot, internalsOf, type FluidboxSlidePart } from "./root.js";
 
 // The package build leaves the NODE_ENV check for the app's bundler, which
@@ -58,7 +64,14 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
    * this slide. Returns a function that unregisters it; call it in ngOnDestroy.
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
-  /** Make the opening flight also wait for this promise. Call it in the constructor or ngOnInit. */
+  /**
+   * Make the opening flight also wait for this promise, at most three seconds
+   * in all. Call it in the constructor or ngOnInit. The slide already waits
+   * for a `@defer` block in it to show. If a later Angular hides that from
+   * the binding (a development warning says so), hold the open with this:
+   * from a component in the slide outside the block, with a promise the
+   * deferred content settles as it initialises.
+   */
   waitUntil(this: void, promise: Promise<unknown>): void;
   /** Put the slide in its error state, with `error` as the `mediaerror`'s cause. */
   fail(this: void, error?: unknown): void;
@@ -117,7 +130,10 @@ type SlideContext<TItem extends FluidboxItem> = FluidboxItemContext<TItem> & { a
  *
  * The open waits for the slide: for its first check, for `@defer` blocks in it
  * to show their content, then for the images and videos in its box and any
- * `waitUntil`, at most three seconds in all.
+ * `waitUntil`, at most three seconds in all. Angular has no public way to see
+ * a `@defer` block's state, so the binding reads Angular's view data. Should
+ * that fail, hold the open with `injectFluidboxSlide().waitUntil(promise)`
+ * from outside the block, with a promise the deferred content settles.
  */
 @Directive({ selector: "ng-template[fluidboxSlide]", standalone: true })
 export class FluidboxSlideDirective<TItem extends FluidboxItem = FluidboxItem>
@@ -208,10 +224,10 @@ export class FluidboxSlideDirective<TItem extends FluidboxItem = FluidboxItem>
       mounted.check();
     });
     // The view has rendered, and the parts in it have drawn into the box and
-    // called waitUntil. Content in a @defer block holds the commit until it shows.
-    const stopDeferred = whenDeferred(mounted.view, mounted.check, release);
+    // called waitUntil. A @defer block that hasn't shown holds the open too.
+    holdForDeferred(mounted.view, slide, mounted.check);
+    release();
     return () => {
-      stopDeferred();
       stopActive();
       stopItems();
       mounted.dispose();
@@ -238,9 +254,22 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
    * Whether pinch, double-tap, wheel and the zoom controls zoom the box.
    * @default true when it holds a fluidbox-image, else false
    */
-  readonly zoom = input<boolean | undefined>(undefined);
+  readonly zoom = input<boolean | undefined, unknown>(undefined, { transform: optionalBoolean });
   /** Draw into the box with a plain-JS slide renderer. A new one draws afresh. */
   readonly render = input<FluidboxSlideRenderer<any> | undefined>(undefined);
+  /**
+   * Classes added to the box, and taken off again when they change or the
+   * slide goes. Bind it, `[class]="'rounded-lg'"`, or give `class` in
+   * `attributes`: Angular passes no static attribute of an `ng-template` to an
+   * input named `class`.
+   */
+  readonly class = input<string>("");
+  /**
+   * Attributes set on the box, as `{ "aria-label": "Plan", style: "border-radius: 8px" }`.
+   * `true` sets an attribute empty and `false` or null leaves it off; `style`
+   * sets its properties one by one. What was there comes back on teardown.
+   */
+  readonly attributes = input<FluidboxMediaAttributes | null | undefined>(undefined);
 
   readonly #scope = requireSlide("fluidboxMedia");
   readonly #template = inject<TemplateRef<unknown>>(TemplateRef);
@@ -249,16 +278,19 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
   readonly #app = inject(ApplicationRef);
   #content: Mounted<unknown> | undefined;
   #drawn: (() => void) | undefined;
+  #restore: (() => void) | undefined;
   #ready = false;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!this.#ready) return;
     if (changes["render"]) this.#draw();
     if (changes["zoom"]) this.#zoomable();
+    if (changes["class"] || changes["attributes"]) this.#apply();
   }
 
   ngOnInit(): void {
     this.#ready = true;
+    this.#apply();
     // Drawn before the content, as the content's parts may draw too.
     this.#draw();
     this.#content = mountView(
@@ -276,6 +308,12 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.#drawn?.();
     this.#content?.dispose();
+    this.#restore?.();
+  }
+
+  #apply(): void {
+    this.#restore?.();
+    this.#restore = applyAttributes(this.#scope.slide.media, this.class(), this.attributes());
   }
 
   #draw(): void {
@@ -304,6 +342,58 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
     const zoom = this.zoom();
     if (zoom !== undefined) this.#scope.slide.zoomable(zoom);
   }
+}
+
+/** What `fluidboxMedia` sets on the box: attribute values, and `style` as CSS text. */
+export type FluidboxMediaAttributes = Record<string, string | number | boolean | null | undefined>;
+
+/**
+ * Set classes and attributes on an element the viewer made, and return a
+ * function that puts back what was there.
+ */
+function applyAttributes(
+  element: HTMLElement,
+  className: string,
+  attributes: FluidboxMediaAttributes | null | undefined,
+): () => void {
+  const restores: (() => void)[] = [];
+  const added = className.split(/\s+/).filter((name) => name && !element.classList.contains(name));
+  element.classList.add(...added);
+  restores.push(() => element.classList.remove(...added));
+  for (const [name, value] of Object.entries(attributes ?? {})) {
+    if (value === undefined || value === null || value === false) continue;
+    if (name === "style") {
+      // The box's own inline style sizes it, so properties go in one at a time.
+      for (const declaration of String(value).split(";")) {
+        const colon = declaration.indexOf(":");
+        if (colon < 0) continue;
+        const property = declaration.slice(0, colon).trim();
+        const important = /!important\s*$/.test(declaration);
+        const css = declaration
+          .slice(colon + 1)
+          .replace(/!important\s*$/, "")
+          .trim();
+        if (!property || !css) continue;
+        const before = element.style.getPropertyValue(property);
+        const priority = element.style.getPropertyPriority(property);
+        element.style.setProperty(property, css, important ? "important" : "");
+        restores.push(() => element.style.setProperty(property, before, priority));
+      }
+      continue;
+    }
+    if (name === "class") {
+      restores.push(applyAttributes(element, String(value), null));
+      continue;
+    }
+    const before = element.getAttribute(name);
+    element.setAttribute(name, value === true ? "" : String(value));
+    restores.push(() =>
+      before === null ? element.removeAttribute(name) : element.setAttribute(name, before),
+    );
+  }
+  return () => {
+    for (const restore of restores.reverse()) restore();
+  };
 }
 
 /** Draw one of the built-in media into the slide's box, again as its item changes. */

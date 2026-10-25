@@ -1,6 +1,8 @@
 import {
   Directive,
+  ElementRef,
   NgZone,
+  Renderer2,
   booleanAttribute,
   computed,
   inject,
@@ -8,6 +10,7 @@ import {
   model,
   output,
   signal,
+  type AfterContentInit,
   type OnChanges,
   type OnDestroy,
   type Signal,
@@ -39,11 +42,14 @@ import {
 } from "@ogdakke/fluidbox";
 import {
   createFluidboxSync,
+  fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
   latestFindTrigger,
   resolveLabels,
+  takeOverFluidbox,
   unloadFluidbox,
+  type FluidboxStaticNode,
 } from "@ogdakke/fluidbox/kit";
 import { injectIsBrowser } from "./mount.js";
 
@@ -155,7 +161,7 @@ const zoomOption = (zoom: FluidboxOptions["zoom"]) =>
  */
 @Directive({ selector: "[fluidboxRoot]", exportAs: "fluidbox", standalone: true })
 export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
-  implements OnChanges, OnDestroy
+  implements OnChanges, AfterContentInit, OnDestroy
 {
   /** The gallery's items: an array, or a list read on demand. */
   readonly items = input<FluidboxItems<TItem>>([]);
@@ -183,7 +189,11 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly dismiss = input<FluidboxOptions<TItem>["dismiss"]>();
   /** What a vertical wheel or trackpad scroll does on an unzoomed slide. */
   readonly wheel = input<FluidboxOptions<TItem>["wheel"]>();
-  /** Where an item's page is: an id, or null for the gallery. Share shares it, unless `shareUrl` says otherwise. */
+  /**
+   * Where an item's page is: an id, or null for the gallery. Share shares it,
+   * unless `shareUrl` says otherwise, and the server's copy of an open viewer
+   * links its controls to it.
+   */
   readonly href = input<(value: string | null) => string | undefined>();
   /** The link Share shares for an item. @default the `href` of its id */
   readonly shareUrl = input<FluidboxOptions<TItem>["shareUrl"]>();
@@ -202,6 +212,10 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
 
   readonly #zone = inject(NgZone);
   readonly #browser = injectIsBrowser();
+  readonly #element = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly #renderer = inject(Renderer2);
+  /** The copy of the open viewer, rendered while the root opens on its first render. */
+  #copy: { element: HTMLElement; value: string } | null = null;
   readonly #slides = new Map<string, FluidboxSlidePart<TItem>>();
   /** The fluidbox. Parts bind to it as they are made. */
   // findTrigger and revealTrigger are read from the newest inputs on each use.
@@ -367,6 +381,17 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     this.#started = true;
     queueMicrotask(() => {
       if (this.#destroyed) return;
+      const copy = this.#copy;
+      if (starting && copy) {
+        // The viewer opens on the copy's item with no motion and hides the copy.
+        const done = () => {
+          if (this.#copy === copy) this.#dropCopy();
+        };
+        this.#zone.runOutsideAngular(
+          () => void takeOverFluidbox(this.fluidbox, copy.element, copy.value).then(done, done),
+        );
+        return;
+      }
       const value = this.value();
       this.#zone.runOutsideAngular(() =>
         this.#sync(starting && value === undefined ? (this.defaultValue() ?? undefined) : value),
@@ -374,8 +399,62 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     });
   }
 
+  /**
+   * Open on the first render, the root renders a copy of the open viewer at
+   * the end of its element, once the parts inside have said what it shows:
+   * on the server, so the page shows the photo before any script runs, and in
+   * the browser, where the viewer takes it over without a flight. A copy the
+   * server rendered and hydration kept is taken over as it is. It is built as
+   * elements, not HTML, so it renders under Trusted Types and a strict style-src.
+   */
+  ngAfterContentInit(): void {
+    const value = this.value() !== undefined ? this.value() : (this.defaultValue() ?? null);
+    if (value === null || value === undefined) return;
+    const { viewer, thumbnails, sheet } = this.#parts;
+    const nodes = fluidboxStaticViewerNodes({
+      items: this.items() ?? [],
+      value,
+      labels: this.resolvedLabels(),
+      loop: this.loop(),
+      href: this.href(),
+      thumbnails: !!thumbnails,
+      sheet: !!sheet,
+      controls: !viewer,
+    });
+    if (!nodes) return;
+    const host = this.#element.nativeElement;
+    const kept = this.#browser
+      ? [...host.children].find((child) => child.hasAttribute("data-fluidbox-server-viewer"))
+      : undefined;
+    let element = kept as HTMLElement | undefined;
+    if (!element) {
+      element = this.#renderer.createElement("div") as HTMLElement;
+      this.#renderer.setAttribute(element, "data-fluidbox-server-viewer", "");
+      this.#renderer.appendChild(element, this.#build(nodes));
+      this.#renderer.appendChild(host, element);
+    }
+    this.#copy = { element, value };
+  }
+
+  #build(each: FluidboxStaticNode | string): Node {
+    const renderer = this.#renderer;
+    if (typeof each === "string") return renderer.createText(each) as Node;
+    const element = renderer.createElement(each.tag) as Element;
+    for (const [name, value] of Object.entries(each.attributes))
+      renderer.setAttribute(element, name, value);
+    for (const child of each.children) renderer.appendChild(element, this.#build(child));
+    return element;
+  }
+
+  #dropCopy(): void {
+    const copy = this.#copy;
+    this.#copy = null;
+    if (copy) this.#renderer.removeChild(this.#element.nativeElement, copy.element);
+  }
+
   ngOnDestroy(): void {
     this.#destroyed = true;
+    this.#dropCopy();
     // The outputs stop first, so dropping the viewer reports no close.
     this.#events.abort();
     // Drops the viewer and closes it at once.
@@ -479,6 +558,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
    * stay outside the zone. Callbacks come back in through zone.run.
    */
   #update(options: FluidboxUpdateOptions<TItem>): void {
+    // A server render leaves the fluidbox as it was made: it never opens there.
+    if (!this.#browser) return;
     this.#zone.runOutsideAngular(() => this.fluidbox.update(options));
   }
 }

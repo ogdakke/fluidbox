@@ -8,6 +8,8 @@ declare global {
       reels: { index: number; read: () => { video?: { currentTime: number } } | null }[];
       held: { id: string; read: () => number }[];
       setHeldItems?: (items: unknown[]) => void;
+      values: (string | null)[];
+      cancel: string[];
     };
   }
 }
@@ -46,6 +48,11 @@ const inSlideAtFlight = (page: Page, selector: string) =>
 test("a slide whose @defer block has not shown waits inside the viewer, and the open flies onto what it renders", async ({
   page,
 }) => {
+  // On the Angular the repo builds with, the binding reads the block's state.
+  const warnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "warning") warnings.push(message.text());
+  });
   await load(page);
   await page.locator('#lazy [data-item="lazy"]').click();
   await expect(page.locator(overlay)).toHaveCount(1);
@@ -59,6 +66,7 @@ test("a slide whose @defer block has not shown waits inside the viewer, and the 
   expect(await landed).toBe(true);
   await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   await expect(page.locator(`${shown} [data-test="lazy-card"]`)).toBeVisible();
+  expect(warnings.filter((text) => text.includes("view data"))).toEqual([]);
 });
 
 test("a slide reads its index and its origin live", async ({ page }) => {
@@ -121,6 +129,10 @@ test("the open waits for a slide's commit and its waitUntil, then flies onto wha
   await load(page);
   await page.locator('#held [data-item="held-a"]').click();
   await expect(page.locator(overlay)).toHaveCount(1);
+  // fluidboxMedia gives the box its class and attributes, beside the viewer's own.
+  const box = page.locator(`${overlay} [data-test="held-box"]`).first();
+  await expect(box).toHaveClass(/\bheld-box\b/);
+  expect(await box.evaluate((element: HTMLElement) => element.style.outline)).toContain("tomato");
   // The content has committed, but its waitUntil holds the open.
   await expect(page.locator(`${overlay} [data-test="held-card"]`).first()).toBeAttached();
   await page.waitForTimeout(400);
@@ -179,6 +191,8 @@ test("the viewer's parts name themselves, follow the item on show, and show your
     "",
   );
   await expect(viewer.locator('[data-test="fullscreen"]')).toHaveAttribute("type", "button");
+  // A bare disabled attribute disables a control the viewer would enable.
+  await expect(viewer.locator('[data-test="zoom-in-off"]')).toBeDisabled();
   // Content you give names a control; the label then names it for assistive technology.
   await expect(viewer.locator('[data-test="share"]')).toHaveText("Pass it on");
   await expect(viewer.locator('[data-test="share"]')).not.toHaveAttribute(
@@ -190,11 +204,13 @@ test("the viewer's parts name themselves, follow the item on show, and show your
   await expect(download).toHaveAttribute("download", /.*/);
   await expect(download).not.toHaveAttribute("disabled", /.*/);
   await expect(viewer.locator('[data-test="counter"]')).toHaveText("1 / 2");
+  await expect(viewer.locator('[data-test="counter-of"]')).toHaveText("Photo 1 of 2");
   await expect(viewer.locator('[data-test="caption"]')).toHaveText("A square photo");
   await expect(viewer.locator('[data-test="error"]')).toHaveCount(0);
 
   await page.keyboard.press("ArrowRight");
   await expect(viewer.locator('[data-test="counter"]')).toHaveText("2 / 2");
+  await expect(viewer.locator('[data-test="counter-of"]')).toHaveText("Photo 2 of 2");
   await expect(viewer.locator('[data-test="caption"]')).toHaveText("A photo that is not there");
   await expect(download).toHaveAttribute("href", /\/missing-photo\.svg$/);
   // The file is missing: your error content shows in place of the default one.
@@ -203,6 +219,69 @@ test("the viewer's parts name themselves, follow the item on show, and show your
 
   await page.keyboard.press("ArrowLeft");
   await expect(viewer.locator('[data-test="error"]')).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+});
+
+test("[(value)] follows the viewer, and a change beforeValueChange cancels never reaches it", async ({
+  page,
+}) => {
+  await load(page);
+  const values = () => page.evaluate(() => [...window.angularSlides.values]);
+  const cancel = (actions: string[]) =>
+    page.evaluate(
+      (actions) => window.angularSlides.cancel.splice(0, Infinity, ...actions),
+      actions,
+    );
+
+  await cancel(["open"]);
+  await page.locator('#bound [data-item="one"]').click();
+  await page.waitForTimeout(300);
+  await expect(page.locator(dialog)).toHaveCount(0);
+  expect(await values()).toEqual([]);
+
+  await cancel(["move", "close"]);
+  await page.locator('#bound [data-item="one"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  expect(await values()).toEqual(["one"]);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(page.locator(`${shown} img`)).toHaveAttribute("src", /photo-square/);
+  expect(await values()).toEqual(["one"]);
+
+  await cancel([]);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(`${shown} img`)).toHaveAttribute("src", /photo-portrait/);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  expect(await values()).toEqual(["one", "two", null]);
+});
+
+test("a root open on its first render shows a copy of the viewer, which the viewer takes over", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    Object.assign(window, { copies: seen });
+    new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof Element && node.matches("[data-fluidbox-server-viewer]"))
+            seen.push(node.querySelector("img")?.getAttribute("src") ?? "");
+        }
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto("/angular-slides.html?open=two");
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(page.locator(`${shown} img`)).toHaveAttribute("src", /photo-portrait/);
+  // The copy showed the photo, and went once the viewer had it.
+  expect(await page.evaluate(() => (window as unknown as { copies: string[] }).copies)).toEqual([
+    "/photo-portrait.svg",
+  ]);
+  await expect(page.locator("[data-fluidbox-server-viewer]")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator(dialog)).toHaveCount(0);
 });

@@ -43,6 +43,9 @@ const fixture = {
   reels: [] as { index: number; read: () => FluidboxSlideOrigin | null }[],
   /** Each held slide's index, read again whenever the test asks. */
   held: [] as { id: string; read: () => number }[],
+  /** What the bound viewer's [(value)] emitted, and the actions its beforeValueChange cancels. */
+  values: [] as (string | null)[],
+  cancel: [] as string[],
   /** The items of the held viewer, which the test can change. */
   setHeldItems: undefined as ((items: FluidboxItem[]) => void) | undefined,
 };
@@ -110,7 +113,11 @@ class LazyCard {}
   standalone: true,
   imports: [FluidboxModule],
   template: `
-    <ng-template fluidboxMedia>
+    <ng-template
+      fluidboxMedia
+      [class]="'held-box'"
+      [attributes]="{ 'data-test': 'held-box', style: 'outline: 2px solid tomato' }"
+    >
       <div class="media-probe" data-test="held-card">
         {{ slide.item().title }} at {{ slide.index() }}
       </div>
@@ -161,15 +168,37 @@ class Reel implements OnInit {
       <app-grid [items]="photos" id="custom" />
       <ng-template fluidboxSlide="image"><fluidbox-image /></ng-template>
     </div>
+    @if (openOnLoad) {
+      <h2>A viewer open on its first render</h2>
+      <div fluidboxRoot [items]="photos" [defaultValue]="openOnLoad">
+        <app-grid [items]="photos" id="opened" />
+      </div>
+    }
+    <h2>A viewer bound with [(value)] that cancels some changes</h2>
+    <div
+      fluidboxRoot
+      [items]="photos"
+      [(value)]="bound"
+      (valueChange)="values.push($event ?? null)"
+      (beforeValueChange)="cancel.includes($event.action) && $event.preventDefault()"
+    >
+      <app-grid [items]="photos" id="bound" />
+    </div>
     <h2>A viewer of parts</h2>
     <div fluidboxRoot [items]="parted">
       <app-grid [items]="parted" id="parts" />
       <ng-template fluidboxViewer>
         <div fluidboxToolbar></div>
         <button fluidboxFullscreen data-test="fullscreen"></button>
+        <button fluidboxZoomIn disabled data-test="zoom-in-off"></button>
         <a fluidboxDownload data-test="download"></a>
         <button fluidboxShare data-test="share">Pass it on</button>
         <span fluidboxCounter data-test="counter"></span>
+        <span fluidboxCounter data-test="counter-of"
+          ><ng-template let-index="index" let-count="count"
+            >Photo {{ index + 1 }} of {{ count }}</ng-template
+          ></span
+        >
         <p fluidboxCaption data-test="caption"></p>
         <ng-template fluidboxError let-item>
           <p data-test="error">{{ item.alt }} didn't load.</p>
@@ -217,6 +246,11 @@ class Reel implements OnInit {
 class Slides {
   readonly photos = photos;
   readonly parted = parted;
+  // ?open=two opens a viewer on its first render, on the copy it renders.
+  readonly openOnLoad = new URLSearchParams(location.search).get("open");
+  bound: string | null = null;
+  readonly values = fixture.values;
+  readonly cancel = fixture.cancel;
   readonly lazy = [custom("lazy", "lazy")];
   readonly lazyReady = lazyReady;
   readonly reels = reels;

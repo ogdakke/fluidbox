@@ -41,7 +41,7 @@ import {
   targetKeys,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
-import { injectIsBrowser, mountView, type FluidboxItemContext } from "./mount.js";
+import { injectIsBrowser, optionalBoolean, mountView, type FluidboxItemContext } from "./mount.js";
 import { FluidboxBlockComponent, FluidboxOutletDirective } from "./outlet.js";
 import { injectRoot, internalsOf } from "./root.js";
 import { injectSlideScope } from "./slide.js";
@@ -384,7 +384,9 @@ abstract class NamedDirective implements AfterContentInit, AfterContentChecked {
 })
 abstract class ControlDirective extends NamedDirective implements OnInit, OnDestroy {
   /** Overrides the disabled state the viewer gives the control. */
-  readonly disabled = input<boolean | undefined>(undefined);
+  readonly disabled = input<boolean | undefined, unknown>(undefined, {
+    transform: optionalBoolean,
+  });
   protected abstract readonly control: FluidboxControlName;
   protected readonly name = computed(() =>
     fluidboxControls[this.control].label(this.root.resolvedLabels(), this.root.state()),
@@ -577,22 +579,48 @@ export class FluidboxZoomControlsComponent extends GroupDirective {
   protected readonly label = computed(() => this.#root.resolvedLabels().zoomed);
 }
 
-/** Where the viewer is, as `1 / 4`. Hidden from screen readers, which hear the slide's name. */
-@Directive({
+/** What a `fluidboxCounter` template gets: `let-index="index" let-count="count"`. */
+export interface FluidboxCounterContext {
+  /** The index of the item on show, from 0. */
+  index: number;
+  count: number;
+}
+
+/**
+ * Where the viewer is, as `1 / 4`. Hidden from screen readers, which hear the
+ * slide's name. An `ng-template` child draws it in place of the label's text:
+ * `<span fluidboxCounter><ng-template let-index="index" let-count="count">…</ng-template></span>`.
+ */
+@Component({
   selector: "[fluidboxCounter]",
   standalone: true,
+  imports: [FluidboxOutletDirective],
   host: {
     "aria-hidden": "true",
     "data-fluidbox-counter": "",
-    "[attr.hidden]": "text() === null ? '' : null",
-    "[textContent]": "text() ?? ''",
+    // The binding draws it, so the viewer doesn't write its text.
+    "data-fluidbox-managed": "",
+    "[attr.hidden]": "context() === null ? '' : null",
   },
+  template: `@if (context(); as context) {
+    @if (content) {
+      <ng-container [fluidboxOutlet]="content" [fluidboxOutletContext]="context" />
+    } @else {
+      {{ text() }}
+    }
+  }`,
 })
-export class FluidboxCounterDirective {
+export class FluidboxCounterComponent {
+  @ContentChild(TemplateRef, { descendants: false })
+  content?: TemplateRef<FluidboxCounterContext>;
   readonly #root = injectRoot("fluidboxCounter");
-  protected readonly text = computed(() => {
+  protected readonly context = computed((): FluidboxCounterContext | null => {
     const { index, count } = this.#root.state();
-    return index === null ? null : this.#root.resolvedLabels().counter(index, count);
+    return index === null ? null : { index, count };
+  });
+  protected readonly text = computed(() => {
+    const context = this.context();
+    return context && this.#root.resolvedLabels().counter(context.index, context.count);
   });
 }
 

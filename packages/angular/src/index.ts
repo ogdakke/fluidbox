@@ -3,7 +3,7 @@ import { NgModule } from "@angular/core";
 import {
   FluidboxCaptionComponent,
   FluidboxCloseDirective,
-  FluidboxCounterDirective,
+  FluidboxCounterComponent,
   FluidboxDownloadDirective,
   FluidboxErrorDirective,
   FluidboxFullscreenDirective,
@@ -37,7 +37,7 @@ export type { FluidboxItemContext } from "./mount.js";
 export {
   FluidboxCaptionComponent,
   FluidboxCloseDirective,
-  FluidboxCounterDirective,
+  FluidboxCounterComponent,
   FluidboxDownloadDirective,
   FluidboxErrorDirective,
   FluidboxFullscreenDirective,
@@ -55,6 +55,7 @@ export {
   FluidboxZoomInDirective,
   FluidboxZoomOutDirective,
   FluidboxZoomResetDirective,
+  type FluidboxCounterContext,
   type FluidboxErrorContext,
 } from "./parts.js";
 export {
@@ -73,6 +74,7 @@ export {
   FluidboxSlideDirective,
   FluidboxVideoComponent,
   injectFluidboxSlide,
+  type FluidboxMediaAttributes,
   type FluidboxSlideApi,
 } from "./slide.js";
 export { FluidboxThumbnailsDirective, type FluidboxThumbnailContext } from "./thumbnails.js";
@@ -134,7 +136,7 @@ const parts = [
   FluidboxFullscreenDirective,
   FluidboxDownloadDirective,
   FluidboxShareDirective,
-  FluidboxCounterDirective,
+  FluidboxCounterComponent,
   FluidboxCaptionComponent,
   FluidboxLoadingDirective,
   FluidboxErrorDirective,

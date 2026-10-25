@@ -70,4 +70,6 @@ The Angular binding's redesigned parts moved it by about 2.5 KB initial, to 17,2
 
 The Angular add-on parts are entries of their own, `angular/embed`, `angular/model` and `angular/spin`. Each consumer imports `FluidboxModule` and the part, as React's do.
 
+The Angular binding then grew by 1,823 B initial, to 19,078 B, with activation following. About 930 B of that is the server's copy of an open viewer, `fluidboxStaticViewerNodes` and its takeover, which React's initial chunk already carried. The rest is `class` and `attributes` on `fluidboxMedia`, a template for `fluidboxCounter`, and the `@defer` hold rewritten onto the slide's `waitUntil`, with a development warning for view data it can't read. The add-on entries moved by the same amount.
+
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

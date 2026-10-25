@@ -1,13 +1,19 @@
 import {
   ApplicationRef,
   PLATFORM_ID,
+  VERSION,
+  booleanAttribute,
   inject,
   type EmbeddedViewRef,
   type Injector,
   type NgZone,
   type TemplateRef,
 } from "@angular/core";
-import type { FluidboxItem } from "@ogdakke/fluidbox";
+import type { FluidboxItem, FluidboxSlide } from "@ogdakke/fluidbox";
+
+// The package build leaves the NODE_ENV check for the app's bundler, which
+// drops the warning in production. A page without a bundler has no process.
+declare const process: { env: { NODE_ENV?: string } };
 
 /**
  * What the sheet's, the thumbnails' and a slide's templates get: `{ item,
@@ -23,6 +29,13 @@ export interface FluidboxItemContext<TItem extends FluidboxItem = FluidboxItem> 
    */
   active?: boolean;
 }
+
+/**
+ * A boolean input that may be left unset: a bare attribute reads as true, as
+ * `booleanAttribute` reads it, and undefined stays undefined, for the default.
+ */
+export const optionalBoolean = (value: unknown): boolean | undefined =>
+  value === undefined ? undefined : booleanAttribute(value);
 
 /** True in the browser, false while rendering on the server. */
 export function injectIsBrowser(): boolean {
@@ -94,76 +107,99 @@ const DEFER_STATE = 1;
 /** DeferBlockState.Complete and DeferBlockState.Error: the block shows its content or its error. */
 const DEFER_DONE = [2, 3];
 
-/**
- * Whether a view holds a `@defer` block, at any depth, that hasn't shown its
- * content or its error yet. An unknown shape of Angular's view data counts as
- * nothing pending, so the slide commits as it renders.
- */
-export function deferPending(view: EmbeddedViewRef<unknown>): boolean {
+/** What a view's `@defer` blocks are doing, or "unknown" for view data of a shape this doesn't read. */
+type DeferStatus = "pending" | "shown" | "unknown";
+
+function deferStatus(view: EmbeddedViewRef<unknown>): DeferStatus {
   try {
-    return pendingIn((view as unknown as { _lView?: unknown })._lView, 0);
+    return statusIn((view as unknown as { _lView?: unknown })._lView, 0);
   } catch {
-    return false;
+    return "unknown";
   }
 }
 
-function pendingIn(lView: unknown, depth: number): boolean {
-  if (!Array.isArray(lView) || depth > 64) return false;
-  const data = (lView[TVIEW] as { data?: unknown } | undefined)?.data;
-  if (Array.isArray(data)) {
-    for (let slot = 0; slot < data.length; slot++) {
-      const entry = data[slot] as Record<string, unknown> | null;
-      if (
-        entry &&
-        typeof entry === "object" &&
-        "primaryTmplIndex" in entry &&
-        "loadingState" in entry
-      ) {
-        const state = (lView[slot] as unknown[] | undefined)?.[DEFER_STATE];
-        if (!DEFER_DONE.includes(state as number)) return true;
-      }
+function statusIn(lView: unknown, depth: number): DeferStatus {
+  const tView = Array.isArray(lView) ? (lView[TVIEW] as { data?: unknown; type?: unknown }) : null;
+  if (!tView || !Array.isArray(tView.data) || typeof tView.type !== "number") return "unknown";
+  if (depth > 64) return "shown";
+  const data = tView.data as unknown[];
+  for (let slot = 0; slot < data.length; slot++) {
+    const entry = data[slot];
+    if (
+      entry &&
+      typeof entry === "object" &&
+      "primaryTmplIndex" in entry &&
+      "loadingState" in entry
+    ) {
+      const details = (lView as unknown[])[slot];
+      if (!Array.isArray(details)) return "unknown";
+      if (!DEFER_DONE.includes(details[DEFER_STATE] as number)) return "pending";
     }
   }
-  for (let child = lView[CHILD_HEAD] as unknown[] | null; child; child = child[NEXT] as never) {
-    if (child[TVIEW] === true) {
-      for (let at = CONTAINER_HEADER; at < child.length; at++) {
-        if (pendingIn(child[at], depth + 1)) return true;
-      }
-    } else if (pendingIn(child, depth + 1)) return true;
+  for (
+    let child = (lView as unknown[])[CHILD_HEAD] as unknown[] | null;
+    child;
+    child = child[NEXT] as never
+  ) {
+    const views = child[TVIEW] === true ? child.slice(CONTAINER_HEADER) : [child];
+    for (const inner of views) {
+      const status = statusIn(inner, depth + 1);
+      if (status !== "shown") return status;
+    }
   }
-  return false;
+  return "shown";
 }
 
-/** How long a slide's `@defer` is watched: past the open's three seconds, its commit counts for nothing. */
-const DEFER_WATCH = 3500;
+let warned = false;
 
 /**
- * Wait for a view's `@defer` blocks to show their content, checking once a
- * frame, then call `done`. Content in a `@defer` renders inside the slide,
- * as its placeholder did, and the open waits for it as it does for the rest.
- * A block that waits for an interaction stops being watched once the open
- * would no longer wait. Returns a function that stops waiting.
+ * Hold a slide's open while its view has a `@defer` block that hasn't shown
+ * its content or its error, through the slide's `waitUntil`, so the open
+ * waits as it does for the slide's images, at most its three seconds. Angular
+ * has no public way to know, so this reads Angular's view data; content can
+ * always hold the open itself with `injectFluidboxSlide().waitUntil()`, called
+ * outside the block with a promise the deferred content settles. While
+ * the slide is on show or opening, the view is checked once a frame until the
+ * block shows, and it stops when the slide is disposed.
  */
-export function whenDeferred(
+export function holdForDeferred(
   view: EmbeddedViewRef<unknown>,
+  slide: FluidboxSlide<any>,
   check: () => void,
-  done: () => void,
-): () => void {
-  if (!deferPending(view)) {
-    done();
-    return () => {};
+): void {
+  const status = deferStatus(view);
+  if (status === "unknown") {
+    // Development builds only: an Angular update that changes the view data
+    // should fail the tests, not stop holding the open without a word.
+    try {
+      if (process.env.NODE_ENV !== "production" && !warned) {
+        warned = true;
+        console.warn(
+          `Fluidbox can't read Angular ${VERSION.full}'s view data, so a slide with a @defer block won't hold the open until it shows. Hold it with injectFluidboxSlide().waitUntil() from outside the block, with a promise the deferred content settles.`,
+        );
+      }
+    } catch {}
+    return;
   }
-  const until = performance.now() + DEFER_WATCH;
+  if (status === "shown") return;
+  let shown!: () => void;
+  slide.waitUntil(new Promise<void>((resolve) => (shown = resolve)));
   let frame = 0;
   const poll = () => {
-    if (deferPending(view) && performance.now() < until) {
-      frame = requestAnimationFrame(poll);
-      return;
-    }
-    // The block's content has its bindings once the view is checked.
-    check();
-    done();
+    frame = 0;
+    if (slide.signal.aborted) return;
+    if (deferStatus(view) !== "pending") {
+      // The block's content has its bindings once the view is checked.
+      check();
+      shown();
+    } else if (slide.active || slide.opening) frame = requestAnimationFrame(poll);
   };
+  slide.onActiveChange((active) => {
+    if (active && !frame) frame = requestAnimationFrame(poll);
+  });
+  slide.signal.addEventListener("abort", () => {
+    cancelAnimationFrame(frame);
+    shown();
+  });
   frame = requestAnimationFrame(poll);
-  return () => cancelAnimationFrame(frame);
 }
