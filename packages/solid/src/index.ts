@@ -45,14 +45,17 @@ import {
   defaultLabels,
   downloadLink,
   fluidboxControls,
+  fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
   latestFindTrigger,
   resolveLabels,
+  takeOverFluidbox,
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
   zoomControlNames,
+  type FluidboxStaticNode,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import type {
@@ -162,6 +165,14 @@ interface FluidboxContextValue {
   claimSlides(contents: SlideContents): () => void;
   setThumbnails(option: true | FluidboxThumbnailsOptions<any>): () => void;
   setSheet(option: Accessor<FluidboxSheetOptions<any>>): () => void;
+  /** What the server's copy of an open viewer needs to know, set as the parts render. */
+  readonly serverHints: ServerHints;
+}
+
+interface ServerHints {
+  thumbnails: boolean;
+  sheet: boolean;
+  viewer: boolean;
 }
 
 /** The slide a part renders in, and whether it is on show. */
@@ -425,16 +436,33 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     ),
   );
 
+  // A Root that renders open on an image draws the viewer's copy on its first
+  // render, after its children, so the server's HTML shows the photo and the
+  // viewer takes it over as the Root mounts.
+  const serverHints: ServerHints = { thumbnails: false, sheet: false, viewer: false };
+  const serverIndex = untrack(() => {
+    const initial = props.value !== undefined ? props.value : (props.defaultValue ?? null);
+    const list = Array.isArray(props.items) ? (props.items as readonly TItem[]) : [];
+    const index = initial === null ? -1 : list.findIndex((item) => idOf(item) === initial);
+    return list[index]?.type === "image" ? index : null;
+  });
+  const [takenOver, setTakenOver] = createSignal(false);
+  let serverViewer: HTMLElement | undefined;
+
   // Your value wins whenever it changes. Effects run once Root's children
   // mount, so the triggers are there and an open flies from its own. The
-  // default value opens once, as the Root mounts.
+  // default value opens once, as the Root mounts, unless it takes over the copy.
   const sync = createFluidboxSync(fluidbox);
   let starting = true;
   createEffect(() => {
     const value = props.value;
-    untrack(() =>
-      sync(starting && value === undefined ? (props.defaultValue ?? undefined) : value),
-    );
+    untrack(() => {
+      if (starting && serverViewer && serverIndex !== null) {
+        const done = () => setTakenOver(true);
+        const id = idOf((props.items as readonly TItem[])[serverIndex]!);
+        void takeOverFluidbox(fluidbox, serverViewer, id).then(done, done);
+      } else sync(starting && value === undefined ? (props.defaultValue ?? undefined) : value);
+    });
     starting = false;
   });
 
@@ -481,7 +509,28 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     },
     setThumbnails,
     setSheet,
+    serverHints,
   };
+
+  // Made after the children, so the first render's parts have left their hints.
+  const serverCopy = () =>
+    serverIndex === null
+      ? null
+      : createMemo(() =>
+          takenOver()
+            ? null
+            : untrack(() =>
+                serverViewerCopy({
+                  items: props.items as readonly FluidboxItem[],
+                  index: serverIndex,
+                  labels: labels(),
+                  loop: props.loop,
+                  href: props.href,
+                  hints: serverHints,
+                  ref: (element) => (serverViewer = element),
+                }),
+              ),
+        );
 
   return createComponent(FluidboxContext.Provider, {
     value,
@@ -493,9 +542,58 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
           },
         }),
         props.children,
-      ];
+        serverCopy(),
+      ] as unknown as JSX.Element;
     },
   });
+}
+
+/** Boolean attributes Solid sets as `true`. */
+const staticFlags = new Set(["disabled", "inert", "hidden"]);
+
+function staticElement(each: FluidboxStaticNode | string): JSX.Element {
+  if (typeof each === "string") return each;
+  const props: Record<string, unknown> = { component: each.tag };
+  for (const [name, value] of Object.entries(each.attributes)) {
+    props[name] = staticFlags.has(name) || value;
+  }
+  if (each.children.length) props.children = each.children.map(staticElement);
+  return createComponent(Dynamic, props as Parameters<typeof Dynamic>[0]);
+}
+
+/**
+ * The open viewer's copy. It is built as elements, not HTML, so it renders
+ * under Trusted Types and a strict style-src.
+ */
+function serverViewerCopy(options: {
+  items: readonly FluidboxItem[];
+  index: number;
+  labels: FluidboxLabels;
+  loop: boolean | undefined;
+  href: FluidboxRootProps<any>["href"];
+  hints: ServerHints;
+  ref: (element: HTMLElement) => void;
+}): JSX.Element {
+  const { items, index, labels, loop, href, hints, ref } = options;
+  const node = fluidboxStaticViewerNodes({
+    items,
+    value: idOf(items[index]!),
+    labels,
+    loop,
+    href,
+    thumbnails: hints.thumbnails,
+    sheet: hints.sheet,
+    controls: !hints.viewer,
+  });
+  if (!node) return null;
+  return createComponent(Dynamic, {
+    component: "div",
+    ref,
+    "data-fluidbox-server-viewer": "",
+    get children() {
+      return staticElement(node);
+    },
+  } as Parameters<typeof Dynamic>[0]);
 }
 
 /** Hands the Root an owner inside its Provider, for the content the viewer asks for. */
@@ -609,6 +707,7 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
 /** Renders your controls and captions into the viewer's layer. Without one, the viewer has the default controls. */
 function Viewer(props: FluidboxViewerProps): JSX.Element {
   const context = useFluidboxContext();
+  context.serverHints.viewer = true;
   onCleanup(context.addViewer());
   mountWhile(context.viewerTarget, () => props.children);
   return null;
@@ -1237,6 +1336,7 @@ function Thumbnails<TItem extends FluidboxItem>(
   props: FluidboxThumbnailsProps<TItem>,
 ): JSX.Element {
   const context = useFluidboxContext();
+  context.serverHints.thumbnails = true;
   const owner = getOwner();
   const custom = typeof untrack(() => props.children) === "function";
   // Renders straight into each button; the newest children are read as it does.
@@ -1264,6 +1364,7 @@ function Thumbnails<TItem extends FluidboxItem>(
  */
 function Sheet<TItem extends FluidboxItem>(props: FluidboxSheetProps<TItem>): JSX.Element {
   const context = useFluidboxContext();
+  context.serverHints.sheet = true;
   const owner = getOwner();
   const [local, attributes] = splitProps(props, [
     "snapPoints",

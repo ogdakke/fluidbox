@@ -19,8 +19,8 @@
       <h1>Strict Content Security Policy</h1>
       <p class="fb-muted">
         No inline scripts or styles, and Trusted Types on. <code>?ssr</code> renders the open viewer
-        on the server for the plain runtime to take over; <code>?react</code> opens a React Root on
-        its first render.
+        on the server for the plain runtime to take over; <code>?react</code> and
+        <code>?solid</code> open a React or Solid Root on its first render.
       </p>
       <h2>Plain JavaScript</h2>
       <div class="csp-grid" data-csp-plain>
@@ -54,6 +54,7 @@
         </fluidbox-item>
       </fluidbox-gallery>
       <div data-csp-react></div>
+      <div data-csp-solid></div>
     </main>
     <!--fluidbox-static-viewer-->
   </body>

@@ -50,6 +50,10 @@ const fixture = {
   setHeldItems: undefined as ((items: FluidboxItem[]) => void) | undefined,
   /** The ids of the items whose media failed. */
   errors: [] as string[],
+  /** While true, the parts viewer's Close calls preventDefault in its onClick. */
+  keepOpen: false,
+  /** How many times that onClick ran. */
+  closeClicks: 0,
   /** How many times each slide reported mounting its content. */
   mounted: {} as Record<string, number>,
 };
@@ -205,7 +209,15 @@ function App() {
           <Fluidbox.Toolbar>
             <Fluidbox.Counter />
             <Fluidbox.Download />
-            <Fluidbox.Close label={false}>Done</Fluidbox.Close>
+            <Fluidbox.Close
+              label={false}
+              onClick={(event) => {
+                fixture.closeClicks += 1;
+                if (fixture.keepOpen) event.preventDefault();
+              }}
+            >
+              Done
+            </Fluidbox.Close>
           </Fluidbox.Toolbar>
           <Fluidbox.ZoomControls />
           <Fluidbox.Next>

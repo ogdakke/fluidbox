@@ -2,8 +2,10 @@ import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import { takeOverFluidbox } from "@ogdakke/fluidbox/kit";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
+import { Fluidbox as SolidFluidbox } from "@ogdakke/fluidbox/solid";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
+import { createComponent, Dynamic, render } from "solid-js/web";
 import { cspItems } from "./csp-items";
 
 const viewer = createFluidbox({ items: cspItems });
@@ -32,6 +34,34 @@ if (params.has("react")) {
         }),
       ),
     ),
+  );
+}
+
+// So does a Solid Root, open through its value.
+if (params.has("solid")) {
+  const photos = cspItems.slice(0, 2);
+  render(
+    () =>
+      createComponent(SolidFluidbox.Root, {
+        items: photos,
+        value: photos[1]!.id!,
+        get children() {
+          return photos.map((photo, index) =>
+            createComponent(SolidFluidbox.Trigger, {
+              value: index,
+              get children() {
+                return createComponent(Dynamic, {
+                  component: "img",
+                  src: photo.src,
+                  alt: photo.alt,
+                  width: 160,
+                });
+              },
+            }),
+          );
+        },
+      }),
+    document.querySelector<HTMLElement>("[data-csp-solid]")!,
   );
 }
 

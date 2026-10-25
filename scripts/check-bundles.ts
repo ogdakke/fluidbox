@@ -56,8 +56,8 @@ const initialGzipLimits: Record<Entry, number> = {
   root: 9_850,
   elements: 14_000,
   react: 17_200,
-  // Solid's redesigned parts and the end of its icon code: about 1,910 B more (step 4).
-  solid: 15_600,
+  // Solid's redesigned parts, the end of its icon code and the server viewer: about 3,280 B more (step 4).
+  solid: 16_950,
   vue: 14_350,
   angular: 14_800,
   thumbnails: 3_850,
@@ -73,9 +73,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-embed": 19_750,
   "react-model": 18_450,
   "react-spin": 19_150,
-  "solid-embed": 17_950,
-  "solid-model": 16_650,
-  "solid-spin": 17_350,
+  "solid-embed": 19_300,
+  "solid-model": 18_050,
+  "solid-spin": 18_700,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -89,7 +89,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
   elements: 47_400,
   react: 50_850,
-  solid: 49_150,
+  solid: 50_550,
   vue: 47_900,
   angular: 48_250,
   thumbnails: 3_850,
@@ -102,9 +102,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "react-embed": 53_350,
   "react-model": 52_000,
   "react-spin": 52_750,
-  "solid-embed": 51_600,
-  "solid-model": 50_250,
-  "solid-spin": 50_900,
+  "solid-embed": 52_950,
+  "solid-model": 51_600,
+  "solid-spin": 52_300,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -133,7 +133,7 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   root: 45_200,
   elements: 48_550,
   react: 52_000,
-  solid: 50_300,
+  solid: 51_700,
   vue: 49_050,
   angular: 49_400,
   thumbnails: 3_850,
@@ -146,15 +146,15 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "react-embed": 54_500,
   "react-model": 53_150,
   "react-spin": 53_900,
-  "solid-embed": 52_750,
-  "solid-model": 51_400,
-  "solid-spin": 52_050,
+  "solid-embed": 54_100,
+  "solid-model": 52_750,
+  "solid-spin": 53_450,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
   elements: 50_200,
   react: 53_600,
-  solid: 52_000,
+  solid: 53_350,
   vue: 50_750,
   angular: 51_050,
   thumbnails: 4_900,
@@ -168,9 +168,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "react-embed": 56_150,
   "react-model": 54_850,
   "react-spin": 55_550,
-  "solid-embed": 54_400,
-  "solid-model": 53_050,
-  "solid-spin": 53_700,
+  "solid-embed": 55_750,
+  "solid-model": 54_400,
+  "solid-spin": 55_100,
 };
 
 const jsonIndex = process.argv.indexOf("--json");

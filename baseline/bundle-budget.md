@@ -11,7 +11,7 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | Root           |         9,802 B |           44,045 B |           1,151 B |          45,196 B |                 46,855 B |
 | Elements       |        13,946 B |           47,387 B |           1,151 B |          48,538 B |                 50,197 B |
 | React          |        17,183 B |           50,787 B |           1,151 B |          51,938 B |                 53,597 B |
-| Solid          |        15,521 B |           49,101 B |           1,151 B |          50,252 B |                 51,911 B |
+| Solid          |        16,887 B |           50,485 B |           1,151 B |          51,636 B |                 53,295 B |
 | Vue            |        14,309 B |           47,899 B |           1,151 B |          49,050 B |                 50,709 B |
 | Angular        |        14,713 B |           48,233 B |           1,151 B |          49,384 B |                 51,043 B |
 | Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
@@ -24,9 +24,9 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | React embed    |        19,683 B |           53,333 B |           1,151 B |          54,484 B |                 56,143 B |
 | React model    |        18,409 B |           51,994 B |           1,151 B |          53,145 B |                 54,804 B |
 | React spin     |        19,108 B |           52,678 B |           1,151 B |          53,829 B |                 55,488 B |
-| Solid embed    |        17,891 B |           51,515 B |           1,151 B |          52,666 B |                 54,325 B |
-| Solid model    |        16,608 B |           50,174 B |           1,151 B |          51,325 B |                 52,984 B |
-| Solid spin     |        17,284 B |           50,842 B |           1,151 B |          51,993 B |                 53,652 B |
+| Solid embed    |        19,222 B |           52,877 B |           1,151 B |          54,028 B |                 55,687 B |
+| Solid model    |        17,968 B |           51,546 B |           1,151 B |          52,697 B |                 54,356 B |
+| Solid spin     |        18,649 B |           52,212 B |           1,151 B |          53,363 B |                 55,022 B |
 
 `styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
@@ -72,3 +72,5 @@ The React add-on parts are entries of their own, `react/embed`, `react/model` an
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.
 
 On 2026-10-25 the Solid binding took the redesign's parts (step 4), moving Solid by 1,910 B initial, to 15,521 B, and 1,895 B activation, against 13,611 B and 47,206 B. The binding's own code went from 3,401 B to 5,734 B gzip minified (React's is 6,530 B, with its server viewer): `Slides` with a slide host that renders each slide under `<Suspense>` and reports its commit from an `onMount` the boundary holds, `Media` with `render`, attributes and children, `Image`, `Video` and `Iframe`, `Toolbar`, `ZoomControls`, `Counter`, `Caption`, `Fullscreen`, `Download`, `Share`, `Loading`, `Error` and `Retry`, the label rule on every control, `Overlay` in place of `ThumbnailOverlay` and `FrameLayer`, `SheetSnap`, `useFluidboxSlide`, the dismiss, wheel, share and media-error props, and `value` in place of the open and index sync. Its error messages are development only, as React's are. The spec estimated 900–1,900 B for Vue's and Solid's initial chunks. The Solid add-on parts (`solid/embed`, `solid/model`, `solid/spin`) are each the binding plus their plain-JS slide and a few dozen bytes.
+
+Later on 2026-10-25 the Solid Root took React's server viewer: a Root whose first value names an image draws the viewer's static copy after its children and takes it over as it mounts. The copy's builder (`fluidboxStaticViewerNodes`) and `takeOverFluidbox` are now in Solid's initial chunk, as they are in React's, moving Solid by 1,366 B initial, to 16,887 B, and 1,384 B activation, to 50,485 B. The add-on parts move by the same. Limits are the measurement plus 40 B, rounded up to 50 B.

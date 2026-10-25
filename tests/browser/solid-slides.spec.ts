@@ -7,6 +7,8 @@ declare global {
       resolveFetch?: () => void;
       mounted: Record<string, number>;
       errors: string[];
+      keepOpen: boolean;
+      closeClicks: number;
       openGate?: () => void;
       reels: { index: number; read: () => { video?: { currentTime: number } } | null }[];
       held: { id: string; read: () => number }[];
@@ -231,4 +233,24 @@ test("the viewer's parts draw text, name themselves by their children, and repla
   expect(await page.evaluate(() => window.solidSlides.errors)).toEqual(["broken"]);
   await close.click();
   await expect(viewer).toHaveCount(0);
+});
+
+test("a control's onClick runs first, and preventDefault in it stops the command", async ({
+  page,
+}) => {
+  await load(page);
+  await page.evaluate(() => (window.solidSlides.keepOpen = true));
+  await page.locator('#parts [data-item="square"]').click();
+  const viewer = page.locator(dialog);
+  await expect(viewer).toHaveAttribute("data-fluidbox-status", "open");
+  const close = viewer.locator("[data-fluidbox-toolbar] [data-fluidbox-close]");
+  await close.click();
+  await expect.poll(() => page.evaluate(() => window.solidSlides.closeClicks)).toBe(1);
+  // Long enough for a close to have started.
+  await page.waitForTimeout(300);
+  await expect(viewer).toHaveAttribute("data-fluidbox-status", "open");
+  await page.evaluate(() => (window.solidSlides.keepOpen = false));
+  await close.click();
+  await expect(viewer).toHaveCount(0);
+  expect(await page.evaluate(() => window.solidSlides.closeClicks)).toBe(2);
 });
