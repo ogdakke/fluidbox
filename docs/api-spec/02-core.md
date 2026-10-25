@@ -456,14 +456,14 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   readonly origin: FluidboxSlideOrigin | null;
   /**
    * Hand the playback position back to the trigger's video on close. Read
-   * once, when a close starts from this slide, before the closing flight.
+   * once, just after the `onClose` listeners, and only on a close that flies.
    * Returns a function that unregisters it. (§2.22)
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
   /**
    * Called once as a close starts from the slide on show, before the closing
    * flight measures, with the origin of the trigger the close lands on. Fires
-   * on every close path. Returns a function that unsubscribes. (§4.4)
+   * on every close path, flown or not. Returns a function that unsubscribes. (§4.4)
    */
   onClose(this: void, listener: (landing: FluidboxSlideOrigin | null) => void): () => void;
   /**
@@ -1167,7 +1167,8 @@ Rules:
   flight, as it does for the built-in video, so a player that seeks once its metadata has loaded
   reads the time then and lands on the right frame.
 - **`returnPlayback(source)`** registers what the runtime reads when a close starts from this
-  slide. The close reads `currentTime` and `paused` once, before the closing flight, then does
+  slide. It is the video counterpart of `onClose` (§4.4). The close reads `currentTime` and
+  `paused` once, just after the `onClose` listeners and only on a close that flies, then does
   what `#handBackVideo` does today: if the item's trigger has a `<video>`, it seeks it when the
   times differ by more than 10 ms, and plays it unless `paused`. This applies to whichever slide
   closes, so it also works after moving to another video item whose trigger is a video. With
