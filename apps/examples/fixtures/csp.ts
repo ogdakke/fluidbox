@@ -2,12 +2,12 @@ import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import { takeOverFluidbox } from "@ogdakke/fluidbox/kit";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import { Fluidbox as SolidFluidbox } from "@ogdakke/fluidbox/solid";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { createComponent, Dynamic, render } from "solid-js/web";
+import { hydrate } from "solid-js/web";
 import { createSSRApp } from "vue";
 import { cspItems } from "./csp-items";
+import { CspSolid } from "./csp-solid";
 import { CspVue } from "./csp-vue";
 
 const viewer = createFluidbox({ items: cspItems });
@@ -42,32 +42,11 @@ if (params.has("react")) {
   );
 }
 
-// So does a Solid Root, open through its value.
+// So does a Solid Root, open through its value, which hydrates the server's
+// HTML. SolidStart writes _$HY in an inline script, which this page refuses.
 if (params.has("solid")) {
-  const photos = cspItems.slice(0, 2);
-  render(
-    () =>
-      createComponent(SolidFluidbox.Root, {
-        items: photos,
-        value: photos[1]!.id!,
-        get children() {
-          return photos.map((photo, index) =>
-            createComponent(SolidFluidbox.Trigger, {
-              value: index,
-              get children() {
-                return createComponent(Dynamic, {
-                  component: "img",
-                  src: photo.src,
-                  alt: photo.alt,
-                  width: 160,
-                });
-              },
-            }),
-          );
-        },
-      }),
-    document.querySelector<HTMLElement>("[data-csp-solid]")!,
-  );
+  (globalThis as { _$HY?: object })._$HY ??= { events: [], completed: new WeakSet(), r: {} };
+  hydrate(CspSolid, document.querySelector<HTMLElement>("[data-csp-solid]")!);
 }
 
 // So does a Vue Root, open through v-model, which hydrates the server's HTML.

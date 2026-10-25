@@ -100,8 +100,17 @@ function cspFixture(): Plugin {
                 }
               ).renderCspVue()
             : "";
+        const solid =
+          server && new URL(context.originalUrl ?? "/", "http://host").searchParams.has("solid")
+            ? (
+                (await server.ssrLoadModule("/fixtures/csp-solid-server.ts")) as {
+                  renderCspSolid: () => string;
+                }
+              ).renderCspSolid()
+            : "";
         return html
           .replace("<!--fluidbox-static-viewer-->", copy ?? "")
+          .replace("<div data-csp-solid></div>", `<div data-csp-solid>${solid}</div>`)
           .replace("<div data-csp-vue></div>", `<div data-csp-vue>${vue}</div>`)
           .replace(/<script type="module">[\s\S]*?<\/script>/g, "");
       },
