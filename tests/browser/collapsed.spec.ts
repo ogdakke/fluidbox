@@ -1,8 +1,6 @@
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { holdMotion } from "./support/hold-motion";
 
-test.use({ video: "on", trace: "on" });
-
 const gallerySelector = "#collapsed-gallery";
 const dialogSelector = "[data-fluidbox-dialog]";
 

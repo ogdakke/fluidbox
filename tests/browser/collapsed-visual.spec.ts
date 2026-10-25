@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-test.use({ video: "on", trace: "on" });
 // Chromium, desktop WebKit and Pixel 7.
 test.skip(
   ({ browserName, isMobile }) =>
