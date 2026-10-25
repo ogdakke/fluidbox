@@ -13,6 +13,7 @@ import {
   on,
   onCleanup,
   onMount,
+  runWithOwner,
   Show,
   splitProps,
   Suspense,
@@ -647,10 +648,14 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
   onCleanup(() => trigger.destroy());
 
   // Only a trigger whose children follow the selection reads the state, so
-  // the rest of a grid stays still as the viewer changes.
-  const followsSelection = typeof untrack(() => local.children) === "function";
-  const preview = followsSelection
-    ? createMemo(
+  // the rest of a grid stays still as the viewer changes. The memo is made
+  // as such children first render, under the trigger's owner; reading the
+  // children here would render them outside the trigger's context.
+  const owner = getOwner();
+  let preview: Accessor<FluidboxTriggerPreview<TItem>> | undefined;
+  const follow = () =>
+    (preview ??= runWithOwner(owner, () =>
+      createMemo(
         () => {
           landing();
           context.items();
@@ -658,8 +663,8 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
         },
         undefined,
         { equals: samePreview },
-      )
-    : null;
+      ),
+    )!);
   const isButton = () => local.as === undefined || local.as === "button";
 
   return createComponent(TriggerContext.Provider, {
@@ -700,7 +705,7 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
             },
             get children() {
               const content = local.children;
-              return typeof content === "function" && preview ? content(preview) : content;
+              return typeof content === "function" ? content(follow()) : content;
             },
           },
         ) as never,
