@@ -248,8 +248,10 @@ function applyView(model: ModelViewerElement, view: ModelView) {
 /**
  * A picture of what a loaded model draws now, or null: a copy of the pixels
  * it shows, made at once, so it holds the frame on screen as a close starts;
- * else, without that canvas, the PNG of its `toDataURL`. A copy of a model
- * with textures from another origin still draws, and can't be read back.
+ * else, without that canvas, the PNG of its `toDataURL`. WebGL takes no
+ * texture from another origin without CORS, so 4.0.0's canvases don't taint,
+ * and the guard on `toDataURL` is defensive; a copy of a tainted canvas would
+ * still draw, and only reading it back would fail.
  */
 function snapshot(
   model: ModelViewerElement,

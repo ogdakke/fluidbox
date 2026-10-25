@@ -15,6 +15,7 @@ declare global {
     __modelViewerTainted?: boolean;
     __modelViewerNoCanvas?: boolean;
     __modelViewerUnshown?: boolean;
+    __modelViewerThrows?: boolean;
     __oldCard?: HTMLElement;
   }
 }
@@ -1110,6 +1111,25 @@ test.describe("live 3D thumbnail", () => {
     });
     // Its bottom-right pixel is the model's, not the magenta beyond it.
     expect(copy.corner).toEqual([(512 - 48) & 255, (512 - 48) >> 8, 128]);
+  });
+
+  test("a model-viewer without its canvas that can't be read opens and closes on its view, with no snapshot", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.__modelViewerNoCanvas = true;
+      window.__modelViewerThrows = true;
+    });
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await openCard(page, "live-a");
+    await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-48");
+    await expect(page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`)).toHaveCount(0);
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await turn(page, slideModel(page), 64);
+    await closeViewer(page);
+    await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "16deg 75deg 2m");
   });
 
   test("a slide that leaves drops its snapshot, so it comes back on its own view", async ({

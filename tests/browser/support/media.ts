@@ -184,6 +184,8 @@ class FakeModelViewer extends HTMLElement {
     this.dataset.jumps = String(Number(this.dataset.jumps ?? 0) + 1);
   }
   toDataURL() {
+    // \`window.__modelViewerThrows\` stands in for a canvas that can't be read back.
+    if (window.__modelViewerThrows) throw new DOMException("The canvas is tainted.", "SecurityError");
     this.canvas?.toDataURL();
     this.dataset.snapshots = String(Number(this.dataset.snapshots ?? 0) + 1);
     const orbit = Math.round(this.orbit);
