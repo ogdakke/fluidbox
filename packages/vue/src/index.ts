@@ -706,10 +706,13 @@ const Trigger = defineComponent(
     provide(TriggerKey, { keys: () => JSON.parse(keys.value) as (number | string)[] });
     // Read by render, so the forced update below sees a change.
     const previewed = shallowRef(0);
+    // Whether the last render's slot read the preview: only then does it follow the viewer.
+    let follows = false;
     const options = () => ({
       value: value(),
       // The closing flight measures the trigger right after this, so patch the DOM now.
       onPreviewChange() {
+        if (!follows) return;
         previewed.value++;
         if (instance.isMounted && !instance.isUnmounted) instance.update();
       },
@@ -732,8 +735,29 @@ const Trigger = defineComponent(
     };
 
     return () => {
-      void previewed.value;
-      const preview = trigger.preview(state.value) as FluidboxTriggerPreview<TItem>;
+      follows = false;
+      // Read the state only for a slot that reads the preview, so other triggers
+      // do not render again on every change.
+      let shown: FluidboxTriggerPreview<TItem> | undefined;
+      const read = () => {
+        if (!shown) {
+          follows = true;
+          void previewed.value;
+          shown = trigger.preview(state.value) as FluidboxTriggerPreview<TItem>;
+        }
+        return shown;
+      };
+      const preview: FluidboxTriggerPreview<TItem> = {
+        get item() {
+          return read().item;
+        },
+        get index() {
+          return read().index;
+        },
+        get status() {
+          return read().status;
+        },
+      };
       const rendered = slots.default?.(preview) ?? [];
       // Your handlers come first in the merge, so preventDefault stops the open.
       const asChild = props.asChild as boolean | "" | undefined;
