@@ -8,25 +8,25 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | On demand JS gzip | Reachable JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | ----------------: | ----------------: | -----------------------: |
-| Root           |        10,042 B |           44,478 B |           1,151 B |          45,629 B |                 47,288 B |
-| Elements       |        14,178 B |           47,815 B |           1,151 B |          48,966 B |                 50,625 B |
-| React          |        17,406 B |           51,204 B |           1,151 B |          52,355 B |                 54,014 B |
-| Solid          |        13,871 B |           47,651 B |           1,151 B |          48,802 B |                 50,461 B |
-| Vue            |        17,841 B |           51,607 B |           1,151 B |          52,758 B |                 54,417 B |
-| Angular        |        14,955 B |           48,679 B |           1,151 B |          49,830 B |                 51,489 B |
+| Root           |        10,113 B |           44,558 B |           1,151 B |          45,709 B |                 47,368 B |
+| Elements       |        14,261 B |           47,907 B |           1,151 B |          49,058 B |                 50,717 B |
+| React          |        17,493 B |           51,306 B |           1,151 B |          52,457 B |                 54,116 B |
+| Solid          |        13,948 B |           47,736 B |           1,151 B |          48,887 B |                 50,546 B |
+| Vue            |        17,923 B |           51,702 B |           1,151 B |          52,853 B |                 54,512 B |
+| Angular        |        15,029 B |           48,763 B |           1,151 B |          49,914 B |                 51,573 B |
 | Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
 | Sheet          |         7,277 B |            7,277 B |               0 B |           7,277 B |                  8,272 B |
-| Kit            |         1,748 B |            1,748 B |               0 B |           1,748 B |                  4,558 B |
+| Kit            |         1,831 B |            1,831 B |               0 B |           1,831 B |                  4,641 B |
 | Hover zoom     |         1,453 B |            1,453 B |               0 B |           1,453 B |                  4,263 B |
 | Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
-| Model          |         2,300 B |            2,300 B |               0 B |           2,300 B |                  5,110 B |
+| Model          |         2,488 B |            2,488 B |               0 B |           2,488 B |                  5,298 B |
 | Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
-| React embed    |        19,917 B |           53,760 B |           1,151 B |          54,911 B |                 56,570 B |
-| React model    |        19,347 B |           53,121 B |           1,151 B |          54,272 B |                 55,931 B |
-| React spin     |        19,328 B |           53,093 B |           1,151 B |          54,244 B |                 55,903 B |
-| Vue embed      |        20,379 B |           54,200 B |           1,151 B |          55,351 B |                 57,010 B |
-| Vue model      |        19,760 B |           53,526 B |           1,151 B |          54,677 B |                 56,336 B |
-| Vue spin       |        19,777 B |           53,524 B |           1,151 B |          54,675 B |                 56,334 B |
+| React embed    |        20,001 B |           53,856 B |           1,151 B |          55,007 B |                 56,666 B |
+| React model    |        19,621 B |           53,404 B |           1,151 B |          54,555 B |                 56,214 B |
+| React spin     |        19,413 B |           53,191 B |           1,151 B |          54,342 B |                 56,001 B |
+| Vue embed      |        20,459 B |           54,294 B |           1,151 B |          55,445 B |                 57,104 B |
+| Vue model      |        20,024 B |           53,797 B |           1,151 B |          54,948 B |                 56,607 B |
+| Vue spin       |        19,857 B |           53,615 B |           1,151 B |          54,766 B |                 56,425 B |
 
 `styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
@@ -84,3 +84,8 @@ On 2026-10-25 the live 3D thumbnail moved every core entry by about 240 B initia
 - **Initial, in the trigger.** A press on content that owns its input (`model-viewer`, `[data-fluidbox-owns-input]`) that moves past 6 px is a drag: the click it ends in doesn't open, and the press's preload is let go. `resolveOrigin` takes a `<model-viewer>` as the trigger's picture. Add-ons can see each trigger and its later content through `triggerHooks`, observed only when an add-on registered one. The kit, which carries the trigger, grew 249 B.
 - **Activation, in the viewer.** `slide.origin.model`, `slide.onClose` with the landing trigger's origin on every close path, and finding the trigger's live model at open and close.
 - **The model add-on** grew 795 B, to 2,300 B: it copies the trigger's camera into the slide's first frame (the zoom converted out of `<model-viewer>`'s widened field of view), flies a snapshot of the trigger's view and, on close, of the slide's, turns the landing card's camera to the slide's view, and takes a live model in a trigger out of the tab order and the accessibility tree. That last part lives in the add-on, not the trigger, so a page without models doesn't carry it; in the trigger it had cost every core entry about 175 B initial. React model and Vue model grew about 940 B initial with it.
+
+The fixes after the live thumbnail's review moved every core entry by about 70 B initial and 80 B activation, and the model add-on by 188 B, to 2,488 B:
+
+- **Initial, in the trigger.** A bound trigger's origin is read as the viewer measures it, so a `<model-viewer>`, or any picture, rendered into the trigger after bind is the one the flight and the camera sync use; a press ends as the pointer lifts, and a drag lets go of the click it swallows after that click's task, so a later `click()`, label click or screen reader activation opens; and a trigger hook may return what undoes it, called on unbind. The kit grew 83 B.
+- **The model add-on** gives a live model its own accessibility back when its trigger is unbound or it leaves the trigger, undoing exactly what it changed, and drops a slide's snapshot when the slide leaves, so a slide that comes back shows its own view, not a stale picture. React model and Vue model grew about 270 B initial with it and the core's change.
