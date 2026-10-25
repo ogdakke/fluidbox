@@ -2,8 +2,6 @@ import { expect, test, type Page } from "@playwright/test";
 import { holdMotion } from "./support/hold-motion";
 import { viewerLoaded } from "./support/viewer-loaded";
 
-test.use({ trace: "on", video: "on" });
-
 type MotionSample = {
   time: number;
   left: number;
