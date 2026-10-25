@@ -155,7 +155,8 @@ test("a press on the teaser keeps its overlay while the viewer prepares", async 
       "[data-fluidbox-prepared] [data-fluidbox-slide-preview][data-fluidbox-image-ready]",
     ),
   ).not.toHaveCount(0);
-  expect(await teaser.screenshot()).toEqual(before);
+  // Buffer.equals: a failing toEqual on PNG bytes spends minutes printing the diff.
+  expect((await teaser.screenshot()).equals(before), "the teaser is unchanged").toBe(true);
   await page.mouse.up();
 });
 

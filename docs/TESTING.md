@@ -6,10 +6,33 @@ The current baseline is documented in [`baseline/README.md`](../baseline/README.
 
 | Tier                   | Runs                                                                     | Evidence                                                                                     | Gate                                              |
 | ---------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Pull request           | Chromium, Firefox, WebKit; Pixel 7, iPhone 15 Pro, iPad Pro 11 emulation | Playwright assertions, screenshots, traces and videos on failure                             | Interaction checks and committed visual snapshots |
+| Pull request           | Chromium, Firefox, WebKit; Pixel 7, iPhone 15 Pro, iPad Pro 11 emulation | Playwright assertions, screenshots, and traces and videos of a retried failure               | Interaction checks and committed visual snapshots |
 | Baseline capture       | Manual CI dispatch or local command                                      | Full videos, timecoded diagnostic, frame samples, CPU/long-task readings, 1k/10k allocations | Observational                                     |
 | Performance regression | Dedicated, stable runner after virtualization                            | Cold/warm open, DOM counts, frame gaps, CDP task/script/layout time, heap after cleanup      | Relative budgets calibrated from the new renderer |
 | Real devices           | iOS Safari and Android Chrome device lab                                 | Touch, browser chrome, memory pressure, GPU/compositor behavior                              | Release gate once available                       |
+
+## Running the browser suite
+
+`bun run test:browser` builds the package and runs every spec on all six projects. Locally it uses six workers and records no traces or videos; on CI each shard uses two workers, retries a failure once and records the retry.
+
+| Variable           | Values                                          | Default                                       |
+| ------------------ | ----------------------------------------------- | --------------------------------------------- |
+| `FLUIDBOX_WORKERS` | a worker count                                  | 6 locally, 2 on CI                            |
+| `FLUIDBOX_RECORD`  | `off`, `on`, `retain-on-failure`, `first-retry` | `off` locally, `first-retry` on CI            |
+| `FLUIDBOX_PORT`    | a free port; not 4190, which WebKit blocks      | 4173                                          |
+| `FLUIDBOX_SERVER`  | `dev`, `preview` (run `build:examples` first)   | `dev`                                         |
+| `BASELINE_CAPTURE` | set by `test:browser:baseline`                  | unset, so `baseline.spec.ts` is not collected |
+
+Six workers stay reliable when other runs share the machine. Eight is the fastest setting on an idle 16-core machine; at twelve the WebKit motion checks start to fail. `motion`, `collapsed`, `collapsed-visual` and `baseline` record every run regardless of `FLUIDBOX_RECORD`. To keep a failure's video locally, use `FLUIDBOX_RECORD=retain-on-failure`, or `FLUIDBOX_RECORD=first-retry` with `--retries=1`.
+
+Several checkouts on one machine each need their own `FLUIDBOX_PORT`. Wrap every run of more than one spec in the shared lock, so suites wait for each other instead of starving each other's timing-sensitive checks:
+
+```sh
+flock /tmp/fluidbox-playwright.lock env FLUIDBOX_PORT=4193 bun run test:browser
+FLUIDBOX_WORKERS=8 FLUIDBOX_RECORD=retain-on-failure bunx playwright test tests/browser/zoom.spec.ts
+```
+
+CI splits the suite into eight shards. Each uploads a blob report, and the `merge-reports` job joins them into one HTML report. A shard runs with an 18-minute `--global-timeout`, which ends a stuck run before the 25-minute job timeout, so its report still uploads.
 
 `bun run test:contract` compiles the positive and negative consumer fixtures for the locked
 headless root and composed React type contracts. It runs without creating a browser session. The

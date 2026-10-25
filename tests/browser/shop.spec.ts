@@ -44,7 +44,8 @@ test.describe("shop fixture, wide screen", () => {
         "[data-fluidbox-prepared] [data-fluidbox-slide-preview][data-fluidbox-image-ready]",
       ),
     ).not.toHaveCount(0);
-    expect(await card.screenshot()).toEqual(before);
+    // Buffer.equals: a failing toEqual on PNG bytes spends minutes printing the diff.
+    expect((await card.screenshot()).equals(before), "the card is unchanged").toBe(true);
     await page.mouse.up();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   });

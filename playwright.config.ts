@@ -3,22 +3,42 @@ import { defineConfig, devices } from "@playwright/test";
 // FLUIDBOX_PORT lets several checkouts run the suite at once without sharing a server.
 const port = Number(process.env.FLUIDBOX_PORT) || 4173;
 const baseURL = `http://127.0.0.1:${port}`;
+// FLUIDBOX_SERVER=preview serves the built examples (bun run build:examples) instead of the dev server.
+const preview = process.env.FLUIDBOX_SERVER === "preview";
+// FLUIDBOX_WORKERS overrides the worker count. Six stay reliable when other suites share the
+// machine; each CI shard runs two on a four-core runner.
+const workers = Number(process.env.FLUIDBOX_WORKERS) || (process.env.CI ? 2 : 6);
+// FLUIDBOX_RECORD chooses when to record a trace and video. Locally nothing is recorded unless
+// asked for; CI records the retry of a failure.
+const recordings = {
+  off: "off",
+  on: "on",
+  "retain-on-failure": "retain-on-failure",
+  "first-retry": "on-first-retry",
+} as const;
+const record = process.env.FLUIDBOX_RECORD || (process.env.CI ? "first-retry" : "off");
+if (!Object.hasOwn(recordings, record)) {
+  throw new Error(`FLUIDBOX_RECORD must be one of ${Object.keys(recordings).join(", ")}.`);
+}
+const recording = recordings[record as keyof typeof recordings];
 
 export default defineConfig({
   testDir: "./tests/browser",
+  // baseline.spec.ts only captures; without BASELINE_CAPTURE every test in it would skip.
+  testIgnore: process.env.BASELINE_CAPTURE ? [] : ["**/baseline.spec.ts"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers,
   reporter: process.env.CI
     ? [["github"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
   outputDir: "test-results",
   use: {
     baseURL,
-    trace: "retain-on-failure",
+    trace: recording,
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: recording,
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
@@ -29,7 +49,7 @@ export default defineConfig({
     { name: "ipad-pro-11", use: { ...devices["iPad Pro 11"] } },
   ],
   webServer: {
-    command: `bun run --cwd apps/examples dev --port ${port} --strictPort`,
+    command: `bun run --cwd apps/examples ${preview ? "preview" : "dev"} --port ${port} --strictPort`,
     url: `${baseURL}/harness.html`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
