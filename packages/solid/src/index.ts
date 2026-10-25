@@ -453,18 +453,34 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   // Your value wins whenever it changes. Effects run once Root's children
   // mount, so the triggers are there and an open flies from its own. The
   // default value opens once, as the Root mounts, unless it takes over the copy.
+  // Later values sync in a microtask: a signal written in onValueChange runs
+  // this effect while the change is still being announced, before the viewer
+  // holds its new value, and syncing then would start the change again. By the
+  // microtask the viewer holds it, or the change was canceled.
   const sync = createFluidboxSync(fluidbox);
   let starting = true;
+  let syncing = false;
+  let live = true;
+  onCleanup(() => (live = false));
   createEffect(() => {
     const value = props.value;
+    if (!starting) {
+      if (syncing) return;
+      syncing = true;
+      queueMicrotask(() => {
+        syncing = false;
+        if (live) sync(untrack(() => props.value));
+      });
+      return;
+    }
+    starting = false;
     untrack(() => {
-      if (starting && serverViewer && serverIndex !== null) {
+      if (serverViewer && serverIndex !== null) {
         const done = () => setTakenOver(true);
         const id = idOf((props.items as readonly TItem[])[serverIndex]!);
         void takeOverFluidbox(fluidbox, serverViewer, id).then(done, done);
-      } else sync(starting && value === undefined ? (props.defaultValue ?? undefined) : value);
+      } else sync(value === undefined ? (props.defaultValue ?? undefined) : value);
     });
-    starting = false;
   });
 
   const commands: FluidboxCommands<TItem> = {

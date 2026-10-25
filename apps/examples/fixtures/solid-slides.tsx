@@ -54,6 +54,13 @@ const fixture = {
   keepOpen: false,
   /** How many times that onClick ran. */
   closeClicks: 0,
+  /** Each onValueChange of the controlled viewer, as "action reason value". */
+  changes: [] as string[],
+  /** The controlled viewer's value signal, and its setter. */
+  value: undefined as (() => string | null) | undefined,
+  setValue: undefined as ((value: string | null) => void) | undefined,
+  /** While true, the controlled viewer cancels moves and leaves its value. */
+  cancelMoves: false,
   /** How many times each slide reported mounting its content. */
   mounted: {} as Record<string, number>,
 };
@@ -162,6 +169,25 @@ const partsItems = [
   photo("broken", "/missing-photo.webp"),
 ];
 
+function ControlledViewer() {
+  const [value, setValue] = createSignal<string | null>(null);
+  fixture.value = value;
+  fixture.setValue = setValue;
+  return (
+    <Fluidbox.Root
+      items={photos}
+      value={value()}
+      onValueChange={(next, details) => {
+        fixture.changes.push(`${details.action} ${details.reason} ${next}`);
+        if (fixture.cancelMoves && details.action === "move") details.cancel();
+        else setValue(next);
+      }}
+    >
+      <Grid items={photos} id="controlled" />
+    </Fluidbox.Root>
+  );
+}
+
 function HeldViewer() {
   const [items, setItems] = createSignal<FluidboxItem[]>([
     custom("held", "held-a"),
@@ -197,6 +223,8 @@ function App() {
         <Grid items={[custom("fetched", "fetched")]} id="fetched" />
         <Fluidbox.Slides fetched={() => <Fetched />} />
       </Fluidbox.Root>
+      <h2>A controlled value</h2>
+      <ControlledViewer />
       <h2>A slide that holds the open</h2>
       <HeldViewer />
       <h2>The viewer's parts, with a photo that fails</h2>

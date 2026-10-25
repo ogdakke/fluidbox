@@ -8,6 +8,10 @@ declare global {
       mounted: Record<string, number>;
       errors: string[];
       keepOpen: boolean;
+      changes: string[];
+      value: () => string | null;
+      setValue: (value: string | null) => void;
+      cancelMoves: boolean;
       closeClicks: number;
       openGate?: () => void;
       reels: { index: number; read: () => { video?: { currentTime: number } } | null }[];
@@ -253,4 +257,39 @@ test("a control's onClick runs first, and preventDefault in it stops the command
   await close.click();
   await expect(viewer).toHaveCount(0);
   expect(await page.evaluate(() => window.solidSlides.closeClicks)).toBe(2);
+});
+
+test("a controlled value written back in onValueChange announces each change once", async ({
+  page,
+}) => {
+  await load(page);
+  const changes = () => page.evaluate(() => window.solidSlides.changes);
+  await page.locator('#controlled [data-item="one"]').click();
+  const viewer = page.locator(dialog);
+  await expect(viewer).toHaveAttribute("data-fluidbox-status", "open");
+  await expectShown(page, "Item 1 of 2");
+  expect(await changes()).toEqual(["open trigger one"]);
+  // A value set from outside still moves and closes the viewer.
+  await page.evaluate(() => window.solidSlides.setValue("two"));
+  await expectShown(page, "Item 2 of 2");
+  await page.evaluate(() => window.solidSlides.setValue(null));
+  await expect(viewer).toHaveCount(0);
+  expect(await changes()).toEqual(["open trigger one", "move api two", "close api null"]);
+});
+
+test("a controlled viewer whose handler cancels a move stays where it is", async ({ page }) => {
+  await load(page);
+  await page.locator('#controlled [data-item="one"]').click();
+  await expectShown(page, "Item 1 of 2");
+  await page.evaluate(() => (window.solidSlides.cancelMoves = true));
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => page.evaluate(() => window.solidSlides.changes.length)).toBe(2);
+  // Long enough for a move to have started.
+  await page.waitForTimeout(300);
+  await expectShown(page, "Item 1 of 2");
+  expect(await page.evaluate(() => window.solidSlides.value())).toBe("one");
+  expect(await page.evaluate(() => window.solidSlides.changes)).toEqual([
+    "open trigger one",
+    "move keyboard two",
+  ]);
 });
