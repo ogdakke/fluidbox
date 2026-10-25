@@ -285,6 +285,22 @@ A cold open needs the `<model-viewer>` script, the model file and a frame. On a 
 that reaches the 3 s cap, and the open then flies on the poster, as it does today. The pointerdown
 preparation starts the load before the click (§5.3, Cost).
 
+### Live 3D thumbnail (in progress)
+
+Session L is building this. These entries are placeholders until its report confirms the final
+names:
+
+- `slide.origin.model`: the trigger's live `<model-viewer>` element, read through a live getter.
+  It is set only on the opened slide, beside `origin.video` (§2.22).
+- `slide.onClose((landing) => …)`: runs once when a close starts from the slide on show, on every
+  close path. `landing` is the origin of the trigger the close lands on (`landing.model`), so the
+  slide can hand its camera back to the card.
+- A cold open flies on a snapshot of the card's current view when there is one, instead of the
+  poster.
+- The trigger treats a `<model-viewer>` like an image or video. A drag past a slop of about 6 px
+  orbits the model and doesn't open the viewer. The trigger also takes the model out of the tab
+  order, so each card is one tab stop.
+
 Name: the part is `Model`, not `ModelViewer` (§8.4). In Angular it is `<fluidbox-model>`, because
 `<model-viewer>` is Google's element and `fluidbox-model-viewer` would read as a wrapper of it.
 

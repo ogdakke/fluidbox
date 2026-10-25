@@ -491,6 +491,9 @@ With four people or agents: one on 1.3–1.5 (the engine), one on 1.1/1.2/1.6/1.
 Vue, one on 3 then Angular; Solid and elements follow. The critical path is 1.3 → 1.4 → React
 `Media` → the other bindings' `Media`.
 
+CI note: the browser suite runs only for ready (non-draft) PRs and pushes to `master`, and is
+skipped for docs-only changes. A test added here runs there, not on every draft push.
+
 ## 9.6 Done when
 
 - `bun run test` (Vitest, contracts, Playwright, bundle check) passes with the new limits.

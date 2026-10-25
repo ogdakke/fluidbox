@@ -219,6 +219,12 @@ no slide (no built-in, no entry in `slides`, no `default`) shows the slide's err
 `labels.error` and logs once in development. Today an unknown `render` throws inside the strip
 (`viewer-strip.ts:987`), which breaks the viewer for every item; an error slide is kinder.
 
+**The declared image size is checked** (user-approved). When an image item decodes, the runtime
+compares its natural aspect ratio with `width / height`. If they differ by more than 2%, it logs
+a development warning, once per file. The warning says the viewer frames the declared shape, so
+the photo will be letterboxed or cropped. Built on `feat/api-redesign` in `#revealImage`
+(`viewer-strip.ts`).
+
 ## 2.4 The instance
 
 ```ts
