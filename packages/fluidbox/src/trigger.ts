@@ -9,6 +9,7 @@ import type {
   FluidboxTriggerValue,
 } from "./public-api";
 import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
+import { triggerHooks } from "./trigger-hooks";
 
 /**
  * Find the parts of a trigger the flight uses: the box marked with
@@ -116,26 +117,6 @@ const OWNS_INPUT = "model-viewer, [data-fluidbox-owns-input]";
 /** How far a press on such content moves before it is a drag, not a click, in CSS pixels. */
 const DRAG_SLOP = 6;
 
-/**
- * A live `<model-viewer>` in a trigger is its picture. The trigger is the one
- * control a keyboard and a screen reader reach, so the model leaves the
- * accessibility tree, and its focus target, in its shadow root, the tab order.
- * A drag still turns it.
- */
-function quietModels(trigger: HTMLElement) {
-  const registry = trigger.ownerDocument.defaultView?.customElements;
-  for (const model of trigger.querySelectorAll<HTMLElement>("model-viewer")) {
-    if (!model.hasAttribute("aria-hidden")) model.setAttribute("aria-hidden", "true");
-    void registry
-      ?.whenDefined("model-viewer")
-      .then(() => (model as { updateComplete?: Promise<unknown> }).updateComplete)
-      .then(() => {
-        const input = model.shadowRoot?.querySelector<HTMLElement>(".userInput");
-        if (input) input.tabIndex = -1;
-      });
-  }
-}
-
 /** How long a preload waits for a click after the pointer lifts. */
 const PRELOAD_GRACE = 250;
 /** How long a mouse rests on a trigger before the viewer's code loads. */
@@ -219,6 +200,14 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     );
     target.addEventListener("keydown", () => (dragged = false), options);
     target.addEventListener("focusin", () => host.intend(), options);
+    // Add-ons see the trigger now, and again as a framework renders into it.
+    if (triggerHooks.size) {
+      const run = () => triggerHooks.forEach((hook) => hook(target));
+      run();
+      const content = new MutationObserver(run);
+      content.observe(target, { childList: true, subtree: true });
+      signal.addEventListener("abort", () => content.disconnect());
+    }
     signal.addEventListener("abort", leave);
   };
   const discardPreload = () => {
@@ -258,7 +247,6 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       if (next) {
         listenForIntent(next);
         next.dataset.fluidboxTrigger = "";
-        quietModels(next);
         if (!next.hasAttribute("aria-haspopup")) next.setAttribute("aria-haspopup", "dialog");
         checkReach(next);
       }

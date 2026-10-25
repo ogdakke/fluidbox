@@ -15,7 +15,9 @@ import type {
   FluidboxItem,
   FluidboxSlideOrigin,
 } from "@ogdakke/fluidbox";
+import { modelItem } from "@ogdakke/fluidbox/model";
 import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/react";
+import { Model } from "@ogdakke/fluidbox/react/model";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
 
@@ -31,6 +33,8 @@ declare module "@ogdakke/fluidbox" {
   }
 }
 
+const MODEL_VIEWER = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
+
 /** What the slides saw, and the gates the tests open. */
 const fixture = {
   /** Resolves the lazy slide's module. */
@@ -43,6 +47,10 @@ const fixture = {
   held: [] as { id: string; read: () => number }[],
   /** The items of the held viewer, which the test can change. */
   setHeldItems: undefined as ((items: FluidboxItem[]) => void) | undefined,
+  /** Loads <model-viewer>, which the test serves, for the live model card. */
+  loadModels: () => import(/* @vite-ignore */ MODEL_VIEWER),
+  /** The controlled value of the model viewer, which the test can set. */
+  setModelValue: undefined as ((value: string | null) => void) | undefined,
 };
 Object.assign(window, { reactSlides: fixture });
 
@@ -141,6 +149,34 @@ function HeldViewer() {
   );
 }
 
+const helmet = modelItem({
+  id: "helmet",
+  title: "Damaged Helmet",
+  src: "/products/damaged-helmet/damaged-helmet.glb",
+  width: 800,
+  height: 800,
+});
+
+/** A live model card whose viewer the page's state owns. */
+function ControlledModel() {
+  const [value, setValue] = useState<string | null>(null);
+  fixture.setModelValue = setValue;
+  return (
+    <Fluidbox.Root items={[helmet]} value={value} onValueChange={(next) => setValue(next)}>
+      <div className="media-grid" id="models">
+        <Fluidbox.Trigger
+          value="helmet"
+          data-item="helmet"
+          aria-label="Open 3D view: Damaged Helmet"
+        >
+          <model-viewer src={helmet.src} camera-controls="" touch-action="pan-y" />
+        </Fluidbox.Trigger>
+      </div>
+      <Fluidbox.Slides model={() => <Model load={fixture.loadModels} />} />
+    </Fluidbox.Root>
+  );
+}
+
 function App() {
   return (
     <>
@@ -172,6 +208,12 @@ function App() {
         </div>
         <Fluidbox.Slides reel={() => <Reel />} />
       </Fluidbox.Root>
+      <h2>A live 3D model card, with the value in the page's state</h2>
+      <ControlledModel />
+      <p className="fb-muted">
+        3D model: Damaged Helmet, from the Khronos glTF Sample Assets. © 2016 theblueturtle_, CC
+        BY-NC 4.0; glTF rebuild © 2018 ctxwing, CC BY 4.0. For non-commercial use only.
+      </p>
     </>
   );
 }

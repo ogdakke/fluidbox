@@ -749,6 +749,7 @@ test.describe("live 3D thumbnail", () => {
 
   /** Drag across a model by `distance` CSS pixels, a multiple of 8, in whole-pixel steps. */
   async function turn(page: Page, model: ReturnType<Page["locator"]>, distance: number) {
+    await model.scrollIntoViewIfNeeded();
     const box = (await model.boundingBox())!;
     const x = Math.round(box.x + box.width / 2);
     const y = Math.round(box.y + box.height / 2);
@@ -805,6 +806,47 @@ test.describe("live 3D thumbnail", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator(dialog)).toHaveCount(0);
     await expect(a).toBeFocused();
+  });
+
+  test("a model put in a trigger after it was bound is quieted too", async ({ page }) => {
+    await loadLive(page);
+    const still = page.locator('#live [data-item="still-c"]');
+    await still.evaluate((button) => {
+      const model = document.createElement("model-viewer");
+      model.setAttribute("src", "/products/damaged-helmet/damaged-helmet.glb?copy=c");
+      model.setAttribute("camera-controls", "");
+      button.replaceChildren(model);
+    });
+    const model = still.locator("model-viewer");
+    await expect(model).toHaveAttribute("aria-hidden", "true");
+    await expect
+      .poll(() =>
+        model.evaluate(
+          (element) => element.shadowRoot!.querySelector<HTMLElement>(".userInput")!.tabIndex,
+        ),
+      )
+      .toBe(-1);
+  });
+
+  test("a model-viewer without .userInput keeps its focus and its name, with one warning", async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning" && message.text().includes(".userInput")) {
+        warnings.push(message.text());
+      }
+    });
+    await page.addInitScript(() => {
+      (window as { __modelViewerNoInput?: boolean }).__modelViewerNoInput = true;
+    });
+    await stubMedia(page);
+    await page.goto("/media-live.html");
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit-at-load", "0");
+    await expect(card(page, "live-a")).not.toHaveAttribute("aria-hidden", /./);
+    await expect(card(page, "live-b")).not.toHaveAttribute("aria-hidden", /./);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("4.0.0");
   });
 
   test("a click opens on the card's view: its first frame and the flight's snapshot", async ({

@@ -28,8 +28,10 @@ class FakeModelViewer extends HTMLElement {
     this.zoom = 1;
     this.target = "0m 0m 0m";
     this.ownFieldOfView = "auto";
+    // \`window.__modelViewerNoInput\` stands in for a version whose focus target is named otherwise.
     this.attachShadow({ mode: "open", delegatesFocus: true }).innerHTML =
-      '<div class="userInput" tabindex="0" role="img" aria-label="3D model" style="width:100%;height:100%"></div>';
+      '<div class="' + (window.__modelViewerNoInput ? "input" : "userInput") +
+      '" tabindex="0" role="img" aria-label="3D model" style="width:100%;height:100%"></div>';
     let x = null;
     this.addEventListener("pointerdown", (event) => {
       x = event.clientX;

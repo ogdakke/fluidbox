@@ -154,3 +154,9 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
     `[data-fluidbox-spin]` at `data-frame="0"`; focus it, ArrowRight → `data-frame="1"`; Next →
     "Item 4 of 4", `[data-fluidbox-model-ready]` in the slide and `<model-viewer>` requested once
     from `modelViewerUrl`.
+    JavaScript and React show the model's trigger as a live `<model-viewer>` of the item (`src`,
+    `poster` from `thumbnailSrc`, `camera-controls`, `touch-action="pan-y"`,
+    `interaction-prompt="none"`), with the item's label as the trigger's `aria-label`, and load
+    `modelViewerUrl` with the page. Test (`media: a live model card opens on its view`): a drag on
+    the card turns it and leaves the viewer closed; a click opens on its view; Escape brings the
+    slide's view home. The other bindings follow when they adopt it.

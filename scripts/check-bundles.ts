@@ -47,25 +47,25 @@ const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fl
 // The React binding's redesigned parts added about 1,430 B to its initial chunk; the size
 // pass after step 3 took 634 B back, mostly development-only checks and messages.
 const initialGzipLimits: Record<Entry, number> = {
-  root: 9_850,
-  elements: 14_000,
-  react: 17_200,
-  solid: 13_700,
-  vue: 14_350,
-  angular: 14_800,
+  root: 10_100,
+  elements: 14_250,
+  react: 17_450,
+  solid: 13_950,
+  vue: 14_600,
+  angular: 15_000,
   thumbnails: 3_850,
   sheet: 7_350,
-  kit: 1_550,
+  kit: 1_800,
   // The hover zoom add-on, loaded by pages that magnify their photos on hover.
   "hover-zoom": 1_500,
   // The media add-ons carry their few rules in their JS. Embed providers added
   // about 430 B to the embed slide; a model that waits for its first frame, 60 B.
   embed: 3_050,
-  model: 1_550,
+  model: 2_350,
   spin: 2_450,
-  "react-embed": 19_750,
-  "react-model": 18_450,
-  "react-spin": 19_150,
+  "react-embed": 20_000,
+  "react-model": 19_400,
+  "react-spin": 19_400,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -75,23 +75,23 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 44_050,
+  root: 44_500,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 47_400,
-  react: 50_850,
-  solid: 47_250,
-  vue: 47_900,
-  angular: 48_250,
+  elements: 47_850,
+  react: 51_250,
+  solid: 47_700,
+  vue: 48_400,
+  angular: 48_700,
   thumbnails: 3_850,
   sheet: 7_350,
-  kit: 1_550,
+  kit: 1_800,
   "hover-zoom": 1_500,
   embed: 3_050,
-  model: 1_550,
+  model: 2_350,
   spin: 2_450,
-  "react-embed": 53_350,
-  "react-model": 52_000,
-  "react-spin": 52_750,
+  "react-embed": 53_800,
+  "react-model": 53_150,
+  "react-spin": 53_150,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -114,41 +114,41 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
-  root: 45_200,
-  elements: 48_550,
-  react: 52_000,
-  solid: 48_400,
-  vue: 49_050,
-  angular: 49_400,
+  root: 45_650,
+  elements: 49_000,
+  react: 52_400,
+  solid: 48_850,
+  vue: 49_550,
+  angular: 49_850,
   thumbnails: 3_850,
   sheet: 7_350,
-  kit: 1_550,
+  kit: 1_800,
   "hover-zoom": 1_500,
   embed: 3_050,
-  model: 1_550,
+  model: 2_350,
   spin: 2_450,
-  "react-embed": 54_500,
-  "react-model": 53_150,
-  "react-spin": 53_900,
+  "react-embed": 54_950,
+  "react-model": 54_300,
+  "react-spin": 54_300,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
-  root: 46_900,
-  elements: 50_200,
-  react: 53_600,
-  solid: 50_050,
-  vue: 50_750,
-  angular: 51_050,
+  root: 47_350,
+  elements: 50_650,
+  react: 54_050,
+  solid: 50_500,
+  vue: 51_200,
+  angular: 51_550,
   thumbnails: 4_900,
   sheet: 8_350,
-  kit: 4_350,
+  kit: 4_600,
   // It needs no stylesheet; the base one counts, as for the kit.
   "hover-zoom": 4_350,
   embed: 5_850,
-  model: 4_400,
+  model: 5_150,
   spin: 5_250,
-  "react-embed": 56_150,
-  "react-model": 54_850,
-  "react-spin": 55_550,
+  "react-embed": 56_600,
+  "react-model": 55_950,
+  "react-spin": 55_950,
 };
 
 const jsonIndex = process.argv.indexOf("--json");

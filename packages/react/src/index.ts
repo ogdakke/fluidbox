@@ -889,6 +889,7 @@ export function useFluidboxSlide<
         return slide.origin;
       },
       returnPlayback: slide.returnPlayback,
+      onClose: slide.onClose,
       waitUntil: slide.waitUntil,
       fail: slide.fail,
       onZoom: slide.onZoom,
