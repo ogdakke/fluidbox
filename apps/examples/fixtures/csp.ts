@@ -4,7 +4,9 @@ import { takeOverFluidbox } from "@ogdakke/fluidbox/kit";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
+import { createSSRApp } from "vue";
 import { cspItems } from "./csp-items";
+import { CspVue } from "./csp-vue";
 
 const viewer = createFluidbox({ items: cspItems });
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo]")) {
@@ -33,6 +35,11 @@ if (params.has("react")) {
       ),
     ),
   );
+}
+
+// So does a Vue Root, open through v-model, which hydrates the server's HTML.
+if (params.has("vue")) {
+  createSSRApp(CspVue).mount(document.querySelector<HTMLElement>("[data-csp-vue]")!);
 }
 
 declare global {

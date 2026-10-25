@@ -18,6 +18,9 @@ const entrypoints = [
   "react-embed",
   "react-model",
   "react-spin",
+  "vue-embed",
+  "vue-model",
+  "vue-spin",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -37,21 +40,31 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "react-embed": ["react", "react-dom"],
   "react-model": ["react", "react-dom"],
   "react-spin": ["react", "react-dom"],
+  "vue-embed": ["vue"],
+  "vue-model": ["vue"],
+  "vue-spin": ["vue"],
 };
 
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
 const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fluidboxSpin" };
 
+/** The prefixes of the add-on parts that are entries of their own, as `react-` of `react-embed`. */
+const addonEntry = new RegExp(`^(.+)-(${Object.keys(addonMarkers).join("|")})$`);
+const bindingPrefix = new RegExp(
+  `^(${[...new Set(entrypoints.map((name) => addonEntry.exec(name)?.[1]).filter(Boolean))].join("|")})-`,
+);
+
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 // baseline/bundle-budget.md records the measurements behind them and why they moved.
 // The React binding's redesigned parts added about 1,430 B to its initial chunk; the size
-// pass after step 3 took 634 B back, mostly development-only checks and messages.
+// pass after step 3 took 634 B back, mostly development-only checks and messages. The Vue
+// binding's added about 1,850 B to its own.
 const initialGzipLimits: Record<Entry, number> = {
   root: 10_100,
   elements: 14_250,
   react: 17_450,
   solid: 13_950,
-  vue: 14_600,
+  vue: 17_900,
   angular: 15_000,
   thumbnails: 3_850,
   sheet: 7_350,
@@ -66,6 +79,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-embed": 20_000,
   "react-model": 19_400,
   "react-spin": 19_400,
+  "vue-embed": 20_450,
+  "vue-model": 19_800,
+  "vue-spin": 19_850,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -75,13 +91,13 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 44_500,
+  root: 44_550,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 47_850,
+  elements: 47_900,
   react: 51_250,
   solid: 47_700,
-  vue: 48_400,
-  angular: 48_700,
+  vue: 51_650,
+  angular: 48_750,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_800,
@@ -90,8 +106,11 @@ const activationJsGzipLimits: Record<Entry, number> = {
   model: 2_350,
   spin: 2_450,
   "react-embed": 53_800,
-  "react-model": 53_150,
+  "react-model": 53_200,
   "react-spin": 53_150,
+  "vue-embed": 54_250,
+  "vue-model": 53_600,
+  "vue-spin": 53_600,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -111,15 +130,18 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
   "react-embed": 1_200,
   "react-model": 1_200,
   "react-spin": 1_200,
+  "vue-embed": 1_200,
+  "vue-model": 1_200,
+  "vue-spin": 1_200,
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
-  root: 45_650,
-  elements: 49_000,
+  root: 45_700,
+  elements: 49_050,
   react: 52_400,
   solid: 48_850,
-  vue: 49_550,
-  angular: 49_850,
+  vue: 52_800,
+  angular: 49_900,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_800,
@@ -127,16 +149,19 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   embed: 3_050,
   model: 2_350,
   spin: 2_450,
-  "react-embed": 54_950,
-  "react-model": 54_300,
+  "react-embed": 55_000,
+  "react-model": 54_350,
   "react-spin": 54_300,
+  "vue-embed": 55_400,
+  "vue-model": 54_750,
+  "vue-spin": 54_750,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 47_350,
-  elements: 50_650,
-  react: 54_050,
-  solid: 50_500,
-  vue: 51_200,
+  elements: 50_700,
+  react: 54_100,
+  solid: 50_550,
+  vue: 54_500,
   angular: 51_550,
   thumbnails: 4_900,
   sheet: 8_350,
@@ -146,9 +171,12 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   embed: 5_850,
   model: 5_150,
   spin: 5_250,
-  "react-embed": 56_600,
-  "react-model": 55_950,
+  "react-embed": 56_650,
+  "react-model": 56_000,
   "react-spin": 55_950,
+  "vue-embed": 57_050,
+  "vue-model": 56_400,
+  "vue-spin": 56_400,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
@@ -248,7 +276,7 @@ for (const name of entrypoints) {
     ...Object.entries(addonMarkers)
       .filter(
         ([addon, marker]) =>
-          addon !== name.replace(/^react-/, "") && activationCode.includes(marker),
+          addon !== name.replace(bindingPrefix, "") && activationCode.includes(marker),
       )
       .map(([addon]) => `carries the ${addon} add-on`),
   ].filter((error): error is string => typeof error === "string");
