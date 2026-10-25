@@ -226,35 +226,48 @@ test.describe("shop fixture, rich media", () => {
     expect(requests.modelViewer).toEqual([
       "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js",
     ]);
-    // The close carries the poster home, not the live model. The box holds a
-    // custom element, so it closes in its own frame rather than a flight.
+    // The close carries a snapshot of the model's view home, not the live model,
+    // with the poster hidden under it. The box holds a custom element, so it
+    // closes in its own frame rather than a flight.
     const closing = page.evaluate(
       () =>
-        new Promise<{ flight: boolean; poster: string; model: string }>((resolve) => {
-          const check = () => {
-            const dialog = document.querySelector("[data-fluidbox-dialog]");
-            if (dialog?.getAttribute("data-fluidbox-status") === "closing") {
-              const box = dialog.querySelector(
-                '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-model]',
-              )!;
-              resolve({
-                flight: !!document.querySelector("[data-fluidbox-flight]"),
-                poster: getComputedStyle(
-                  box.querySelector('[data-fluidbox-media-poster="poster"]')!,
-                ).visibility,
-                model: getComputedStyle(box.querySelector("model-viewer")!).visibility,
-              });
-              return;
-            }
-            requestAnimationFrame(check);
-          };
-          check();
-        }),
+        new Promise<{ flight: boolean; snapshot: string; poster: string; model: string }>(
+          (resolve) => {
+            const check = () => {
+              const dialog = document.querySelector("[data-fluidbox-dialog]");
+              if (dialog?.getAttribute("data-fluidbox-status") === "closing") {
+                const box = dialog.querySelector(
+                  '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-model]',
+                )!;
+                const shown = (selector: string) => {
+                  const element = box.querySelector(selector);
+                  return element ? getComputedStyle(element).visibility : "none";
+                };
+                resolve({
+                  flight: !!document.querySelector("[data-fluidbox-flight]"),
+                  snapshot: shown('[data-fluidbox-media-poster="snapshot"]'),
+                  poster: getComputedStyle(
+                    box.querySelector('[data-fluidbox-media-poster="poster"]')!,
+                  ).visibility,
+                  model: getComputedStyle(box.querySelector("model-viewer")!).visibility,
+                });
+                return;
+              }
+              requestAnimationFrame(check);
+            };
+            check();
+          },
+        ),
     );
     await page.locator(dialog).focus();
     await page.keyboard.press("Escape");
     const visible = await closing;
-    expect(visible).toEqual({ flight: false, poster: "visible", model: "hidden" });
+    expect(visible).toEqual({
+      flight: false,
+      snapshot: "visible",
+      poster: "hidden",
+      model: "hidden",
+    });
     await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
   });
 });
