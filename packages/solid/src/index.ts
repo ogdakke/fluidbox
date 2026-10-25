@@ -646,15 +646,20 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
   createEffect(on(context.items, () => trigger.refresh(), { defer: true }));
   onCleanup(() => trigger.destroy());
 
-  const preview = createMemo(
-    () => {
-      landing();
-      context.items();
-      return trigger.preview(context.state());
-    },
-    undefined,
-    { equals: samePreview },
-  );
+  // Only a trigger whose children follow the selection reads the state, so
+  // the rest of a grid stays still as the viewer changes.
+  const followsSelection = typeof untrack(() => local.children) === "function";
+  const preview = followsSelection
+    ? createMemo(
+        () => {
+          landing();
+          context.items();
+          return trigger.preview(context.state());
+        },
+        undefined,
+        { equals: samePreview },
+      )
+    : null;
   const isButton = () => local.as === undefined || local.as === "button";
 
   return createComponent(TriggerContext.Provider, {
@@ -695,7 +700,7 @@ function Trigger<TItem extends FluidboxItem>(props: FluidboxTriggerProps<TItem>)
             },
             get children() {
               const content = local.children;
-              return typeof content === "function" ? content(preview) : content;
+              return typeof content === "function" && preview ? content(preview) : content;
             },
           },
         ) as never,
