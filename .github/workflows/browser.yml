@@ -1,13 +1,24 @@
 name: Browser tests
 on:
+  # Branches are tested through their pull request, so a push to one doesn't run twice.
   push:
+    branches: [master]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+
+# A newer push supersedes a run still going on the same pull request. Master runs every
+# commit to the end, so each one keeps its result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
+    outputs:
+      browser: ${{ steps.scope.outputs.browser }}
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -22,8 +33,36 @@ jobs:
       - run: bun run test:ssr
       - run: bun run build:examples
       - run: bun run build:docs
+      # The browser suite runs against apps/examples and the packages. A change that only
+      # touches the docs site, docs/, baseline/ or Markdown can't change its result, and a
+      # draft pull request waits until it's ready (or a manual run). Anything unknown runs it.
+      - id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          files=""
+          if [ "$EVENT" = pull_request ]; then
+            files=$(gh pr diff "$PR" --name-only --repo "$GITHUB_REPOSITORY") || files=""
+          elif [ "$EVENT" = push ] && ! [[ "$BEFORE" =~ ^0*$ ]]; then
+            files=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA" --jq '.files[].filename') || files=""
+          fi
+          browser=true
+          if [ "$DRAFT" = true ]; then
+            browser=false
+          elif [ -n "$files" ] && ! grep -qvE '^(apps/docs/|docs/|baseline/|LICENSE$|.*\.md$)' <<<"$files"; then
+            browser=false
+          fi
+          echo "browser=$browser" >> "$GITHUB_OUTPUT"
+          echo "Browser suite: $browser"
 
   browser:
+    # The checks take under a minute, and a failure there would fail every shard too.
+    needs: checks
+    if: needs.checks.outputs.browser == 'true'
     runs-on: ubuntu-26.04
     # Each shard stops itself at its 18-minute --global-timeout, so the blob report and
     # recordings are still written and uploaded before the job is cancelled.
@@ -38,18 +77,26 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - uses: actions/cache@v4
+      - id: playwright
+        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - id: browsers
+        uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      # With the browsers cached this only installs their system packages.
-      - run: bunx playwright install --with-deps chromium firefox webkit
-      - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: bunx playwright install --with-deps chromium firefox webkit
+      # Cached browsers still need their system packages on a fresh runner.
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps chromium firefox webkit
       - run: bun run build
       - run: bunx playwright test --shard=${{ matrix.shard }}/8 --global-timeout=1080000 --reporter=dot,blob
+      # ffmpeg is only needed to index the recordings of a failure.
       - name: Index failure videos
         if: failure()
-        run: bun run inspect:failures
+        run: |
+          command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+          bun run inspect:failures
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -64,9 +111,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # One report for all shards, merged only when there is a failure to read.
   merge-reports:
     needs: browser
-    if: always()
+    if: ${{ !cancelled() && needs.browser.result == 'failure' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:

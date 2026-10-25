@@ -32,7 +32,11 @@ flock /tmp/fluidbox-playwright.lock env FLUIDBOX_PORT=4193 bun run test:browser
 FLUIDBOX_WORKERS=8 FLUIDBOX_RECORD=retain-on-failure bunx playwright test tests/browser/zoom.spec.ts
 ```
 
-CI splits the suite into eight shards. Each uploads a blob report, and the `merge-reports` job joins them into one HTML report. A shard runs with an 18-minute `--global-timeout`, which ends a stuck run before the 25-minute job timeout, so its report still uploads.
+CI runs on pushes to `master`, on pull requests, and by hand (`workflow_dispatch`); a branch without a pull request isn't tested. A newer push to a pull request cancels the run still going on it.
+
+The `checks` job (format, build, lint, unit, bundle, SSR and both site builds) takes under a minute, and the browser suite starts only once it passes. The browser suite is skipped for a draft pull request, which runs it once it's marked ready (or by hand), and for a change that touches only `apps/docs/`, `docs/`, `baseline/` or Markdown files.
+
+The browser suite runs in eight shards. Each uploads a blob report; when a shard fails, the `merge-reports` job joins them into one HTML report. A shard runs with an 18-minute `--global-timeout`, which ends a stuck run before the 25-minute job timeout, so its report still uploads. The browsers are cached by Playwright version, and ffmpeg is installed only to index a failure's videos.
 
 `bun run test:contract` compiles the positive and negative consumer fixtures for the locked
 headless root and composed React type contracts. It runs without creating a browser session. The
