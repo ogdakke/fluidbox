@@ -10,6 +10,7 @@ declare global {
       setHeldItems?: (items: unknown[]) => void;
       remount?: () => void;
       mediaErrors: () => number;
+      model: () => string | null;
     };
   }
 }
@@ -224,4 +225,28 @@ test("the parts draw the viewer's controls, caption and error, with labels as te
     .evaluate((button: HTMLButtonElement) => button.click());
   await expect.poll(() => page.evaluate(() => window.vueSlides.mediaErrors())).toBe(2);
   await expect(error.locator('[data-test="retry"]')).toHaveText("Retry");
+});
+
+test("a move canceled in @value-change never reaches the v-model", async ({ page, isMobile }) => {
+  test.skip(isMobile, "The swipe is a horizontal wheel, as on a trackpad.");
+  await load(page);
+  const model = () => page.evaluate(() => window.vueSlides.model());
+  await page.locator('#guarded [data-item="one"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  expect(await model()).toBe("one");
+  const slides = page.locator("[data-fluidbox-slides]");
+  await slides.hover();
+  await page.mouse.wheel(900, 0);
+  await page.waitForTimeout(800);
+  await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 1 of 2");
+  expect(await model()).toBe("one");
+  // A move it lets through reaches the model, and the viewer stays where it went.
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 2");
+  await expect.poll(model).toBe("two");
+  await page.waitForTimeout(400);
+  await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 2");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  await expect.poll(model).toBeNull();
 });

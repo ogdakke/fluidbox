@@ -26,7 +26,7 @@ function onValueChange(_: FluidboxValue, details: FluidboxValueChangeDetails) {
   <Fluidbox.Root
     v-slot="{ status, index, open }"
     :items="photos"
-    @update:model-value="onValueChange"
+    @value-change="onValueChange"
     @value-change-complete="record('valuechangecomplete')"
   >
     <div class="pattern-toolbar">

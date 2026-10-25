@@ -15,6 +15,7 @@ import type {
   FluidboxImageItem,
   FluidboxItem,
   FluidboxSlideOrigin,
+  FluidboxValueChangeDetails,
 } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/vue";
 import "@ogdakke/fluidbox/baseline.css";
@@ -48,6 +49,8 @@ const fixture = {
   remount: undefined as (() => void) | undefined,
   /** How many mediaerror events the parts viewer has emitted. */
   mediaErrors: () => 0,
+  /** The v-model of the viewer that cancels swipes. */
+  model: () => null as string | null,
 };
 Object.assign(window, { vueSlides: fixture });
 
@@ -188,6 +191,25 @@ const Parts = defineComponent(
     ),
 );
 
+// A v-model whose @value-change cancels swipes: a canceled move never reaches the model.
+const Guarded = defineComponent(() => {
+  const model = shallowRef<string | null>(null);
+  fixture.model = () => model.value;
+  return () =>
+    h(
+      Fluidbox.Root,
+      {
+        items: photos,
+        modelValue: model.value,
+        "onUpdate:modelValue": (value: string | null) => (model.value = value),
+        onValueChange: (_: unknown, details: FluidboxValueChangeDetails) => {
+          if (details.action === "move" && details.reason === "pointer") details.cancel();
+        },
+      },
+      () => h(Grid, { items: photos, id: "guarded" }),
+    );
+});
+
 const App = defineComponent(() => {
   const generation = shallowRef(0);
   fixture.remount = () => generation.value++;
@@ -201,6 +223,8 @@ const App = defineComponent(() => {
       h(Grid, { items: photos, id: "custom" }),
       h(Fluidbox.Slides, null, { image: () => h(Fluidbox.Image) }),
     ]),
+    h("h2", "A v-model that cancels swipes"),
+    h(Guarded),
     h("h2", "The viewer's parts"),
     h(Parts),
     h("h2", "A slide that suspends"),

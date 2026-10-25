@@ -73,6 +73,7 @@ import {
   takeOverFluidbox,
   targetKeys,
   unloadFluidbox,
+  valueChangeDetails,
   watchFluidbox,
   zoomControlNames,
   type FluidboxSlot,
@@ -299,6 +300,11 @@ type RootEmits<TItem extends FluidboxItem> = {
    * Before every open, move and close, from any input, with the value the
    * viewer goes to: an id, or null for a close. `details.cancel()` stops it.
    */
+  valueChange: (value: FluidboxValue, details: FluidboxValueChangeDetails<TItem>) => true;
+  /**
+   * The value the viewer went to, for `v-model`, once an open, move or close
+   * goes through: a canceled one never reaches the model.
+   */
   "update:modelValue": (value: FluidboxValue, details: FluidboxValueChangeDetails<TItem>) => true;
   /** Once the motion of a value change settled: the flight landed, a move came to rest, or a close finished. */
   valueChangeComplete: (value: FluidboxValue, details: FluidboxValueChangeDetails<TItem>) => true;
@@ -479,14 +485,20 @@ const Root = defineComponent(
     fluidbox.addEventListener("sheetchange", (event) => (sheetSnap.value = event.snap), {
       signal,
     });
-    // From the before-event, so `details.cancel()` works in the handler.
+    // valueChange comes from the before-event, so `details.cancel()` works in
+    // its handler; the model hears only of changes that went through.
     watchFluidbox(
       fluidbox,
       {
-        value: (value, details) => emit("update:modelValue", value, details),
+        value: (value, details) => emit("valueChange", value, details),
         complete: (value, details) => emit("valueChangeComplete", value, details),
       },
       signal,
+    );
+    fluidbox.addEventListener(
+      "valuechange",
+      (event) => emit("update:modelValue", event.value, valueChangeDetails(event)),
+      { signal },
     );
 
     // A Root that renders open on an image draws the viewer's copy on its
@@ -603,7 +615,7 @@ const Root = defineComponent(
       "wheel",
       "shareUrl",
     ],
-    emits: ["update:modelValue", "valueChangeComplete", "zoomChange", "mediaError"],
+    emits: ["valueChange", "update:modelValue", "valueChangeComplete", "zoomChange", "mediaError"],
   },
 );
 
