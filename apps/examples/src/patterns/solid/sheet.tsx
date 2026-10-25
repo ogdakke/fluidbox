@@ -13,9 +13,9 @@ function Details(props: { photo: FluidboxImageItem }) {
     <>
       <h3 data-test="sheet-title">{itemLabel(props.photo)}</h3>
       <p>
-        Stop <output data-test="stop">{sheet.stop()}</output>
+        Snap <output data-test="stop">{sheet.snap()}</output>
       </p>
-      <button type="button" data-test="expand" onClick={() => sheet.set(2)}>
+      <button type="button" data-test="expand" onClick={() => sheet.setSnap(2)}>
         Expand
       </button>
       <input data-test="field" placeholder="Add a note" aria-label="Note" />
@@ -29,22 +29,21 @@ export function Sheet() {
       <div class="pattern-grid">
         <For each={photos}>
           {(photo) => (
-            <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+            <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
               <img src={photo.src} alt={itemLabel(photo)} />
             </Fluidbox.Trigger>
           )}
         </For>
       </div>
-      {/* The sheet's content, for the active item. Its attributes go on the sheet itself. */}
+      {/* Snap 0 rests below the photo; snaps 1 and 2 raise it to 40% and 90% of the screen. */}
       <Fluidbox.Sheet<FluidboxImageItem> snapPoints={["40%", "90%"]} class="pattern-sheet">
         {({ item }) => <Details photo={item} />}
       </Fluidbox.Sheet>
       <Fluidbox.Viewer>
-        {/* Raises the sheet to its first stop. */}
-        <Fluidbox.SheetStop stop={1} class="pattern-sheet-toggle" data-test="peek">
+        <Fluidbox.SheetSnap to={1} class="pattern-sheet-toggle" data-test="peek">
           Details
-        </Fluidbox.SheetStop>
-        <Fluidbox.Controls />
+        </Fluidbox.SheetSnap>
+        <Fluidbox.Toolbar />
       </Fluidbox.Viewer>
     </Fluidbox.Root>
   );

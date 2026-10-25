@@ -11,13 +11,13 @@ export function Basic() {
       <div class="pattern-grid">
         <For each={photos}>
           {(photo) => (
-            <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+            <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
               <img src={photo.src} alt={itemLabel(photo)} />
             </Fluidbox.Trigger>
           )}
         </For>
       </div>
-      {/* Without a Viewer, the viewer has these three by default. */}
+      {/* Without a Viewer, the viewer has these same three buttons. */}
       <Fluidbox.Viewer>
         <Fluidbox.Previous />
         <Fluidbox.Next />

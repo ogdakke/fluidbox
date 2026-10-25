@@ -120,6 +120,7 @@ for (const [article, binding] of [
   ["a", "React"],
   ["a", "Vue"],
   ["an", "Angular"],
+  ["a", "Solid"],
 ]) {
   test(`${article} ${binding} slide that draws the image opens as soon as the built-in image, on a first open`, async ({
     page,

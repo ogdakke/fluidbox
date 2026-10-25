@@ -12,7 +12,7 @@ function Grid() {
     <div class="pattern-grid">
       <For each={photos}>
         {(photo) => (
-          <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+          <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
             <img src={photo.src} alt={itemLabel(photo)} />
           </Fluidbox.Trigger>
         )}
@@ -26,12 +26,13 @@ export function Thumbnails() {
     <>
       <Fluidbox.Root items={photos}>
         <Grid />
+        {/* Being there turns the thumbnails on. */}
         <Fluidbox.Thumbnails />
       </Fluidbox.Root>
 
       <Fluidbox.Root items={photos}>
         <Grid />
-        {/* Your own thumbnails. The selected button has data-fluidbox-selected. */}
+        {/* Your own thumbnails. The selected button has data-active. */}
         <Fluidbox.Thumbnails>
           {(thumb) => (
             <span class="pattern-thumbnails-thumb" data-test="thumb">

@@ -55,6 +55,18 @@
       "types": "./dist/solid/index.d.ts",
       "import": "./dist/solid/index.js"
     },
+    "./solid/embed": {
+      "types": "./dist/solid/embed.d.ts",
+      "import": "./dist/solid/embed.js"
+    },
+    "./solid/model": {
+      "types": "./dist/solid/model.d.ts",
+      "import": "./dist/solid/model.js"
+    },
+    "./solid/spin": {
+      "types": "./dist/solid/spin.d.ts",
+      "import": "./dist/solid/spin.js"
+    },
     "./vue": {
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js"

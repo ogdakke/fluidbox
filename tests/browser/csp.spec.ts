@@ -122,3 +122,43 @@ test("a Vue Root that renders open hydrates and hands over its copy under a stri
   expect(warnings).toEqual([]);
   expect(await violations(page)).toEqual([]);
 });
+
+test("a Solid Root that renders open hydrates and hands over its copy under a strict policy", async ({
+  page,
+}) => {
+  const warnings: string[] = [];
+  page.on("console", (message) => {
+    if (/hydrat/i.test(message.text())) warnings.push(message.text());
+  });
+  // The server's HTML holds the copy before any script runs.
+  const response = await page.request.get("/csp.html?solid");
+  expect(await response.text()).toMatch(/<div data-csp-solid>.*data-fluidbox-server-viewer/s);
+  // Mark the server's nodes before the script runs, to see hydration keep them.
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/fixtures/csp.ts*", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/csp.html?solid", { waitUntil: "commit" });
+  const triggers = page.locator("[data-csp-solid] > button");
+  await expect(triggers).toHaveCount(2);
+  await triggers
+    .first()
+    .evaluate((element) => ((element as { fromServer?: true }).fromServer = true));
+  release();
+  await page.waitForFunction(() => window.cspViewer !== undefined);
+  await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(triggers).toHaveCount(2);
+  expect(await triggers.first().evaluate((element) => "fromServer" in element)).toBe(true);
+  await expect(triggers.first()).toHaveAttribute("data-fluidbox-trigger", "");
+  await expect(activeSlide(page)).toHaveAttribute("aria-label", "Item 2 of 2");
+  await expect(page.locator("[data-fluidbox-server-viewer]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  expect(errors).toEqual([]);
+  expect(warnings).toEqual([]);
+  expect(await violations(page)).toEqual([]);
+});

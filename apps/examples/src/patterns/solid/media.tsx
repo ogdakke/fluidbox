@@ -1,55 +1,34 @@
 /** @jsxImportSource solid-js */
 // #region example
-import { For, onCleanup, onMount } from "solid-js";
-import { itemLabel, type FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { embedSlide } from "@ogdakke/fluidbox/embed";
-import { createModelSlide } from "@ogdakke/fluidbox/model";
-import { Fluidbox, type FluidboxSolidRenderer } from "@ogdakke/fluidbox/solid";
-import { createSpinSlide } from "@ogdakke/fluidbox/spin";
+import { For } from "solid-js";
+import { itemLabel } from "@ogdakke/fluidbox";
+import { Fluidbox } from "@ogdakke/fluidbox/solid";
+import { Embed } from "@ogdakke/fluidbox/solid/embed";
+import { Model } from "@ogdakke/fluidbox/solid/model";
+import { Spin } from "@ogdakke/fluidbox/solid/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
-import { addonSlide } from "../../addon-slide";
 
-/**
- * The add-ons draw into an element. A Solid renderer returns one, and hands
- * the add-on the slide's item, signal and activity.
- */
-const addon =
-  (render: FluidboxSlideRenderer<any>): FluidboxSolidRenderer =>
-  (context) => {
-    const target = (<span style={{ display: "contents" }} />) as HTMLSpanElement;
-    onMount(() => {
-      const controller = new AbortController();
-      const dispose = render(
-        addonSlide(context, target, AbortSignal.any([context.signal, controller.signal])),
-      );
-      onCleanup(() => {
-        controller.abort();
-        dispose?.();
-      });
-    });
-    return target;
-  };
-
-// The items' types name these slides: "embed", "spin" and "model".
-const renderers = {
-  embed: addon(embedSlide),
-  spin: addon(createSpinSlide()),
-  // <model-viewer> loads when a model first comes on show.
-  model: addon(createModelSlide({ load: () => import(/* @vite-ignore */ modelViewerUrl) })),
-};
+// <model-viewer> loads when a model first comes on show.
+const loadModelViewer = () => import(/* @vite-ignore */ modelViewerUrl);
 
 export function Media() {
   return (
-    <Fluidbox.Root items={productMedia} renderers={renderers}>
+    <Fluidbox.Root items={productMedia}>
       <div class="pattern-grid">
         <For each={productMedia}>
           {(item) => (
-            <Fluidbox.Trigger item={item} class="pattern-thumb" data-test="trigger">
+            <Fluidbox.Trigger value={item.id} class="pattern-thumb" data-test="trigger">
               <img src={thumbnailSrc(item)} alt={itemLabel(item)} />
             </Fluidbox.Trigger>
           )}
         </For>
       </div>
+      {/* The photo is built in; the other items' types name these slides. */}
+      <Fluidbox.Slides
+        embed={() => <Embed />}
+        spin={() => <Spin />}
+        model={() => <Model load={loadModelViewer} />}
+      />
     </Fluidbox.Root>
   );
 }
