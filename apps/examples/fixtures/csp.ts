@@ -2,11 +2,11 @@ import { createFluidbox } from "@ogdakke/fluidbox";
 import "@ogdakke/fluidbox/elements";
 import { takeOverFluidbox } from "@ogdakke/fluidbox/kit";
 import { Fluidbox } from "@ogdakke/fluidbox/react";
-import { Fluidbox as VueFluidbox } from "@ogdakke/fluidbox/vue";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { createApp, h } from "vue";
+import { createSSRApp } from "vue";
 import { cspItems } from "./csp-items";
+import { CspVue } from "./csp-vue";
 
 const viewer = createFluidbox({ items: cspItems });
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo]")) {
@@ -37,19 +37,9 @@ if (params.has("react")) {
   );
 }
 
-// So does a Vue Root, open through v-model.
+// So does a Vue Root, open through v-model, which hydrates the server's HTML.
 if (params.has("vue")) {
-  const photos = cspItems.slice(0, 2);
-  createApp({
-    render: () =>
-      h(VueFluidbox.Root, { items: photos, modelValue: photos[1]!.id! }, () =>
-        photos.map((photo, index) =>
-          h(VueFluidbox.Trigger, { key: photo.id, value: index }, () =>
-            h("img", { src: photo.src, alt: photo.alt, width: 160 }),
-          ),
-        ),
-      ),
-  }).mount(document.querySelector<HTMLElement>("[data-csp-vue]")!);
+  createSSRApp(CspVue).mount(document.querySelector<HTMLElement>("[data-csp-vue]")!);
 }
 
 declare global {
