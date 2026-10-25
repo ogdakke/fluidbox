@@ -975,7 +975,8 @@ const Media = defineComponent({
         { immediate: true },
       );
     });
-    return () => (slots.default ? h(Teleport, { to: host }, slots.default()) : null);
+    // One Teleport to one target, never disabled, so what it holds is never moved.
+    return () => h(Teleport, { to: host }, slots.default?.() ?? []);
   },
 });
 
