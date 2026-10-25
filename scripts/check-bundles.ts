@@ -45,6 +45,9 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "vue-spin": ["vue"],
 };
 
+/** The bindings whose add-on parts are entries of their own, as `react-embed`. */
+const bindingPrefix = new RegExp(`^(${["react", "vue", "solid", "angular"].join("|")})-`);
+
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
 const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fluidboxSpin" };
 
@@ -270,7 +273,7 @@ for (const name of entrypoints) {
     ...Object.entries(addonMarkers)
       .filter(
         ([addon, marker]) =>
-          addon !== name.replace(/^(react|vue)-/, "") && activationCode.includes(marker),
+          addon !== name.replace(bindingPrefix, "") && activationCode.includes(marker),
       )
       .map(([addon]) => `carries the ${addon} add-on`),
   ].filter((error): error is string => typeof error === "string");
