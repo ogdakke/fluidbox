@@ -59,6 +59,18 @@
       "types": "./dist/vue/index.d.ts",
       "import": "./dist/vue/index.js"
     },
+    "./vue/embed": {
+      "types": "./dist/vue/embed.d.ts",
+      "import": "./dist/vue/embed.js"
+    },
+    "./vue/model": {
+      "types": "./dist/vue/model.d.ts",
+      "import": "./dist/vue/model.js"
+    },
+    "./vue/spin": {
+      "types": "./dist/vue/spin.d.ts",
+      "import": "./dist/vue/spin.js"
+    },
     "./angular": {
       "types": "./dist/angular/index.d.ts",
       "import": "./dist/angular/index.js"
