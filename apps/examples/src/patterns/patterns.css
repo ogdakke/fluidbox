@@ -277,3 +277,11 @@
   height: auto;
   aspect-ratio: 1;
 }
+
+/* A live 3D model as a thumbnail. */
+.pattern-thumb model-viewer {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+}

@@ -68,6 +68,12 @@ const livePlayback = (video: HTMLVideoElement): FluidboxPlayback => ({
   },
 });
 
+/** What a trigger shows, as a slide reads it: its video's playback, and its live model. */
+const slideOrigin = (video: HTMLVideoElement | null, model: HTMLElement | null) => ({
+  ...(video && { video: livePlayback(video) }),
+  ...(model && { model }),
+});
+
 const WINDOW_SIZE = 31;
 const LOAD_RADIUS = 1;
 
@@ -132,6 +138,8 @@ interface ViewerSlide {
   originPlayback?: FluidboxSlideOrigin;
   /** What the slide hands back to the trigger's video as a close starts from it. */
   playback?: FluidboxPlaybackSource;
+  /** The renderer's listeners for a close starting from the slide. */
+  closeListeners?: Set<(landing: FluidboxSlideOrigin | null) => void>;
   /** The slide's layer beside the box, made when a renderer first asks for it. */
   layer?: HTMLDivElement;
   /** What the renderer said of zoom, if it did: off, or on with these options. */
@@ -253,7 +261,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   /** The item an open waits for, and whether its flight has started. */
   #opening: { readonly index: number; readonly flying: boolean } | undefined;
   /** The trigger's video the open under way starts from, and the item it opens. */
-  #originVideo: { readonly index: number; readonly video: HTMLVideoElement } | undefined;
+  #originMedia:
+    | {
+        readonly index: number;
+        readonly video: HTMLVideoElement | null;
+        readonly model: HTMLElement | null;
+      }
+    | undefined;
   #recycled: Map<string, { item: TItem; slide: ViewerSlide }[]> | undefined;
 
   constructor(
@@ -812,17 +826,36 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    */
   setOpening(index: number | undefined, flying = false) {
     this.#opening = index === undefined ? undefined : { index, flying };
-    if (index === undefined) this.#originVideo = undefined;
+    if (index === undefined) this.#originMedia = undefined;
   }
 
   /**
-   * The trigger's video an open of the item at `index` starts from, or null.
-   * The slide for it, mounted or yet to mount, gets it as its `origin`.
+   * The trigger's video and live model an open of the item at `index` starts
+   * from, or null. The slide for it, mounted or yet to mount, gets them as its
+   * `origin`.
    */
-  setOriginVideo(index: number, video: HTMLVideoElement | null) {
-    this.#originVideo = video ? { index, video } : undefined;
+  setOriginMedia(index: number, video: HTMLVideoElement | null, model: HTMLElement | null) {
+    this.#originMedia = video || model ? { index, video, model } : undefined;
     const slide = this.#slides.get(this.#near(index));
-    if (video && slide?.rendered) slide.originPlayback = { video: livePlayback(video) };
+    if (this.#originMedia && slide?.rendered) slide.originPlayback = slideOrigin(video, model);
+  }
+
+  /**
+   * Tell the slide on show that a close starts from it, with what the trigger
+   * it lands on shows. Each listener runs once per close.
+   */
+  closing(video: HTMLVideoElement | null, model: HTMLElement | null) {
+    const listeners = this.current?.closeListeners;
+    if (!listeners?.size) return;
+    const landing = video || model ? slideOrigin(video, model) : null;
+    for (const listener of listeners) {
+      try {
+        listener(landing);
+      } catch (error) {
+        // A slide's error doesn't stop the close.
+        if (typeof reportError === "function") reportError(error);
+      }
+    }
   }
 
   /** The playback the slide on show hands back as the viewer closes from it, or null. */
@@ -1461,8 +1494,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     let holds = 0;
     let rendering = true;
     const opening = () => (this.#opening?.index === itemIndex() ? this.#opening : undefined);
-    const originVideo = this.#originVideo?.index === itemIndex() ? this.#originVideo.video : null;
-    if (originVideo) slide.originPlayback = { video: livePlayback(originVideo) };
+    const origin = this.#originMedia?.index === itemIndex() ? this.#originMedia : undefined;
+    if (origin) slide.originPlayback = slideOrigin(origin.video, origin.model);
+    const closeListeners = (slide.closeListeners = new Set());
     const context: FluidboxSlide<any> & { [holdCommit]?: () => () => void } = {
       item,
       get index() {
@@ -1488,6 +1522,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       },
       returnPlayback: (source: FluidboxPlaybackSource) =>
         signal.aborted ? () => {} : this.#returnPlayback(slide, source),
+      onClose(listener: (landing: FluidboxSlideOrigin | null) => void) {
+        if (signal.aborted) return () => {};
+        closeListeners.add(listener);
+        return () => closeListeners.delete(listener);
+      },
       zoomable: (on) => {
         if (signal.aborted) return;
         slide.zoom = on === true ? {} : on;
@@ -1659,6 +1698,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.dispose = undefined;
       slide.activity = undefined;
       slide.zoomListeners = undefined;
+      slide.closeListeners = undefined;
       // An open waiting for the slide goes on without it.
       slide.release?.();
       slide.release = undefined;

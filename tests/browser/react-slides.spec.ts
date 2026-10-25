@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { stubMedia } from "./support/media";
 
 declare global {
   interface Window {
@@ -8,6 +9,8 @@ declare global {
       reels: { index: number; read: () => { video?: { currentTime: number } } | null }[];
       held: { id: string; read: () => number }[];
       setHeldItems?: (items: unknown[]) => void;
+      loadModels: () => Promise<unknown>;
+      setModelValue?: (value: string | null) => void;
     };
   }
 }
@@ -170,4 +173,38 @@ test("a Counter's render child stays the binding's as the viewer moves", async (
   // The core paints a counter it doesn't own as "2 / 2", over React's node.
   await expect(own).toHaveText("2 of 2");
   await expect(page.locator(`${dialog} [data-fluidbox-counter]`)).toHaveText("2 of 2");
+});
+
+test("a live model card opens on its view, and a value of null brings the slide's view home", async ({
+  page,
+}) => {
+  await stubMedia(page);
+  await load(page);
+  await page.evaluate(() => window.reactSlides.loadModels());
+  const card = page.locator('#models [data-item="helmet"] model-viewer');
+  await expect(card).toHaveAttribute("data-orbit-at-load", "0");
+  await card.scrollIntoViewIfNeeded();
+  const box = (await card.boundingBox())!;
+  const x = Math.round(box.x + box.width / 2);
+  const y = Math.round(box.y + box.height / 2);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let step = 1; step <= 8; step++) await page.mouse.move(x - step * 4, y);
+  await page.mouse.up();
+  await expect(card).toHaveAttribute("data-orbit", "-32");
+  await expect(page.locator(dialog)).toHaveCount(0);
+
+  await card.click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const model = page.locator(`${shown} model-viewer`);
+  // StrictMode renders the slide twice; one element joins the page, once, on the card's view.
+  await expect(model).toHaveCount(1);
+  await expect(model).toHaveAttribute("data-orbit-at-load", "-32");
+  await model.evaluate((element) => {
+    (element as HTMLElement & { cameraOrbit: string }).cameraOrbit = "24deg 75deg 2m";
+  });
+  await page.evaluate(() => window.reactSlides.setModelValue!(null));
+  await expect(page.locator(dialog)).toHaveCount(0);
+  await expect(card).toHaveAttribute("data-camera-orbit", "24deg 75deg 2m");
+  await expect(card).toHaveAttribute("data-connections", "1");
 });

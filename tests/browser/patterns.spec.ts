@@ -428,5 +428,34 @@ for (const framework of frameworks) {
       await expect(activeSlide(page).locator("[data-fluidbox-embed]")).toHaveCount(1);
       await close(page);
     });
+
+    // JavaScript and React show the model's card as a live <model-viewer>.
+    if (framework === "javascript" || framework === "react") {
+      test("media: a live model card opens on its view", async ({ page }) => {
+        const trigger = pattern(page, "media").locator('[data-test="trigger"]').nth(3);
+        const card = trigger.locator("model-viewer");
+        await expect(card).toHaveAttribute("data-orbit-at-load", "0");
+        await expect(card).toHaveAttribute("aria-hidden", "true");
+        await expect(trigger).toHaveAccessibleName("Damaged Helmet, a 3D model");
+        // A drag turns the card and leaves the viewer closed.
+        await card.scrollIntoViewIfNeeded();
+        const box = (await card.boundingBox())!;
+        const x = Math.round(box.x + box.width / 2);
+        const y = Math.round(box.y + box.height / 2);
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        for (let step = 1; step <= 8; step++) await page.mouse.move(x - step * 5, y);
+        await page.mouse.up();
+        await expect(card).toHaveAttribute("data-orbit", "-40");
+        await expect(dialog(page)).toHaveCount(0);
+        // A click opens on the card's view, and a close brings the slide's view home.
+        await open(page, trigger, "Item 4 of 4");
+        const model = activeSlide(page).locator("model-viewer");
+        await expect(model).toHaveAttribute("data-orbit-at-load", "-40");
+        await close(page);
+        await expect(card).toHaveAttribute("data-camera-orbit", "-40deg 75deg 2m");
+        await expect(card).toHaveAttribute("data-connections", "1");
+      });
+    }
   });
 }

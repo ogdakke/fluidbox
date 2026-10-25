@@ -5,6 +5,8 @@ import { createModelSlide } from "@ogdakke/fluidbox/model";
 import { createSpinSlide } from "@ogdakke/fluidbox/spin";
 import { modelViewerUrl, productMedia, thumbnailSrc } from "../shared";
 
+const loadModelViewer = () => import(/* @vite-ignore */ modelViewerUrl);
+
 export function mountMedia(root: HTMLElement) {
   const fluidbox = createFluidbox({
     items: productMedia,
@@ -12,8 +14,8 @@ export function mountMedia(root: HTMLElement) {
     slides: {
       embed: embedSlide,
       spin: createSpinSlide(),
-      // <model-viewer> loads when a model first comes on show.
-      model: createModelSlide({ load: () => import(/* @vite-ignore */ modelViewerUrl) }),
+      // The model's card draws <model-viewer> too, so it loads with the page.
+      model: createModelSlide({ load: loadModelViewer }),
     },
   });
 
@@ -24,7 +26,20 @@ export function mountMedia(root: HTMLElement) {
     button.type = "button";
     button.className = "pattern-thumb";
     button.dataset.test = "trigger";
-    button.append(Object.assign(new Image(), { src: thumbnailSrc(item), alt: itemLabel(item) }));
+    if (item.type === "model") {
+      // A live model: a drag turns it, and a click opens the viewer on the same view.
+      void loadModelViewer();
+      button.setAttribute("aria-label", itemLabel(item));
+      const model = document.createElement("model-viewer");
+      model.setAttribute("src", item.src);
+      model.setAttribute("poster", thumbnailSrc(item) ?? "");
+      model.setAttribute("camera-controls", "");
+      model.setAttribute("touch-action", "pan-y");
+      model.setAttribute("interaction-prompt", "none");
+      button.append(model);
+    } else {
+      button.append(Object.assign(new Image(), { src: thumbnailSrc(item), alt: itemLabel(item) }));
+    }
     grid.append(button);
     fluidbox.bind(button, index);
   });

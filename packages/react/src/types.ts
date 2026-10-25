@@ -302,15 +302,23 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
   onActiveChange(this: void, listener: (active: boolean) => void): () => void;
   /**
    * What the trigger showed, on the slide an open started from it: `video`
-   * reads the trigger's `<video>` live. Null on the other slides. Read live,
-   * as an open can start from a trigger after the slide rendered.
+   * reads the trigger's `<video>` live, and `model` is its live
+   * `<model-viewer>`. Null on the other slides. Read live, as an open can start
+   * from a trigger after the slide rendered.
    */
   readonly origin: FluidboxSlideOrigin | null;
   /**
    * Hand the playback back to the trigger's video as the viewer closes from
    * this slide. Call it in an effect, and return what it returns as the cleanup.
+   * The video helper for `onClose`, read just after its listeners on a close that flies.
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
+  /**
+   * Hear a close start from this slide, once per close, with what the trigger
+   * it lands on shows. Call it in an effect, and return what it returns as the
+   * cleanup.
+   */
+  onClose(this: void, listener: (landing: FluidboxSlideOrigin | null) => void): () => void;
   /** Make the opening flight also wait for this promise. Call it during render or in a layout effect. */
   waitUntil(this: void, promise: Promise<unknown>): void;
   /** Put the slide in its error state, with `error` as the `mediaerror`'s cause. */
