@@ -363,7 +363,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes["items"]) void this.fluidbox.setItems(this.items() ?? []);
+    if (changes["items"]) void this.setItems(this.items() ?? []);
     if (changes["labels"]) {
       this.#labels.set(resolveLabels(this.labels()));
       this.#update({ labels: this.labels() });
@@ -469,15 +469,15 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 
   close(options?: FluidboxCommandOptions): Promise<boolean> {
-    return this.fluidbox.close(options);
+    return this.#zone.runOutsideAngular(() => this.fluidbox.close(options));
   }
 
   next(options?: FluidboxCommandOptions): Promise<boolean> {
-    return this.fluidbox.next(options);
+    return this.#zone.runOutsideAngular(() => this.fluidbox.next(options));
   }
 
   previous(options?: FluidboxCommandOptions): Promise<boolean> {
-    return this.fluidbox.previous(options);
+    return this.#zone.runOutsideAngular(() => this.fluidbox.previous(options));
   }
 
   // A zoom can load the zoom's code, whose listeners stay outside the zone.
@@ -513,7 +513,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 
   setItems(items: FluidboxItems<TItem>): Promise<boolean> {
-    return this.fluidbox.setItems(items);
+    return this.#zone.runOutsideAngular(() => this.fluidbox.setItems(items));
   }
 
   /** Start loading an item a press is likely to open. Call the result to let go. */

@@ -400,6 +400,7 @@ abstract class ControlDirective extends NamedDirective implements OnInit, OnDest
       hidden: !!control.hidden?.(this.root.fluidbox, state),
     };
   });
+  readonly #zone = inject(NgZone);
   #unlisten: (() => void) | undefined;
 
   ngOnInit(): void {
@@ -411,7 +412,9 @@ abstract class ControlDirective extends NamedDirective implements OnInit, OnDest
     // Added after the template's own listeners, so a (click) there can prevent the command.
     this.#unlisten = this.renderer.listen(element, "click", (event: MouseEvent) => {
       if (event.defaultPrevented) return;
-      this.run(event);
+      // The viewer's frames and timers stay out of the zone; its state comes
+      // back in through the root's subscription.
+      this.#zone.runOutsideAngular(() => this.run(event));
     });
   }
 
