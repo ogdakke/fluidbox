@@ -16,7 +16,6 @@ import {
   type FluidboxReactRenderContext,
   type FluidboxReactRenderer,
 } from "@ogdakke/fluidbox/react";
-import { hoverZoom } from "@ogdakke/fluidbox/hover-zoom";
 import { thumbHashToDataURL } from "thumbhash";
 import hashes from "./shop-photos.json";
 import { Avatar, compact, type Person } from "./social-ui";
@@ -285,29 +284,20 @@ function Photo({
   size,
   origin,
   eager,
-  zoom,
 }: {
   item: ShopItem;
   src: string;
   size: number;
   origin?: boolean;
   eager?: boolean;
-  /** Magnify the photo in place under a resting mouse, as Shop's product page does. */
-  zoom?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   // A cached image can finish before React attaches onLoad.
   const ref = useCallback((image: HTMLImageElement | null) => {
     if (image?.complete && image.naturalWidth) setLoaded(true);
   }, []);
-  const box = useRef<HTMLSpanElement>(null);
-  useEffect(
-    () => (zoom && item.type === "img" && box.current ? hoverZoom(box.current, item) : undefined),
-    [zoom, item],
-  );
   return (
     <span
-      ref={box}
       className="shop-photo"
       style={item.placeholder ? { backgroundImage: `url(${item.placeholder})` } : undefined}
     >
@@ -355,19 +345,15 @@ function Gallery({ carousel }: { carousel: Carousel }) {
                 className="shop-slide"
                 aria-label={`Open ${at + 1} of ${media.length}: ${named(item)}`}
               >
-                <Photo
-                  item={item}
-                  src={cover(item)}
-                  size={item.width}
-                  origin
-                  eager={at < 2}
-                  zoom={item.type === "img"}
-                />
-                {item.type === "custom" && (
-                  <span className="shop-kind" aria-hidden="true">
-                    {badges[item.render]}
-                  </span>
-                )}
+                {/* The card scales as it scrolls; the button, the snap target, doesn't. */}
+                <span className="shop-card">
+                  <Photo item={item} src={cover(item)} size={item.width} origin eager={at < 2} />
+                  {item.type === "custom" && (
+                    <span className="shop-kind" aria-hidden="true">
+                      {badges[item.render]}
+                    </span>
+                  )}
+                </span>
               </button>
             </Fluidbox.Trigger>
           ))}
@@ -873,11 +859,6 @@ function Findings() {
         <li>
           <strong>Click to zoom: fits.</strong> Shop zooms on one click and zooms out on the next.
           The package does the same for a mouse; touch zooms on a double tap.
-        </li>
-        <li>
-          <strong>Zoom on hover: add-on.</strong> Shop magnifies the photo in the carousel under a
-          resting mouse. The fixture calls hoverZoom from @ogdakke/fluidbox/hover-zoom on each card;
-          a click still opens the viewer.
         </li>
         <li>
           <strong>Pan with the pointer: fixture code.</strong> Shop pans a zoomed photo by moving
