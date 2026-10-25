@@ -69,6 +69,9 @@ class TestDriver {
   setZoom() {}
   setLoop() {}
   setGestures() {}
+  setSlideshow() {}
+  play() {}
+  pause() {}
   setFullscreen() {
     return Promise.resolve(false);
   }
@@ -149,8 +152,8 @@ describe("the fluidbox runtime", () => {
     expect(controlNameList).toEqual(allControlNames);
     const fluidbox = make(new TestDriver());
     const button = { setAttribute() {} } as unknown as HTMLElement;
-    expect(() => fluidbox.bindControl(button, "slideshow" as never)).toThrow(
-      new TypeError('Fluidbox has no control named "slideshow".'),
+    expect(() => fluidbox.bindControl(button, "hotspot" as never)).toThrow(
+      new TypeError('Fluidbox has no control named "hotspot".'),
     );
   });
 

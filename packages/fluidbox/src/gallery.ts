@@ -141,6 +141,7 @@ const closedState: FluidboxState = Object.freeze({
   hasNext: false,
   zoom: null,
   fullscreen: false,
+  playing: false,
 });
 
 function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined {

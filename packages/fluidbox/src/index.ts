@@ -39,6 +39,7 @@ export type {
   FluidboxTriggerValue,
   FluidboxSheet,
   FluidboxSheetOptions,
+  FluidboxSlideshowOptions,
   FluidboxSheetSnapPoint,
   FluidboxPlayback,
   FluidboxPlaybackSource,

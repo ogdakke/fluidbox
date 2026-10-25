@@ -1586,6 +1586,9 @@ export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem
     get fullscreen() {
       return state().fullscreen;
     },
+    get playing() {
+      return state().playing;
+    },
   } satisfies FluidboxApi<TItem>;
   return selector ? createMemo(() => selector(api)) : api;
 }

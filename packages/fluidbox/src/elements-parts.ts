@@ -39,6 +39,7 @@ const CONTROLS: Readonly<Record<FluidboxControlName, string>> = {
   fullscreen: "data-fluidbox-fullscreen",
   download: "data-fluidbox-download",
   share: "data-fluidbox-share",
+  slideshow: "data-fluidbox-slideshow",
   retry: "data-fluidbox-retry",
 };
 const NAMES = Object.keys(CONTROLS) as FluidboxControlName[];

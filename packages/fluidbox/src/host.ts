@@ -29,6 +29,8 @@ export interface FluidboxHost {
   shareLink(item: FluidboxItem): string | undefined;
   /** Load the slide on show again if it failed. False when it hadn't. */
   retry(): Promise<boolean>;
+  /** Whether the fluidbox has a `slideshow` option, without which the Slideshow control hides. */
+  slideshow(): boolean;
   /** The labels the viewer uses now. */
   readonly labels: FluidboxLabels;
   /** Drop the viewer and close at once, keeping the bindings, as a binding's unmount does. */

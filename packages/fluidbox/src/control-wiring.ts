@@ -30,7 +30,10 @@ export function namingOf(element: Element, name: FluidboxControlName): ControlNa
     : "label";
 }
 
-/** Show a control as the state has it: disabled, hidden, its name, and for Download its file. */
+/**
+ * Show a control as the state has it: disabled, hidden, on (`data-active`),
+ * its name, and for Download its file.
+ */
 export function paintControl(
   element: HTMLElement,
   name: FluidboxControlName,
@@ -42,6 +45,7 @@ export function paintControl(
   const control = fluidboxControls[name];
   if (element instanceof HTMLButtonElement) element.disabled = control.disabled(state);
   if (control.hidden) element.hidden = control.hidden(fluidbox, state);
+  if (control.active) element.toggleAttribute("data-active", control.active(state));
   if (name === "download" && element instanceof HTMLAnchorElement) {
     const file = state.item && fileOf(state.item);
     if (file) {

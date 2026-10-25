@@ -230,7 +230,21 @@ assert<Equal<ReturnType<typeof fluidbox.close>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.setItems>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.load>, Promise<boolean>>>();
 assert<Equal<Root.FluidboxPreload, "intent" | "press" | "eager">>();
-assert<Equal<FluidboxReason, "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items">>();
+assert<
+  Equal<
+    FluidboxReason,
+    "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items" | "slideshow"
+  >
+>();
+// The slideshow: commands, state, options and its control.
+assert<Equal<ReturnType<typeof fluidbox.play>, void>>();
+assert<Equal<ReturnType<typeof fluidbox.pause>, void>>();
+assert<Equal<typeof fluidbox.state.playing, boolean>>();
+createFluidbox({ items: photos, slideshow: { interval: 3000, loop: true, autoplay: true } });
+fluidbox.update({ slideshow: { interval: 4000 } });
+fluidbox.bindControl(document.createElement("button"), "slideshow");
+// @ts-expect-error the interval is a number of ms
+createFluidbox({ items: photos, slideshow: { interval: "5s" } });
 // A scrub is a kind of move, not a source of one.
 void fluidbox.open(1, { scrub: true });
 

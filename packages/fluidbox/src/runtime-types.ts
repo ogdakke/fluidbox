@@ -53,7 +53,7 @@ export interface FluidboxOriginAdapter {
   revealOrigin?(id: string, index: number, context: FluidboxRevealContext): void | Promise<void>;
 }
 
-export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel";
+export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "slideshow";
 
 export type SessionChangeReason = SessionReason | "source-update" | "source-empty";
 
@@ -207,6 +207,8 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   zoomableChanged?(): void;
   /** The viewer became the document's fullscreen element, or stopped being it. */
   fullscreenChanged?(on: boolean): void;
+  /** The slideshow started or stopped advancing. */
+  playingChanged?(on: boolean): void;
   /** A slide's media failed, or a zoom image did. */
   mediaError?(event: FluidboxMediaErrorEvent<any>): void;
 }

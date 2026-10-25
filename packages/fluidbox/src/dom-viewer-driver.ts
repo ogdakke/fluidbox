@@ -54,6 +54,7 @@ import {
 } from "./viewer-portal";
 import type { FluidboxLabels } from "./labels";
 import { ViewerStrip } from "./viewer-strip";
+import { ViewerSlideshow } from "./viewer-slideshow";
 import type * as ViewerActions from "./viewer-actions";
 import { canGoFullscreen, crossOrigin, downloadName, fileOf } from "./item-file";
 import { activeViewer } from "./viewer-ownership";
@@ -271,6 +272,7 @@ export class DomViewerDriver<
   /** A cross-origin download's fetch, which a move or a close aborts. */
   #fileFetch: AbortController | undefined;
   #copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  readonly #slideshow: ViewerSlideshow;
 
   constructor(
     ownerDocument: Document,
@@ -283,6 +285,15 @@ export class DomViewerDriver<
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
     this.#slides = slides ?? {};
     this.#portal.dialog.dataset.fluidboxHeadless = "";
+    this.#slideshow = new ViewerSlideshow({
+      controller: () => this.#controller,
+      loops: () => this.#loop,
+      ready: (index, cap) => this.#strip?.ready(index, cap),
+      slide: () => this.#strip?.current?.element,
+      dialog: this.#portal.dialog,
+      status: this.#portal.status,
+    });
+    this.onUserInteraction((event) => this.#slideshow.interaction(event));
     this.#portal.container.addEventListener(
       "click",
       (event) => {
@@ -312,7 +323,7 @@ export class DomViewerDriver<
     );
     // Ahead of every other listener, the zoom's included: each input a person makes.
     for (const type of ["pointerdown", "touchstart", "wheel"] as const) {
-      this.#portal.container.addEventListener(type, () => this.#userInteraction(), {
+      this.#portal.container.addEventListener(type, (event) => this.#userInteraction(event), {
         capture: true,
         passive: true,
         signal: this.#lifetime.signal,
@@ -612,17 +623,34 @@ export class DomViewerDriver<
   }
 
   /** Listeners for a person's input to the open viewer. */
-  readonly #interactions = new Set<() => void>();
+  readonly #interactions = new Set<(event?: Event) => void>();
 
-  /** Follow every gesture, key and zoom a person makes in the viewer. Returns a function that stops. */
-  onUserInteraction(listener: () => void) {
+  /**
+   * Follow every gesture, key and zoom a person makes in the viewer, with the
+   * event behind it when there is one. Returns a function that stops.
+   */
+  onUserInteraction(listener: (event?: Event) => void) {
     this.#interactions.add(listener);
     return () => void this.#interactions.delete(listener);
   }
 
   /** A person's input: a pointer, a touch, a wheel, a key or a zoom. Every one passes here. */
-  #userInteraction() {
-    for (const listener of this.#interactions) listener();
+  #userInteraction(event?: Event) {
+    for (const listener of this.#interactions) listener(event);
+  }
+
+  /** The slideshow's interval, loop and autoplay. */
+  setSlideshow(options: FluidboxOptions["slideshow"]) {
+    this.#slideshow.options = options;
+  }
+
+  /** Start the slideshow on the open viewer. */
+  play() {
+    this.#slideshow.play();
+  }
+
+  pause() {
+    this.#slideshow.pause();
   }
 
   /**
@@ -654,6 +682,8 @@ export class DomViewerDriver<
       readonly reason?: ZoomReason;
     },
   ): Promise<boolean> {
+    // A zoom pauses the slideshow, whether a control, a key or your code asked.
+    this.#slideshow.pause();
     // Its scale is the goal from now, before the zoom has loaded and started to move.
     const command = { scale };
     this.#zoomCommand = command;
@@ -995,6 +1025,7 @@ export class DomViewerDriver<
     // The item left behind scrolled away zoomed; coming back, it shows at fit.
     this.#zoom?.release();
     this.#render(context.item, context.index, true);
+    this.#slideshow.moved();
     // The overlay is invisible while open. Moving it between slide frames
     // during native scrolling can invalidate the browser's painted snap.
     // A scrub is a direct preview. The full-size image swaps immediately
@@ -1194,6 +1225,7 @@ export class DomViewerDriver<
     this.#endWheelHandoff();
     this.#fileFetch?.abort();
     clearTimeout(this.#copiedTimer);
+    this.#slideshow.destroy();
     if (this.#isFullscreen()) void this.setFullscreen(false);
     this.#actions?.raiseAgain(this.#portal.overlay);
     this.#zoom?.destroy();
@@ -2273,6 +2305,7 @@ export class DomViewerDriver<
       target.toggleAttribute("data-dismissing", state === "closing" || this.#dragGesture.active);
     }
     if (state === "closed") this.#endReveal();
+    this.#slideshow.statusChanged(state);
     // Once open, the actions load out of the flight's way, so a press on a
     // button of the app's own that calls setFullscreen, download or share
     // finds them ready, and keeps its user activation.
@@ -2306,7 +2339,7 @@ export class DomViewerDriver<
     ) {
       return;
     }
-    this.#userInteraction();
+    this.#userInteraction(event);
     if (event.key === "Escape") {
       const owner = target?.closest(ESCAPE_OWNERS);
       if (owner && dialog.contains(owner) && owner !== dialog) return;

@@ -480,6 +480,11 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly zoom: FluidboxZoomState | null;
   /** The viewer is the document's fullscreen element. */
   readonly fullscreen: boolean;
+  /**
+   * The slideshow is advancing on its timer. False once anything pauses it,
+   * the tab hiding and a video playing included, and while closed.
+   */
+  readonly playing: boolean;
 }
 
 /**
@@ -487,10 +492,17 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
  * a click on a trigger, and "keyboard" the arrow keys, Escape, or a page-scrolling
  * key that closes the viewer. "pointer" is a swipe or scroll through the slides, a
  * drag to dismiss or a tap on the backdrop, and "wheel" a wheel or trackpad scroll
- * that dismisses. "items" is a move made by `setItems`. A move from the thumbnails
- * has the reason of its input.
+ * that dismisses. "items" is a move made by `setItems`, and "slideshow" one the
+ * slideshow's timer made. A move from the thumbnails has the reason of its input.
  */
-export type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items";
+export type FluidboxReason =
+  | "api"
+  | "trigger"
+  | "keyboard"
+  | "pointer"
+  | "wheel"
+  | "items"
+  | "slideshow";
 
 /** The open item's id, or null while the viewer is closed. */
 export type FluidboxValue = string | null;
@@ -708,7 +720,8 @@ export type FluidboxControlName =
   | "fullscreen"
   | "download"
   | "share"
-  | "retry";
+  | "retry"
+  | "slideshow";
 
 /**
  * When the viewer's code loads. `"intent"` loads it when a mouse rests on a
@@ -817,6 +830,26 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly wheel?: "dismiss" | "zoom" | "navigate" | "none";
   /** The link Share shares for an item. Without one, Share hides. */
   readonly shareUrl?: (item: TItem) => string | undefined;
+  /**
+   * Advance on a timer. It never starts by itself: only `play()`, the
+   * Slideshow control or `autoplay` start it. Without it, the Slideshow
+   * control hides; `play()` still plays, with the defaults.
+   */
+  readonly slideshow?: FluidboxSlideshowOptions;
+}
+
+/** How the slideshow plays. */
+export interface FluidboxSlideshowOptions {
+  /**
+   * Time on each slide, in ms. The next slide then has as long again to be
+   * ready before the slideshow moves to it.
+   * @default 5000
+   */
+  readonly interval?: number;
+  /** Go from the last slide to the first. Without it, the slideshow stops on the last. @default the `loop` option */
+  readonly loop?: boolean;
+  /** Start playing as the viewer opens. @default false */
+  readonly autoplay?: boolean;
 }
 
 /**
@@ -836,7 +869,8 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
     | "preload"
     | "dismiss"
     | "wheel"
-    | "shareUrl"]?: FluidboxOptions<TItem>[K] | undefined;
+    | "shareUrl"
+    | "slideshow"]?: FluidboxOptions<TItem>[K] | undefined;
 };
 
 export interface FluidboxCommandOptions {
@@ -943,6 +977,15 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
    * clipboard. Resolves whether it was shared or copied.
    */
   share(): Promise<boolean>;
+  /**
+   * Start the slideshow on the open viewer, as the Slideshow control does. It
+   * moves on every `interval` with the reason "slideshow", and pauses on any
+   * input to the viewer, while the tab is hidden and while a video in the
+   * slide plays. Closed, it does nothing.
+   */
+  play(): void;
+  /** Stop the slideshow. It stays paused until `play()` or the control. */
+  pause(): void;
   /**
    * Change options without closing the viewer. Labels and zoom apply in place, so
    * a zoomed photo zooms out when zoom turns off. A change of `controls`, `viewer`

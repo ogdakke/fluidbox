@@ -15,6 +15,8 @@ export interface FluidboxControl {
    * sit in the tab order disabled.
    */
   readonly hidden?: (fluidbox: Fluidbox<any>, state: FluidboxState<any>) => boolean;
+  /** For a control that switches, as Slideshow does: whether it is on, shown as `data-active`. */
+  readonly active?: (state: FluidboxState<any>) => boolean;
   /** Run the command. Pass the click, so its events tell a key from a pointer. */
   readonly run: (fluidbox: Fluidbox<any>, click?: { readonly detail: number }) => Promise<boolean>;
 }
@@ -92,6 +94,18 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
     (fluidbox, state) => !state.item || !canShare() || !hostOf(fluidbox).shareLink(state.item),
     (fluidbox) => fluidbox.share(),
   ),
+  slideshow: {
+    attribute: "data-fluidbox-slideshow",
+    label: (labels, state) => (state?.playing ? labels.pauseSlideshow : labels.playSlideshow),
+    disabled: closed,
+    hidden: (fluidbox) => !hostOf(fluidbox).slideshow(),
+    active: (state) => state.playing,
+    run: (fluidbox) => {
+      if (fluidbox.state.playing) fluidbox.pause();
+      else fluidbox.play();
+      return Promise.resolve(true);
+    },
+  },
   // For an error of your own: it loads the slide on show again.
   retry: {
     attribute: "data-fluidbox-retry",
@@ -120,5 +134,6 @@ export const allControlNames: readonly FluidboxControlName[] = [
   "fullscreen",
   "download",
   "share",
+  "slideshow",
   "retry",
 ];

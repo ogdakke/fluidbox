@@ -47,6 +47,10 @@ export interface FluidboxLabels {
   readonly share: string;
   /** Announced once Share copied the link. */
   readonly linkCopied: string;
+  /** The slideshow control, while the slideshow is paused. */
+  readonly playSlideshow: string;
+  /** The slideshow control, while the slideshow plays. */
+  readonly pauseSlideshow: string;
 }
 
 /** The labels the viewer uses for any you don't pass. */
@@ -77,6 +81,8 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   download: "Download",
   share: "Share",
   linkCopied: "Link copied",
+  playSlideshow: "Play slideshow",
+  pauseSlideshow: "Pause slideshow",
 });
 
 /** Your labels over the defaults. */
