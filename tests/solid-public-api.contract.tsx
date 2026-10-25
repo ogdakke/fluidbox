@@ -232,3 +232,7 @@ void sheetStop;
 // @ts-expect-error an Image draws image items
 const wrongImage = <Fluidbox.Image item={{ type: "video", src: "/a.mp4", width: 1, height: 1 }} />;
 void wrongImage;
+
+// @ts-expect-error the box takes no event handlers, in either spelling
+const mediaHandler = <Fluidbox.Media onclick={() => {}} />;
+void mediaHandler;

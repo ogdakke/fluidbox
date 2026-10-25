@@ -142,7 +142,10 @@ export type FluidboxSlidesProps<TItem extends FluidboxItem = FluidboxItem> = {
 /** The attributes a part gives an element the viewer made: no event handlers. */
 type ElementAttributes = Omit<
   JSX.HTMLAttributes<HTMLElement>,
-  keyof JSX.CustomEventHandlersCamelCase<HTMLElement> | "children" | "ref"
+  | keyof JSX.CustomEventHandlersCamelCase<HTMLElement>
+  | keyof JSX.CustomEventHandlersLowerCase<HTMLElement>
+  | "children"
+  | "ref"
 >;
 
 export interface FluidboxMediaProps extends ElementAttributes {

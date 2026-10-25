@@ -841,11 +841,12 @@ export function useFluidboxSlide<
  */
 function applyAttributes(
   element: HTMLElement,
-  attributes: Readonly<Record<string, string | number | boolean | object | null | undefined>>,
+  attributes: Readonly<Record<string, unknown>>,
 ): () => void {
   const restores: (() => void)[] = [];
   for (const [key, value] of Object.entries(attributes)) {
-    if (value === undefined || value === null) continue;
+    // A function is a handler, which the box doesn't take; never its source as text.
+    if (value === undefined || value === null || typeof value === "function") continue;
     if (key === "style") {
       // An object spells CSS properties as CSS does; a string is parsed into them.
       let declarations = value as Record<string, string | number | null>;
