@@ -164,7 +164,7 @@ interface FluidboxContextValue {
   readonly slides: Accessor<SlideContents | null>;
   addViewer(): () => void;
   claimSlides(contents: SlideContents): () => void;
-  setThumbnails(option: true | FluidboxThumbnailsOptions<any>): () => void;
+  setThumbnails(option: Accessor<true | FluidboxThumbnailsOptions<any>>): () => void;
   setSheet(option: Accessor<FluidboxSheetOptions<any>>): () => void;
   /** What the server's copy of an open viewer needs to know, set as the parts render. */
   readonly serverHints: ServerHints;
@@ -295,7 +295,7 @@ const sameJson = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JS
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.Element {
   const [viewerTarget, setViewerTarget] = createSignal<HTMLElement | null>(null);
   const [viewers, setViewers] = createSignal(0);
-  const [thumbnails, setThumbnails] = registry<true | FluidboxThumbnailsOptions<any>>();
+  const [thumbnails, setThumbnails] = registry<Accessor<true | FluidboxThumbnailsOptions<any>>>();
   const [sheet, setSheet] = registry<Accessor<FluidboxSheetOptions<any>>>();
   const [slides, setSlides] = createSignal<SlideContents | null>(null);
 
@@ -419,7 +419,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   // Each part's render functions stay the same while it is mounted, so the
   // viewer only remounts an add-on when its options really change. Not
   // deferred: the parts register as Root's children render, before this runs.
-  const thumbnailsOption = createMemo(() => thumbnails() ?? undefined);
+  const thumbnailsOption = createMemo(() => thumbnails()?.());
   const sheetOption = createMemo(() => sheet()?.());
   createEffect(() =>
     fluidbox.update({
@@ -1364,7 +1364,6 @@ function Thumbnails<TItem extends FluidboxItem>(
   const context = useFluidboxContext();
   context.serverHints.thumbnails = true;
   const owner = getOwner();
-  const custom = typeof untrack(() => props.children) === "function";
   // Renders straight into each button; the newest children are read as it does.
   const render: FluidboxRenderer<TItem> = ({ item, index, target }) =>
     mountInto(
@@ -1379,7 +1378,10 @@ function Thumbnails<TItem extends FluidboxItem>(
         }),
       owner,
     );
-  onCleanup(context.setThumbnails(custom ? { render } : true));
+  // Children that turn into a function, or stop being one, switch the strip
+  // between your thumbnails and the default ones.
+  const custom = createMemo(() => typeof props.children === "function");
+  onCleanup(context.setThumbnails(createMemo(() => (custom() ? { render } : true))));
   return null;
 }
 

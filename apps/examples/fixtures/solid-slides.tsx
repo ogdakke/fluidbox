@@ -19,6 +19,7 @@ import type {
 } from "@ogdakke/fluidbox";
 import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/solid";
 import "@ogdakke/fluidbox/baseline.css";
+import "@ogdakke/fluidbox/thumbnails.css";
 import "./media.css";
 
 mountSite("fixtures", {
@@ -61,6 +62,8 @@ const fixture = {
   setValue: undefined as ((value: string | null) => void) | undefined,
   /** While true, the controlled viewer cancels moves and leaves its value. */
   cancelMoves: false,
+  /** Switches the thumbnails viewer between your thumbnails and the default ones. */
+  setCustomThumbnails: undefined as ((custom: boolean) => void) | undefined,
   /** How many times each slide reported mounting its content. */
   mounted: {} as Record<string, number>,
 };
@@ -188,6 +191,21 @@ function ControlledViewer() {
   );
 }
 
+function ThumbnailsViewer() {
+  const [custom, setCustom] = createSignal(false);
+  fixture.setCustomThumbnails = setCustom;
+  return (
+    <Fluidbox.Root items={photos}>
+      <Grid items={photos} id="thumbnails" />
+      <Fluidbox.Thumbnails>
+        {custom()
+          ? ({ index }: { index: number }) => <span data-test="thumb">{index + 1}</span>
+          : undefined}
+      </Fluidbox.Thumbnails>
+    </Fluidbox.Root>
+  );
+}
+
 function HeldViewer() {
   const [items, setItems] = createSignal<FluidboxItem[]>([
     custom("held", "held-a"),
@@ -225,6 +243,8 @@ function App() {
       </Fluidbox.Root>
       <h2>A controlled value</h2>
       <ControlledViewer />
+      <h2>Thumbnails that switch between yours and the default ones</h2>
+      <ThumbnailsViewer />
       <h2>A slide that holds the open</h2>
       <HeldViewer />
       <h2>The viewer's parts, with a photo that fails</h2>

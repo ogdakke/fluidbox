@@ -12,6 +12,7 @@ declare global {
       value: () => string | null;
       setValue: (value: string | null) => void;
       cancelMoves: boolean;
+      setCustomThumbnails: (custom: boolean) => void;
       closeClicks: number;
       openGate?: () => void;
       reels: { index: number; read: () => { video?: { currentTime: number } } | null }[];
@@ -292,4 +293,22 @@ test("a controlled viewer whose handler cancels a move stays where it is", async
     "open trigger one",
     "move keyboard two",
   ]);
+});
+
+test("thumbnails switch between yours and the default ones as the children change", async ({
+  page,
+}) => {
+  await load(page);
+  await page.locator('#thumbnails [data-item="one"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const buttons = page.locator("[data-fluidbox-thumbnails] button");
+  await expect(buttons).toHaveCount(2);
+  await expect(buttons.locator("img")).toHaveCount(2);
+  await page.evaluate(() => window.solidSlides.setCustomThumbnails(true));
+  await expect(buttons.locator('[data-test="thumb"]')).toHaveText(["1", "2"]);
+  await expect(buttons.locator("img")).toHaveCount(0);
+  // Back to the default thumbnails, not empty buttons.
+  await page.evaluate(() => window.solidSlides.setCustomThumbnails(false));
+  await expect(buttons.locator("img")).toHaveCount(2);
+  await expect(buttons.locator('[data-test="thumb"]')).toHaveCount(0);
 });
