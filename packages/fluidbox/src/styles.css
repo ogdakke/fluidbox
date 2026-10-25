@@ -180,6 +180,14 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   visibility: visible !important;
 }
 
+/**
+ * How fast the viewer moves: `2` plays the open, the close, a release, a zoom
+ * and a move between slides twice as fast. Read as each motion starts, clamped
+ * to `0.25`–`4`. Reduced motion has no flights at any speed.
+ * @input --fluidbox-motion-speed
+ * @default 1
+ * @on Viewer, which takes it from around the trigger as it opens
+ */
 /* Keep root rule specificity; :where keeps descendant defaults easy to override. */
 :is([data-fluidbox-viewer], [data-fluidbox-flight]) {
   display: block;

@@ -255,8 +255,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #fence: -1 | 0 | 1 = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #selection:
-    | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
+    | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> | undefined }
     | undefined;
+  /**
+   * A smooth selection the strip scrolls itself, at a motion speed other than
+   * 1. An empty animation keeps its time, so it plays on the document's
+   * timeline as the flights do.
+   */
+  #glide: { frame: number; readonly timing: Animation } | undefined;
   /** While new items are laid out: the old slides whose item is unchanged, by id. */
   /** The item an open waits for, and whether its flight has started. */
   #opening: { readonly index: number; readonly flying: boolean } | undefined;
@@ -547,7 +553,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     for (const slide of this.#slides.values()) this.#unload(slide);
   }
 
-  select(item: number, smooth: boolean, step?: 1 | -1): Promise<void> {
+  /** Go to an item: at once, or smoothly at a motion speed (1 is the browser's own smooth scroll). */
+  select(item: number, smooth: false | number, step?: 1 | -1): Promise<void> {
     if (!Number.isInteger(item) || item < 0 || item >= this.#source.count) {
       throw new RangeError(`Viewer strip index ${item} is out of range.`);
     }
@@ -561,6 +568,27 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (!this.#mounted || !smooth || index === this.#index) {
       this.#jump(index);
       return Promise.resolve();
+    }
+    if (smooth !== 1) {
+      const from = this.#left;
+      const timing = this.element.animate(null, { duration: 300 / smooth, easing: "ease-in-out" });
+      // Snapping would pull every step back to a slide.
+      this.element.style.scrollSnapType = "none";
+      const step = () => {
+        const progress = timing.effect!.getComputedTiming().progress;
+        const left = (index - this.#base) * this.#width;
+        this.#scrollTo(progress == null ? left : from + (left - from) * progress, "instant");
+        if (progress != null) {
+          this.#glide!.frame = requestAnimationFrame(step);
+          return;
+        }
+        this.#resolveSelection();
+        this.#jump(index);
+      };
+      return new Promise<void>((resolve) => {
+        this.#selection = { index, resolve, timeout: undefined };
+        this.#glide = { frame: requestAnimationFrame(step), timing };
+      });
     }
     this.#scrollTo((index - this.#base) * this.#width, "smooth");
     return new Promise<void>((resolve) => {
@@ -1972,6 +2000,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #onScroll = () => {
+    // The strip's own glide changes slides as it lands, so no work slows it on the way.
+    if (this.#glide) return;
     if (this.#frozen) {
       const offset = this.#left - this.#frozenLeft;
       this.element.style.setProperty("--fluidbox-scroll-compensation", `${this.#sign * offset}px`);
@@ -2002,6 +2032,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #settled = () => {
+    if (this.#glide) return;
     if (this.#touching || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
     // A finger or trackpad still pressing into a fence keeps it up.
     if (this.#fence && (this.#fingers || performance.now() - this.#lastWheel < 180)) {
@@ -2029,6 +2060,12 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   };
 
   #resolveSelection() {
+    if (this.#glide) {
+      cancelAnimationFrame(this.#glide.frame);
+      this.#glide.timing.cancel();
+      this.#glide = undefined;
+      this.element.style.removeProperty("scroll-snap-type");
+    }
     if (!this.#selection) return;
     clearTimeout(this.#selection.timeout);
     this.#selection.resolve();
@@ -2036,6 +2073,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #takeControl = (event: Event) => {
+    // A person's gesture takes over from a smooth selection the strip scrolls itself.
+    if (this.#glide) this.#resolveSelection();
     if (event.type === "wheel") this.#lastWheel = performance.now();
     if (event.type === "touchstart") this.#fingers = true;
     this.#userOwned = true;

@@ -608,7 +608,15 @@ export class DomViewerDriver<
    * its motion plays it. One place, so a motion speed changes them all.
    */
   #duration(ms: number) {
-    return ms;
+    return ms / this.#motionSpeed();
+  }
+
+  /** `--fluidbox-motion-speed` on the viewer: 2 plays every motion twice as fast. */
+  #motionSpeed() {
+    const speed = Number.parseFloat(
+      getComputedStyle(this.#portal.dialog).getPropertyValue("--fluidbox-motion-speed"),
+    );
+    return Number.isFinite(speed) ? Math.min(4, Math.max(0.25, speed)) : 1;
   }
 
   /** Listeners for a person's input to the open viewer. */
@@ -989,7 +997,7 @@ export class DomViewerDriver<
     if (!selected) {
       const smooth =
         !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
-      await this.#strip?.select(context.index, smooth, context.step);
+      await this.#strip?.select(context.index, smooth && this.#motionSpeed(), context.step);
       if (context.signal.aborted || this.#destroyed) return;
     }
     // The item left behind scrolled away zoomed; coming back, it shows at fit.
