@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stubMedia } from "./support/media";
+import { expectSlideshowPart } from "./support/slideshow-part";
 
 declare global {
   interface Window {
@@ -207,4 +208,9 @@ test("a live model card opens on its view, and a value of null brings the slide'
   await expect(page.locator(dialog)).toHaveCount(0);
   await expect(card).toHaveAttribute("data-camera-orbit", "24deg 75deg 2m");
   await expect(card).toHaveAttribute("data-connections", "1");
+});
+
+test("Slideshow plays and pauses, and is named for what it does next", async ({ page }) => {
+  await load(page);
+  await expectSlideshowPart(page, "#slideshow");
 });
