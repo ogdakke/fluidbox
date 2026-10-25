@@ -98,7 +98,7 @@ function cspFixture(): Plugin {
 export default defineConfig(({ command }) => ({
   plugins: [
     react({ include: [/(photo-library|social|shop)\.tsx$/, /patterns\/react\/.*\.tsx$/] }),
-    solid({ include: [/patterns\/solid\/.*\.tsx$/] }),
+    solid({ include: [/patterns\/solid\/.*\.tsx$/, /fixtures\/solid-slides\.tsx$/] }),
     vue(),
     highlightedSource(),
     delayedResponses(),
