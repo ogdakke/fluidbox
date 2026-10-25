@@ -754,7 +754,11 @@ const Viewer = defineComponent({
     const { viewerTarget, addViewer, serverHints } = useRootContext();
     // Read by the server's copy of the open viewer, which renders after this.
     serverHints.viewer = true;
-    onBeforeUnmount(addViewer(usePatch()));
+    // Once mounted, so a server render loads nothing.
+    const patch = usePatch();
+    let remove: (() => void) | undefined;
+    onMounted(() => (remove = addViewer(patch)));
+    onBeforeUnmount(() => remove?.());
     return () =>
       viewerTarget.value ? h(Teleport, { to: viewerTarget.value }, slots.default?.() ?? []) : null;
   },
@@ -1382,8 +1386,16 @@ const Thumbnails = defineComponent({
     const { setAddon, thumbnailsSlots, state, serverHints } = useRootContext();
     // Read by the server's copy of the open viewer, which renders after this.
     serverHints.thumbnails = true;
-    const custom = !!slots.default;
-    setAddon("thumbnails", { custom });
+    // Once mounted, so a server render loads nothing, and again when a slot
+    // comes or goes.
+    let custom: boolean | undefined;
+    const register = () => {
+      if (custom === !!slots.default) return;
+      custom = !!slots.default;
+      setAddon("thumbnails", { custom });
+    };
+    onMounted(register);
+    onUpdated(register);
     onBeforeUnmount(() => setAddon("thumbnails", null));
     const strip = useSlotList(thumbnailsSlots);
     return () => {
@@ -1429,14 +1441,17 @@ const Sheet = defineComponent({
     // Read by the server's copy of the open viewer, which renders after this.
     serverHints.sheet = true;
     // The snap points are compared by value, so an inline array changes nothing.
-    watch(
-      () => JSON.stringify([props.snapPoints ?? null, props.dismissMotion ?? null]),
-      () =>
-        setAddon("sheet", {
-          snapPoints: props.snapPoints && [...toRaw(props.snapPoints)],
-          dismissMotion: props.dismissMotion,
-        }),
-      { immediate: true },
+    // Once mounted, so a server render loads nothing.
+    onMounted(() =>
+      watch(
+        () => JSON.stringify([props.snapPoints ?? null, props.dismissMotion ?? null]),
+        () =>
+          setAddon("sheet", {
+            snapPoints: props.snapPoints && [...toRaw(props.snapPoints)],
+            dismissMotion: props.dismissMotion,
+          }),
+        { immediate: true },
+      ),
     );
     onBeforeUnmount(() => setAddon("sheet", null));
     const events = new AbortController();
