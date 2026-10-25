@@ -17,7 +17,8 @@ const TEXTURE =
  * it has the camera API a model slide syncs with: the orbit is the drag's
  * turn in degrees (`"<turn>deg 75deg 2m"`), the field of view 30° over the
  * zoom. It draws to a canvas marked `show` in its shadow root, as 4.0.0 does,
- * whose first pixel's red and green are the orbit plus 512, and `toDataURL`
+ * twice its size, in the top-left corner its content box takes, whose pixels'
+ * red and green are the orbit plus 512, magenta outside it, and `toDataURL`
  * is a picture naming the orbit, which throws, as the real one does, once a
  * texture from another origin has tainted the canvas. It records what it got in
  * data attributes (`data-camera-orbit`, `data-camera-target`,
@@ -36,14 +37,27 @@ class FakeModelViewer extends HTMLElement {
     this.turned = value;
     this.paint();
   }
+  // As 4.0.0's renderer: the canvas is sized for a larger model than this one,
+  // twice its content box, and this model draws its top-left corner, at the
+  // content box's size; the rest is another model's, magenta.
   paint() {
     const context = this.canvas?.getContext("2d");
-    if (!context) return;
+    const size = this.size;
+    if (!context || !size) return;
+    const dpr = devicePixelRatio;
+    const width = Math.ceil(size.width * 2 * dpr);
+    const height = Math.ceil(size.height * 2 * dpr);
+    if (this.canvas.width !== width) this.canvas.width = width;
+    if (this.canvas.height !== height) this.canvas.height = height;
+    this.canvas.style.width = Math.ceil(size.width * 2) + "px";
+    this.canvas.style.height = Math.ceil(size.height * 2) + "px";
+    context.fillStyle = "rgb(255,0,255)";
+    context.fillRect(0, 0, width, height);
     const code = Math.round(this.orbit) + 512;
-    context.clearRect(0, 0, 16, 16);
+    context.clearRect(0, 0, Math.ceil(size.width * dpr), Math.ceil(size.height * dpr));
     context.fillStyle = "rgb(" + (code & 255) + "," + (code >> 8) + ",128)";
-    context.fillRect(0, 0, 16, 16);
-    if (this.texture?.complete && this.texture.naturalWidth) context.drawImage(this.texture, 8, 8, 8, 8);
+    context.fillRect(0, 0, Math.ceil(size.width * dpr), Math.ceil(size.height * dpr));
+    if (this.texture?.complete && this.texture.naturalWidth) context.drawImage(this.texture, 0, 0, 4, 4);
   }
   constructor() {
     super();
@@ -54,13 +68,21 @@ class FakeModelViewer extends HTMLElement {
     // \`window.__modelViewerNoInput\` stands in for a version whose focus target
     // is named otherwise, and \`window.__modelViewerNoCanvas\` for one that draws
     // somewhere else; \`window.__modelViewerUnshown\` leaves its canvas unmarked, as
-    // before 4.0.0 has drawn. The canvas shows the orbit in its first pixel's red and green.
+    // before 4.0.0 has drawn.
+    // Its .container takes the content box's size, fractions and all, as 4.0.0's does.
     this.attachShadow({ mode: "open", delegatesFocus: true }).innerHTML =
-      '<div class="' + (window.__modelViewerNoInput ? "input" : "userInput") +
+      '<div class="container" style="overflow:hidden"><div class="' + (window.__modelViewerNoInput ? "input" : "userInput") +
       '" tabindex="0" role="img" aria-label="3D model" style="width:100%;height:100%">' +
-      (window.__modelViewerNoCanvas ? "" : '<canvas class="' + (window.__modelViewerUnshown ? "" : "show") + '" width="16" height="16" style="display:block;width:100%;height:100%"></canvas>') +
-      "</div>";
+      (window.__modelViewerNoCanvas ? "" : '<canvas class="' + (window.__modelViewerUnshown ? "" : "show") + '" style="display:block"></canvas>') +
+      "</div></div>";
     this.canvas = this.shadowRoot.querySelector("canvas");
+    const container = this.shadowRoot.querySelector(".container");
+    new ResizeObserver(([entry]) => {
+      this.size = entry.contentRect;
+      container.style.width = this.size.width + "px";
+      container.style.height = this.size.height + "px";
+      this.paint();
+    }).observe(this);
     // \`window.__modelViewerTainted\` stands in for a model with textures from another origin.
     if (this.canvas && window.__modelViewerTainted) {
       this.texture = new Image();

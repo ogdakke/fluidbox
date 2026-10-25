@@ -251,15 +251,31 @@ function applyView(model: ModelViewerElement, view: ModelView) {
  * else, without that canvas, the PNG of its `toDataURL`. A copy of a model
  * with textures from another origin still draws, and can't be read back.
  */
-function snapshot(model: ModelViewerElement): HTMLCanvasElement | HTMLImageElement | null {
+function snapshot(
+  model: ModelViewerElement,
+  ownerDocument: Document,
+): HTMLCanvasElement | HTMLImageElement | null {
   if (!model.loaded) return null;
-  const ownerDocument = model.ownerDocument;
   const source = shownCanvas(model);
   if (source) {
-    const scale = source.width / (source.clientWidth || 1);
+    // The renderer draws at the device's pixel ratio, lower while it throttles,
+    // when it shows its canvas larger than its pixels; its scene is the
+    // content box, whose size, fractions and all, its .container takes.
+    const ratio = model.ownerDocument.defaultView?.devicePixelRatio ?? 1;
+    const scale =
+      Math.abs(source.width / ratio - source.clientWidth) < 1
+        ? ratio
+        : source.width / (source.clientWidth || 1);
+    const content = source.closest<HTMLElement>(".container")?.style;
     const copy = ownerDocument.createElement("canvas");
-    copy.width = Math.min(source.width, Math.ceil(model.clientWidth * scale));
-    copy.height = Math.min(source.height, Math.ceil(model.clientHeight * scale));
+    copy.width = Math.min(
+      source.width,
+      Math.ceil((Number.parseFloat(content?.width ?? "") || model.clientWidth) * scale),
+    );
+    copy.height = Math.min(
+      source.height,
+      Math.ceil((Number.parseFloat(content?.height ?? "") || model.clientHeight) * scale),
+    );
     const context = copy.getContext("2d");
     if (!context || !copy.width || !copy.height) return null;
     context.drawImage(source, 0, 0, copy.width, copy.height, 0, 0, copy.width, copy.height);
@@ -440,7 +456,7 @@ export function createModelSlide(
       const run = ++shows;
       const synced = slide.opening;
       // Until the model draws, the opening flies on the trigger's view.
-      if (synced && card()) paintSnapshot(snapshot(card()!));
+      if (synced && card()) paintSnapshot(snapshot(card()!, ownerDocument));
       return (shown = show(run, synced).catch(() => {
         if (run !== shows) return;
         // A failed load of the element tries again when the slide next comes on show.
@@ -463,7 +479,7 @@ export function createModelSlide(
     // lands on, if it shows this item, to that view.
     slide.onClose((landing) => {
       if (!model) return;
-      paintSnapshot(snapshot(model));
+      paintSnapshot(snapshot(model, ownerDocument));
       const view = readView(model);
       const home = landing?.model as ModelViewerElement | undefined;
       if (view && home && showsSrc(home, item.src)) applyView(home, view);

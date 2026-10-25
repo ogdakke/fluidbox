@@ -1069,6 +1069,49 @@ test.describe("live 3D thumbnail", () => {
     expect(warnings).toEqual([]);
   });
 
+  test("a snapshot is the model's own corner of the renderer's canvas, at its content box", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    // Padding outside the box the model draws in, and a fractional width.
+    await card(page, "live-a").evaluate((model) => {
+      model.style.padding = "7px 11px 13px 5px";
+      model.style.width = "150.5px";
+    });
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    const region = await card(page, "live-a").evaluate((model) => {
+      const box = model.getBoundingClientRect();
+      const style = getComputedStyle(model);
+      const width =
+        box.width - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+      const height =
+        box.height - Number.parseFloat(style.paddingTop) - Number.parseFloat(style.paddingBottom);
+      const canvas = model.shadowRoot!.querySelector("canvas")!;
+      return {
+        width: Math.ceil(width * devicePixelRatio),
+        height: Math.ceil(height * devicePixelRatio),
+        larger: canvas.width > Math.ceil(width * devicePixelRatio),
+      };
+    });
+    expect(region.larger).toBe(true);
+    await openCard(page, "live-a");
+    const copy = await page
+      .locator(`${shown} canvas[data-fluidbox-media-poster="snapshot"]`)
+      .evaluate((snapshot: HTMLCanvasElement) => {
+        const [red, green, blue] = snapshot
+          .getContext("2d")!
+          .getImageData(snapshot.width - 1, snapshot.height - 1, 1, 1).data;
+        return { width: snapshot.width, height: snapshot.height, corner: [red, green, blue] };
+      });
+    expect({ width: copy.width, height: copy.height }).toEqual({
+      width: region.width,
+      height: region.height,
+    });
+    // Its bottom-right pixel is the model's, not the magenta beyond it.
+    expect(copy.corner).toEqual([(512 - 48) & 255, (512 - 48) >> 8, 128]);
+  });
+
   test("a slide that leaves drops its snapshot, so it comes back on its own view", async ({
     page,
   }) => {

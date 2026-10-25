@@ -19,22 +19,22 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | Kit            |         1,831 B |            1,831 B |               0 B |           1,831 B |                  4,641 B |
 | Hover zoom     |         1,453 B |            1,453 B |               0 B |           1,453 B |                  4,263 B |
 | Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
-| Model          |         2,638 B |            2,638 B |               0 B |           2,638 B |                  5,448 B |
+| Model          |         2,704 B |            2,704 B |               0 B |           2,704 B |                  5,514 B |
 | Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
 | React embed    |        20,005 B |           53,814 B |           1,151 B |          54,965 B |                 56,624 B |
-| React model    |        19,763 B |           53,502 B |           1,151 B |          54,653 B |                 56,312 B |
+| React model    |        19,822 B |           53,559 B |           1,151 B |          54,710 B |                 56,369 B |
 | React spin     |        19,416 B |           53,145 B |           1,151 B |          54,296 B |                 55,955 B |
 | Solid embed    |        19,607 B |           53,424 B |           1,151 B |          54,575 B |                 56,234 B |
-| Solid model    |        19,376 B |           53,115 B |           1,151 B |          54,266 B |                 55,925 B |
+| Solid model    |        19,438 B |           53,174 B |           1,151 B |          54,325 B |                 55,984 B |
 | Solid spin     |        19,016 B |           52,738 B |           1,151 B |          53,889 B |                 55,548 B |
 | Vue embed      |        20,461 B |           54,252 B |           1,151 B |          55,403 B |                 57,062 B |
-| Vue model      |        20,183 B |           53,896 B |           1,151 B |          55,047 B |                 56,706 B |
+| Vue model      |        20,244 B |           53,957 B |           1,151 B |          55,108 B |                 56,767 B |
 | Vue spin       |        19,858 B |           53,569 B |           1,151 B |          54,720 B |                 56,379 B |
 | Angular embed  |        22,269 B |           56,013 B |           1,151 B |          57,164 B |                 58,823 B |
-| Angular model  |        21,965 B |           55,627 B |           1,151 B |          56,778 B |                 58,437 B |
+| Angular model  |        22,020 B |           55,687 B |           1,151 B |          56,838 B |                 58,497 B |
 | Angular spin   |        21,621 B |           55,309 B |           1,151 B |          56,460 B |                 58,119 B |
 | Elements embed |        17,916 B |           53,473 B |           1,151 B |          54,624 B |                 56,283 B |
-| Elements model |        17,732 B |           53,286 B |           1,151 B |          54,437 B |                 56,096 B |
+| Elements model |        17,781 B |           53,335 B |           1,151 B |          54,486 B |                 56,145 B |
 | Elements spin  |        17,409 B |           52,964 B |           1,151 B |          54,115 B |                 55,774 B |
 
 `styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
@@ -127,3 +127,5 @@ The fixes after the live thumbnail's review moved every core entry by about 70 B
 Merging the live 3D thumbnail into the redesign with every binding moved each entry by what that branch measured on its own base: about 310 B initial and 450 B activation in the core (the trigger's origin getters, the drag slop and the trigger hooks), and about 1.2 KB more in each model entry (the model add-on's quieting, its undo and the snapshot). The limits moved by the rule.
 
 A model slide's snapshot then became a copy of the pixels `<model-viewer>` shows, in place of a PNG of `toDataURL`: the model add-on grew 150 B, to 2,638 B, and each binding's model entry about 145 B. The copy draws the canvas the element shows, the renderer's shared WebGL canvas or the element's own 2D canvas, into a canvas of the slide's, and keeps the PNG for a version without that canvas, with a development warning. On the phone viewport the close's start fell from 30 ms to 10 ms in Chromium and from 187 ms to 7 ms in WebKit. The measurement table is rebuilt whole from this run: the merge before it had left an older table and two partial ones.
+
+Measuring a snapshot's region from the content box, which `<model-viewer>`'s shadow `.container` takes with its fractions, in place of the element's client size, which counts its padding, and at the device's exact pixel ratio while the renderer doesn't throttle, grew the model add-on 66 B, to 2,704 B, and each binding's model entry about 60 B.
