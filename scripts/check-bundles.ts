@@ -75,7 +75,7 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-model": 18_450,
   "react-spin": 19_150,
   "elements-embed": 17_600,
-  "elements-model": 16_300,
+  "elements-model": 16_350,
   "elements-spin": 17_050,
 };
 const cssGzipLimit = 2_850;

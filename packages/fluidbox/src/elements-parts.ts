@@ -82,6 +82,17 @@ function drawControl(
   return element;
 }
 
+const warned = new Set<string>();
+/** Tell a developer once, in development builds only. */
+function warnOnce(message: string) {
+  try {
+    if (process.env.NODE_ENV !== "production" && !warned.has(message)) {
+      warned.add(message);
+      console.warn(message);
+    }
+  } catch {}
+}
+
 /** Whether an element holds anything a reader would see or hear. */
 const holds = (element: Element) => element.childElementCount > 0 || !!element.textContent?.trim();
 
@@ -116,7 +127,8 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
   /** Parts that show while the slide is loading or failed. */
   const statuses: ((busy: boolean, error: boolean) => void)[] = [];
 
-  // An empty control shows its label as text, as a default one does.
+  // An empty control shows your icon, or its label as text, as a default one
+  // does. It stays the element it is, with your listeners and references.
   for (const element of root.querySelectorAll<HTMLElement>(CONTROL_SELECTOR)) {
     const name = nameOf(element);
     const tag = name === "download" ? "A" : "BUTTON";
@@ -128,7 +140,15 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
       element.hasAttribute("aria-labelledby")
     )
       continue;
-    element.replaceWith(adopt(element, control(name)));
+    const icon = icons?.[name]?.();
+    if (icon) element.append(icon);
+    else element.setAttribute("data-fluidbox-default", "");
+  }
+
+  if (root.querySelector("fluidbox-controls")) {
+    warnOnce(
+      "<fluidbox-controls> is gone: use <fluidbox-toolbar> and <fluidbox-zoom-controls>, or controls of your own.",
+    );
   }
 
   /** Put `part` where the placeholder was, while `shown` says so. */
@@ -166,9 +186,10 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
       group.append(...(own ?? defaults.map((each) => control(each))));
       placeholder.replaceWith(group);
     } else if (tag === "FLUIDBOX-COUNTER") {
+      if (own) warnOnce("<fluidbox-counter> shows the count; its children are dropped.");
       placeholder.replaceWith(adopt(placeholder, control("counter")));
     } else if (tag === "FLUIDBOX-CAPTION") {
-      // Nothing, and no description, without a caption.
+      // Without content of yours, nothing and no description for an item without a caption.
       const caption = adopt(placeholder, ownerDocument.createElement("div"));
       caption.setAttribute("data-fluidbox-caption", "");
       caption.setAttribute("data-fluidbox-description", "");
@@ -176,8 +197,9 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
       const show = present(placeholder, caption);
       follows.push((item) => {
         const shown = text(item, "caption");
+        // Your own content shows whatever the item has.
         if (!own) caption.textContent = shown;
-        show(!!shown);
+        show(!!own || !!shown);
       });
     } else {
       // Loading and Error: their children, while the slide is loading or failed.

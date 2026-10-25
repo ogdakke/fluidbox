@@ -361,3 +361,65 @@ test.describe("the value", () => {
     );
   });
 });
+
+test.describe("slides and parts", () => {
+  test("controls of a viewer property stay the elements it made, and its parts expand", async ({
+    page,
+  }) => {
+    await load(page);
+    await page.evaluate(() => {
+      const state = ((window as { made?: { buttons: HTMLButtonElement[]; clicks: number } }).made =
+        { buttons: [] as HTMLButtonElement[], clicks: 0 });
+      const gallery = document.querySelector("#typed") as HTMLElementTagNameMap["fluidbox-gallery"];
+      gallery.viewer = ({ target }) => {
+        const button = document.createElement("button");
+        button.setAttribute("data-fluidbox-close", "");
+        button.addEventListener("click", () => (state.clicks += 1));
+        state.buttons.push(button);
+        target.append(button, document.createElement("fluidbox-counter"));
+      };
+    });
+    // Let the parts arrive, so the viewer draws once.
+    await page.waitForTimeout(300);
+    await page.locator('[data-test="print"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator(`${dialog} [data-fluidbox-counter]`)).toHaveText(/1\D+1/);
+    const made = () =>
+      page.evaluate(() => {
+        const { buttons, clicks } = (
+          window as unknown as { made: { buttons: HTMLButtonElement[]; clicks: number } }
+        ).made;
+        return { count: buttons.length, connected: buttons.at(-1)!.isConnected, clicks };
+      });
+    expect(await made()).toEqual({ count: 1, connected: true, clicks: 0 });
+    const close = page.locator(`${dialog} button[data-fluidbox-close]`);
+    await expect(close).toHaveCount(1);
+    await expect(close).toHaveText("Close");
+    await close.click();
+    await expect.poll(() => status(page)).toBe("closed");
+    expect((await made()).clicks).toBe(1);
+  });
+
+  test("a caption of your own shows without an item caption, and an icon keeps its control's label", async ({
+    page,
+  }) => {
+    await load(page);
+    await page.evaluate(() => {
+      const gallery = document.createElement("fluidbox-gallery");
+      gallery.innerHTML = `<template slot="viewer">
+        <fluidbox-caption><span data-test="own-caption">Own words</span></fluidbox-caption>
+        <button data-fluidbox-close data-fluidbox-default data-test="icon-close"><svg width="10" height="10"></svg></button>
+      </template>`;
+      gallery.items = [
+        { type: "image", id: "dune", src: "/art/dune.svg", alt: "Dune", width: 800, height: 600 },
+      ];
+      gallery.value = "dune";
+      document.querySelector("main")!.append(gallery);
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator(`${dialog} [data-test="own-caption"]`)).toHaveText("Own words");
+    const close = page.locator(`${dialog} [data-test="icon-close"]`);
+    await expect(close.locator("svg")).toHaveCount(1);
+    await expect(close).toHaveAccessibleName("Close");
+  });
+});

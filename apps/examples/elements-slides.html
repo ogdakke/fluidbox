@@ -134,6 +134,24 @@
           </template>
         </fluidbox-item>
       </fluidbox-gallery>
+
+      <h2>A typed item, and slides from a template, the registry or a property</h2>
+      <fluidbox-gallery id="typed" class="media-grid" aria-label="Typed gallery">
+        <template data-fluidbox-slide="print">
+          <fluidbox-media>
+            <fluidbox-image></fluidbox-image>
+          </fluidbox-media>
+          <p class="note-title" data-test="slide-from">template</p>
+        </template>
+        <fluidbox-item value="print" type="print">
+          <button slot="trigger" type="button" data-test="print">
+            <img src="/art/meadow.svg" alt="Meadow print" width="320" height="240" />
+          </button>
+          <template slot="content">
+            <img src="/art/meadow.svg" alt="Meadow print" width="1600" height="1200" />
+          </template>
+        </fluidbox-item>
+      </fluidbox-gallery>
     </main>
   </body>
 </html>
