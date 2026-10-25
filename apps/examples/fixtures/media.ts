@@ -22,9 +22,18 @@ declare module "@ogdakke/fluidbox" {
 
 /** What the probe slides saw, in order, for the tests. */
 const log: string[] = [];
+/** Each close a probe slide heard start from it. */
+const closes: string[] = [];
 
 /** A slide that records when it mounts, comes on show, leaves it and unloads. */
-const probe: FluidboxSlideRenderer = ({ item, media: target, signal, active, onActiveChange }) => {
+const probe: FluidboxSlideRenderer = ({
+  item,
+  media: target,
+  signal,
+  active,
+  onActiveChange,
+  onClose,
+}) => {
   const id = item.id ?? "";
   log.push(`${id} mount ${active ? "active" : "inactive"}`);
   const text = document.createElement("p");
@@ -36,6 +45,7 @@ const probe: FluidboxSlideRenderer = ({ item, media: target, signal, active, onA
     text.textContent = `${id}: ${now ? "on show" : "waiting"}`;
   });
   signal.addEventListener("abort", () => log.push(`${id} abort`));
+  onClose(() => closes.push(id));
 };
 
 const probeItem = (id: string): FluidboxItem => ({
@@ -111,4 +121,4 @@ for (const item of items) {
   fluidbox.bind(button, item);
 }
 
-Object.assign(window, { mediaFixture: { fluidbox, log } });
+Object.assign(window, { mediaFixture: { fluidbox, log, closes } });

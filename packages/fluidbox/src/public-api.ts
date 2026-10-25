@@ -257,6 +257,14 @@ export type FluidboxRenderer<TItem extends FluidboxItem = FluidboxItem> = (
 export interface FluidboxSlideOrigin {
   /** The trigger's `<video>`, when that is what the trigger showed. */
   readonly video?: FluidboxPlayback;
+  /**
+   * The trigger's live `<model-viewer>`, when the trigger holds one. It is the
+   * element itself, not a reading of it as `video` is: a slide reads its
+   * camera and draws a snapshot of it when it opens, and turns it to the
+   * slide's view when it closes, through `<model-viewer>`'s own API. Never
+   * move it: it draws nothing once it has left the page and come back.
+   */
+  readonly model?: HTMLElement;
 }
 
 /** A video's playback, read live: each read returns its state now. */
@@ -325,6 +333,14 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
    * Returns a function that unregisters it.
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
+  /**
+   * Call `listener` once as a close starts from this slide, before the closing
+   * flight measures the trigger, with what the trigger the close lands on
+   * shows: null when it lands on none. That trigger may not be the one the
+   * open started from, as after moving to another item. Returns a function
+   * that stops listening; `signal` stops it too.
+   */
+  onClose(this: void, listener: (landing: FluidboxSlideOrigin | null) => void): () => void;
   /**
    * Let the media box zoom (pinch, double-tap, wheel, the zoom controls), or
    * stop it. Off by default for your own media; on for `drawImage`.

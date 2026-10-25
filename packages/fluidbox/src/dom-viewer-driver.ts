@@ -143,6 +143,15 @@ const NAVIGATE_WHEEL_GAP = 150;
 const rubberBand = (distance: number) =>
   Math.sign(distance) * 48 * (1 - Math.exp(-Math.abs(distance) / 160));
 
+/** The trigger's live `<model-viewer>`, which a model slide syncs its camera with. */
+function originModel(origin: FluidboxOrigin | null | undefined) {
+  const visual = origin?.visual;
+  if (!visual) return null;
+  return visual.localName === "model-viewer"
+    ? visual
+    : visual.querySelector<HTMLElement>("model-viewer");
+}
+
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 /** Zoom options with their defaults, or undefined when zoom is off. */
 function zoomConfig(
@@ -757,7 +766,11 @@ export class DomViewerDriver<
     this.#stage(context.origin?.trigger ?? null);
     // The slide mounts knowing an open may wait for it, and what it opens from.
     this.#strip?.setOpening(context.index);
-    this.#strip?.setOriginVideo(context.index, this.#originVideo(context));
+    this.#strip?.setOriginMedia(
+      context.index,
+      this.#originVideo(context),
+      originModel(context.origin),
+    );
     void this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
     this.#render(context.item, context.index, false);
@@ -821,7 +834,11 @@ export class DomViewerDriver<
     if (!prepared) this.#discardPreparation();
     else this.#preparedOpen = undefined;
     this.#strip?.setOpening(context.index);
-    this.#strip?.setOriginVideo(context.index, this.#originVideo(context));
+    this.#strip?.setOriginMedia(
+      context.index,
+      this.#originVideo(context),
+      originModel(context.origin),
+    );
     const focused = this.#portal.overlay.ownerDocument.activeElement;
     this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
@@ -1007,6 +1024,8 @@ export class DomViewerDriver<
       this.#returnFocus = context.origin.trigger;
       this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
     }
+    // Every close, flown or not, tells the slide on show where it lands.
+    this.#strip?.closing(this.#originVideo(context), originModel(context.origin));
     if (
       immediate ||
       this.#forceImmediateClose ||

@@ -8,7 +8,10 @@ declare global {
     mediaFixture: {
       fluidbox: Fluidbox;
       log: string[];
+      closes: string[];
     };
+    liveFixture: { fluidbox: Fluidbox };
+    __modelViewerDelay?: number;
   }
 }
 
@@ -657,5 +660,253 @@ test.describe("3D model", () => {
     expect(await index(page)).toBe(6);
     await page.locator(`${dialog} [data-fluidbox-next]`).click();
     await expect.poll(() => index(page)).toBe(7);
+  });
+});
+
+test.describe("every close tells the slide on show", () => {
+  const closes = (page: Page) => page.evaluate(() => window.mediaFixture.closes);
+  const closed = (page: Page) => expect(page.locator(dialog)).toHaveCount(0);
+  const frame = `${shown} [data-fluidbox-frame]`;
+  const paths: Record<string, (page: Page) => Promise<unknown>> = {
+    Escape: (page) => page.keyboard.press("Escape"),
+    "the close button": (page) => page.locator(`${dialog} [data-fluidbox-close]`).click(),
+    "the backdrop": (page) => page.mouse.click(5, 5),
+    "close()": (page) => page.evaluate(() => window.mediaFixture.fluidbox.close()),
+    "a drag to dismiss": async (page) => {
+      const target = page.locator(frame);
+      const box = (await target.boundingBox())!;
+      const pointer = (clientY: number) => ({
+        pointerId: 7,
+        pointerType: "touch",
+        isPrimary: true,
+        clientX: box.x + box.width / 2,
+        clientY,
+      });
+      const y = box.y + box.height / 2;
+      await target.dispatchEvent("pointerdown", pointer(y));
+      await target.dispatchEvent("pointermove", pointer(y + 120));
+      await target.dispatchEvent("pointerup", pointer(y + 120));
+    },
+    "a wheel to dismiss": (page) =>
+      page.locator(frame).evaluate(async (element) => {
+        for (let step = 0; step < 6; step++) {
+          element.dispatchEvent(
+            new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 80 }),
+          );
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+      }),
+  };
+  for (const [name, close] of Object.entries(paths)) {
+    test(`a close by ${name}`, async ({ page }, testInfo) => {
+      test.skip(
+        name === "a wheel to dismiss" && testInfo.project.use.hasTouch === true,
+        "Touch devices have no wheel.",
+      );
+      await load(page);
+      await open(page, "a");
+      expect(await closes(page)).toEqual([]);
+      await close(page);
+      await closed(page);
+      expect(await closes(page)).toEqual(["a"]);
+    });
+  }
+
+  test("a close that a reopen interrupts, once", async ({ page }) => {
+    await load(page);
+    await open(page, "a");
+    await page.evaluate(() => {
+      void window.mediaFixture.fluidbox.close();
+      void window.mediaFixture.fluidbox.open("a");
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    expect(await closes(page)).toEqual(["a"]);
+  });
+
+  test("the slide on show hears it, after moving", async ({ page }) => {
+    await load(page);
+    await open(page, "a");
+    await page.evaluate(() => window.mediaFixture.fluidbox.next());
+    await expect.poll(() => index(page)).toBe(2);
+    await page.evaluate(() => window.mediaFixture.fluidbox.close());
+    await closed(page);
+    expect(await closes(page)).toEqual(["b"]);
+  });
+});
+
+test.describe("live 3D thumbnail", () => {
+  const card = (page: Page, id: string) => page.locator(`#live [data-item="${id}"] model-viewer`);
+  const slideModel = (page: Page) => page.locator(`${shown} model-viewer`);
+  const status = (page: Page) => page.evaluate(() => window.liveFixture.fluidbox.state.status);
+
+  async function loadLive(page: Page) {
+    await stubMedia(page);
+    await page.goto("/media-live.html");
+    // The cards' own models have drawn.
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit-at-load", "0");
+    await expect(card(page, "live-b")).toHaveAttribute("data-orbit-at-load", "0");
+  }
+
+  /** Drag across a model by `distance` CSS pixels, a multiple of 8, in whole-pixel steps. */
+  async function turn(page: Page, model: ReturnType<Page["locator"]>, distance: number) {
+    const box = (await model.boundingBox())!;
+    const x = Math.round(box.x + box.width / 2);
+    const y = Math.round(box.y + box.height / 2);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    for (let step = 1; step <= 8; step++) await page.mouse.move(x + (distance * step) / 8, y);
+    await page.mouse.up();
+  }
+
+  async function openCard(page: Page, id: string) {
+    await card(page, id).click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  }
+
+  async function closeViewer(page: Page) {
+    await page.evaluate(() => window.liveFixture.fluidbox.close());
+    await expect(page.locator(dialog)).toHaveCount(0);
+  }
+
+  /** How often each model element has joined the page. */
+  const connections = (page: Page) =>
+    page.locator("model-viewer").evaluateAll((models) => models.map((m) => m.dataset.connections));
+
+  test("a drag on the card turns it and doesn't open the viewer", async ({ page }) => {
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    // The drag ended in a click on the card, which the trigger let go.
+    await expect(card(page, "live-a")).toHaveAttribute("data-clicks", "1");
+    await page.waitForTimeout(400);
+    expect(await status(page)).toBe("closed");
+    await expect(page.locator(dialog)).toHaveCount(0);
+  });
+
+  test("the card is one stop for a keyboard and a screen reader, and Enter opens it", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    const a = page.locator('#live [data-item="live-a"]');
+    await expect(card(page, "live-a")).toHaveAttribute("aria-hidden", "true");
+    expect(
+      await card(page, "live-a").evaluate(
+        (model) => model.shadowRoot!.querySelector<HTMLElement>(".userInput")!.tabIndex,
+      ),
+    ).toBe(-1);
+    await expect(a).toHaveAccessibleName("Open 3D view: Damaged Helmet");
+    await a.focus();
+    await page.keyboard.press("Tab");
+    await expect(page.locator('#live [data-item="live-b"]')).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(a).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(dialog)).toHaveCount(0);
+    await expect(a).toBeFocused();
+  });
+
+  test("a click opens on the card's view: its first frame and the flight's snapshot", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await openCard(page, "live-a");
+    await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-48");
+    await expect(slideModel(page)).toHaveAttribute("data-camera-orbit", "-48deg 75deg 2m");
+    // Unzoomed, the slide keeps its own field of view.
+    await expect(slideModel(page)).toHaveAttribute("data-field-of-view", "auto");
+    await expect(page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`)).toHaveAttribute(
+      "src",
+      /#orbit=-48$/,
+    );
+  });
+
+  test("a close turns the card to the view the slide was left at", async ({ page }) => {
+    await loadLive(page);
+    await openCard(page, "live-a");
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await turn(page, slideModel(page), 96);
+    await expect(slideModel(page)).toHaveAttribute("data-orbit", "96");
+    await closeViewer(page);
+    await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "96deg 75deg 2m");
+    await expect(card(page, "live-a")).toHaveAttribute("data-field-of-view", "auto");
+    await expect(card(page, "live-b")).not.toHaveAttribute("data-camera-orbit", /./);
+    // No element ever left the page and came back: the slide's went, the cards stayed.
+    expect(await connections(page)).toEqual(["1", "1"]);
+  });
+
+  test("a zoom comes home, and the card's own field of view comes back unzoomed", async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.use.hasTouch === true, "The fake zooms on a wheel.");
+    await loadLive(page);
+    await openCard(page, "live-a");
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await slideModel(page).hover();
+    await page.mouse.wheel(0, -100);
+    await expect(slideModel(page)).toHaveAttribute("data-zoom", "2.72");
+    await closeViewer(page);
+    const zoomed = await card(page, "live-a").getAttribute("data-field-of-view");
+    expect(Number.parseFloat(zoomed!)).toBeCloseTo(30 / Math.E, 1);
+    // Open on it again, zoomed, and close without zooming: the card's "auto" returns.
+    await openCard(page, "live-a");
+    await expect(slideModel(page)).toHaveAttribute("data-zoom", "2.72");
+    await slideModel(page).hover();
+    await page.mouse.wheel(0, 100);
+    await expect(slideModel(page)).toHaveAttribute("data-zoom", "1.00");
+    await closeViewer(page);
+    await expect(card(page, "live-a")).toHaveAttribute("data-field-of-view", "auto");
+  });
+
+  test("a close after moving turns the card it lands on, and only that one", async ({ page }) => {
+    await loadLive(page);
+    await openCard(page, "live-a");
+    await page.evaluate(() => window.liveFixture.fluidbox.next());
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await turn(page, slideModel(page), 80);
+    await expect(slideModel(page)).toHaveAttribute("data-orbit", "80");
+    await closeViewer(page);
+    await expect(card(page, "live-b")).toHaveAttribute("data-camera-orbit", "80deg 75deg 2m");
+    await expect(card(page, "live-a")).not.toHaveAttribute("data-camera-orbit", /./);
+
+    // A close that lands on a still card turns no model.
+    await openCard(page, "live-a");
+    await page.evaluate(() => window.liveFixture.fluidbox.open("still-c"));
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await turn(page, slideModel(page), 40);
+    await closeViewer(page);
+    await expect(card(page, "live-a")).not.toHaveAttribute("data-camera-orbit", /./);
+    await expect(card(page, "live-b")).toHaveAttribute("data-camera-orbit", "80deg 75deg 2m");
+    expect(await connections(page)).toEqual(["1", "1"]);
+  });
+
+  test("a cold open flies on the card's snapshot at the cap, then shows the model on its view", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -40);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-40");
+    // The slide's model takes longer than the open waits.
+    await page.evaluate(() => (window.__modelViewerDelay = 4500));
+    const started = Date.now();
+    await card(page, "live-a").click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open", {
+      timeout: 6000,
+    });
+    const waited = Date.now() - started;
+    expect(waited).toBeGreaterThan(2500);
+    expect(waited).toBeLessThan(4500);
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(0);
+    const snapshot = page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`);
+    await expect(snapshot).toHaveAttribute("src", /#orbit=-40$/);
+    await expect(snapshot).toBeVisible();
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1, {
+      timeout: 4000,
+    });
+    await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-40");
+    await expect(snapshot).toBeHidden();
   });
 });

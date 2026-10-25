@@ -23,3 +23,10 @@
   background: var(--fb-surface-2);
   color: var(--fb-fg);
 }
+.media-grid model-viewer {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: var(--fb-surface-2);
+}

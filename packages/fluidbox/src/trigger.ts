@@ -12,16 +12,17 @@ import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
 
 /**
  * Find the parts of a trigger the flight uses: the box marked with
- * `data-fluidbox-origin`, else its image or video, else the trigger itself.
+ * `data-fluidbox-origin`, else its image, video or live `<model-viewer>`, else
+ * the trigger itself.
  */
 export function resolveOrigin(trigger: HTMLElement): RuntimeOrigin {
   const visual =
     (trigger.matches("[data-fluidbox-origin]")
       ? trigger
       : trigger.querySelector<HTMLElement>("[data-fluidbox-origin]")) ??
-    (trigger.matches("img, video")
+    (trigger.matches("img, video, model-viewer")
       ? trigger
-      : (trigger.querySelector<HTMLElement>("img, video") ?? trigger));
+      : (trigger.querySelector<HTMLElement>("img, video, model-viewer") ?? trigger));
   const thumbnail = visual.matches("img")
     ? (visual as HTMLImageElement)
     : (visual.querySelector("img") ?? undefined);
@@ -110,6 +111,31 @@ function checkReach(element: HTMLElement) {
   }
 }
 
+/** Content in a trigger that a drag works, rather than the trigger. */
+const OWNS_INPUT = "model-viewer, [data-fluidbox-owns-input]";
+/** How far a press on such content moves before it is a drag, not a click, in CSS pixels. */
+const DRAG_SLOP = 6;
+
+/**
+ * A live `<model-viewer>` in a trigger is its picture. The trigger is the one
+ * control a keyboard and a screen reader reach, so the model leaves the
+ * accessibility tree, and its focus target, in its shadow root, the tab order.
+ * A drag still turns it.
+ */
+function quietModels(trigger: HTMLElement) {
+  const registry = trigger.ownerDocument.defaultView?.customElements;
+  for (const model of trigger.querySelectorAll<HTMLElement>("model-viewer")) {
+    if (!model.hasAttribute("aria-hidden")) model.setAttribute("aria-hidden", "true");
+    void registry
+      ?.whenDefined("model-viewer")
+      .then(() => (model as { updateComplete?: Promise<unknown> }).updateComplete)
+      .then(() => {
+        const input = model.shadowRoot?.querySelector<HTMLElement>(".userInput");
+        if (input) input.tabIndex = -1;
+      });
+  }
+}
+
 /** How long a preload waits for a click after the pointer lifts. */
 const PRELOAD_GRACE = 250;
 /** How long a mouse rests on a trigger before the viewer's code loads. */
@@ -132,6 +158,9 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   let intents: AbortController | undefined;
   let lastPreviewId: string | null = null;
   let following = false;
+  // A press on content that owns its input, and whether it became a drag.
+  let press: { readonly x: number; readonly y: number } | undefined;
+  let dragged = false;
 
   const ids = () => idsIn(fluidbox.items, targets);
   const register = () => {
@@ -167,6 +196,28 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       options,
     );
     target.addEventListener("pointerleave", leave, options);
+    // A drag on a live model turns it; the click that ends it doesn't open.
+    target.addEventListener(
+      "pointerdown",
+      (event) => {
+        dragged = false;
+        const owner = event.isPrimary && (event.target as Element).closest?.(OWNS_INPUT);
+        press =
+          owner && target.contains(owner) ? { x: event.clientX, y: event.clientY } : undefined;
+      },
+      options,
+    );
+    target.addEventListener(
+      "pointermove",
+      (event) => {
+        if (!press || dragged || !event.isPrimary) return;
+        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) <= DRAG_SLOP) return;
+        dragged = true;
+        discardPreload();
+      },
+      options,
+    );
+    target.addEventListener("keydown", () => (dragged = false), options);
     target.addEventListener("focusin", () => host.intend(), options);
     signal.addEventListener("abort", leave);
   };
@@ -207,6 +258,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       if (next) {
         listenForIntent(next);
         next.dataset.fluidboxTrigger = "";
+        quietModels(next);
         if (!next.hasAttribute("aria-haspopup")) next.setAttribute("aria-haspopup", "dialog");
         checkReach(next);
       }
@@ -239,6 +291,11 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     },
     pointerCancel: discardPreload,
     click(event) {
+      if (dragged) {
+        dragged = false;
+        event.preventDefault?.();
+        return;
+      }
       const target = openTarget();
       const modified = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
       if (following || event.defaultPrevented || modified || (event.button ?? 0) !== 0) return;

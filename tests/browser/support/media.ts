@@ -9,10 +9,15 @@ const still = readFileSync(
 /**
  * A stand-in for `<model-viewer>`: a focusable element that turns on a drag
  * and the arrow keys, zooms on a wheel, and fires `load` once it has a `src`.
- * It records what it got in data attributes, and how often it has joined the
- * page: the real element draws nothing, or a clipped frame, once it has left
- * the page and come back. \`window.__modelViewerDelay\` sets how long its load
- * takes, 50 ms by default.
+ * As the real one, its focus target is a `.userInput` in its shadow root, and
+ * it has the camera API a model slide syncs with: the orbit is the drag's
+ * turn in degrees (`"<turn>deg 75deg 2m"`), the field of view 30° over the
+ * zoom, and `toDataURL` a picture naming the orbit. It records what it got in
+ * data attributes (`data-camera-orbit`, `data-camera-target`,
+ * `data-field-of-view`, `data-jumps`, `data-snapshots`), and how often it has
+ * joined the page: the real element draws nothing, or a clipped frame, once it
+ * has left the page and come back. \`window.__modelViewerDelay\` sets how long
+ * its load takes, 50 ms by default.
  */
 const fakeModelViewer = `
 window.__modelViewerLoads = (window.__modelViewerLoads ?? 0) + 1;
@@ -21,6 +26,10 @@ class FakeModelViewer extends HTMLElement {
     super();
     this.orbit = 0;
     this.zoom = 1;
+    this.target = "0m 0m 0m";
+    this.ownFieldOfView = "auto";
+    this.attachShadow({ mode: "open", delegatesFocus: true }).innerHTML =
+      '<div class="userInput" tabindex="0" role="img" aria-label="3D model" style="width:100%;height:100%"></div>';
     let x = null;
     this.addEventListener("pointerdown", (event) => {
       x = event.clientX;
@@ -31,6 +40,9 @@ class FakeModelViewer extends HTMLElement {
       this.orbit += event.clientX - x;
       x = event.clientX;
       this.dataset.orbit = String(Math.round(this.orbit));
+    });
+    this.addEventListener("click", () => {
+      this.dataset.clicks = String(Number(this.dataset.clicks ?? 0) + 1);
     });
     const up = () => (x = null);
     this.addEventListener("pointerup", up);
@@ -51,14 +63,72 @@ class FakeModelViewer extends HTMLElement {
       { passive: false },
     );
   }
+  get updateComplete() {
+    return Promise.resolve(true);
+  }
   connectedCallback() {
     this.dataset.connections = String(Number(this.dataset.connections ?? 0) + 1);
-    this.tabIndex = 0;
     this.style.display = "block";
-    if (this.getAttribute("src") && !this.loaded) {
-      this.loaded = true;
-      setTimeout(() => this.dispatchEvent(new Event("load")), window.__modelViewerDelay ?? 50);
+    if (this.getAttribute("src") && !this.loading) {
+      this.loading = true;
+      setTimeout(() => {
+        this.loaded = true;
+        // The view its first frame draws.
+        this.dataset.orbitAtLoad = String(Math.round(this.orbit));
+        this.dispatchEvent(new Event("load"));
+      }, window.__modelViewerDelay ?? 50);
     }
+  }
+  set cameraOrbit(value) {
+    this.orbit = Number.parseFloat(value) || 0;
+    this.dataset.cameraOrbit = value;
+    this.dataset.orbit = String(Math.round(this.orbit));
+  }
+  get cameraOrbit() {
+    return this.dataset.cameraOrbit ?? "auto auto auto";
+  }
+  set cameraTarget(value) {
+    this.target = value;
+    this.dataset.cameraTarget = value;
+  }
+  get cameraTarget() {
+    return this.dataset.cameraTarget ?? "auto auto auto";
+  }
+  set fieldOfView(value) {
+    this.ownFieldOfView = value;
+    this.zoom = value === "auto" ? 1 : 30 / Number.parseFloat(value);
+    this.dataset.fieldOfView = value;
+    this.dataset.zoom = this.zoom.toFixed(2);
+  }
+  get fieldOfView() {
+    return this.ownFieldOfView;
+  }
+  getCameraOrbit() {
+    const orbit = Math.round(this.orbit) + "deg 75deg 2m";
+    return { toString: () => orbit };
+  }
+  getCameraTarget() {
+    const target = this.target;
+    return { toString: () => target };
+  }
+  getFieldOfView() {
+    return 30 / this.zoom;
+  }
+  getMaximumFieldOfView() {
+    return 30;
+  }
+  getIdealAspect() {
+    return 0;
+  }
+  jumpCameraToGoal() {
+    this.dataset.jumps = String(Number(this.dataset.jumps ?? 0) + 1);
+  }
+  toDataURL() {
+    this.dataset.snapshots = String(Number(this.dataset.snapshots ?? 0) + 1);
+    const orbit = Math.round(this.orbit);
+    return "data:image/svg+xml," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" data-orbit="' + orbit + '"><rect width="80" height="80" fill="teal"/></svg>',
+    ) + "#orbit=" + orbit;
   }
   pause() {
     this.dataset.paused = String(Number(this.dataset.paused ?? 0) + 1);
