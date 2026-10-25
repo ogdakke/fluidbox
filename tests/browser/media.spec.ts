@@ -829,6 +829,33 @@ test.describe("live 3D thumbnail", () => {
       .toBe(-1);
   });
 
+  test("a hover after a press doesn't swallow the next activation", async ({ page }) => {
+    await loadLive(page);
+    const a = page.locator('#live [data-item="live-a"]');
+    const hover = async () => {
+      const box = (await card(page, "live-a").boundingBox())!;
+      for (let step = 0; step <= 4; step++) {
+        await page.mouse.move(box.x + 20 + step * 10, box.y + box.height / 2);
+      }
+    };
+    // A plain click opens; the pointer then wanders over the card with no button held.
+    await card(page, "live-a").click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await closeViewer(page);
+    await hover();
+    await a.evaluate((button: HTMLElement) => button.click());
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await closeViewer(page);
+    // After a drag, too: it swallows only its own click.
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await page.waitForTimeout(50);
+    expect(await status(page)).toBe("closed");
+    await hover();
+    await a.evaluate((button: HTMLElement) => button.click());
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  });
+
   test("a model put in a trigger after bind opens on its view, and takes the slide's home", async ({
     page,
   }) => {

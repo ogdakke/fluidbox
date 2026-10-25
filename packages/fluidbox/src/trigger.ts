@@ -199,13 +199,21 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     target.addEventListener(
       "pointermove",
       (event) => {
-        if (!press || dragged || !event.isPrimary) return;
+        if (!press || dragged || !event.isPrimary || !event.buttons) return;
         if (Math.hypot(event.clientX - press.x, event.clientY - press.y) <= DRAG_SLOP) return;
         dragged = true;
         discardPreload();
       },
       options,
     );
+    // The press ends as the pointer lifts; a hover after it is no drag. A drag
+    // swallows only the click that ends it, which comes in the same task.
+    const release = () => {
+      press = undefined;
+      if (dragged) setTimeout(() => (dragged = false));
+    };
+    target.addEventListener("pointerup", release, options);
+    target.addEventListener("pointercancel", release, options);
     target.addEventListener("keydown", () => (dragged = false), options);
     target.addEventListener("focusin", () => host.intend(), options);
     // Add-ons see the trigger now, and again as a framework renders into it.
