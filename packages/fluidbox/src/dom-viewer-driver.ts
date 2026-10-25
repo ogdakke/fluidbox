@@ -147,9 +147,11 @@ const rubberBand = (distance: number) =>
 function originModel(origin: FluidboxOrigin | null | undefined) {
   const visual = origin?.visual;
   if (!visual) return null;
-  return visual.localName === "model-viewer"
-    ? visual
-    : visual.querySelector<HTMLElement>("model-viewer");
+  const model =
+    visual.localName === "model-viewer"
+      ? visual
+      : visual.querySelector<HTMLElement>("model-viewer");
+  return model?.isConnected ? model : null;
 }
 
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */

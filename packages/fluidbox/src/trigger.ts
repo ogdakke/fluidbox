@@ -152,8 +152,16 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     dispose = undefined;
     registered = key;
     if (!element || !key) return;
+    const trigger = element;
+    // Read as the viewer measures, so content rendered into the trigger since bind counts.
     const origin: RuntimeOrigin = {
-      ...resolveOrigin(element),
+      trigger,
+      get visual() {
+        return resolveOrigin(trigger).visual;
+      },
+      get thumbnail() {
+        return resolveOrigin(trigger).thumbnail;
+      },
       onPreviewChange: (item, index) => {
         lastPreviewId = idOf(item);
         onPreviewChange?.(item as TItem, index);

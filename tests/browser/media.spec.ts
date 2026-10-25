@@ -12,6 +12,7 @@ declare global {
     };
     liveFixture: { fluidbox: Fluidbox };
     __modelViewerDelay?: number;
+    __oldCard?: HTMLElement;
   }
 }
 
@@ -826,6 +827,59 @@ test.describe("live 3D thumbnail", () => {
         ),
       )
       .toBe(-1);
+  });
+
+  test("a model put in a trigger after bind opens on its view, and takes the slide's home", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    const still = page.locator('#live [data-item="still-c"]');
+    await still.evaluate((button) => {
+      const model = document.createElement("model-viewer");
+      model.setAttribute("src", "/products/damaged-helmet/damaged-helmet.glb?copy=c");
+      model.setAttribute("camera-controls", "");
+      button.replaceChildren(model);
+    });
+    await expect(card(page, "still-c")).toHaveAttribute("data-orbit-at-load", "0");
+    await turn(page, card(page, "still-c"), -40);
+    await expect(card(page, "still-c")).toHaveAttribute("data-orbit", "-40");
+    await openCard(page, "still-c");
+    await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-40");
+    await turn(page, slideModel(page), 64);
+    await expect(slideModel(page)).toHaveAttribute("data-orbit", "24");
+    await closeViewer(page);
+    await expect(card(page, "still-c")).toHaveAttribute("data-camera-orbit", "24deg 75deg 2m");
+  });
+
+  test("a card whose model is replaced opens on the new one's view and turns only it", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), 32);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "32");
+    // As a framework remounts it: a new element in the old one's place.
+    await page.locator('#live [data-item="live-a"]').evaluate((button) => {
+      const old = button.querySelector<HTMLElement>("model-viewer")!;
+      window.__oldCard = old;
+      const model = document.createElement("model-viewer");
+      model.setAttribute("src", old.getAttribute("src")!);
+      model.setAttribute("camera-controls", "");
+      button.replaceChildren(model);
+    });
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit-at-load", "0");
+    await turn(page, card(page, "live-a"), -24);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-24");
+    await openCard(page, "live-a");
+    await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-24");
+    await turn(page, slideModel(page), 80);
+    await expect(slideModel(page)).toHaveAttribute("data-orbit", "56");
+    await closeViewer(page);
+    await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "56deg 75deg 2m");
+    const old = await page.evaluate(() => ({
+      orbit: window.__oldCard!.dataset.cameraOrbit ?? null,
+      snapshots: window.__oldCard!.dataset.snapshots ?? null,
+    }));
+    expect(old).toEqual({ orbit: null, snapshots: null });
   });
 
   test("a model-viewer without .userInput keeps its focus and its name, with one warning", async ({
