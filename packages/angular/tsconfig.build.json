@@ -12,7 +12,7 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "files": ["src/index.ts"],
+  "files": ["src/index.ts", "src/embed.ts", "src/model.ts", "src/spin.ts"],
   "angularCompilerOptions": {
     "compilationMode": "partial",
     "strictTemplates": true,

@@ -32,6 +32,13 @@ export function packageSource(command: "build" | "serve"): Alias[] {
       find: `@ogdakke/fluidbox/react/${name}`,
       replacement: resolve(packages, "react/src", `${name}.ts`),
     })),
+    // Angular's signal inputs, models and outputs need its AOT compiler, so the
+    // Angular binding is served from its partial build, which the page's
+    // @angular/compiler links. `bun run build` makes it.
+    ...["embed", "model", "spin", "index"].map((name) => ({
+      find: name === "index" ? "@ogdakke/fluidbox/angular" : `@ogdakke/fluidbox/angular/${name}`,
+      replacement: resolve(packages, "angular/dist", `${name}.js`),
+    })),
     ...bindings.map((name) => ({
       find: `@ogdakke/fluidbox/${name}`,
       replacement: resolve(packages, name, "src/index.ts"),

@@ -13,7 +13,7 @@ import { photos } from "../shared";
   template: `
     <div fluidboxRoot [items]="photos" class="pattern-grid">
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }
@@ -21,11 +21,11 @@ import { photos } from "../shared";
     </div>
     <div fluidboxRoot [items]="photos" class="pattern-grid">
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }
-      <!-- Your own thumbnails. The selected button has data-fluidbox-selected. -->
+      <!-- Your own thumbnails. The selected button has data-active. -->
       <ng-template fluidboxThumbnails let-index="index">
         <span class="pattern-thumbnails-thumb" data-test="thumb">{{ index + 1 }}</span>
       </ng-template>

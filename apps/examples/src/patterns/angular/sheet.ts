@@ -17,9 +17,9 @@ import { photos } from "../shared";
   template: `
     <h3 data-test="sheet-title">{{ label(photo) }}</h3>
     <p>
-      Stop <output data-test="stop">{{ sheet.stop() }}</output>
+      Snap <output data-test="stop">{{ sheet.snap() }}</output>
     </p>
-    <button type="button" data-test="expand" (click)="sheet.set(2)">Expand</button>
+    <button type="button" data-test="expand" (click)="sheet.setSnap(2)">Expand</button>
     <input data-test="field" placeholder="Add a note" aria-label="Note" />
   `,
 })
@@ -36,18 +36,18 @@ export class Details {
   template: `
     <div fluidboxRoot [items]="photos" class="pattern-grid">
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }
-      <!-- Stop 0 rests below the photo; stops 1 and 2 raise it to 40% and 90% of the screen. -->
+      <!-- Snap 0 rests below the photo; snaps 1 and 2 raise it to 40% and 90% of the screen. -->
       <ng-template fluidboxSheet [snapPoints]="['40%', '90%']" let-photo>
         <div appDetails [photo]="photo"></div>
       </ng-template>
       <ng-template fluidboxViewer>
-        <div fluidboxControls></div>
-        <!-- A fluidboxSheetStop button moves the sheet to that stop. -->
-        <button fluidboxSheetStop="1" class="pattern-sheet-toggle" data-test="peek">Details</button>
+        <div fluidboxToolbar></div>
+        <!-- A fluidboxSheetSnap button moves the sheet to that snap. -->
+        <button fluidboxSheetSnap="1" class="pattern-sheet-toggle" data-test="peek">Details</button>
       </ng-template>
     </div>
   `,

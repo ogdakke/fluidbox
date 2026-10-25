@@ -31,7 +31,10 @@
       "@ogdakke/fluidbox/react/spin": ["./packages/react/src/spin.ts"],
       "@ogdakke/fluidbox/solid": ["./packages/solid/src/index.ts"],
       "@ogdakke/fluidbox/vue": ["./packages/vue/src/index.ts"],
-      "@ogdakke/fluidbox/angular": ["./packages/angular/src/index.ts"]
+      "@ogdakke/fluidbox/angular": ["./packages/angular/src/index.ts"],
+      "@ogdakke/fluidbox/angular/embed": ["./packages/angular/src/embed.ts"],
+      "@ogdakke/fluidbox/angular/model": ["./packages/angular/src/model.ts"],
+      "@ogdakke/fluidbox/angular/spin": ["./packages/angular/src/spin.ts"]
     }
   },
   "include": [

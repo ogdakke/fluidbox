@@ -1,50 +1,88 @@
-/** The Angular binding: standalone `fluidbox*` directives and `FluidboxModule`. */
+/** The Angular binding: standalone `fluidbox*` directives and components, and `FluidboxModule`. */
 import { NgModule } from "@angular/core";
-import { FluidboxThumbnailsDirective } from "./thumbnails.js";
 import {
+  FluidboxCaptionComponent,
   FluidboxCloseDirective,
-  FluidboxControlsComponent,
-  FluidboxFrameLayerDirective,
+  FluidboxCounterDirective,
+  FluidboxDownloadDirective,
+  FluidboxErrorDirective,
+  FluidboxFullscreenDirective,
+  FluidboxLoadingDirective,
   FluidboxNextDirective,
+  FluidboxOverlayComponent,
   FluidboxPreviousDirective,
-  FluidboxSheetStopDirective,
-  FluidboxThumbnailOverlayComponent,
+  FluidboxRetryDirective,
+  FluidboxShareDirective,
+  FluidboxSheetSnapDirective,
+  FluidboxToolbarComponent,
   FluidboxTriggerDirective,
   FluidboxViewerDirective,
+  FluidboxZoomControlsComponent,
   FluidboxZoomInDirective,
   FluidboxZoomOutDirective,
   FluidboxZoomResetDirective,
 } from "./parts.js";
 import { FluidboxRootDirective } from "./root.js";
 import { FluidboxSheetDirective } from "./sheet.js";
+import {
+  FluidboxIframeComponent,
+  FluidboxImageComponent,
+  FluidboxMediaDirective,
+  FluidboxSlideDirective,
+  FluidboxVideoComponent,
+} from "./slide.js";
+import { FluidboxThumbnailsDirective } from "./thumbnails.js";
 
-export { FluidboxThumbnailsDirective } from "./thumbnails.js";
-export type { FluidboxContent, FluidboxItemContext } from "./mount.js";
+export type { FluidboxItemContext } from "./mount.js";
 export {
+  FluidboxCaptionComponent,
   FluidboxCloseDirective,
-  FluidboxControlDirective,
-  FluidboxControlsComponent,
-  FluidboxFrameLayerDirective,
+  FluidboxCounterDirective,
+  FluidboxDownloadDirective,
+  FluidboxErrorDirective,
+  FluidboxFullscreenDirective,
+  FluidboxLoadingDirective,
   FluidboxNextDirective,
+  FluidboxOverlayComponent,
   FluidboxPreviousDirective,
-  FluidboxSheetStopDirective,
-  FluidboxThumbnailOverlayComponent,
+  FluidboxRetryDirective,
+  FluidboxShareDirective,
+  FluidboxSheetSnapDirective,
+  FluidboxToolbarComponent,
   FluidboxTriggerDirective,
   FluidboxViewerDirective,
+  FluidboxZoomControlsComponent,
   FluidboxZoomInDirective,
   FluidboxZoomOutDirective,
   FluidboxZoomResetDirective,
+  type FluidboxErrorContext,
 } from "./parts.js";
 export {
   FluidboxRootDirective,
   injectFluidbox,
   injectFluidboxSheet,
   type FluidboxApi,
+  type FluidboxCommands,
   type FluidboxSheetApi,
 } from "./root.js";
 export { FluidboxSheetDirective } from "./sheet.js";
+export {
+  FluidboxIframeComponent,
+  FluidboxImageComponent,
+  FluidboxMediaDirective,
+  FluidboxSlideDirective,
+  FluidboxVideoComponent,
+  injectFluidboxSlide,
+  type FluidboxSlideApi,
+} from "./slide.js";
+export { FluidboxThumbnailsDirective, type FluidboxThumbnailContext } from "./thumbnails.js";
 
-export { FluidboxSheetEvent, FluidboxValueChangeEvent, FluidboxZoomEvent } from "@ogdakke/fluidbox";
+export {
+  FluidboxMediaErrorEvent,
+  FluidboxSheetEvent,
+  FluidboxValueChangeEvent,
+  FluidboxZoomEvent,
+} from "@ogdakke/fluidbox";
 export type {
   Fluidbox,
   FluidboxCommandOptions,
@@ -57,42 +95,59 @@ export type {
   FluidboxItemListOptions,
   FluidboxItems,
   FluidboxLabels,
+  FluidboxOptions,
   FluidboxPreload,
   FluidboxReason,
   FluidboxSheetSnapPoint,
+  FluidboxSlide,
+  FluidboxSlideRenderer,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
   FluidboxValue,
   FluidboxValueChangeAction,
-  FluidboxValueChangeDetails,
   FluidboxVideoItem,
   FluidboxZoomCommandOptions,
+  FluidboxZoomPose,
   FluidboxZoomState,
 } from "@ogdakke/fluidbox";
-export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 
 const parts = [
   FluidboxRootDirective,
   FluidboxTriggerDirective,
-  FluidboxThumbnailOverlayComponent,
-  FluidboxFrameLayerDirective,
+  FluidboxOverlayComponent,
+  FluidboxSlideDirective,
+  FluidboxMediaDirective,
+  FluidboxImageComponent,
+  FluidboxVideoComponent,
+  FluidboxIframeComponent,
   FluidboxViewerDirective,
-  FluidboxControlsComponent,
+  FluidboxToolbarComponent,
+  FluidboxZoomControlsComponent,
   FluidboxCloseDirective,
   FluidboxPreviousDirective,
   FluidboxNextDirective,
   FluidboxZoomInDirective,
   FluidboxZoomOutDirective,
   FluidboxZoomResetDirective,
+  FluidboxFullscreenDirective,
+  FluidboxDownloadDirective,
+  FluidboxShareDirective,
+  FluidboxCounterDirective,
+  FluidboxCaptionComponent,
+  FluidboxLoadingDirective,
+  FluidboxErrorDirective,
+  FluidboxRetryDirective,
   FluidboxThumbnailsDirective,
   FluidboxSheetDirective,
-  FluidboxSheetStopDirective,
+  FluidboxSheetSnapDirective,
 ];
 
 /**
  * Every fluidbox part, for NgModule apps and quick starts. The thumbnails and
- * sheet runtimes load on demand, the first time a root uses them.
+ * sheet runtimes load on demand, the first time a root uses them. The add-on
+ * parts come from `@ogdakke/fluidbox/angular/{embed,model,spin}`.
  */
 @NgModule({ imports: parts, exports: parts })
 export class FluidboxModule {}

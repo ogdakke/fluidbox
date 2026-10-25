@@ -18,6 +18,9 @@ const entrypoints = [
   "react-embed",
   "react-model",
   "react-spin",
+  "angular-embed",
+  "angular-model",
+  "angular-spin",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -37,6 +40,9 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "react-embed": ["react", "react-dom"],
   "react-model": ["react", "react-dom"],
   "react-spin": ["react", "react-dom"],
+  "angular-embed": ["@angular/core"],
+  "angular-model": ["@angular/core"],
+  "angular-spin": ["@angular/core"],
 };
 
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
@@ -52,7 +58,7 @@ const initialGzipLimits: Record<Entry, number> = {
   react: 17_200,
   solid: 13_700,
   vue: 14_350,
-  angular: 14_800,
+  angular: 17_300,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -66,6 +72,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-embed": 19_750,
   "react-model": 18_450,
   "react-spin": 19_150,
+  "angular-embed": 20_000,
+  "angular-model": 18_650,
+  "angular-spin": 19_350,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -81,7 +90,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   react: 50_850,
   solid: 47_250,
   vue: 47_900,
-  angular: 48_250,
+  angular: 50_800,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -92,6 +101,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "react-embed": 53_350,
   "react-model": 52_000,
   "react-spin": 52_750,
+  "angular-embed": 53_550,
+  "angular-model": 52_100,
+  "angular-spin": 52_850,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -111,6 +123,9 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
   "react-embed": 1_200,
   "react-model": 1_200,
   "react-spin": 1_200,
+  "angular-embed": 1_200,
+  "angular-model": 1_200,
+  "angular-spin": 1_200,
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
@@ -119,7 +134,7 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   react: 52_000,
   solid: 48_400,
   vue: 49_050,
-  angular: 49_400,
+  angular: 51_950,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -130,6 +145,9 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "react-embed": 54_500,
   "react-model": 53_150,
   "react-spin": 53_900,
+  "angular-embed": 54_700,
+  "angular-model": 53_250,
+  "angular-spin": 54_000,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
@@ -137,7 +155,7 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   react: 53_600,
   solid: 50_050,
   vue: 50_750,
-  angular: 51_050,
+  angular: 53_650,
   thumbnails: 4_900,
   sheet: 8_350,
   kit: 4_350,
@@ -149,6 +167,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "react-embed": 56_150,
   "react-model": 54_850,
   "react-spin": 55_550,
+  "angular-embed": 56_350,
+  "angular-model": 54_950,
+  "angular-spin": 55_650,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
@@ -248,7 +269,7 @@ for (const name of entrypoints) {
     ...Object.entries(addonMarkers)
       .filter(
         ([addon, marker]) =>
-          addon !== name.replace(/^react-/, "") && activationCode.includes(marker),
+          addon !== name.replace(/^(react|angular)-/, "") && activationCode.includes(marker),
       )
       .map(([addon]) => `carries the ${addon} add-on`),
   ].filter((error): error is string => typeof error === "string");

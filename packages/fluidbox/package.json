@@ -63,6 +63,18 @@
       "types": "./dist/angular/index.d.ts",
       "import": "./dist/angular/index.js"
     },
+    "./angular/embed": {
+      "types": "./dist/angular/embed.d.ts",
+      "import": "./dist/angular/embed.js"
+    },
+    "./angular/model": {
+      "types": "./dist/angular/model.d.ts",
+      "import": "./dist/angular/model.js"
+    },
+    "./angular/spin": {
+      "types": "./dist/angular/spin.d.ts",
+      "import": "./dist/angular/spin.js"
+    },
     "./thumbnails": {
       "types": "./dist/thumbnails.d.ts",
       "import": "./dist/thumbnails.js"
