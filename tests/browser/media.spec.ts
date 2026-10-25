@@ -10,7 +10,7 @@ declare global {
       log: string[];
       closes: string[];
     };
-    liveFixture: { fluidbox: Fluidbox };
+    liveFixture: { fluidbox: Fluidbox; unbind: Record<string, () => void> };
     __modelViewerDelay?: number;
     __oldCard?: HTMLElement;
   }
@@ -827,6 +827,37 @@ test.describe("live 3D thumbnail", () => {
         ),
       )
       .toBe(-1);
+  });
+
+  test("unbinding a card, or taking its model out, gives the model its own accessibility back", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    const input = (model: ReturnType<Page["locator"]>) =>
+      model.evaluate(
+        (element) => element.shadowRoot!.querySelector<HTMLElement>(".userInput")!.tabIndex,
+      );
+    await expect.poll(() => input(card(page, "live-a"))).toBe(-1);
+    await page.evaluate(() => window.liveFixture.unbind["live-a"]!());
+    await expect(card(page, "live-a")).not.toHaveAttribute("aria-hidden", /./);
+    expect(await input(card(page, "live-a"))).toBe(0);
+    // Content changes in a trigger no longer bound don't quiet it again.
+    await page.locator('#live [data-item="live-a"]').evaluate((button) => button.append(" "));
+    await page.waitForTimeout(50);
+    await expect(card(page, "live-a")).not.toHaveAttribute("aria-hidden", /./);
+
+    // A model taken out of a bound trigger is restored too.
+    await expect.poll(() => input(card(page, "live-b"))).toBe(-1);
+    const restored = await page.locator('#live [data-item="live-b"]').evaluate(async (button) => {
+      const model = button.querySelector<HTMLElement>("model-viewer")!;
+      button.replaceChildren(document.createElement("span"));
+      await new Promise((resolve) => setTimeout(resolve));
+      return {
+        hidden: model.getAttribute("aria-hidden"),
+        tabIndex: model.shadowRoot!.querySelector<HTMLElement>(".userInput")!.tabIndex,
+      };
+    });
+    expect(restored).toEqual({ hidden: null, tabIndex: 0 });
   });
 
   test("a hover after a press doesn't swallow the next activation", async ({ page }) => {

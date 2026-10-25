@@ -42,6 +42,7 @@ const fluidbox = createFluidbox({
 });
 
 const grid = document.querySelector<HTMLElement>("#live")!;
+const unbind: Record<string, () => void> = {};
 for (const item of items) {
   const button = document.createElement("button");
   button.type = "button";
@@ -63,7 +64,7 @@ for (const item of items) {
     button.append(card);
   }
   grid.append(button);
-  fluidbox.bind(button, item);
+  unbind[item.id] = fluidbox.bind(button, item);
 }
 
-Object.assign(window, { liveFixture: { fluidbox } });
+Object.assign(window, { liveFixture: { fluidbox, unbind } });

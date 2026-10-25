@@ -83,8 +83,8 @@ interface ModelViewerElement extends HTMLElement {
   toDataURL?(type?: string, quality?: number): string;
 }
 
-/** The live models a trigger has quieted, so each is quieted once. */
-const quieted = new WeakSet<Element>();
+/** The live models each trigger has quieted, with what gives each its own accessibility back. */
+const quieted = new WeakMap<HTMLElement, Map<HTMLElement, () => void>>();
 /** Whether the development warning about a `<model-viewer>` without its focus target ran. */
 let warnedModel = false;
 
@@ -93,46 +93,76 @@ let warnedModel = false;
  * control a keyboard and a screen reader reach, so the model leaves the
  * accessibility tree, and its focus target, `.userInput` in its shadow root,
  * the tab order; its poster's and AR buttons go inert. A drag still turns it.
- * Checked against `<model-viewer>` 4.0.0: a version without `.userInput` keeps
- * its focus, and loses the `aria-hidden`, which would hide a focusable element.
+ * A model that leaves the trigger, or a trigger that is unbound, gets all of
+ * that back. Checked against `<model-viewer>` 4.0.0: a version without
+ * `.userInput` keeps its focus, and loses the `aria-hidden`, which would hide
+ * a focusable element.
  */
 function quietModels(trigger: HTMLElement) {
-  const registry = trigger.ownerDocument.defaultView?.customElements;
-  for (const model of trigger.querySelectorAll<HTMLElement>("model-viewer")) {
-    if (quieted.has(model)) continue;
-    quieted.add(model);
-    const hid = !model.hasAttribute("aria-hidden");
-    if (hid) model.setAttribute("aria-hidden", "true");
-    registry
-      ?.whenDefined("model-viewer")
-      .then(() => (model as { updateComplete?: Promise<unknown> }).updateComplete)
-      .then(() => {
-        const root = model.shadowRoot;
-        const input = root?.querySelector<HTMLElement>(".userInput");
-        if (!root || !input) {
-          if (hid) model.removeAttribute("aria-hidden");
-          // Development builds only; a page without a bundler has no process.
-          try {
-            if (process.env.NODE_ENV !== "production" && !warnedModel) {
-              warnedModel = true;
-              console.warn(
-                "Fluidbox found no .userInput in this <model-viewer>'s shadow root, so the live model in a trigger stays a second tab stop. Fluidbox is checked against <model-viewer> 4.0.0:",
-                model,
-              );
-            }
-          } catch {}
-          return;
-        }
-        for (const target of root.querySelectorAll<HTMLElement>("[tabindex]")) {
-          if (target.tabIndex >= 0) target.tabIndex = -1;
-        }
-        // Its own buttons go inert, so a press on the poster opens the viewer too.
-        for (const control of root.querySelectorAll<HTMLElement>("button, a")) {
-          control.inert = true;
-        }
-      })
-      .catch(() => {});
+  let own = quieted.get(trigger);
+  if (!own) quieted.set(trigger, (own = new Map()));
+  for (const [model, restore] of own) {
+    if (trigger.contains(model)) continue;
+    restore();
+    own.delete(model);
   }
+  for (const model of trigger.querySelectorAll<HTMLElement>("model-viewer")) {
+    if (!own.has(model)) own.set(model, quiet(model));
+  }
+  const models = own;
+  return () => {
+    models.forEach((restore) => restore());
+    quieted.delete(trigger);
+  };
+}
+
+/** Quiet one live model, and return what undoes it. */
+function quiet(model: HTMLElement) {
+  const undo: (() => void)[] = [];
+  let quiet = true;
+  if (!model.hasAttribute("aria-hidden")) {
+    model.setAttribute("aria-hidden", "true");
+    undo.push(() => model.removeAttribute("aria-hidden"));
+  }
+  model.ownerDocument.defaultView?.customElements
+    .whenDefined("model-viewer")
+    .then(() => (model as { updateComplete?: Promise<unknown> }).updateComplete)
+    .then(() => {
+      if (!quiet) return;
+      const root = model.shadowRoot;
+      const input = root?.querySelector<HTMLElement>(".userInput");
+      if (!root || !input) {
+        undo.splice(0).forEach((done) => done());
+        // Development builds only; a page without a bundler has no process.
+        try {
+          if (process.env.NODE_ENV !== "production" && !warnedModel) {
+            warnedModel = true;
+            console.warn(
+              "Fluidbox found no .userInput in this <model-viewer>'s shadow root, so the live model in a trigger stays a second tab stop. Fluidbox is checked against <model-viewer> 4.0.0:",
+              model,
+            );
+          }
+        } catch {}
+        return;
+      }
+      for (const target of root.querySelectorAll<HTMLElement>("[tabindex]")) {
+        if (target.tabIndex < 0) continue;
+        const was = target.getAttribute("tabindex")!;
+        target.tabIndex = -1;
+        undo.push(() => target.setAttribute("tabindex", was));
+      }
+      // Its own buttons go inert, so a press on the poster opens the viewer too.
+      for (const control of root.querySelectorAll<HTMLElement>("button, a")) {
+        if (control.inert) continue;
+        control.inert = true;
+        undo.push(() => (control.inert = false));
+      }
+    })
+    .catch(() => {});
+  return () => {
+    quiet = false;
+    undo.splice(0).forEach((done) => done());
+  };
 }
 
 // Imported, the add-on quiets the live models in every trigger.

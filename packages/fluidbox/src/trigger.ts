@@ -218,11 +218,19 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     target.addEventListener("focusin", () => host.intend(), options);
     // Add-ons see the trigger now, and again as a framework renders into it.
     if (triggerHooks.size) {
-      const run = () => triggerHooks.forEach((hook) => hook(target));
+      const undo = new Map<unknown, () => void>();
+      const run = () =>
+        triggerHooks.forEach((hook) => {
+          const done = hook(target);
+          if (done) undo.set(hook, done);
+        });
       run();
       const content = new MutationObserver(run);
       content.observe(target, { childList: true, subtree: true });
-      signal.addEventListener("abort", () => content.disconnect());
+      signal.addEventListener("abort", () => {
+        content.disconnect();
+        undo.forEach((done) => done());
+      });
     }
     signal.addEventListener("abort", leave);
   };
