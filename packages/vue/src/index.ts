@@ -65,16 +65,19 @@ import {
   defaultLabels,
   downloadLink,
   fluidboxControls,
+  fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
   latestFindTrigger,
   resolveLabels,
+  takeOverFluidbox,
   targetKeys,
   unloadFluidbox,
   watchFluidbox,
   zoomControlNames,
   type FluidboxSlot,
   type FluidboxSlots,
+  type FluidboxStaticNode,
   type FluidboxTriggerPreview,
 } from "@ogdakke/fluidbox/kit";
 import type {
@@ -219,6 +222,14 @@ interface RootContext {
   readonly setAddon: <K extends keyof Addons>(name: K, value: Addons[K]) => void;
   /** Count a Viewer part, which the viewer patches as it draws its layer. */
   readonly addViewer: (patch: () => void) => () => void;
+  /** What the server's copy of an open viewer needs to know, set as the parts set up. */
+  readonly serverHints: ServerHints;
+}
+
+interface ServerHints {
+  thumbnails: boolean;
+  sheet: boolean;
+  viewer: boolean;
 }
 
 interface SlideContext {
@@ -324,6 +335,7 @@ const Root = defineComponent(
     const viewerTarget = shallowRef<HTMLElement | null>(null);
     const viewers = new Set<() => void>();
     const labels = computed(() => resolveLabels(props.labels));
+    const serverHints: ServerHints = { thumbnails: false, sheet: false, viewer: false };
 
     // One function for the life of Root, so `update` redraws the layer only when it comes or goes.
     const renderViewer: FluidboxViewerRenderer<TItem> = ({ target }) => {
@@ -477,13 +489,30 @@ const Root = defineComponent(
       signal,
     );
 
+    // A Root that renders open on an image draws the viewer's copy on its
+    // first render, so the server's HTML shows the photo, and the viewer
+    // takes it over as the Root mounts.
+    const initial =
+      props.modelValue !== undefined ? props.modelValue : (props.defaultValue ?? null);
+    const first = Array.isArray(items.value) ? (items.value as readonly TItem[]) : [];
+    const at = initial === null ? -1 : first.findIndex((item) => idOf(item) === initial);
+    const serverIndex = first[at]?.type === "image" ? at : null;
+    const serverViewer = shallowRef<HTMLElement | null>(null);
+    const takenOver = shallowRef(false);
+
     // Your value wins whenever it changes. The triggers and parts have
     // registered by now, so an open flies from the item's own. The default
     // value opens once, as the Root mounts.
     onMounted(() => {
       applyAddons();
       const sync = createFluidboxSync(fluidbox);
-      sync(props.modelValue === undefined ? (props.defaultValue ?? undefined) : props.modelValue);
+      const copy = serverViewer.value;
+      if (copy && serverIndex !== null) {
+        const done = () => (takenOver.value = true);
+        void takeOverFluidbox(fluidbox, copy, idOf(first[serverIndex]!)).then(done, done);
+      } else {
+        sync(props.modelValue === undefined ? (props.defaultValue ?? undefined) : props.modelValue);
+      }
       watch(
         () => props.modelValue,
         (value) => sync(value),
@@ -538,8 +567,24 @@ const Root = defineComponent(
       mount: mounts.mount,
       setAddon,
       addViewer,
+      serverHints,
     });
-    return () => [slots.default?.(api), ...mounts.render()];
+    return () => [
+      slots.default?.(api),
+      // After the Root's content, so the parts in it have said what the copy needs.
+      serverIndex !== null && !takenOver.value
+        ? h(ServerViewer, {
+            setElement: (element: HTMLElement | null) => (serverViewer.value = element),
+            items: first,
+            index: serverIndex,
+            labels: labels.value,
+            loop: props.loop,
+            href: props.href,
+            hints: serverHints,
+          })
+        : null,
+      ...mounts.render(),
+    ];
   },
   {
     name: "FluidboxRoot",
@@ -561,6 +606,54 @@ const Root = defineComponent(
     emits: ["update:modelValue", "valueChangeComplete", "zoomChange", "mediaError"],
   },
 );
+
+function staticElement(each: FluidboxStaticNode | string): VNode | string {
+  if (typeof each === "string") return each;
+  return h(each.tag, { ...each.attributes }, each.children.map(staticElement));
+}
+
+/**
+ * The open viewer's copy. It is built as elements, not HTML, so it renders
+ * under Trusted Types and a strict style-src.
+ */
+const ServerViewer = defineComponent({
+  name: "FluidboxServerViewer",
+  props: {
+    setElement: {
+      type: Function as PropType<(element: HTMLElement | null) => void>,
+      required: true,
+    },
+    items: { type: Array as PropType<readonly FluidboxItem[]>, required: true },
+    index: { type: Number, required: true },
+    labels: { type: Object as PropType<FluidboxLabels>, required: true },
+    loop: { type: Boolean, default: undefined },
+    href: Function as PropType<FluidboxRootProps["href"]>,
+    hints: { type: Object as PropType<ServerHints>, required: true },
+  },
+  setup(props) {
+    return () => {
+      const copy = fluidboxStaticViewerNodes({
+        items: props.items,
+        value: idOf(props.items[props.index]!),
+        labels: props.labels,
+        loop: props.loop,
+        href: props.href,
+        thumbnails: props.hints.thumbnails,
+        sheet: props.hints.sheet,
+        controls: !props.hints.viewer,
+      });
+      if (!copy) return null;
+      return h(
+        "div",
+        {
+          ref: (element: unknown) => props.setElement(toElement(element)),
+          "data-fluidbox-server-viewer": "",
+        },
+        [staticElement(copy)],
+      );
+    };
+  },
+});
 
 type TriggerSlots<TItem extends FluidboxItem> = SlotsType<{
   default?: (preview: FluidboxTriggerPreview<TItem>) => VNode[];
@@ -646,7 +739,9 @@ const Trigger = defineComponent(
 const Viewer = defineComponent({
   name: "FluidboxViewer",
   setup(_, { slots }) {
-    const { viewerTarget, addViewer } = useRootContext();
+    const { viewerTarget, addViewer, serverHints } = useRootContext();
+    // Read by the server's copy of the open viewer, which renders after this.
+    serverHints.viewer = true;
     onBeforeUnmount(addViewer(usePatch()));
     return () =>
       viewerTarget.value ? h(Teleport, { to: viewerTarget.value }, slots.default?.() ?? []) : null;
@@ -1271,7 +1366,9 @@ const Thumbnails = defineComponent({
     default?: (thumbnail: FluidboxThumbnailContext) => VNode[];
   }>,
   setup(_, { slots }) {
-    const { setAddon, thumbnailsSlots, state } = useRootContext();
+    const { setAddon, thumbnailsSlots, state, serverHints } = useRootContext();
+    // Read by the server's copy of the open viewer, which renders after this.
+    serverHints.thumbnails = true;
     const custom = !!slots.default;
     setAddon("thumbnails", { custom });
     onBeforeUnmount(() => setAddon("thumbnails", null));
@@ -1315,7 +1412,9 @@ const Sheet = defineComponent({
     default?: (sheet: FluidboxItemContext) => VNode[];
   }>,
   setup(props, { attrs, emit, slots }) {
-    const { fluidbox, setAddon, sheetSlots } = useRootContext();
+    const { fluidbox, setAddon, sheetSlots, serverHints } = useRootContext();
+    // Read by the server's copy of the open viewer, which renders after this.
+    serverHints.sheet = true;
     // The snap points are compared by value, so an inline array changes nothing.
     watch(
       () => JSON.stringify([props.snapPoints ?? null, props.dismissMotion ?? null]),

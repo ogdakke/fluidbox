@@ -101,3 +101,16 @@ test("a React Root that renders open draws and hands over its copy under a stric
   expect(errors).toEqual([]);
   expect(await violations(page)).toEqual([]);
 });
+
+test("a Vue Root that renders open draws and hands over its copy under a strict policy", async ({
+  page,
+}) => {
+  const errors = await load(page, "?vue");
+  await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(activeSlide(page)).toHaveAttribute("aria-label", "Item 2 of 2");
+  await expect(page.locator("[data-fluidbox-server-viewer]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog(page)).toHaveCount(0);
+  expect(errors).toEqual([]);
+  expect(await violations(page)).toEqual([]);
+});

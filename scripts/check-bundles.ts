@@ -61,7 +61,7 @@ const initialGzipLimits: Record<Entry, number> = {
   elements: 14_000,
   react: 17_200,
   solid: 13_700,
-  vue: 16_250,
+  vue: 17_600,
   angular: 14_800,
   thumbnails: 3_850,
   sheet: 7_350,
@@ -76,9 +76,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-embed": 19_750,
   "react-model": 18_450,
   "react-spin": 19_150,
-  "vue-embed": 19_750,
-  "vue-model": 18_400,
-  "vue-spin": 19_150,
+  "vue-embed": 20_100,
+  "vue-model": 18_800,
+  "vue-spin": 19_550,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -93,7 +93,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   elements: 47_400,
   react: 50_850,
   solid: 47_250,
-  vue: 49_800,
+  vue: 51_150,
   angular: 48_250,
   thumbnails: 3_850,
   sheet: 7_350,
@@ -105,9 +105,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "react-embed": 53_350,
   "react-model": 52_000,
   "react-spin": 52_750,
-  "vue-embed": 53_250,
-  "vue-model": 51_850,
-  "vue-spin": 52_600,
+  "vue-embed": 53_750,
+  "vue-model": 52_350,
+  "vue-spin": 53_100,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -137,7 +137,7 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   elements: 48_550,
   react: 52_000,
   solid: 48_400,
-  vue: 50_950,
+  vue: 52_300,
   angular: 49_400,
   thumbnails: 3_850,
   sheet: 7_350,
@@ -149,16 +149,16 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "react-embed": 54_500,
   "react-model": 53_150,
   "react-spin": 53_900,
-  "vue-embed": 54_400,
-  "vue-model": 53_000,
-  "vue-spin": 53_750,
+  "vue-embed": 54_900,
+  "vue-model": 53_500,
+  "vue-spin": 54_250,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
   elements: 50_200,
   react: 53_600,
   solid: 50_050,
-  vue: 52_600,
+  vue: 53_950,
   angular: 51_050,
   thumbnails: 4_900,
   sheet: 8_350,
@@ -171,9 +171,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "react-embed": 56_150,
   "react-model": 54_850,
   "react-spin": 55_550,
-  "vue-embed": 56_100,
-  "vue-model": 54_650,
-  "vue-spin": 55_400,
+  "vue-embed": 56_550,
+  "vue-model": 55_150,
+  "vue-spin": 55_900,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
