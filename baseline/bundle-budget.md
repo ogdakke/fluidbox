@@ -8,44 +8,36 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | On demand JS gzip | Reachable JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | ----------------: | ----------------: | -----------------------: |
-| Root           |         9,802 B |           44,045 B |           1,151 B |          45,196 B |                 46,855 B |
-| Elements       |        13,946 B |           47,387 B |           1,151 B |          48,538 B |                 50,197 B |
-| React          |        17,183 B |           50,787 B |           1,151 B |          51,938 B |                 53,597 B |
-| Solid          |        16,955 B |           50,555 B |           1,151 B |          51,706 B |                 53,365 B |
-| Vue            |        17,625 B |           51,193 B |           1,151 B |          52,344 B |                 54,003 B |
-| Angular        |        14,713 B |           48,233 B |           1,151 B |          49,384 B |                 51,043 B |
+| Root           |        10,117 B |           44,506 B |           1,151 B |          45,657 B |                 47,316 B |
+| Elements       |        15,148 B |           50,693 B |           1,151 B |          51,844 B |                 53,503 B |
+| React          |        17,493 B |           51,260 B |           1,151 B |          52,411 B |                 54,070 B |
+| Solid          |        17,258 B |           51,020 B |           1,151 B |          52,171 B |                 53,830 B |
+| Vue            |        17,923 B |           51,657 B |           1,151 B |          52,808 B |                 54,467 B |
+| Angular        |        19,623 B |           53,306 B |           1,151 B |          54,457 B |                 56,116 B |
+| Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
+| Sheet          |         7,277 B |            7,277 B |               0 B |           7,277 B |                  8,272 B |
+| Kit            |         1,831 B |            1,831 B |               0 B |           1,831 B |                  4,641 B |
+| Hover zoom     |         1,453 B |            1,453 B |               0 B |           1,453 B |                  4,263 B |
+| Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
+| Model          |         2,704 B |            2,704 B |               0 B |           2,704 B |                  5,514 B |
+| Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
+| React embed    |        20,005 B |           53,814 B |           1,151 B |          54,965 B |                 56,624 B |
+| React model    |        19,822 B |           53,559 B |           1,151 B |          54,710 B |                 56,369 B |
+| React spin     |        19,416 B |           53,145 B |           1,151 B |          54,296 B |                 55,955 B |
+| Solid embed    |        19,607 B |           53,424 B |           1,151 B |          54,575 B |                 56,234 B |
+| Solid model    |        19,438 B |           53,174 B |           1,151 B |          54,325 B |                 55,984 B |
+| Solid spin     |        19,016 B |           52,738 B |           1,151 B |          53,889 B |                 55,548 B |
+| Vue embed      |        20,461 B |           54,252 B |           1,151 B |          55,403 B |                 57,062 B |
+| Vue model      |        20,244 B |           53,957 B |           1,151 B |          55,108 B |                 56,767 B |
+| Vue spin       |        19,858 B |           53,569 B |           1,151 B |          54,720 B |                 56,379 B |
+| Angular embed  |        22,269 B |           56,013 B |           1,151 B |          57,164 B |                 58,823 B |
+| Angular model  |        22,020 B |           55,687 B |           1,151 B |          56,838 B |                 58,497 B |
+| Angular spin   |        21,621 B |           55,309 B |           1,151 B |          56,460 B |                 58,119 B |
+| Elements embed |        17,916 B |           53,473 B |           1,151 B |          54,624 B |                 56,283 B |
+| Elements model |        17,781 B |           53,335 B |           1,151 B |          54,486 B |                 56,145 B |
+| Elements spin  |        17,409 B |           52,964 B |           1,151 B |          54,115 B |                 55,774 B |
 
-| Root | 10,113 B | 44,558 B | 1,151 B | 45,709 B | 47,368 B |
-| Elements | 14,261 B | 47,907 B | 1,151 B | 49,058 B | 50,717 B |
-| React | 17,493 B | 51,306 B | 1,151 B | 52,457 B | 54,116 B |
-| Solid | 13,948 B | 47,736 B | 1,151 B | 48,887 B | 50,546 B |
-| Vue | 17,923 B | 51,702 B | 1,151 B | 52,853 B | 54,512 B |
-| Angular | 15,029 B | 48,763 B | 1,151 B | 49,914 B | 51,573 B |
-| Thumbnails | 3,763 B | 3,763 B | 0 B | 3,763 B | 4,858 B |
-| Sheet | 7,277 B | 7,277 B | 0 B | 7,277 B | 8,272 B |
-| Kit | 1,831 B | 1,831 B | 0 B | 1,831 B | 4,641 B |
-| Hover zoom | 1,453 B | 1,453 B | 0 B | 1,453 B | 4,263 B |
-| Embed | 2,991 B | 2,991 B | 0 B | 2,991 B | 5,801 B |
-| Model | 2,488 B | 2,488 B | 0 B | 2,488 B | 5,298 B |
-| Spin | 2,388 B | 2,388 B | 0 B | 2,388 B | 5,198 B |
-| React embed | 19,683 B | 53,333 B | 1,151 B | 54,484 B | 56,143 B |
-| React model | 18,409 B | 51,994 B | 1,151 B | 53,145 B | 54,804 B |
-| React spin | 19,108 B | 52,678 B | 1,151 B | 53,829 B | 55,488 B |
-| Solid embed | 19,297 B | 52,955 B | 1,151 B | 54,106 B | 55,765 B |
-| Solid model | 18,032 B | 51,609 B | 1,151 B | 52,760 B | 54,419 B |
-| Solid spin | 18,724 B | 52,283 B | 1,151 B | 53,434 B | 55,093 B |
-| Vue embed | 20,146 B | 53,776 B | 1,151 B | 54,927 B | 56,586 B |
-| Vue model | 18,827 B | 52,387 B | 1,151 B | 53,538 B | 55,197 B |
-| Vue spin | 19,556 B | 53,108 B | 1,151 B | 54,259 B | 55,918 B |
-
-| React embed | 20,001 B | 53,856 B | 1,151 B | 55,007 B | 56,666 B |
-| React model | 19,621 B | 53,404 B | 1,151 B | 54,555 B | 56,214 B |
-| React spin | 19,413 B | 53,191 B | 1,151 B | 54,342 B | 56,001 B |
-| Vue embed | 20,459 B | 54,294 B | 1,151 B | 55,445 B | 57,104 B |
-| Vue model | 20,024 B | 53,797 B | 1,151 B | 54,948 B | 56,607 B |
-| Vue spin | 19,857 B | 53,615 B | 1,151 B | 54,766 B | 56,425 B |
-
-`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
+`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,256 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
 The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each core entry, record the hardening and product-media work merged together:
 
@@ -133,3 +125,7 @@ The fixes after the live thumbnail's review moved every core entry by about 70 B
 - **The model add-on** gives a live model its own accessibility back when its trigger is unbound or it leaves the trigger, undoing exactly what it changed, and drops a slide's snapshot when the slide leaves, so a slide that comes back shows its own view, not a stale picture. React model and Vue model grew about 270 B initial with it and the core's change.
 
 Merging the live 3D thumbnail into the redesign with every binding moved each entry by what that branch measured on its own base: about 310 B initial and 450 B activation in the core (the trigger's origin getters, the drag slop and the trigger hooks), and about 1.2 KB more in each model entry (the model add-on's quieting, its undo and the snapshot). The limits moved by the rule.
+
+A model slide's snapshot then became a copy of the pixels `<model-viewer>` shows, in place of a PNG of `toDataURL`: the model add-on grew 150 B, to 2,638 B, and each binding's model entry about 145 B. The copy draws the canvas the element shows, the renderer's shared WebGL canvas or the element's own 2D canvas, into a canvas of the slide's, and keeps the PNG for a version without that canvas, with a development warning. On the phone viewport the close's start fell from 30 ms to 10 ms in Chromium and from 187 ms to 7 ms in WebKit. The measurement table is rebuilt whole from this run: the merge before it had left an older table and two partial ones.
+
+Measuring a snapshot's region from the content box, which `<model-viewer>`'s shadow `.container` takes with its fractions, in place of the element's client size, which counts its padding, and at the device's exact pixel ratio while the renderer doesn't throttle, grew the model add-on 66 B, to 2,704 B, and each binding's model entry about 60 B.

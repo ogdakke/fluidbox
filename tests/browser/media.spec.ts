@@ -13,6 +13,9 @@ declare global {
     liveFixture: { fluidbox: Fluidbox; unbind: Record<string, () => void> };
     __modelViewerDelay?: number;
     __modelViewerTainted?: boolean;
+    __modelViewerNoCanvas?: boolean;
+    __modelViewerUnshown?: boolean;
+    __modelViewerThrows?: boolean;
     __oldCard?: HTMLElement;
   }
 }
@@ -771,6 +774,19 @@ test.describe("live 3D thumbnail", () => {
     await expect(page.locator(dialog)).toHaveCount(0);
   }
 
+  /**
+   * The orbit the slide's snapshot shows: a copy of the fake's canvas keeps its
+   * first pixel, and the picture `toDataURL` makes names it.
+   */
+  const snapshotOrbit = (page: Page) =>
+    page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`).evaluate((snapshot) => {
+      if (snapshot instanceof HTMLImageElement) return Number(snapshot.src.split("#orbit=")[1]);
+      const [red, green] = (snapshot as HTMLCanvasElement)
+        .getContext("2d")!
+        .getImageData(0, 0, 1, 1).data;
+      return red! + green! * 256 - 512;
+    });
+
   /** How often each model element has joined the page. */
   const connections = (page: Page) =>
     page.locator("model-viewer").evaluateAll((models) => models.map((m) => m.dataset.connections));
@@ -941,14 +957,176 @@ test.describe("live 3D thumbnail", () => {
     expect(old).toEqual({ orbit: null, snapshots: null });
   });
 
-  test("a card that can't be read opens on its view without a snapshot", async ({ page }) => {
+  test("a model with textures from another origin still flies a snapshot, which can't be read back", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => (window.__modelViewerTainted = true));
+    await loadLive(page);
+    // The card's canvas has drawn the texture, so it is tainted.
+    await expect
+      .poll(() =>
+        card(page, "live-a").evaluate((model) => {
+          try {
+            model.shadowRoot!.querySelector("canvas")!.toDataURL();
+            return "readable";
+          } catch (error) {
+            return (error as DOMException).name;
+          }
+        }),
+      )
+      .toBe("SecurityError");
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await openCard(page, "live-a");
+    await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-48");
+    const unreadable = (page: Page) =>
+      page.evaluate((shown) => {
+        const snapshot = document.querySelector<HTMLCanvasElement>(
+          `${shown} canvas[data-fluidbox-media-poster="snapshot"]`,
+        );
+        if (!snapshot) return "none";
+        try {
+          snapshot.getContext("2d")!.getImageData(0, 0, 1, 1);
+          return "readable";
+        } catch (error) {
+          return (error as DOMException).name;
+        }
+      }, shown);
+    expect(await unreadable(page)).toBe("SecurityError");
+    await expect(page.locator(`${shown} model-viewer`)).toHaveCount(1);
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await turn(page, slideModel(page), 64);
+    await expect(slideModel(page)).toHaveAttribute("data-orbit", "16");
+    // The close carries a copy of the slide's view, as it starts.
+    const closing = page.evaluate(
+      (shown) =>
+        new Promise<string>((resolve) => {
+          const box = document.querySelector(`${shown} [data-fluidbox-model]`)!;
+          const check = () => {
+            const dialog = document.querySelector("[data-fluidbox-dialog]");
+            if (dialog?.getAttribute("data-fluidbox-status") !== "closing") {
+              requestAnimationFrame(check);
+              return;
+            }
+            const snapshot = box.querySelector('[data-fluidbox-media-poster="snapshot"]');
+            resolve(`${snapshot?.localName} ${getComputedStyle(snapshot!).visibility}`);
+          };
+          check();
+        }),
+      shown,
+    );
+    await page.evaluate(() => void window.liveFixture.fluidbox.close());
+    expect(await closing).toBe("canvas visible");
+    await expect(page.locator(dialog)).toHaveCount(0);
+    await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "16deg 75deg 2m");
+  });
+
+  test("a model-viewer without its canvas flies a PNG of its view, with one warning", async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning" && message.text().includes("reach the canvas")) {
+        warnings.push(message.text());
+      }
+    });
+    await page.addInitScript(() => (window.__modelViewerNoCanvas = true));
     await loadLive(page);
     await turn(page, card(page, "live-a"), -48);
     await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
-    await page.evaluate(() => (window.__modelViewerTainted = true));
+    await openCard(page, "live-a");
+    await expect(page.locator(`${shown} img[data-fluidbox-media-poster="snapshot"]`)).toHaveCount(
+      1,
+    );
+    expect(await snapshotOrbit(page)).toBe(-48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-snapshots", "1");
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await turn(page, slideModel(page), 64);
+    await closeViewer(page);
+    await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "16deg 75deg 2m");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("4.0.0");
+  });
+
+  test("a model-viewer whose canvas isn't marked shown flies a PNG, with no warning", async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning" && message.text().includes("reach the canvas")) {
+        warnings.push(message.text());
+      }
+    });
+    await page.addInitScript(() => (window.__modelViewerUnshown = true));
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await openCard(page, "live-a");
+    await expect(page.locator(`${shown} img[data-fluidbox-media-poster="snapshot"]`)).toHaveCount(
+      1,
+    );
+    expect(await snapshotOrbit(page)).toBe(-48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-snapshots", "1");
+    expect(warnings).toEqual([]);
+  });
+
+  test("a snapshot is the model's own corner of the renderer's canvas, at its content box", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    // Padding outside the box the model draws in, and a fractional width.
+    await card(page, "live-a").evaluate((model) => {
+      model.style.padding = "7px 11px 13px 5px";
+      model.style.width = "150.5px";
+    });
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    const region = await card(page, "live-a").evaluate((model) => {
+      const box = model.getBoundingClientRect();
+      const style = getComputedStyle(model);
+      const width =
+        box.width - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+      const height =
+        box.height - Number.parseFloat(style.paddingTop) - Number.parseFloat(style.paddingBottom);
+      const canvas = model.shadowRoot!.querySelector("canvas")!;
+      return {
+        width: Math.ceil(width * devicePixelRatio),
+        height: Math.ceil(height * devicePixelRatio),
+        larger: canvas.width > Math.ceil(width * devicePixelRatio),
+      };
+    });
+    expect(region.larger).toBe(true);
+    await openCard(page, "live-a");
+    const copy = await page
+      .locator(`${shown} canvas[data-fluidbox-media-poster="snapshot"]`)
+      .evaluate((snapshot: HTMLCanvasElement) => {
+        const [red, green, blue] = snapshot
+          .getContext("2d")!
+          .getImageData(snapshot.width - 1, snapshot.height - 1, 1, 1).data;
+        return { width: snapshot.width, height: snapshot.height, corner: [red, green, blue] };
+      });
+    expect({ width: copy.width, height: copy.height }).toEqual({
+      width: region.width,
+      height: region.height,
+    });
+    // Its bottom-right pixel is the model's, not the magenta beyond it.
+    expect(copy.corner).toEqual([(512 - 48) & 255, (512 - 48) >> 8, 128]);
+  });
+
+  test("a model-viewer without its canvas that can't be read opens and closes on its view, with no snapshot", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.__modelViewerNoCanvas = true;
+      window.__modelViewerThrows = true;
+    });
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
     await openCard(page, "live-a");
     await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-48");
     await expect(page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`)).toHaveCount(0);
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
     await turn(page, slideModel(page), 64);
     await closeViewer(page);
     await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "16deg 75deg 2m");
@@ -1001,10 +1179,12 @@ test.describe("live 3D thumbnail", () => {
     await expect(slideModel(page)).toHaveAttribute("data-camera-orbit", "-48deg 75deg 2m");
     // Unzoomed, the slide keeps its own field of view.
     await expect(slideModel(page)).toHaveAttribute("data-field-of-view", "auto");
-    await expect(page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`)).toHaveAttribute(
-      "src",
-      /#orbit=-48$/,
-    );
+    await expect(
+      page.locator(`${shown} canvas[data-fluidbox-media-poster="snapshot"]`),
+    ).toHaveCount(1);
+    expect(await snapshotOrbit(page)).toBe(-48);
+    // A copy of the card's pixels, with no picture encoded.
+    await expect(card(page, "live-a")).not.toHaveAttribute("data-snapshots", /./);
   });
 
   test("a close turns the card to the view the slide was left at", async ({ page }) => {
@@ -1084,7 +1264,7 @@ test.describe("live 3D thumbnail", () => {
     expect(waited).toBeLessThan(4500);
     await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(0);
     const snapshot = page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`);
-    await expect(snapshot).toHaveAttribute("src", /#orbit=-40$/);
+    expect(await snapshotOrbit(page)).toBe(-40);
     await expect(snapshot).toBeVisible();
     // No poster shows through the snapshot's clear background.
     const posters = page.locator(
