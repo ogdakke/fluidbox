@@ -920,13 +920,21 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       if (!current) {
         // Nothing paints yet, so the full image can stream straight in.
         this.#applyImage(index, slide);
-      } else if (this.#painted(slide.image) && this.#showsFull(slide.image, item)) {
+      } else if (
+        this.#painted(slide.image)
+          ? this.#showsFull(slide.image, item)
+          : !slide.image.complete && this.#showsFull(slide.image, item, slide.image.src)
+      ) {
         // The preview is the full image. Rewriting the same source would make
-        // Safari decode it again and paint nothing in between.
+        // Safari decode it again and paint nothing in between. It may still be
+        // loading: an image in a <picture> never takes a cached source
+        // synchronously (Firefox follows the specification here), and its load
+        // reveals it. Until then its currentSrc is the previous source.
         slide.fullApplied = true;
-        slide.element.removeAttribute("aria-busy");
         slide.image.loading = "eager";
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
+        if (this.#painted(slide.image)) slide.element.removeAttribute("aria-busy");
+        else void this.#revealImage(slide, slide.imageVersion);
       } else {
         const controller = new AbortController();
         // Decode the exact candidate the slide will pick before it swaps, so the
@@ -1095,11 +1103,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /** Whether the image already shows the one candidate the full media resolves to. */
-  #showsFull(image: HTMLImageElement, item: TItem) {
+  #showsFull(image: HTMLImageElement, item: TItem, shown = image.currentSrc || image.src) {
     if (item.type !== "img") return false;
     if (item.sources?.length || item.srcset) return false;
     const base = this.#ownerDocument.baseURI;
-    return new URL(image.currentSrc || image.src, base).href === new URL(item.src, base).href;
+    return new URL(shown, base).href === new URL(item.src, base).href;
   }
 
   #writeSet(
