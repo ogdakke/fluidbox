@@ -223,6 +223,11 @@ const App = defineComponent(() => {
       h(Grid, { items: photos, id: "custom" }),
       h(Fluidbox.Slides, null, { image: () => h(Fluidbox.Image) }),
     ]),
+    h("h2", "A bare loop attribute"),
+    // As `<Fluidbox.Root loop>` compiles.
+    h(Fluidbox.Root, { items: photos, loop: "" as unknown as boolean }, () =>
+      h(Grid, { items: photos, id: "looping" }),
+    ),
     h("h2", "A v-model that cancels swipes"),
     h(Guarded),
     h("h2", "The viewer's parts"),

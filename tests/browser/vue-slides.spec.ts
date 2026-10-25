@@ -250,3 +250,12 @@ test("a move canceled in @value-change never reaches the v-model", async ({ page
   await expect(page.locator(dialog)).toHaveCount(0);
   await expect.poll(model).toBeNull();
 });
+
+test("a bare loop attribute loops the viewer", async ({ page }) => {
+  await load(page);
+  await page.locator('#looping [data-item="two"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(page.locator(`${dialog} [data-fluidbox-next]`)).toBeEnabled();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 1 of 2");
+});

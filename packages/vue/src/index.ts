@@ -600,21 +600,24 @@ const Root = defineComponent(
   },
   {
     name: "FluidboxRoot",
-    props: [
-      "items",
-      "modelValue",
-      "defaultValue",
-      "loop",
-      "href",
-      "labels",
-      "zoom",
-      "findTrigger",
-      "revealTrigger",
-      "preload",
-      "dismiss",
-      "wheel",
-      "shareUrl",
-    ],
+    // Declared without types to keep the item type generic, but `loop`, so a
+    // bare `loop` attribute is true; unset, it stays undefined.
+    props: {
+      items: null,
+      modelValue: null,
+      defaultValue: null,
+      loop: { type: Boolean, default: undefined },
+      href: null,
+      labels: null,
+      zoom: null,
+      findTrigger: null,
+      revealTrigger: null,
+      preload: null,
+      dismiss: null,
+      wheel: null,
+      shareUrl: null,
+      // Typed as the names, which keeps the generic signature's props.
+    } as unknown as (keyof FluidboxRootProps)[],
     emits: ["valueChange", "update:modelValue", "valueChangeComplete", "zoomChange", "mediaError"],
   },
 );
