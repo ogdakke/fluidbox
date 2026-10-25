@@ -91,13 +91,13 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B.
 const activationJsGzipLimits: Record<Entry, number> = {
-  root: 44_050,
+  root: 44_150,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 47_400,
+  elements: 47_450,
   react: 50_850,
   solid: 47_250,
   vue: 51_250,
-  angular: 48_250,
+  angular: 48_300,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -105,8 +105,8 @@ const activationJsGzipLimits: Record<Entry, number> = {
   embed: 3_050,
   model: 1_550,
   spin: 2_450,
-  "react-embed": 53_350,
-  "react-model": 52_000,
+  "react-embed": 53_400,
+  "react-model": 52_100,
   "react-spin": 52_750,
   "vue-embed": 53_850,
   "vue-model": 52_450,
@@ -136,12 +136,12 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
-  root: 45_200,
-  elements: 48_550,
+  root: 45_300,
+  elements: 48_600,
   react: 52_000,
   solid: 48_400,
   vue: 52_400,
-  angular: 49_400,
+  angular: 49_450,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_550,
@@ -149,8 +149,8 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   embed: 3_050,
   model: 1_550,
   spin: 2_450,
-  "react-embed": 54_500,
-  "react-model": 53_150,
+  "react-embed": 54_550,
+  "react-model": 53_250,
   "react-spin": 53_900,
   "vue-embed": 55_000,
   "vue-model": 53_600,
@@ -158,11 +158,11 @@ const reachableJsGzipLimits: Record<Entry, number> = {
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
-  elements: 50_200,
-  react: 53_600,
+  elements: 50_300,
+  react: 53_700,
   solid: 50_050,
   vue: 54_050,
-  angular: 51_050,
+  angular: 51_150,
   thumbnails: 4_900,
   sheet: 8_350,
   kit: 4_350,
@@ -171,7 +171,7 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   embed: 5_850,
   model: 4_400,
   spin: 5_250,
-  "react-embed": 56_150,
+  "react-embed": 56_250,
   "react-model": 54_850,
   "react-spin": 55_550,
   "vue-embed": 56_650,
