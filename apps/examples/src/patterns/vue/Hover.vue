@@ -6,7 +6,7 @@ import { hoverZoom } from "@ogdakke/fluidbox/hover-zoom";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
 import { productPhoto, thumbnailSrc } from "../shared";
 
-// Magnifies the photo inside its own box under a resting mouse.
+// Magnifies the photo inside its own box under a resting mouse. Returns its cleanup.
 const image = useTemplateRef<HTMLImageElement>("image");
 watchEffect((onCleanup) => {
   if (image.value) onCleanup(hoverZoom(image.value, productPhoto));
@@ -15,7 +15,7 @@ watchEffect((onCleanup) => {
 
 <template>
   <Fluidbox.Root :items="[productPhoto]">
-    <Fluidbox.Trigger :item="productPhoto" class="pattern-product" data-test="product">
+    <Fluidbox.Trigger :value="productPhoto.id" class="pattern-product" data-test="product">
       <img
         ref="image"
         :src="thumbnailSrc(productPhoto)"
