@@ -14,6 +14,7 @@ declare global {
     __modelViewerDelay?: number;
     __modelViewerTainted?: boolean;
     __modelViewerNoCanvas?: boolean;
+    __modelViewerUnshown?: boolean;
     __oldCard?: HTMLElement;
   }
 }
@@ -1024,7 +1025,7 @@ test.describe("live 3D thumbnail", () => {
   }) => {
     const warnings: string[] = [];
     page.on("console", (message) => {
-      if (message.type() === "warning" && message.text().includes("no canvas")) {
+      if (message.type() === "warning" && message.text().includes("reach the canvas")) {
         warnings.push(message.text());
       }
     });
@@ -1044,6 +1045,28 @@ test.describe("live 3D thumbnail", () => {
     await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "16deg 75deg 2m");
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("4.0.0");
+  });
+
+  test("a model-viewer whose canvas isn't marked shown flies a PNG, with no warning", async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning" && message.text().includes("reach the canvas")) {
+        warnings.push(message.text());
+      }
+    });
+    await page.addInitScript(() => (window.__modelViewerUnshown = true));
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await openCard(page, "live-a");
+    await expect(page.locator(`${shown} img[data-fluidbox-media-poster="snapshot"]`)).toHaveCount(
+      1,
+    );
+    expect(await snapshotOrbit(page)).toBe(-48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-snapshots", "1");
+    expect(warnings).toEqual([]);
   });
 
   test("a slide that leaves drops its snapshot, so it comes back on its own view", async ({

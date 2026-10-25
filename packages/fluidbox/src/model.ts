@@ -184,13 +184,14 @@ let warnedCanvas = false;
 function shownCanvas(model: ModelViewerElement) {
   const root = model.shadowRoot;
   const canvas = root?.querySelector<HTMLCanvasElement>("canvas.show");
-  if (canvas || root?.querySelector("canvas")) return canvas ?? null;
-  // Development builds only; a page without a bundler has no process.
+  if (canvas) return canvas;
+  // Development builds only; a page without a bundler has no process. A
+  // canvas not yet marked has drawn nothing, and warns of nothing.
   try {
-    if (process.env.NODE_ENV !== "production" && !warnedCanvas) {
+    if (process.env.NODE_ENV !== "production" && !warnedCanvas && !root?.querySelector("canvas")) {
       warnedCanvas = true;
       console.warn(
-        "Fluidbox found no canvas in this <model-viewer>'s shadow root, so its snapshots encode a PNG, which is slower. Fluidbox is checked against <model-viewer> 4.0.0:",
+        "Fluidbox can't reach the canvas this <model-viewer> draws to, so its snapshots encode a PNG, which is slower. Fluidbox is checked against <model-viewer> 4.0.0:",
         model,
       );
     }

@@ -53,11 +53,12 @@ class FakeModelViewer extends HTMLElement {
     this.ownFieldOfView = "auto";
     // \`window.__modelViewerNoInput\` stands in for a version whose focus target
     // is named otherwise, and \`window.__modelViewerNoCanvas\` for one that draws
-    // somewhere else. The canvas shows the orbit in its first pixel's red and green.
+    // somewhere else; \`window.__modelViewerUnshown\` leaves its canvas unmarked, as
+    // before 4.0.0 has drawn. The canvas shows the orbit in its first pixel's red and green.
     this.attachShadow({ mode: "open", delegatesFocus: true }).innerHTML =
       '<div class="' + (window.__modelViewerNoInput ? "input" : "userInput") +
       '" tabindex="0" role="img" aria-label="3D model" style="width:100%;height:100%">' +
-      (window.__modelViewerNoCanvas ? "" : '<canvas class="show" width="16" height="16" style="display:block;width:100%;height:100%"></canvas>') +
+      (window.__modelViewerNoCanvas ? "" : '<canvas class="' + (window.__modelViewerUnshown ? "" : "show") + '" width="16" height="16" style="display:block;width:100%;height:100%"></canvas>') +
       "</div>";
     this.canvas = this.shadowRoot.querySelector("canvas");
     // \`window.__modelViewerTainted\` stands in for a model with textures from another origin.
