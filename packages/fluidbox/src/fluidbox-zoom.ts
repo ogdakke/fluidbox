@@ -303,7 +303,13 @@ export class FluidboxZoom {
   }
 
   #startMousePan = (event: PointerEvent) => {
-    if (event.pointerType !== "mouse" || event.button !== 0 || !event.isPrimary || !this.#viewport)
+    if (
+      event.pointerType !== "mouse" ||
+      event.button !== 0 ||
+      !event.isPrimary ||
+      !this.#viewport ||
+      ownsInput(event)
+    )
       return;
     event.preventDefault();
     const target = event.target as HTMLElement;

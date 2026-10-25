@@ -48,6 +48,7 @@ export interface ViewerZoomPose {
 }
 import { sharperCandidate, srcsetCandidates } from "./srcset";
 import type * as ZoomPosing from "./zoom-pose";
+import type { FluidboxHotspotOptions } from "./public-api";
 
 /** A `<video>` as a playback source: nothing until it knows its duration. */
 const videoPlayback = (video: HTMLVideoElement) => () =>
@@ -171,10 +172,17 @@ interface ViewerSlide {
   release?: () => void;
   /** The renderer's `waitUntil` promises, each until it settles. */
   waits?: Set<Promise<void>>;
+  /** The hotspot layer in the box, made when the renderer first adds a hotspot. */
+  hotspots?: {
+    readonly element: HTMLElement;
+    place(button: HTMLElement, options: FluidboxHotspotOptions): void;
+  };
 }
 
 /** Where a binding finds the hold on a slide's commit: shared across chunks by its key. */
 const holdCommit = Symbol.for("fluidbox.holdCommit");
+/** Where a binding finds a slide's hotspot layer, to place hotspots it renders itself. */
+const hotspotsKey = Symbol.for("fluidbox.hotspots");
 
 /** Settles once a video can show a frame, or its poster has decoded. */
 function videoFrame(video: HTMLVideoElement) {
@@ -1497,7 +1505,25 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const origin = this.#originMedia?.index === itemIndex() ? this.#originMedia : undefined;
     if (origin) slide.originPlayback = slideOrigin(origin.video, origin.model);
     const closeListeners = (slide.closeListeners = new Set());
-    const context: FluidboxSlide<any> & { [holdCommit]?: () => () => void } = {
+    // The layer's code loads the first time a slide adds a hotspot. The layer
+    // joins the box once it has, so nothing shows before it is laid out.
+    const hotspots = () => {
+      if (!slide.hotspots) {
+        const element = this.#ownerDocument.createElement("div");
+        const placing = import("./hotspots").then(({ hotspotLayer }) =>
+          hotspotLayer(element, slide.media, () => item, signal),
+        );
+        slide.hotspots = {
+          element,
+          place: (button, options) => void placing.then((place) => place(button, options)),
+        };
+      }
+      return slide.hotspots;
+    };
+    const context: FluidboxSlide<any> & {
+      [holdCommit]?: () => () => void;
+      [hotspotsKey]?: typeof hotspots;
+    } = {
       item,
       get index() {
         return itemIndex();
@@ -1581,6 +1607,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
           options && { ...options, slide: context },
         ),
       drawIframe: (iframe?: FluidboxItem) => this.#draw(slide, signal, "iframe", iframe ?? item),
+      hotspot: (options) => {
+        const button = this.#ownerDocument.createElement("button");
+        button.type = "button";
+        hotspots().place(button, options);
+        return button;
+      },
+      [hotspotsKey]: hotspots,
     };
     try {
       slide.dispose = renderer(context) ?? undefined;
@@ -1699,6 +1732,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.activity = undefined;
       slide.zoomListeners = undefined;
       slide.closeListeners = undefined;
+      slide.hotspots = undefined;
       // An open waiting for the slide goes on without it.
       slide.release?.();
       slide.release = undefined;

@@ -47,6 +47,8 @@ export type {
   FluidboxSlideRenderer,
   FluidboxSlides,
   FluidboxZoomableOptions,
+  FluidboxHotspotCoordinate,
+  FluidboxHotspotOptions,
   FluidboxZoomPose,
   FluidboxState,
   FluidboxStatus,

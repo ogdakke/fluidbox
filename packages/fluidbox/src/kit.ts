@@ -7,7 +7,13 @@ import { idOf, indexIn, itemLabel, targetKey, targetKeys } from "./items";
 import { defaultLabels, resolveLabels } from "./labels";
 import { fluidboxEventTypes } from "./events";
 import { crossOrigin, downloadName, fileOf } from "./item-file";
-import type { Fluidbox, FluidboxItem, FluidboxRenderer, FluidboxSlide } from "./public-api";
+import type {
+  Fluidbox,
+  FluidboxHotspotOptions,
+  FluidboxItem,
+  FluidboxRenderer,
+  FluidboxSlide,
+} from "./public-api";
 
 export {
   controlNames,
@@ -53,6 +59,25 @@ export function holdSlideCommit(slide: FluidboxSlide<any>): () => void {
     Symbol.for("fluidbox.holdCommit")
   ];
   return hold ? hold() : () => {};
+}
+
+/** A slide's hotspot layer, and how to put a hotspot a binding renders on its point. */
+export interface FluidboxHotspots {
+  /** The layer: render hotspots into it, as a portal. */
+  readonly element: HTMLElement;
+  /** Put `button` on its point and keep it there; it joins the layer if it isn't in it. */
+  place(this: void, button: HTMLElement, options: FluidboxHotspotOptions): void;
+}
+
+/**
+ * The hotspot layer of a slide, made on first use. Null outside a slide's
+ * renderer, as on the server.
+ */
+export function slideHotspots(slide: FluidboxSlide<any>): FluidboxHotspots | null {
+  const layer = (slide as unknown as { [key: symbol]: (() => FluidboxHotspots) | undefined })[
+    Symbol.for("fluidbox.hotspots")
+  ];
+  return layer ? layer() : null;
 }
 
 /**

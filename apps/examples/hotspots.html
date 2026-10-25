@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fluidbox hotspots</title>
+    <script type="module" src="/fixtures/hotspots.ts"></script>
+  </head>
+  <body>
+    <main class="lab-page">
+      <h1>Hotspots on a product photo</h1>
+      <p>
+        Open a photo, then zoom: the pins stay on the frame, the books and the plant, and keep their
+        size. Tab to a pin while zoomed and the photo pans to it.
+      </p>
+      <h2>In a box of the photo's own shape</h2>
+      <div class="media-grid" id="room" aria-label="Room gallery"></div>
+      <h2>Letterboxed: a wide box, the photo contained in it</h2>
+      <div class="media-grid" id="wide" aria-label="Wide gallery"></div>
+      <h2>In a box that fills the stage</h2>
+      <div class="media-grid" id="filled" aria-label="Filled gallery"></div>
+      <h2>Pins that grow with the zoom</h2>
+      <div class="media-grid" id="growing" aria-label="Growing gallery"></div>
+    </main>
+  </body>
+</html>

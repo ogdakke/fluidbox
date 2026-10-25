@@ -29,10 +29,11 @@ const isAddon = (chunk: { facadeModuleId?: string | null } | undefined) =>
 
 /**
  * A chunk the viewer loads on a rarely used feature's first use: fullscreen,
- * download and share, or a slide's zoom pose.
+ * download and share, a slide's zoom pose, or its hotspots.
  */
 const isOnDemand = (chunk: { facadeModuleId?: string | null } | undefined) =>
-  !!chunk?.facadeModuleId && /[/\\](viewer-actions|zoom-pose)\.[jt]s$/.test(chunk.facadeModuleId);
+  !!chunk?.facadeModuleId &&
+  /[/\\](viewer-actions|zoom-pose|hotspots)\.[jt]s$/.test(chunk.facadeModuleId);
 
 /**
  * Build `tests/bundle/<name>.ts` as a consumer would and walk its chunk graph. Initial is what

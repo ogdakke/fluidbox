@@ -7,7 +7,7 @@ const none = (): never => {
 /**
  * The slide a plain-JS add-on draws into, from a framework slide's context:
  * an element of the component's own is its box. It doesn't zoom, holds no
- * open, and has no built-in media to draw.
+ * open, and has no built-in media to draw or hotspots to place.
  */
 export function addonSlide<TItem extends FluidboxItem>(
   context: {
@@ -43,5 +43,6 @@ export function addonSlide<TItem extends FluidboxItem>(
     drawImage: none,
     drawVideo: none,
     drawIframe: none,
+    hotspot: none,
   };
 }

@@ -85,6 +85,18 @@ export const parts: readonly CssName[] = [
    * stays put while the media flies and zooms, and hides with the controls.
    */
   { names: ["data-fluidbox-slide-layer"] },
+  /**
+   * A slide's hotspot layer, inside the media box over the painted image or
+   * video. It zooms with the box, hides during the flights and fades in with
+   * the controls.
+   */
+  { names: ["data-fluidbox-hotspots"] },
+  /**
+   * A hotspot, `slide.hotspot()`'s button or a binding's `Hotspot`: centred on
+   * its point by `translate`, and kept at its screen size by `scale` unless
+   * `data-scale-with-zoom`.
+   */
+  { names: ["data-fluidbox-hotspot", "data-scale-with-zoom"] },
   /** A framework binding's wrapper inside custom content, with `display: contents`. */
   { names: ["data-fluidbox-mount"] },
   /** The item's `placeholder` image. */
@@ -313,6 +325,8 @@ export const internal: readonly string[] = [
   "--fluidbox-thumbnails-hide",
   "--fluidbox-flight-height",
   "--fluidbox-glyph",
+  "--fluidbox-hotspots-height",
+  "--fluidbox-hotspots-width",
   "--fluidbox-flight-item-height",
   "--fluidbox-flight-left",
   "--fluidbox-flight-top",

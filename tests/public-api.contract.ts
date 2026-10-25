@@ -265,6 +265,11 @@ createFluidbox<Photo | ContractNoteItem>({
       const media: HTMLElement = slide.media;
       void media;
       const undraw: () => void = slide.drawImage(photo);
+      // A hotspot is a button on a point of the painted media: a percentage or pixels.
+      const pin: HTMLButtonElement = slide.hotspot({ x: "42%", y: 412, scaleWithZoom: true });
+      pin.ariaLabel = "Lens";
+      // @ts-expect-error a coordinate is a percentage or a number of pixels
+      slide.hotspot({ x: "42px", y: 0 });
       return undraw;
     },
     // Listing a built-in type replaces its slide; it can still draw the built-in image.

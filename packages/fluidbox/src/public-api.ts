@@ -383,6 +383,30 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   drawVideo(this: void, item?: FluidboxVideoItem, options?: FluidboxVideoOptions): () => void;
   /** Draw the built-in iframe into `media`, as `drawImage` does the image. */
   drawIframe(this: void, item?: FluidboxIframeItem): () => void;
+  /**
+   * Add a hotspot: a `<button>` on a point of the media, for you to fill and
+   * name. It sits on the painted image or video, `object-fit` and all, zooms
+   * with the box and keeps its screen size, hides during the flights, and
+   * focusing it pans a zoomed box to it. Remove it to take it out; the runtime
+   * empties the box after your disposer runs.
+   */
+  hotspot(this: void, options: FluidboxHotspotOptions): HTMLButtonElement;
+}
+
+/**
+ * A hotspot's point: a percentage of the painted media, or its pixels as the
+ * image or video's `width` and `height` count them (the slide item's when it
+ * draws none).
+ */
+export type FluidboxHotspotCoordinate = `${number}%` | number;
+
+export interface FluidboxHotspotOptions {
+  /** Across the painted media: `"42%"`, or pixels counted on its `width`. */
+  readonly x: FluidboxHotspotCoordinate;
+  /** Down the painted media: `"30%"`, or pixels counted on its `height`. */
+  readonly y: FluidboxHotspotCoordinate;
+  /** Grow with the zoom instead of keeping its screen size. @default false */
+  readonly scaleWithZoom?: boolean;
 }
 
 /** Where a zoomable box's zoom is. */

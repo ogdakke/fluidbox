@@ -1,0 +1,15 @@
+/* A pin: a small ring with a dot, as a product page would draw one. */
+.hotspot-pin {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fb-accent, #2563eb) 85%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+  cursor: pointer;
+}
+.hotspot-pin:focus-visible {
+  outline: 3px solid var(--fb-accent, #2563eb);
+  outline-offset: 3px;
+}
