@@ -19,7 +19,15 @@ defineMarkup("img[data-spin-frames]", (image, { id, title, thumbnail, caption })
   const width = Number(image.getAttribute("width"));
   const height = Number(image.getAttribute("height"));
   if (!width || !height) {
-    throw new TypeError(`The spin of item ${id} needs width and height attributes.`);
+    throw new TypeError(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `The spin of item ${id} needs width and height attributes.`;
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   }
   return spinItem({
     id,

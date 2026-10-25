@@ -266,7 +266,7 @@ for (const name of entrypoints) {
     activationWithCss.gzipBytes > activationWithCssGzipLimits[name] &&
       `activation with CSS gzip budget exceeded (${activationWithCssGzipLimits[name]} B)`,
     !name.startsWith("elements") && registersFluidbox && "custom elements loaded eagerly",
-    name === "elements" && !registersFluidbox && "custom element registration missing",
+    name.startsWith("elements") && !registersFluidbox && "custom element registration missing",
     carriesExtension && "sheet extension bundled into a core entry",
     ...Object.entries(addonMarkers)
       .filter(
