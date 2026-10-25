@@ -232,9 +232,13 @@ function useFluidboxContext(): FluidboxContextValue {
   const value = useContext(FluidboxContext);
   if (!value)
     throw new Error(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : "Fluidbox parts must be rendered inside <Fluidbox.Root>.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "Fluidbox parts must be rendered inside <Fluidbox.Root>.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   return value;
 }
@@ -243,9 +247,13 @@ function useSlideContext(part: string): SlideContextValue {
   const value = useContext(SlideContext);
   if (!value)
     throw new Error(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : `<Fluidbox.${part}> must be inside a slide, in <Fluidbox.Slides>.`,
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `<Fluidbox.${part}> must be inside a slide, in <Fluidbox.Slides>.`;
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   return value;
 }
@@ -672,9 +680,13 @@ function Trigger<TItem extends FluidboxItem>({
   const context = useFluidboxContext();
   if (value === null || value === undefined) {
     throw new Error(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : "<Fluidbox.Trigger> needs a value: an item, its id or its index, or a list.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "<Fluidbox.Trigger> needs a value: an item, its id or its index, or a list.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   }
   // Its first opens; every one closes back onto it. Compared by value.
@@ -710,9 +722,13 @@ function Trigger<TItem extends FluidboxItem>({
   const only = asChild ? Children.only(rendered) : null;
   if (asChild && !isValidElement(only)) {
     throw new Error(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : "<Fluidbox.Trigger asChild> needs one element child.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "<Fluidbox.Trigger asChild> needs one element child.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   }
   const child = isValidElement(only) ? only : null;
@@ -788,9 +804,14 @@ function Slides<TItem extends FluidboxItem>(props: FluidboxSlidesProps<TItem>): 
   // Every render, so the slides on show render the newest content.
   useIsomorphicLayoutEffect(() => slides.set(props as SlideContents));
   useIsomorphicLayoutEffect(() => {
-    if (process.env.NODE_ENV !== "production" && claimed.has(slides)) {
-      throw new Error("A <Fluidbox.Root> takes one <Fluidbox.Slides>.");
-    }
+    // Development builds only; a page without a bundler has no process.
+    const twice = (() => {
+      try {
+        if (process.env.NODE_ENV !== "production") return claimed.has(slides);
+      } catch {}
+      return false;
+    })();
+    if (twice) throw new Error("A <Fluidbox.Root> takes one <Fluidbox.Slides>.");
     claimed.add(slides);
     return () => {
       claimed.delete(slides);
@@ -1449,9 +1470,13 @@ const Overlay = forwardRef<HTMLSpanElement, FluidboxOverlayProps>(function Overl
   const travelling = useContext(TravelContext);
   if (!keys && !travelling) {
     throw new Error(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : "<Fluidbox.Overlay> must be inside a <Fluidbox.Trigger>.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "<Fluidbox.Overlay> must be inside a <Fluidbox.Trigger>.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   }
   const latestChildren = useLatest(children);

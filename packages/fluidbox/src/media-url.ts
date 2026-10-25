@@ -32,9 +32,13 @@ export function checkItemUrls(item: FluidboxItem): void {
   for (const [name, url] of urls) {
     if (typeof url === "string" && !isSafeMediaUrl(url, item.type)) {
       throw new TypeError(
-        process.env.NODE_ENV === "production"
-          ? "fluidbox"
-          : `The ${name} of fluidbox ${item.type} item ${item.id ?? ""} is not http(s) or relative: ${url}`,
+        (() => {
+          try {
+            if (process.env.NODE_ENV !== "production")
+              return `The ${name} of fluidbox ${item.type} item ${item.id ?? ""} is not http(s) or relative: ${url}`;
+          } catch {}
+          return "fluidbox";
+        })(),
       );
     }
   }

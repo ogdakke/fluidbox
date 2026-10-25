@@ -29,9 +29,12 @@ export function createFluidboxSync(fluidbox: Fluidbox<any>) {
         }
       }
       if (index === null || index < 0) {
-        if (process.env.NODE_ENV !== "production") {
-          console.warn(`Fluidbox value names no item: ${value}. It counts as null.`);
-        }
+        // Development builds only; a page without a bundler has no process.
+        try {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(`Fluidbox value names no item: ${value}. It counts as null.`);
+          }
+        } catch {}
         index = null;
       }
     }

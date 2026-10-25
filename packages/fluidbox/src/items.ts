@@ -22,7 +22,12 @@ export function idOf(item: FluidboxItem): string {
   const id = item.id ?? derivedIds.get(item) ?? ("src" in item ? item.src : undefined);
   if (typeof id !== "string" || !id.trim())
     throw new TypeError(
-      process.env.NODE_ENV === "production" ? "fluidbox" : "A fluidbox item needs an id or a src.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production") return "A fluidbox item needs an id or a src.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   return id;
 }
@@ -82,9 +87,13 @@ export function targetKeys(value: FluidboxTarget | readonly FluidboxTarget[]): (
     : [value as FluidboxTarget];
   if (!targets.length)
     throw new TypeError(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : "A fluidbox trigger needs at least one item.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "A fluidbox trigger needs at least one item.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   return [...new Set(targets.map(targetKey))];
 }
@@ -92,9 +101,13 @@ export function targetKeys(value: FluidboxTarget | readonly FluidboxTarget[]): (
 function checkCount(count: number) {
   if (!Number.isInteger(count) || count < 0) {
     throw new RangeError(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : "A fluidbox item list's count must be a non-negative integer.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "A fluidbox item list's count must be a non-negative integer.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   }
 }
@@ -102,9 +115,13 @@ function checkCount(count: number) {
 function checkIndex(index: number, count: number) {
   if (!Number.isInteger(index) || index < 0 || index >= count) {
     throw new RangeError(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : `Fluidbox item index is out of range: ${index}`,
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `Fluidbox item index is out of range: ${index}`;
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   }
 }
@@ -191,9 +208,13 @@ function checkItem(item: FluidboxItem) {
   const { width, height } = item;
   if (!(width! > 0 && height! > 0)) {
     throw new TypeError(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : `Fluidbox item ${idOf(item)} needs a positive width and height, or fit: "fill".`,
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `Fluidbox item ${idOf(item)} needs a positive width and height, or fit: "fill".`;
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   }
 }
@@ -219,7 +240,12 @@ export function toList<TItem extends FluidboxItem>(
     const id = idOf(item);
     if (indices.has(id))
       throw new TypeError(
-        process.env.NODE_ENV === "production" ? "fluidbox" : `Duplicate fluidbox item id: ${id}`,
+        (() => {
+          try {
+            if (process.env.NODE_ENV !== "production") return `Duplicate fluidbox item id: ${id}`;
+          } catch {}
+          return "fluidbox";
+        })(),
       );
     indices.set(id, index);
   }

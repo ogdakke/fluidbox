@@ -41,9 +41,13 @@ export function hostOf(fluidbox: Fluidbox<any>): FluidboxHost {
   const host = (fluidbox as unknown as { [hostKey]?: FluidboxHost })[hostKey];
   if (!host)
     throw new TypeError(
-      process.env.NODE_ENV === "production"
-        ? "fluidbox"
-        : "Expected a fluidbox from createFluidbox.",
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "Expected a fluidbox from createFluidbox.";
+        } catch {}
+        return "fluidbox";
+      })(),
     );
   return host;
 }

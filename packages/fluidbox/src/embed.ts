@@ -359,9 +359,12 @@ export function createEmbedSlide(
   return ({ item, media: target, signal, onActiveChange, fail }) => {
     const provider = providers.get(item.provider);
     if (!provider) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn(`The embed slide has no provider named ${item.provider}, for ${item.id}.`);
-      }
+      // Development builds only; a page without a bundler has no process.
+      try {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(`The embed slide has no provider named ${item.provider}, for ${item.id}.`);
+        }
+      } catch {}
       fail(new TypeError(`No embed provider named ${item.provider}`));
       return;
     }

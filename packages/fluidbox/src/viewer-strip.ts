@@ -877,12 +877,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const capped = new Promise<false>((resolve) => (timer = setTimeout(resolve, cap, false)));
     const done = await Promise.race([ready.then(() => true), capped]);
     clearTimeout(timer);
-    if (!done && process.env.NODE_ENV !== "production" && slide.content === content) {
-      const waiting = committed ? [...pending.values()] : ["the slide's content to commit"];
-      console.warn(
-        `Fluidbox opened ${itemLabel(this.#source.getItem(index))} after ${cap} ms without its slide ready, still waiting for ${waiting.join(", ")}.`,
-      );
-    }
+    // Development builds only; a page without a bundler has no process.
+    try {
+      if (process.env.NODE_ENV !== "production" && !done && slide.content === content) {
+        const waiting = committed ? [...pending.values()] : ["the slide's content to commit"];
+        console.warn(
+          `Fluidbox opened ${itemLabel(this.#source.getItem(index))} after ${cap} ms without its slide ready, still waiting for ${waiting.join(", ")}.`,
+        );
+      }
+    } catch {}
   }
 
   /** The images and videos in a slide's box that must paint, but not the built-in media it drew. */
@@ -1416,12 +1419,15 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#renderers[item.type] ?? (builtIn(item.type) ? undefined : this.#renderers.default);
     slide.rendered = true;
     if (!renderer) {
-      if (process.env.NODE_ENV !== "production" && !unknownTypes.has(item.type)) {
-        unknownTypes.add(item.type);
-        console.warn(
-          `Fluidbox has no slide for items of type "${item.type}". Add one to the slides option.`,
-        );
-      }
+      // Development builds only; a page without a bundler has no process.
+      try {
+        if (process.env.NODE_ENV !== "production" && !unknownTypes.has(item.type)) {
+          unknownTypes.add(item.type);
+          console.warn(
+            `Fluidbox has no slide for items of type "${item.type}". Add one to the slides option.`,
+          );
+        }
+      } catch {}
       this.#fail(slide, "custom", new TypeError(`Fluidbox has no slide for "${item.type}" items.`));
       return;
     }
@@ -1483,11 +1489,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       },
       waitUntil: (promise: Promise<unknown>) => {
         if (signal.aborted) return;
-        if (process.env.NODE_ENV !== "production" && opening()?.flying) {
-          console.warn(
-            "Fluidbox got slide.waitUntil() after the opening flight started, so it doesn't delay it. Call it before the slide commits.",
-          );
-        }
+        // Development builds only; a page without a bundler has no process.
+        try {
+          if (process.env.NODE_ENV !== "production" && opening()?.flying) {
+            console.warn(
+              "Fluidbox got slide.waitUntil() after the opening flight started, so it doesn't delay it. Call it before the slide commits.",
+            );
+          }
+        } catch {}
         const settled = Promise.resolve(promise).then(
           () => {},
           () => {},
