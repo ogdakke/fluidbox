@@ -12,6 +12,7 @@ declare global {
     };
     liveFixture: { fluidbox: Fluidbox; unbind: Record<string, () => void> };
     __modelViewerDelay?: number;
+    __modelViewerTainted?: boolean;
     __oldCard?: HTMLElement;
   }
 }
@@ -940,6 +941,34 @@ test.describe("live 3D thumbnail", () => {
     expect(old).toEqual({ orbit: null, snapshots: null });
   });
 
+  test("a card that can't be read opens on its view without a snapshot", async ({ page }) => {
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await page.evaluate(() => (window.__modelViewerTainted = true));
+    await openCard(page, "live-a");
+    await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-48");
+    await expect(page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`)).toHaveCount(0);
+    await turn(page, slideModel(page), 64);
+    await closeViewer(page);
+    await expect(card(page, "live-a")).toHaveAttribute("data-camera-orbit", "16deg 75deg 2m");
+  });
+
+  test("a slide that leaves drops its snapshot, so it comes back on its own view", async ({
+    page,
+  }) => {
+    await loadLive(page);
+    await turn(page, card(page, "live-a"), -48);
+    await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-48");
+    await openCard(page, "live-a");
+    await expect(page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`)).toHaveCount(1);
+    await page.evaluate(() => window.liveFixture.fluidbox.next());
+    await expect(page.locator(`${shown} model-viewer[src$="copy=b"]`)).toHaveCount(1);
+    await page.evaluate(() => window.liveFixture.fluidbox.previous());
+    await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+    await expect(page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`)).toHaveCount(0);
+  });
+
   test("a model-viewer without .userInput keeps its focus and its name, with one warning", async ({
     page,
   }) => {
@@ -1057,6 +1086,16 @@ test.describe("live 3D thumbnail", () => {
     const snapshot = page.locator(`${shown} [data-fluidbox-media-poster="snapshot"]`);
     await expect(snapshot).toHaveAttribute("src", /#orbit=-40$/);
     await expect(snapshot).toBeVisible();
+    // No poster shows through the snapshot's clear background.
+    const posters = page.locator(
+      `${shown} [data-fluidbox-media-poster]:not([data-fluidbox-media-poster="snapshot"])`,
+    );
+    expect(await posters.count()).toBeGreaterThan(0);
+    expect(
+      await posters.evaluateAll((images) =>
+        images.map((image) => getComputedStyle(image).visibility),
+      ),
+    ).not.toContain("visible");
     await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1, {
       timeout: 4000,
     });

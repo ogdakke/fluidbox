@@ -218,6 +218,8 @@ function applyView(model: ModelViewerElement, view: ModelView) {
 function snapshot(model: ModelViewerElement) {
   if (!model.loaded || !model.toDataURL) return null;
   try {
+    // PNG: the canvas is clear around the model, which JPEG loses, and WebP
+    // encoded slower than PNG where it was measured (a phone viewport in Chromium).
     return model.toDataURL();
   } catch {
     return null;
@@ -259,6 +261,11 @@ const modelStyles = `
 :where([data-fluidbox-flight], [data-fluidbox-status="closing"])
   :where([data-fluidbox-model])
   > model-viewer {
+  visibility: hidden;
+}
+/* A snapshot shows the view whole, with no poster through its clear background. */
+:where([data-fluidbox-model]:has(> [data-fluidbox-media-poster="snapshot"]))
+  > [data-fluidbox-media-poster]:not([data-fluidbox-media-poster="snapshot"]) {
   visibility: hidden;
 }
 `;
@@ -401,6 +408,8 @@ export function createModelSlide(
       model?.pause?.();
       model?.remove();
       model = undefined;
+      // A snapshot is of one view; the slide's next show starts from its own.
+      box.querySelector('[data-fluidbox-media-poster="snapshot"]')?.remove();
       delete box.dataset.fluidboxModelReady;
       delete box.dataset.fluidboxModelError;
     };
