@@ -455,7 +455,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * Show new items. A slide whose item is unchanged stays, loaded, wherever its
    * item moved to, so swapping a product's variant keeps the photos it shares.
    */
-  setSource(source: FluidboxSource<TItem>) {
+  setSource(source: FluidboxSource<TItem>, loop = this.#loop) {
     this.#resolveSelection();
     this.#focusable(source.count);
     this.#unfence();
@@ -463,7 +463,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const index = this.index;
     const shown = previous.count ? idOf(previous.getItem(index)) : null;
     const recycled = new Map<string, { item: TItem; slide: ViewerSlide }[]>();
-    for (const [position, slide] of this.#slides) {
+    // Nearest first, so an item a loop repeats keeps the slide on show, and the ones beside it.
+    const slides = [...this.#slides].sort(
+      ([a], [b]) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
+    );
+    for (const [position, slide] of slides) {
       const at = this.#item(position);
       const item = previous.getItem(at);
       const id = idOf(item);
@@ -478,6 +482,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     this.#slides.clear();
     this.#source = source;
+    this.#loop = loop;
     // The strip stays on the item it shows, wherever that went.
     this.#index =
       (shown === null ? null : source.getIndex(shown)) ??
@@ -508,19 +513,12 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return slide;
   }
 
-  /** Go round, or stop at the ends. The slides are made again around the item on show. */
+  /**
+   * Go round, or stop at the ends. Every slide stays, loaded, with its item;
+   * only the slides past the ends come or go.
+   */
   setLoop(loop: boolean) {
-    if (loop === this.#loop) return;
-    const index = this.index;
-    // Positions mean something else now, so no slide carries over.
-    for (const slide of this.#slides.values()) {
-      this.#unload(slide);
-      slide.element.remove();
-    }
-    this.#slides.clear();
-    this.#loop = loop;
-    this.#index = index;
-    this.setSource(this.#source);
+    if (loop !== this.#loop) this.setSource(this.#source, loop);
   }
 
   mount() {
@@ -1107,17 +1105,32 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.element.remove();
       this.#slides.delete(index);
     }
-    let insertionPoint = this.element.firstChild;
-    for (let index = base; index < base + size; index++) {
+    const elements: HTMLElement[] = [];
+    // Nearest the slide on show first, so it and the ones beside it keep their
+    // slides where a loop repeats an item.
+    const positions = Array.from({ length: size }, (_, at) => base + at).sort(
+      (a, b) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
+    );
+    for (const index of positions) {
       let slide = this.#slides.get(index);
       if (!slide) {
         slide = this.#recycle(index) ?? this.#makeSlide(index);
         this.#slides.set(index, slide);
       }
-      // Only a slide out of place moves: moving an embed reloads it.
-      if (slide.element !== insertionPoint)
-        this.element.insertBefore(slide.element, insertionPoint);
-      insertionPoint = slide.element.nextSibling;
+      elements[index - base] = slide.element;
+    }
+    // Only a slide out of place moves, as moving an embed reloads it, and
+    // the one on show never does: the others take their places around it.
+    const fixed = Math.max(0, Math.min(size - 1, this.#index - base));
+    if (elements[fixed]!.parentNode !== this.element) this.element.append(elements[fixed]!);
+    for (let at = fixed - 1; at >= 0; at--) {
+      if (elements[at]!.nextSibling !== elements[at + 1]) {
+        this.element.insertBefore(elements[at]!, elements[at + 1]!);
+      }
+    }
+    for (let at = fixed + 1; at < size; at++) {
+      if (elements[at]!.previousSibling !== elements[at - 1])
+        elements[at - 1]!.after(elements[at]!);
     }
     this.#rebasing = true;
     this.#base = base;
