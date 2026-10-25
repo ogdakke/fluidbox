@@ -3,7 +3,6 @@
  * slide templates, expanded into what the bindings' parts render. They are not
  * custom elements, so they cost no registration.
  */
-import { allControlNames, controlNames, fluidboxControls, zoomControlNames } from "./controls";
 import type { FluidboxLabels } from "./labels";
 import type {
   Fluidbox,
@@ -13,7 +12,6 @@ import type {
   FluidboxSlide,
   FluidboxSlideRenderer,
 } from "./public-api";
-import { controlButton, controlSelector } from "./viewer-layer";
 
 export interface FluidboxPartsContext {
   readonly fluidbox: Fluidbox<any>;
@@ -25,6 +23,27 @@ export interface FluidboxPartsContext {
   readonly slide?: FluidboxSlide<any>;
 }
 
+/**
+ * Each control's attribute. The viewer's wiring gives a control its command,
+ * state and name, so the parts draw only the element, and stay out of the
+ * gallery's first chunk.
+ */
+const CONTROLS: Readonly<Record<FluidboxControlName, string>> = {
+  previous: "data-fluidbox-previous",
+  next: "data-fluidbox-next",
+  close: "data-fluidbox-close",
+  zoomIn: "data-fluidbox-zoom-in",
+  zoomOut: "data-fluidbox-zoom-out",
+  zoomReset: "data-fluidbox-zoom-reset",
+  counter: "data-fluidbox-counter",
+  fullscreen: "data-fluidbox-fullscreen",
+  download: "data-fluidbox-download",
+  share: "data-fluidbox-share",
+  retry: "data-fluidbox-retry",
+};
+const NAMES = Object.keys(CONTROLS) as FluidboxControlName[];
+const CONTROL_SELECTOR = NAMES.map((name) => `[${CONTROLS[name]}]`).join();
+
 /** Controls that stand as elements of their own, as `<fluidbox-share>`. */
 const ELEMENT_CONTROLS: Readonly<Record<string, FluidboxControlName>> = {
   "FLUIDBOX-FULLSCREEN": "fullscreen",
@@ -35,8 +54,33 @@ const ELEMENT_CONTROLS: Readonly<Record<string, FluidboxControlName>> = {
 const PARTS =
   "fluidbox-toolbar, fluidbox-zoom-controls, fluidbox-counter, fluidbox-caption, fluidbox-loading, fluidbox-error, fluidbox-fullscreen, fluidbox-download, fluidbox-share";
 
-const nameOf = (element: Element) =>
-  allControlNames.find((name) => element.hasAttribute(fluidboxControls[name].attribute))!;
+const nameOf = (element: Element) => NAMES.find((name) => element.hasAttribute(CONTROLS[name]))!;
+
+/**
+ * A control as the viewer draws a default one: a button, a link for
+ * Download, text for the counter. Without an icon it is marked
+ * `data-fluidbox-default`, and the wiring writes its label as its text.
+ */
+function drawControl(
+  ownerDocument: Document,
+  name: FluidboxControlName,
+  icons: FluidboxOptions["icons"],
+  content?: readonly Node[] | null,
+): HTMLElement {
+  const element =
+    name === "counter"
+      ? ownerDocument.createElement("span")
+      : name === "download"
+        ? ownerDocument.createElement("a")
+        : Object.assign(ownerDocument.createElement("button"), { type: "button" });
+  element.setAttribute(CONTROLS[name], "");
+  const icon = content ? null : name === "counter" ? undefined : icons?.[name]?.();
+  if (content) element.append(...content);
+  else if (icon) element.append(icon);
+  else element.setAttribute("data-fluidbox-default", "");
+  if (name === "counter") element.setAttribute("aria-hidden", "true");
+  return element;
+}
 
 /** Whether an element holds anything a reader would see or hear. */
 const holds = (element: Element) => element.childElementCount > 0 || !!element.textContent?.trim();
@@ -65,14 +109,15 @@ function adopt(from: Element, to: HTMLElement) {
 export function expandParts(root: ParentNode, context: FluidboxPartsContext): void {
   const { fluidbox, labels, icons, signal, slide } = context;
   const ownerDocument = (root as Node).ownerDocument!;
-  const control = (name: FluidboxControlName) => controlButton(ownerDocument, name, labels, icons);
+  const control = (name: FluidboxControlName, content?: readonly Node[] | null) =>
+    drawControl(ownerDocument, name, icons, content);
   /** Parts that show the item: the slide's, or the one on show. */
   const follows: ((item: FluidboxItem | null) => void)[] = [];
   /** Parts that show while the slide is loading or failed. */
   const statuses: ((busy: boolean, error: boolean) => void)[] = [];
 
   // An empty control shows its label as text, as a default one does.
-  for (const element of root.querySelectorAll<HTMLElement>(controlSelector)) {
+  for (const element of root.querySelectorAll<HTMLElement>(CONTROL_SELECTOR)) {
     const name = nameOf(element);
     const tag = name === "download" ? "A" : "BUTTON";
     if (
@@ -104,16 +149,7 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
     const own = holds(placeholder) ? Array.from(placeholder.childNodes) : null;
     const name = ELEMENT_CONTROLS[tag];
     if (name) {
-      let element: HTMLElement;
-      if (own) {
-        element =
-          name === "download"
-            ? ownerDocument.createElement("a")
-            : Object.assign(ownerDocument.createElement("button"), { type: "button" });
-        element.setAttribute(fluidboxControls[name].attribute, "");
-        element.append(...own);
-      } else element = control(name);
-      placeholder.replaceWith(adopt(placeholder, element));
+      placeholder.replaceWith(adopt(placeholder, control(name, own)));
     } else if (tag === "FLUIDBOX-TOOLBAR" || tag === "FLUIDBOX-ZOOM-CONTROLS") {
       const toolbar = tag === "FLUIDBOX-TOOLBAR";
       const group = ownerDocument.createElement("div");
@@ -121,7 +157,10 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
       if (!toolbar) group.setAttribute("aria-label", labels.zoomed);
       adopt(placeholder, group);
       group.setAttribute(toolbar ? "data-fluidbox-toolbar" : "data-fluidbox-zoom-controls", "");
-      group.append(...(own ?? (toolbar ? controlNames : zoomControlNames).map(control)));
+      const defaults: readonly FluidboxControlName[] = toolbar
+        ? ["previous", "next", "close"]
+        : ["zoomIn", "zoomOut", "zoomReset"];
+      group.append(...(own ?? defaults.map((each) => control(each))));
       placeholder.replaceWith(group);
     } else if (tag === "FLUIDBOX-COUNTER") {
       placeholder.replaceWith(adopt(placeholder, control("counter")));
@@ -175,7 +214,7 @@ export function expandParts(root: ParentNode, context: FluidboxPartsContext): vo
 
   // The viewer's layer wires the controls in it; a slide's are bound here.
   if (slide) {
-    for (const element of root.querySelectorAll<HTMLElement>(controlSelector)) {
+    for (const element of root.querySelectorAll<HTMLElement>(CONTROL_SELECTOR)) {
       fluidbox.bindControl(element, nameOf(element), { signal });
     }
   }

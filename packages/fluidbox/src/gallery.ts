@@ -1,11 +1,12 @@
 import { createFluidboxSync } from "./controlled";
 import { createFluidbox } from "./create-fluidbox";
-import { expandParts, templateSlide } from "./elements-parts";
+import type * as PartsModule from "./elements-parts";
 import { onDefine, registeredSlide } from "./elements-registry";
 import { forwardEvents } from "./events";
 import { FluidboxThumbnailsElement, FluidboxSheetElement } from "./thumbnails";
 import { FluidboxItemElement, type DeclarativeFluidboxDefinition } from "./item";
 import { idOf, toList } from "./items";
+import { holdSlideCommit } from "./kit";
 import { resolveLabels, type FluidboxLabels } from "./labels";
 import type {
   Fluidbox,
@@ -101,6 +102,23 @@ const overlayFlight = (overlay: HTMLElement) => {
   const flight = overlay.dataset.fluidboxTriggerOverlay;
   return flight === "copy" || flight === "frame" ? flight : "none";
 };
+
+/**
+ * The parts of the viewer and slide templates, loaded once a gallery has
+ * templates, so a gallery without them never loads them.
+ */
+type Parts = typeof PartsModule;
+let parts: Parts | undefined;
+let partsLoading: Promise<Parts> | undefined;
+const loadParts = () =>
+  (partsLoading ??= import("./elements-parts").then(
+    (loaded) => (parts = loaded),
+    (error: unknown) => {
+      // A failed load tries again on the next viewer.
+      partsLoading = undefined;
+      throw error;
+    },
+  ));
 
 /** One factory per icon template, so the same templates make the same icons option. */
 const iconFactories = new WeakMap<HTMLTemplateElement, () => Node>();
@@ -232,6 +250,8 @@ export class FluidboxGalleryElement extends HTMLElement {
   /** A new function when `viewer` or the viewer template changes, so the update draws the viewer again. */
   #viewerRenderer: FluidboxViewerRenderer<any> = (context) => this.#mountViewer(context);
   #viewerTemplate: HTMLTemplateElement | null = null;
+  /** The viewer was drawn before the parts arrived, so it draws again once they do. */
+  #drawnWithoutParts = false;
 
   connectedCallback() {
     if (!this.hasAttribute("tabindex")) this.tabIndex = -1;
@@ -435,6 +455,7 @@ export class FluidboxGalleryElement extends HTMLElement {
     if (viewer === this.#viewer) return;
     this.#viewer = viewer;
     this.#viewerRenderer = (context) => this.#mountViewer(context);
+    if (viewer) this.#loadParts();
     this.#queueUpdate();
   }
 
@@ -727,12 +748,42 @@ export class FluidboxGalleryElement extends HTMLElement {
     if (template) {
       let slide = this.#templateSlides.get(template);
       if (!slide) {
-        slide = templateSlide(template, () => this.#partsContext());
+        let stamp: FluidboxSlideRenderer<any> | undefined;
+        const stamped = (loaded: Parts) =>
+          (stamp ??= loaded.templateSlide(template, () => this.#partsContext()));
+        slide = (each) => {
+          if (parts) return stamped(parts)(each);
+          // An open that beats the parts waits for them, as for a framework's render.
+          const release = holdSlideCommit(each);
+          let dispose: void | (() => void);
+          void loadParts().then((loaded) => {
+            if (!each.signal.aborted) dispose = stamped(loaded)(each);
+            release();
+          }, release);
+          return () => {
+            release();
+            dispose?.();
+          };
+        };
         this.#templateSlides.set(template, slide);
       }
       return slide;
     }
     return registeredSlide(type) ?? this.#markupSlides.get(type);
+  }
+
+  /** Load the parts for a gallery that has templates or viewer content of its own. */
+  #loadParts() {
+    if (parts) return;
+    void loadParts().then(
+      () => {
+        if (!this.#drawnWithoutParts) return;
+        this.#drawnWithoutParts = false;
+        this.#viewerRenderer = (context) => this.#mountViewer(context);
+        this.#queueUpdate();
+      },
+      () => {},
+    );
   }
 
   /** What the parts in the viewer template and the slide templates draw with. */
@@ -751,6 +802,8 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   async #refresh() {
+    if (this.querySelector(":scope > template[slot=viewer], template[data-fluidbox-slide]"))
+      this.#loadParts();
     const definitions = new Map<string, DeclarativeFluidboxDefinition>();
     let items = this.#items;
     if (!items) {
@@ -893,7 +946,13 @@ export class FluidboxGalleryElement extends HTMLElement {
     else if (this.#viewerTemplate) {
       target.append(target.ownerDocument.importNode(this.#viewerTemplate.content, true));
     }
-    expandParts(target, { ...this.#partsContext(), signal });
+    if (parts) parts.expandParts(target, { ...this.#partsContext(), signal });
+    else {
+      // Draw it again once the parts arrive, which a gallery with templates
+      // started loading as it connected.
+      this.#drawnWithoutParts = true;
+      this.#loadParts();
+    }
     return () => {
       dispose?.();
       target.replaceChildren();

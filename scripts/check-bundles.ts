@@ -18,6 +18,9 @@ const entrypoints = [
   "react-embed",
   "react-model",
   "react-spin",
+  "elements-embed",
+  "elements-model",
+  "elements-spin",
 ] as const;
 type Entry = (typeof entrypoints)[number];
 const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][]> = {
@@ -37,6 +40,9 @@ const expectedFramework: Record<Entry, readonly (typeof frameworkPeers)[number][
   "react-embed": ["react", "react-dom"],
   "react-model": ["react", "react-dom"],
   "react-spin": ["react", "react-dom"],
+  "elements-embed": [],
+  "elements-model": [],
+  "elements-spin": [],
 };
 
 /** What each media add-on's code carries, so an entry can be checked for the others'. */
@@ -45,10 +51,12 @@ const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fl
 // Keep separate initial, activation, and CSS ceilings for every public entry.
 // baseline/bundle-budget.md records the measurements behind them and why they moved.
 // The React binding's redesigned parts added about 1,430 B to its initial chunk; the size
-// pass after step 3 took 634 B back, mostly development-only checks and messages.
+// pass after step 3 took 634 B back, mostly development-only checks and messages. The
+// custom elements' value, slide templates and registry added about 740 B to theirs; their
+// parts load only for a gallery with templates.
 const initialGzipLimits: Record<Entry, number> = {
   root: 9_850,
-  elements: 14_000,
+  elements: 14_750,
   react: 17_200,
   solid: 13_700,
   vue: 14_350,
@@ -66,6 +74,9 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-embed": 19_750,
   "react-model": 18_450,
   "react-spin": 19_150,
+  "elements-embed": 17_500,
+  "elements-model": 16_300,
+  "elements-spin": 17_050,
 };
 const cssGzipLimit = 2_850;
 // The opt-in look, glyphs included. No entry imports it, so it counts in no
@@ -77,7 +88,7 @@ const baselineCssGzipLimit = 3_300;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 44_050,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 47_400,
+  elements: 50_000,
   react: 50_850,
   solid: 47_250,
   vue: 47_900,
@@ -92,6 +103,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "react-embed": 53_350,
   "react-model": 52_000,
   "react-spin": 52_750,
+  "elements-embed": 52_800,
+  "elements-model": 51_550,
+  "elements-spin": 52_300,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -111,11 +125,14 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
   "react-embed": 1_200,
   "react-model": 1_200,
   "react-spin": 1_200,
+  "elements-embed": 1_200,
+  "elements-model": 1_200,
+  "elements-spin": 1_200,
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
   root: 45_200,
-  elements: 48_550,
+  elements: 51_150,
   react: 52_000,
   solid: 48_400,
   vue: 49_050,
@@ -130,10 +147,13 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "react-embed": 54_500,
   "react-model": 53_150,
   "react-spin": 53_900,
+  "elements-embed": 53_950,
+  "elements-model": 52_700,
+  "elements-spin": 53_450,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
-  elements: 50_200,
+  elements: 52_800,
   react: 53_600,
   solid: 50_050,
   vue: 50_750,
@@ -149,6 +169,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "react-embed": 56_150,
   "react-model": 54_850,
   "react-spin": 55_550,
+  "elements-embed": 55_600,
+  "elements-model": 54_350,
+  "elements-spin": 55_100,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
@@ -242,13 +265,13 @@ for (const name of entrypoints) {
       `reachable JS gzip budget exceeded (${reachableJsGzipLimits[name]} B)`,
     activationWithCss.gzipBytes > activationWithCssGzipLimits[name] &&
       `activation with CSS gzip budget exceeded (${activationWithCssGzipLimits[name]} B)`,
-    name !== "elements" && registersFluidbox && "custom elements loaded eagerly",
+    !name.startsWith("elements") && registersFluidbox && "custom elements loaded eagerly",
     name === "elements" && !registersFluidbox && "custom element registration missing",
     carriesExtension && "sheet extension bundled into a core entry",
     ...Object.entries(addonMarkers)
       .filter(
         ([addon, marker]) =>
-          addon !== name.replace(/^react-/, "") && activationCode.includes(marker),
+          addon !== name.replace(/^(react|elements)-/, "") && activationCode.includes(marker),
       )
       .map(([addon]) => `carries the ${addon} add-on`),
   ].filter((error): error is string => typeof error === "string");

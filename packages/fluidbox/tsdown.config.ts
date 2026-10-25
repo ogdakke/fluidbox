@@ -4,6 +4,9 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     elements: "src/elements.ts",
+    "elements/embed": "src/elements-embed.ts",
+    "elements/model": "src/elements-model.ts",
+    "elements/spin": "src/elements-spin.ts",
     thumbnails: "src/thumbnails-entry.ts",
     sheet: "src/sheet-entry.ts",
     kit: "src/kit.ts",

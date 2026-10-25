@@ -26,6 +26,11 @@ export function packageSource(command: "build" | "serve"): Alias[] {
     { find: "@ogdakke/fluidbox/embed", replacement: core("embed.ts") },
     { find: "@ogdakke/fluidbox/model", replacement: core("model.ts") },
     { find: "@ogdakke/fluidbox/spin", replacement: core("spin.ts") },
+    // The elements' add-on entries, before the elements they sit under.
+    ...["embed", "model", "spin"].map((name) => ({
+      find: `@ogdakke/fluidbox/elements/${name}`,
+      replacement: core(`elements-${name}.ts`),
+    })),
     { find: "@ogdakke/fluidbox/elements", replacement: core("elements.ts") },
     // The React add-on parts, before the binding they sit under.
     ...["embed", "model", "spin"].map((name) => ({
