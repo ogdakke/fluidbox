@@ -27,7 +27,8 @@ export const Embed = defineComponent({
   setup(props, { slots }) {
     // The Play button holds an element of ours, and the slot renders into it.
     const host = shallowRef<HTMLElement | null>(null);
-    const playable = !!slots.default;
+    // Whether the Play button holds the slot, checked on each render.
+    let playable = !!slots.default;
     const make = () =>
       createEmbedSlide({
         providers: props.providers,
@@ -42,16 +43,25 @@ export const Embed = defineComponent({
             }
           : undefined,
       });
-    const render = shallowRef(make());
+    let render = make();
+    const made = shallowRef(0);
     watch(
       [() => props.providers?.map((provider) => provider.name).join(" "), () => !!props.label],
       () => {
-        render.value = make();
+        render = make();
+        made.value++;
       },
     );
-    return () => [
-      h(Fluidbox.Media, { render: render.value }),
-      host.value && slots.default ? h(Teleport, { to: host.value }, slots.default()) : null,
-    ];
+    return () => {
+      void made.value;
+      if (playable !== !!slots.default) {
+        playable = !playable;
+        render = make();
+      }
+      return [
+        h(Fluidbox.Media, { render }),
+        host.value && slots.default ? h(Teleport, { to: host.value }, slots.default()) : null,
+      ];
+    };
   },
 });
