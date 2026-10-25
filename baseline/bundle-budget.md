@@ -12,7 +12,7 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | Elements       |        13,946 B |           47,387 B |           1,151 B |          48,538 B |                 50,197 B |
 | React          |        17,183 B |           50,787 B |           1,151 B |          51,938 B |                 53,597 B |
 | Solid          |        13,611 B |           47,206 B |           1,151 B |          48,357 B |                 50,016 B |
-| Vue            |        17,532 B |           51,096 B |           1,151 B |          52,247 B |                 53,906 B |
+| Vue            |        17,625 B |           51,193 B |           1,151 B |          52,344 B |                 54,003 B |
 | Angular        |        14,713 B |           48,233 B |           1,151 B |          49,384 B |                 51,043 B |
 | Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
 | Sheet          |         7,277 B |            7,277 B |               0 B |           7,277 B |                  8,272 B |
@@ -24,9 +24,9 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 | React embed    |        19,683 B |           53,333 B |           1,151 B |          54,484 B |                 56,143 B |
 | React model    |        18,409 B |           51,994 B |           1,151 B |          53,145 B |                 54,804 B |
 | React spin     |        19,108 B |           52,678 B |           1,151 B |          53,829 B |                 55,488 B |
-| Vue embed      |        20,037 B |           53,666 B |           1,151 B |          54,817 B |                 56,476 B |
-| Vue model      |        18,733 B |           52,290 B |           1,151 B |          53,441 B |                 55,100 B |
-| Vue spin       |        19,466 B |           53,014 B |           1,151 B |          54,165 B |                 55,824 B |
+| Vue embed      |        20,146 B |           53,776 B |           1,151 B |          54,927 B |                 56,586 B |
+| Vue model      |        18,827 B |           52,387 B |           1,151 B |          53,538 B |                 55,197 B |
+| Vue spin       |        19,556 B |           53,108 B |           1,151 B |          54,259 B |                 55,918 B |
 
 `styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
@@ -72,5 +72,7 @@ The React add-on parts are entries of their own, `react/embed`, `react/model` an
 The Vue binding's redesigned parts, step 4, moved Vue by 1,863 B initial, to 16,172 B, and 1,848 B activation, against 14,309 B and 47,899 B: the same parts as React's, with `v-model` for the value and a slide host that holds each slide's commit inside a `<Suspense>` until the content beside it has mounted. The binding is about 6.1 KB gzip on its own, against React's 6.4 KB; the old Vue binding was 4.1 KB. Its component names, which Vue's devtools show, are about 100 B of it. By part, gzip on its own: the slide host and `Slides` 426 B, `Media` with the attribute helper 662 B, `Image`, `Video` and `Iframe` 164 B, `Toolbar`, `ZoomControls`, `Counter` and `Caption` 291 B, `Loading` and `Error` 336 B; the controls grew 245 B with Fullscreen, Download, Share, Retry and the label rule, and Root 94 B, while `Trigger` lost 93 B and `Overlay` 163 B against ThumbnailOverlay and FrameLayer.
 
 The Vue Root then began to draw the server copy of a viewer it renders open on an image, as React's does, and to take it over as it mounts: 1,360 B initial, to 17,532 B, of which about 440 B is the binding's and the rest the core's static viewer, which the Vue entry had not carried before. The Vue add-on parts are entries of their own, `vue/embed`, `vue/model` and `vue/spin`, measured and checked as React's are.
+
+The fixes after the Vue binding's review added 93 B initial, to 17,625 B, and 97 B activation, about the same to each Vue entry: a cancellable `valueChange` beside `update:modelValue`, the add-on parts registering on mount, `loop` declared as a Boolean prop, a Trigger preview that reads the viewer's state only when its slot reads it, and an Embed that checks for its Play content on each render.
 
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.
