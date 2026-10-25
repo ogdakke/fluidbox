@@ -227,6 +227,17 @@ const App = defineComponent(() => {
     h(Fluidbox.Root, { key: generation.value, items: photos }, () =>
       h(Grid, { items: photos, id: "builtin" }),
     ),
+    // A slideshow, with a Slideshow of text and one with an icon.
+    h(Fluidbox.Root, { items: photos, slideshow: { interval: 60_000 } }, () => [
+      h(Grid, { items: photos, id: "slideshow" }),
+      h(Fluidbox.Viewer, null, () => [
+        h(Fluidbox.Slideshow, { "data-test": "slideshow-text" }),
+        h(Fluidbox.Slideshow, { "data-test": "slideshow-icon" }, () =>
+          h("svg", { "aria-hidden": "true" }),
+        ),
+        h(Fluidbox.Close),
+      ]),
+    ]),
     h(Fluidbox.Root, { items: photos }, () => [
       h(Grid, { items: photos, id: "custom" }),
       h(Fluidbox.Slides, null, { image: () => h(Fluidbox.Image) }),
