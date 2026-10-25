@@ -15,7 +15,7 @@ import { arabic, photos } from "../shared";
         <Fluidbox.Trigger
           v-for="photo in photos"
           :key="photo.id"
-          :item="photo"
+          :value="photo.id"
           class="pattern-thumb"
           data-test="trigger"
         >

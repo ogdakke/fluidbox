@@ -81,18 +81,17 @@ Without a `Fluidbox.Viewer`, the viewer has the default Previous, Next and Close
 
 ### `Fluidbox.Root`
 
-| Prop            | Type                                                           | Default               | Purpose                                                                                                                                          |
-| --------------- | -------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `items`         | `readonly TItem[] \| FluidboxItemList<TItem>`                  |                       | Required. The items, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                                 |
-| `open`          | `boolean`                                                      |                       | Whether the viewer is open, for `v-model:open`. It opens on `index` and closes as this changes. Leave it out to let the triggers own it.         |
-| `index`         | `number`                                                       |                       | The item the viewer shows, for `v-model:index`. An index out of range is ignored.                                                                |
-| `renderers`     | `Record<string, (ctx: { item, index, signal }) => VNodeChild>` | `{}`                  | Draw `custom` items, by the name in their `render`. The type is `FluidboxVueRenderer`.                                                           |
-| `zoom`          | `false \| { step?: number; max?: number }`                     | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                                         |
-| `loop`          | `boolean`                                                      | `false`               | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                   |
-| `labels`        | `Partial<FluidboxLabels>`                                      | English               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                            |
-| `findTrigger`   | `(item, index) => Element \| null`                             |                       | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter). |
-| `revealTrigger` | `(item, index, { signal, phase }) => void \| Promise<void>`    |                       | Brings an item's trigger into view before the viewer flies back to it.                                                                           |
-| `preload`       | `"intent" \| "press" \| "eager"`                               | `"intent"`            | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                 |
+| Prop            | Type                                                        | Default               | Purpose                                                                                                                                          |
+| --------------- | ----------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `items`         | `readonly TItem[] \| FluidboxItemList<TItem>`               |                       | Required. The items, or a lazy list `{ count, get, indexOf? }`. See [Items and origins](./items-and-origins.md).                                 |
+| `open`          | `boolean`                                                   |                       | Whether the viewer is open, for `v-model:open`. It opens on `index` and closes as this changes. Leave it out to let the triggers own it.         |
+| `index`         | `number`                                                    |                       | The item the viewer shows, for `v-model:index`. An index out of range is ignored.                                                                |
+| `zoom`          | `false \| { step?: number; max?: number }`                  | `{ step: 2, max: 4 }` | Zoom steps, or `false` to turn zoom off.                                                                                                         |
+| `loop`          | `boolean`                                                   | `false`               | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                   |
+| `labels`        | `Partial<FluidboxLabels>`                                   | English               | Your strings for the viewer's names and announcements. See [Labels](./api.md#labels).                                                            |
+| `findTrigger`   | `(item, index) => Element \| null`                          |                       | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter). |
+| `revealTrigger` | `(item, index, { signal, phase }) => void \| Promise<void>` |                       | Brings an item's trigger into view before the viewer flies back to it.                                                                           |
+| `preload`       | `"intent" \| "press" \| "eager"`                            | `"intent"`            | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                 |
 
 A renderer's `ctx` also has `active` and `onActiveChange`, to play and pause as its slide comes on show and leaves it. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
 
@@ -222,7 +221,7 @@ Read the object's fields where you use them, as `fluidbox.index`. Destructuring 
 
 ### Types
 
-The entry exports the parts' types (`FluidboxApi`, `FluidboxCommands`, `FluidboxSheetApi`, `FluidboxTriggerPreview`, `FluidboxItemContext`, `FluidboxVueRenderer`, `FluidboxVueRenderContext`) and the core types you use with them: the item types, `FluidboxItemList`, `FluidboxTarget`, `FluidboxState`, `FluidboxLabels`, `FluidboxValueChangeEvent` and `FluidboxSheetEvent`. Your own item type flows from `items` to the events and slots, and `useFluidbox<Photo>()` names it in a child component.
+The entry exports the parts' types (`FluidboxApi`, `FluidboxCommands`, `FluidboxSheetApi`, `FluidboxSlideApi`, `FluidboxTriggerPreview`, `FluidboxItemContext`, `FluidboxThumbnailContext`, `FluidboxSlidesSlots`) and the core types you use with them: the item types, `FluidboxItemList`, `FluidboxTarget`, `FluidboxState`, `FluidboxLabels`, `FluidboxValueChangeEvent` and `FluidboxSheetEvent`. Your own item type flows from `items` to the events and slots, and `useFluidbox<Photo>()` names it in a child component.
 
 ## Patterns
 

@@ -37,6 +37,11 @@ export function packageSource(command: "build" | "serve"): Alias[] {
       find: `@ogdakke/fluidbox/solid/${name}`,
       replacement: resolve(packages, "solid/src", `${name}.ts`),
     })),
+    // The Vue add-on parts, before the binding they sit under.
+    ...["embed", "model", "spin"].map((name) => ({
+      find: `@ogdakke/fluidbox/vue/${name}`,
+      replacement: resolve(packages, "vue/src", `${name}.ts`),
+    })),
     ...bindings.map((name) => ({
       find: `@ogdakke/fluidbox/${name}`,
       replacement: resolve(packages, name, "src/index.ts"),

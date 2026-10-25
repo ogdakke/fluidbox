@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import solid from "vite-plugin-solid";
 import vue from "@vitejs/plugin-vue";
 import { readFileSync } from "node:fs";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { highlight, highlightHtml } from "../design/highlight";
 import { packageSource, watchPackageSource } from "../design/package-source";
 import { fluidboxStaticViewer } from "../../packages/fluidbox/src/static-viewer";
@@ -74,21 +74,35 @@ function delayedResponses(): Plugin {
  * The strict-CSP fixture, `csp.html`: `?ssr=1` renders the open viewer's copy
  * into it, as a server would. The page allows no inline script, so the dev
  * server's inline preambles come out; the fixture loads none of their modules.
+ * `?vue` renders the Vue Root's HTML into it, for the client to hydrate.
  */
 function cspFixture(): Plugin {
+  let server: ViteDevServer | undefined;
   return {
     name: "csp-fixture",
+    configureServer(devServer) {
+      server = devServer;
+    },
     transformIndexHtml: {
       order: "post",
-      handler(html, context) {
+      async handler(html, context) {
         if (context.path !== "/csp.html") return html;
         const ssr = new URL(context.originalUrl ?? "/", "http://host").searchParams.get("ssr");
         const copy =
           ssr === null
             ? ""
             : fluidboxStaticViewer({ items: cspItems, value: cspItems[Number(ssr) || 0]!.id! });
+        const vue =
+          server && new URL(context.originalUrl ?? "/", "http://host").searchParams.has("vue")
+            ? await (
+                (await server.ssrLoadModule("/fixtures/csp-vue-server.ts")) as {
+                  renderCspVue: () => Promise<string>;
+                }
+              ).renderCspVue()
+            : "";
         return html
           .replace("<!--fluidbox-static-viewer-->", copy ?? "")
+          .replace("<div data-csp-vue></div>", `<div data-csp-vue>${vue}</div>`)
           .replace(/<script type="module">[\s\S]*?<\/script>/g, "");
       },
     },

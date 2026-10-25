@@ -6,7 +6,9 @@ import { Fluidbox as SolidFluidbox } from "@ogdakke/fluidbox/solid";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { createComponent, Dynamic, render } from "solid-js/web";
+import { createSSRApp } from "vue";
 import { cspItems } from "./csp-items";
+import { CspVue } from "./csp-vue";
 
 const viewer = createFluidbox({ items: cspItems });
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo]")) {
@@ -63,6 +65,11 @@ if (params.has("solid")) {
       }),
     document.querySelector<HTMLElement>("[data-csp-solid]")!,
   );
+}
+
+// So does a Vue Root, open through v-model, which hydrates the server's HTML.
+if (params.has("vue")) {
+  createSSRApp(CspVue).mount(document.querySelector<HTMLElement>("[data-csp-vue]")!);
 }
 
 declare global {

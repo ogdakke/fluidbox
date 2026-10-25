@@ -13,13 +13,14 @@ import { photos } from "../shared";
       <Fluidbox.Trigger
         v-for="photo in photos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >
         <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
+    <!-- Being there turns the thumbnails on. -->
     <Fluidbox.Thumbnails />
   </Fluidbox.Root>
 
@@ -28,14 +29,14 @@ import { photos } from "../shared";
       <Fluidbox.Trigger
         v-for="photo in photos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >
         <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
-    <!-- Your own thumbnails. The selected button has data-fluidbox-selected. -->
+    <!-- Your own thumbnails. The selected button has data-active. -->
     <Fluidbox.Thumbnails v-slot="{ index }">
       <span class="pattern-thumbnails-thumb" data-test="thumb">{{ index + 1 }}</span>
     </Fluidbox.Thumbnails>
