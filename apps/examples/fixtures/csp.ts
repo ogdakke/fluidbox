@@ -16,7 +16,10 @@ for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo]")) {
 }
 
 const params = new URLSearchParams(location.search);
-const copy = document.querySelector<HTMLElement>("[data-fluidbox-static]");
+// Only ?ssr's copy is the plain runtime's; a Root takes over its own.
+const copy = params.has("ssr")
+  ? document.querySelector<HTMLElement>("[data-fluidbox-static]")
+  : null;
 const takeOver = copy
   ? takeOverFluidbox(viewer, copy, cspItems[Number(params.get("ssr") || 0)]!.id!)
   : Promise.resolve(false);
