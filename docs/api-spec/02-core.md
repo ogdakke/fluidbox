@@ -219,6 +219,12 @@ no slide (no built-in, no entry in `slides`, no `default`) shows the slide's err
 `labels.error` and logs once in development. Today an unknown `render` throws inside the strip
 (`viewer-strip.ts:987`), which breaks the viewer for every item; an error slide is kinder.
 
+**The declared image size is checked** (user-approved). When an image item decodes, the runtime
+compares its natural aspect ratio with `width / height`. If they differ by more than 2%, it logs
+a development warning, once per file. The warning says the viewer frames the declared shape, so
+the photo will be letterboxed or cropped. Built on `feat/api-redesign` in `#revealImage`
+(`viewer-strip.ts`).
+
 ## 2.4 The instance
 
 ```ts
@@ -450,10 +456,16 @@ export interface FluidboxSlide<TItem extends FluidboxItem = FluidboxItem> {
   readonly origin: FluidboxSlideOrigin | null;
   /**
    * Hand the playback position back to the trigger's video on close. Read
-   * once, when a close starts from this slide, before the closing flight.
+   * once, just after the `onClose` listeners, and only on a close that flies.
    * Returns a function that unregisters it. (§2.22)
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
+  /**
+   * Called once as a close starts from the slide on show, before the closing
+   * flight measures, with the origin of the trigger the close lands on. Fires
+   * on every close path, flown or not. Returns a function that unsubscribes. (§4.4)
+   */
+  onClose(this: void, listener: (landing: FluidboxSlideOrigin | null) => void): () => void;
   /**
    * Let the media box zoom (pinch, double-tap, wheel, the zoom controls).
    * Off by default for your own media; on for drawImage.
@@ -1119,6 +1131,11 @@ seeks the trigger's video to the player's time and plays it if the player was pl
 export interface FluidboxSlideOrigin {
   /** The trigger's `<video>`, when that is what the trigger showed. */
   readonly video?: FluidboxPlayback;
+  /**
+   * The trigger's live model element itself, not a reading of it: its camera
+   * is live WebGL state. Never move or reattach it. (§4.4)
+   */
+  readonly model?: HTMLElement;
 }
 
 export interface FluidboxPlayback {
@@ -1150,7 +1167,8 @@ Rules:
   flight, as it does for the built-in video, so a player that seeks once its metadata has loaded
   reads the time then and lands on the right frame.
 - **`returnPlayback(source)`** registers what the runtime reads when a close starts from this
-  slide. The close reads `currentTime` and `paused` once, before the closing flight, then does
+  slide. It is the video counterpart of `onClose` (§4.4). The close reads `currentTime` and
+  `paused` once, just after the `onClose` listeners and only on a close that flies, then does
   what `#handBackVideo` does today: if the item's trigger has a `<video>`, it seeks it when the
   times differ by more than 10 ms, and plays it unless `paused`. This applies to whichever slide
   closes, so it also works after moving to another video item whose trigger is a video. With

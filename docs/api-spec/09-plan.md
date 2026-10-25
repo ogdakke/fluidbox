@@ -191,6 +191,11 @@ dozen lines (§4.1). Done by whoever does that framework in step 4.
 - Fix the stale docs listed in §1.19 in the same pass.
 - `apps/examples/src/demos/photo-library.tsx` and `pages/fixtures.ts`: the browser specs read them.
 - Update `baseline/bundle-budget.md` with the measured numbers and a paragraph on what moved.
+- The live 3D thumbnail page (§4.4): pin model-viewer 4.0.0, the card anatomy, and the advice
+  against `auto-rotate`.
+- Follow-up from the live 3D thumbnail: `onClose` and `origin.model` on Vue's, Solid's and
+  Angular's slide APIs (`useFluidboxSlide()`, `injectFluidboxSlide()`). L's branch adds both to
+  plain JS and React only.
 
 ### Step 7: motion speed, hotspots, slideshow, reachend, deep zoom
 
@@ -490,6 +495,9 @@ Step 7:
 With four people or agents: one on 1.3–1.5 (the engine), one on 1.1/1.2/1.6/1.7, one on 2 then
 Vue, one on 3 then Angular; Solid and elements follow. The critical path is 1.3 → 1.4 → React
 `Media` → the other bindings' `Media`.
+
+CI note: the browser suite runs only for ready (non-draft) PRs and pushes to `master`, and is
+skipped for docs-only changes. A test added here runs there, not on every draft push.
 
 ## 9.6 Done when
 

@@ -285,6 +285,54 @@ A cold open needs the `<model-viewer>` script, the model file and a frame. On a 
 that reaches the 3 s cap, and the open then flies on the poster, as it does today. The pointerdown
 preparation starts the load before the click (§5.3, Cost).
 
+### Live 3D thumbnail
+
+Built by session L and merged (`feat/api-redesign`, 7991561). A card can show a live `<model-viewer>` that the user orbits, and the
+viewer continues from that view and hands it back.
+
+- **`slide.origin.model?: HTMLElement`** (§2.22) is the card's model element itself, set only on
+  the opened slide. It isn't a reading, as `origin.video` is: the camera is live WebGL state, so a
+  copy would go stale. The slide reads the camera from it and must never move or reattach it.
+- **`slide.onClose(listener: (landing: FluidboxSlideOrigin | null) => void)`** (§2.8) returns an
+  unsubscribe function.
+  - It runs once as a close starts, before the closing flight measures. `landing` is the origin
+    of the trigger the close will land on, worked out from the item on show, so the slide can set
+    `landing.model`'s camera to its own.
+  - It runs on every close path: Escape, the backdrop, the close button, a drag or wheel dismiss,
+    `close()`, `value` set to null, and a close interrupted by a reopen (still once). It runs
+    whether or not the close flies. `returnPlayback` (§2.22) is its video counterpart. The
+    runtime reads it just after the `onClose` listeners, and only on a close that flies.
+  - Errors thrown by a listener go to `reportError` and don't stop the close.
+- **Cold open.** If the slide's model isn't ready, the card's canvas (`toDataURL()`) is painted
+  under it as a poster. The open waits on `slide.waitUntil`, within the 3 s cap (§5.3), so it
+  flies on the card's view, not the item's poster.
+- **The trigger treats a model like an image or video.** Inside a trigger, a drag past a 6 px
+  slop on `model-viewer, [data-fluidbox-owns-input]` orbits and doesn't open: the click is
+  swallowed and the open's preload discarded. A keydown resets the slop state.
+  `data-fluidbox-owns-input` lets any element claim its own drags the same way.
+- **The add-on quiets a live model in a trigger,** through an internal hook, not public API:
+  - It sets `aria-hidden` on the host if the app hasn't.
+  - It sets the shadow root's `tabindex` to -1 and makes its buttons and links inert, so the card
+    is one tab stop.
+  - If the element lacks `.userInput` (an older model-viewer), it removes the `aria-hidden` it
+    added and logs a development warning naming model-viewer 4.0.0.
+- **Field of view.** After a close, an unzoomed card view goes back to `"auto"`, or to the
+  field of view the page set.
+- **The origin is read when the viewer asks,** not fixed when the trigger binds. That covers the
+  visual, the thumbnail and the model. So a card whose model is replaced or remounted gives the
+  connected one, and a disconnected model is ignored.
+- **The quieting is undone** when the trigger unbinds, the Root is destroyed, or the model leaves
+  the trigger.
+- **The close snapshot is a PNG.** It keeps the model's transparent background. While it is in
+  the box, the posters under it are hidden, so they don't show through.
+
+Docs (step 6):
+
+- Pin model-viewer 4.0.0.
+- Give the card's anatomy as a `<button aria-label>` around `<model-viewer camera-controls
+touch-action="pan-y" interaction-prompt="none">`.
+- Advise against `auto-rotate` on cards.
+
 Name: the part is `Model`, not `ModelViewer` (§8.4). In Angular it is `<fluidbox-model>`, because
 `<model-viewer>` is Google's element and `fluidbox-model-viewer` would read as a wrapper of it.
 
