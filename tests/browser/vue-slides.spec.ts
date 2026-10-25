@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { stubMedia } from "./support/media";
 
 declare global {
   interface Window {
@@ -258,4 +259,21 @@ test("a bare loop attribute loops the viewer", async ({ page }) => {
   await expect(page.locator(`${dialog} [data-fluidbox-next]`)).toBeEnabled();
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 1 of 2");
+});
+
+test("an Embed's default slot renders into its Play button, which then plays", async ({ page }) => {
+  const requests = await stubMedia(page);
+  await load(page);
+  await page.locator("#clips [data-item]").click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const play = page.locator(`${shown} [data-fluidbox-embed-play]`);
+  await expect(play.locator('[data-test="play-content"]')).toHaveText("Watch");
+  await expect(play).toHaveAttribute("aria-label", "Play Clip");
+  await expect(play).not.toHaveAttribute("data-fluidbox-default");
+  await play.click();
+  await expect(page.locator(`${shown} [data-fluidbox-embed] iframe`)).toHaveAttribute(
+    "src",
+    /youtube-nocookie\.com\/embed\/M7lc1UVf-VE/,
+  );
+  expect(requests.players).toHaveLength(1);
 });

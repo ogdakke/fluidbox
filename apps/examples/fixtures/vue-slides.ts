@@ -17,7 +17,9 @@ import type {
   FluidboxSlideOrigin,
   FluidboxValueChangeDetails,
 } from "@ogdakke/fluidbox";
+import { youtubeItem } from "@ogdakke/fluidbox/embed";
 import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/vue";
+import { Embed } from "@ogdakke/fluidbox/vue/embed";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
 
@@ -63,6 +65,8 @@ const photo = (id: string, src: string): FluidboxImageItem => ({
   height: 800,
 });
 const photos = [photo("one", "/photo-square.svg"), photo("two", "/photo-portrait.svg")];
+
+const clips = [youtubeItem("https://www.youtube.com/watch?v=M7lc1UVf-VE", { title: "Clip" })];
 
 const Grid = defineComponent({
   props: {
@@ -222,6 +226,13 @@ const App = defineComponent(() => {
     h(Fluidbox.Root, { items: photos }, () => [
       h(Grid, { items: photos, id: "custom" }),
       h(Fluidbox.Slides, null, { image: () => h(Fluidbox.Image) }),
+    ]),
+    h("h2", "An embed with Play content"),
+    h(Fluidbox.Root, { items: clips }, () => [
+      h(Grid, { items: clips, id: "clips" }),
+      h(Fluidbox.Slides, null, {
+        embed: () => h(Embed, null, () => h("span", { "data-test": "play-content" }, "Watch")),
+      }),
     ]),
     h("h2", "A bare loop attribute"),
     // As `<Fluidbox.Root loop>` compiles.
