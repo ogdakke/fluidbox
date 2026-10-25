@@ -120,6 +120,14 @@ const loadParts = () =>
     },
   ));
 
+/** Whether the fluidbox has an item of id `value`. */
+function hasItem(fluidbox: Fluidbox, value: string) {
+  const { items } = fluidbox;
+  if (items.indexOf) return items.indexOf(value) >= 0;
+  for (let at = 0; at < items.count; at++) if (idOf(items.get(at)) === value) return true;
+  return false;
+}
+
 /** One factory per icon template, so the same templates make the same icons option. */
 const iconFactories = new WeakMap<HTMLTemplateElement, () => Node>();
 
@@ -613,11 +621,19 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   /**
    * Bring the viewer to the `value` attribute when it changed: a request, as
-   * a binding's `value` is, so a viewer that moved on its own stays.
+   * a binding's `value` is, so a viewer that moved on its own stays. A value
+   * counts as used once it found its item, or closed: one that names no item
+   * yet, as items set after the gallery connects, waits for them.
    */
   #control() {
+    const fluidbox = this.#fluidbox;
     const value = this.getAttribute("value");
-    if (value === this.#synced) return;
+    if (!fluidbox || value === this.#synced) return;
+    if (value !== null && !hasItem(fluidbox, value)) {
+      // With no items yet there is nothing to tell; with some, it counts as null.
+      if (fluidbox.items.count) this.#sync?.(value);
+      return;
+    }
     this.#synced = value;
     this.#sync?.(value);
   }
@@ -856,8 +872,8 @@ export class FluidboxGalleryElement extends HTMLElement {
     );
     this.#fluidbox = fluidbox;
     this.#sync = createFluidboxSync(fluidbox);
-    // A new viewer starts from the value, as the first did.
-    this.#synced = undefined;
+    // A gallery moved in the page keeps the viewer as it was: the value it
+    // already used, or a change to it that was canceled, isn't asked again.
     this.#events = new AbortController();
     forwardEvents(fluidbox, this, this.#events.signal);
     this.#unsubscribe = fluidbox.subscribe((state) => {

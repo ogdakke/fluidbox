@@ -73,4 +73,6 @@ The custom elements' redesign moved their initial chunk by 744 B, to 14,690 B, a
 
 The custom elements' add-ons are entries of their own, `elements/embed`, `elements/model` and `elements/spin`. Each registers its slide and reads its markup (a YouTube or Vimeo `<iframe>`, `<model-viewer>`, `<img data-spin-frames>`), and measures the gallery, the add-on and its registration together, about 2.3–2.8 KB over the gallery's initial chunk, as the React parts are over React's.
 
+After review, a starting `value` that waits for its items, as server HTML whose items arrive later has, and a gallery moved in the page that keeps the viewer's value instead of asking it again, added about 70 B to the custom elements' initial chunk.
+
 These are artifact-size regression limits, not loading-time or frame-rate claims. Browser caching, HTTP compression settings, framework peer bytes, host application code, images, and fonts affect real transfer and paint time. The check counts all statically reachable dynamic chunks as a conservative activation total even if a particular viewer interaction does not load every branch. It does not measure network requests or execution cost. Latency and frame budgets need device measurements on a stable runner.

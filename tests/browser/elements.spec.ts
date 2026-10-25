@@ -302,3 +302,62 @@ test.describe("the add-ons read their markup", () => {
     expect(await page.evaluate(() => (window as { frameLoads?: number }).frameLoads)).toBe(1);
   });
 });
+
+test.describe("the value", () => {
+  test("a starting value waits for items set later, and opens them", async ({ page }) => {
+    await load(page);
+    const warnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning") warnings.push(message.text());
+    });
+    await page.evaluate(() => {
+      const gallery = document.createElement("fluidbox-gallery");
+      gallery.id = "late";
+      gallery.setAttribute("value", "b");
+      document.querySelector("main")!.append(gallery);
+      setTimeout(() => {
+        gallery.items = ["a", "b"].map((id) => ({
+          type: "image" as const,
+          id,
+          src: "/art/canyon.svg",
+          alt: `Photo ${id}`,
+          width: 800,
+          height: 600,
+        }));
+      }, 100);
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 2");
+    expect(warnings.filter((text) => text.includes("names no item"))).toEqual([]);
+  });
+
+  test("a gallery moved in the page keeps the viewer as it was", async ({ page }) => {
+    await load(page);
+    const gallery = page.locator(parts);
+    const move = () =>
+      gallery.evaluate((element) => document.querySelector("main")!.append(element));
+    // A value already used, then closed with Escape, doesn't open again.
+    await gallery.evaluate((element) => element.setAttribute("value", "canyon"));
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => status(page)).toBe("closed");
+    await move();
+    await page.waitForTimeout(500);
+    await expect(page.locator(dialog)).toHaveCount(0);
+
+    // A canceled value isn't asked again.
+    await gallery.evaluate((element) =>
+      element.addEventListener("beforevaluechange", (event) => event.preventDefault(), {
+        once: true,
+      }),
+    );
+    await gallery.evaluate((element) => element.setAttribute("value", "broken"));
+    await page.waitForTimeout(300);
+    await move();
+    await page.waitForTimeout(500);
+    await expect(page.locator(dialog)).toHaveCount(0);
+    expect((await events(page)).filter((each) => each === "beforevaluechange broken")).toHaveLength(
+      1,
+    );
+  });
+});

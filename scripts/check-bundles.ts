@@ -56,7 +56,7 @@ const addonMarkers = { embed: "fluidboxEmbed", model: "fluidboxModel", spin: "fl
 // parts load only for a gallery with templates.
 const initialGzipLimits: Record<Entry, number> = {
   root: 9_850,
-  elements: 14_750,
+  elements: 14_800,
   react: 17_200,
   solid: 13_700,
   vue: 14_350,
@@ -74,7 +74,7 @@ const initialGzipLimits: Record<Entry, number> = {
   "react-embed": 19_750,
   "react-model": 18_450,
   "react-spin": 19_150,
-  "elements-embed": 17_500,
+  "elements-embed": 17_600,
   "elements-model": 16_300,
   "elements-spin": 17_050,
 };
@@ -88,7 +88,7 @@ const baselineCssGzipLimit = 3_300;
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 44_050,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
-  elements: 50_000,
+  elements: 50_100,
   react: 50_850,
   solid: 47_250,
   vue: 47_900,
@@ -103,9 +103,9 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "react-embed": 53_350,
   "react-model": 52_000,
   "react-spin": 52_750,
-  "elements-embed": 52_800,
-  "elements-model": 51_550,
-  "elements-spin": 52_300,
+  "elements-embed": 52_850,
+  "elements-model": 51_650,
+  "elements-spin": 52_400,
 };
 // Fullscreen, download and share, and a slide's zoom pose, load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -132,7 +132,7 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
   root: 45_200,
-  elements: 51_150,
+  elements: 51_250,
   react: 52_000,
   solid: 48_400,
   vue: 49_050,
@@ -147,13 +147,13 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "react-embed": 54_500,
   "react-model": 53_150,
   "react-spin": 53_900,
-  "elements-embed": 53_950,
-  "elements-model": 52_700,
-  "elements-spin": 53_450,
+  "elements-embed": 54_000,
+  "elements-model": 52_800,
+  "elements-spin": 53_550,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 46_900,
-  elements: 52_800,
+  elements: 52_900,
   react: 53_600,
   solid: 50_050,
   vue: 50_750,
@@ -169,9 +169,9 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "react-embed": 56_150,
   "react-model": 54_850,
   "react-spin": 55_550,
-  "elements-embed": 55_600,
-  "elements-model": 54_350,
-  "elements-spin": 55_100,
+  "elements-embed": 55_700,
+  "elements-model": 54_450,
+  "elements-spin": 55_200,
 };
 
 const jsonIndex = process.argv.indexOf("--json");
