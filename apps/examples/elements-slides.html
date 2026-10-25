@@ -62,6 +62,16 @@
 
       <h2>Add-ons read from markup</h2>
       <fluidbox-gallery id="media" class="media-grid" aria-label="Add-ons gallery">
+        <!-- A frame that counts its loads: stamped into the box, it loads once. -->
+        <template data-fluidbox-slide="frame">
+          <fluidbox-media>
+            <iframe
+              title="Counting frame"
+              data-test="frame"
+              srcdoc="<script>parent.frameLoads = (parent.frameLoads ?? 0) + 1</script><p>Frame</p>"
+            ></iframe>
+          </fluidbox-media>
+        </template>
         <fluidbox-item value="film">
           <button slot="trigger" type="button" data-test="film">
             <img
@@ -115,6 +125,12 @@
               alt="Fjord chair in 3D"
               exposure="1.2"
             ></model-viewer>
+          </template>
+        </fluidbox-item>
+        <fluidbox-item value="frame" type="frame">
+          <button slot="trigger" type="button" data-test="frame">A frame</button>
+          <template slot="content">
+            <div aria-label="Counting frame" width="800" height="600"></div>
           </template>
         </fluidbox-item>
       </fluidbox-gallery>

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { stubMedia } from "./support/media";
 
 /**
  * apps/examples/elements-slides.html: a `<fluidbox-gallery>` with a viewer
@@ -245,5 +246,59 @@ test.describe("the add-ons read their markup", () => {
     await expect(model).toHaveAttribute("exposure", "1.2");
     await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  });
+
+  test("a model never joins the page twice: not on a gallery's redraw, nor on a reopen", async ({
+    page,
+  }) => {
+    await stubMedia(page);
+    await load(page);
+    // The page loads <model-viewer> with its own script; the slide has no load.
+    await page.addScriptTag({
+      url: "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js",
+    });
+    const gallery = page.locator("#media");
+    const model = page.locator(`${shown} model-viewer`);
+    for (let round = 0; round < 2; round++) {
+      await page.locator('[data-test="model"]').click();
+      await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1);
+      await expect(model).toHaveAttribute("data-connections", "1");
+      // Reading the items again, and new options, leave the element where it is.
+      await gallery.evaluate((element, round) => {
+        const item = element.querySelector("fluidbox-item")!.cloneNode(true) as HTMLElement;
+        item.setAttribute("value", `film-${round}`);
+        element.append(item);
+        element.setAttribute("zoom-max", String(4 + round));
+      }, round);
+      await page.waitForTimeout(300);
+      await expect(model).toHaveCount(1);
+      await expect(model).toHaveAttribute("data-connections", "1");
+      await page.keyboard.press("Escape");
+      await expect.poll(() => status(page)).toBe("closed");
+    }
+  });
+
+  test("an iframe stamped from a slide template loads once, through a re-read and moves", async ({
+    page,
+  }) => {
+    await load(page);
+    await page.locator('button[data-test="frame"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect
+      .poll(() => page.evaluate(() => (window as { frameLoads?: number }).frameLoads))
+      .toBe(1);
+    // Reading the items again, and new options, keep the slide and its frame.
+    await page.locator("#media").evaluate((element) => {
+      const item = element.querySelector("fluidbox-item")!.cloneNode(true) as HTMLElement;
+      item.setAttribute("value", "film-again");
+      element.prepend(item);
+      element.setAttribute("zoom-max", "5");
+    });
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 5 of 5");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator(`${shown} iframe[data-test="frame"]`)).toHaveCount(1);
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => (window as { frameLoads?: number }).frameLoads)).toBe(1);
   });
 });
