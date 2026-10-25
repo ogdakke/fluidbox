@@ -193,9 +193,9 @@ dozen lines (§4.1). Done by whoever does that framework in step 4.
 - Update `baseline/bundle-budget.md` with the measured numbers and a paragraph on what moved.
 - The live 3D thumbnail page (§4.4): pin model-viewer 4.0.0, the card anatomy, and the advice
   against `auto-rotate`.
-- Follow-up from the live 3D thumbnail: `onClose` on Vue's, Solid's and Angular's slide APIs
-  (`useFluidboxSlide()`, `injectFluidboxSlide()`), which L's branch adds to plain JS and React
-  only.
+- Follow-up from the live 3D thumbnail: `onClose` and `origin.model` on Vue's, Solid's and
+  Angular's slide APIs (`useFluidboxSlide()`, `injectFluidboxSlide()`). L's branch adds both to
+  plain JS and React only.
 
 ### Step 7: motion speed, hotspots, slideshow, reachend, deep zoom
 
