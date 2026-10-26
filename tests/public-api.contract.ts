@@ -572,6 +572,9 @@ gallery.addEventListener("mediaerror", (event) => void [event.kind, event.cause]
 void gallery.setFullscreen();
 void gallery.download();
 void gallery.share();
+gallery.slideshow = { interval: 4000, autoplay: true };
+gallery.play();
+gallery.pause();
 gallery.viewer = ({ target }) => {
   target.append("Caption");
 };

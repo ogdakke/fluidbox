@@ -6,16 +6,22 @@ const dialog = "[data-fluidbox-dialog]";
  * Open the viewer from `grid` and check its two Slideshow parts, one with no
  * content (`data-test="slideshow-text"`) and one with an icon
  * (`data-test="slideshow-icon"`): each plays and pauses, and is named for what
- * it does next, by its text or its `aria-label`.
+ * it does next, by its text or its `aria-label`. A binding's parts are
+ * `data-fluidbox-managed`; the elements' are the viewer's to paint, so not.
  */
-export async function expectSlideshowPart(page: Page, grid: string) {
-  await page.locator(`${grid} [data-item]`).first().click();
+export async function expectSlideshowPart(
+  page: Page,
+  grid: string,
+  { trigger = "[data-item]", managed = true } = {},
+) {
+  await page.locator(`${grid} ${trigger}`).first().click();
   await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   const text = page.locator(`${dialog} [data-test="slideshow-text"]`);
   const icon = page.locator(`${dialog} [data-test="slideshow-icon"]`);
   for (const part of [text, icon]) {
     await expect(part).toHaveAttribute("data-fluidbox-slideshow", "");
-    await expect(part).toHaveAttribute("data-fluidbox-managed", "");
+    if (managed) await expect(part).toHaveAttribute("data-fluidbox-managed", "");
+    else await expect(part).not.toHaveAttribute("data-fluidbox-managed");
     await expect(part).toHaveAttribute("type", "button");
     await expect(part).toBeVisible();
     await expect(part).not.toHaveAttribute("data-active");

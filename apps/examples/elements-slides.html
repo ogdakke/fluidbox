@@ -135,6 +135,35 @@
         </fluidbox-item>
       </fluidbox-gallery>
 
+      <h2>A slideshow, with a control of text and one with an icon</h2>
+      <fluidbox-gallery id="slideshow" class="media-grid" aria-label="Slideshow gallery">
+        <template slot="viewer">
+          <fluidbox-toolbar></fluidbox-toolbar>
+          <fluidbox-slideshow data-test="slideshow-text"></fluidbox-slideshow>
+          <fluidbox-slideshow data-test="slideshow-icon">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path d="M4 2l10 6-10 6z" />
+            </svg>
+          </fluidbox-slideshow>
+        </template>
+        <fluidbox-item value="dawn">
+          <button slot="trigger" type="button" data-test="dawn">
+            <img src="/art/canyon.svg" alt="Dawn" width="280" height="280" />
+          </button>
+          <template slot="content">
+            <img src="/art/canyon.svg" alt="Dawn" width="1400" height="1400" />
+          </template>
+        </fluidbox-item>
+        <fluidbox-item value="dusk">
+          <button slot="trigger" type="button" data-test="dusk">
+            <img src="/art/dune.svg" alt="Dusk" width="360" height="240" />
+          </button>
+          <template slot="content">
+            <img src="/art/dune.svg" alt="Dusk" width="1800" height="1200" />
+          </template>
+        </fluidbox-item>
+      </fluidbox-gallery>
+
       <h2>A typed item, and slides from a template, the registry or a property</h2>
       <fluidbox-gallery id="typed" class="media-grid" aria-label="Typed gallery">
         <template data-fluidbox-slide="print">

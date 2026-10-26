@@ -1,3 +1,4 @@
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox/elements";
 import { mountSite } from "../src/site";
 import "@ogdakke/fluidbox/baseline.css";
 import "@ogdakke/fluidbox/elements";
@@ -42,3 +43,6 @@ for (const gallery of document.querySelectorAll("fluidbox-gallery")) {
     });
   }
 }
+
+// A slideshow slow enough that the test sees it play without it moving on.
+document.querySelector<FluidboxGalleryElement>("#slideshow")!.slideshow = { interval: 60_000 };

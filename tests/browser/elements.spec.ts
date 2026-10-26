@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stubMedia } from "./support/media";
+import { expectSlideshowPart } from "./support/slideshow-part";
 
 /**
  * apps/examples/elements-slides.html: a `<fluidbox-gallery>` with a viewer
@@ -536,4 +537,11 @@ test.describe("slides and parts", () => {
     await expect(close.locator("svg")).toHaveCount(1);
     await expect(close).toHaveAccessibleName("Close");
   });
+});
+
+test("<fluidbox-slideshow> plays and pauses, named by its content or its label", async ({
+  page,
+}) => {
+  await load(page);
+  await expectSlideshowPart(page, "#slideshow", { trigger: '[slot="trigger"]', managed: false });
 });

@@ -220,6 +220,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   #zoom: FluidboxOptions["zoom"] | undefined;
   #dismiss: FluidboxOptions["dismiss"];
   #shareUrl: FluidboxOptions["shareUrl"];
+  #slideshow: FluidboxOptions["slideshow"];
   #definitions = new Map<string, DeclarativeFluidboxDefinition>();
   /** The slides of markup content, by the item type it gets. */
   #markupSlides = new Map<string, FluidboxSlideRenderer<any>>();
@@ -464,6 +465,19 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#queueUpdate();
   }
 
+  /**
+   * Advance on a timer, once `play()`, `<fluidbox-slideshow>` or `autoplay`
+   * starts it. Without it, `<fluidbox-slideshow>` hides.
+   */
+  get slideshow(): FluidboxOptions["slideshow"] {
+    return this.#slideshow;
+  }
+
+  set slideshow(slideshow: FluidboxOptions["slideshow"]) {
+    this.#slideshow = slideshow;
+    this.#queueUpdate();
+  }
+
   /** Your own controls and captions, instead of a `<template slot="viewer">` or the defaults. */
   get viewer(): FluidboxViewerRenderer<any> | undefined {
     return this.#viewer;
@@ -609,6 +623,16 @@ export class FluidboxGalleryElement extends HTMLElement {
     return this.#run((fluidbox) => fluidbox.share());
   }
 
+  /** Start the slideshow on the open viewer. */
+  play(): void {
+    this.#fluidbox?.play();
+  }
+
+  /** Stop the slideshow, until `play()` or `<fluidbox-slideshow>`. */
+  pause(): void {
+    this.#fluidbox?.pause();
+  }
+
   /**
    * Run a command at once when nothing is queued to rebuild or update the
    * fluidbox, as a press or a key does, so it lands in order with them.
@@ -708,6 +732,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       dismiss: this.#dismiss,
       wheel: this.wheel,
       shareUrl: this.#shareUrl,
+      slideshow: this.#slideshow,
     } satisfies FluidboxUpdateOptions;
   }
 
