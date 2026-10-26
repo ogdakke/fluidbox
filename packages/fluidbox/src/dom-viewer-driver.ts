@@ -727,7 +727,7 @@ export class DomViewerDriver<
     };
     this.#strip.onZoomableChange = () => this.#controller?.zoomableChanged?.();
     this.#strip.onMediaError = (index, kind, cause) => {
-      const item = source.getItem(index);
+      const item = this.#source!.getItem(index);
       this.#controller?.mediaError?.(
         new FluidboxMediaErrorEvent("mediaerror", { value: idOf(item), index, item, kind, cause }),
       );
