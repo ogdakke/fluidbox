@@ -3,7 +3,6 @@ import {
   createFluidbox,
   itemLabel,
   type Fluidbox,
-  type FluidboxCustomItemBase,
   type FluidboxHotspotOptions,
   type FluidboxImageItem,
   type FluidboxItem,
@@ -11,21 +10,11 @@ import {
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
 import "./hotspots.css";
+import type { RoomItem } from "./hotspot-items";
 
 mountSite("fixtures", {
   fixture: "Hotspots · pins on a product photo, contained, letterboxed and in a fill box",
 });
-
-interface RoomItem extends FluidboxCustomItemBase<"room"> {
-  readonly id: string;
-  readonly image: FluidboxImageItem;
-}
-
-declare module "@ogdakke/fluidbox" {
-  interface FluidboxItemTypes {
-    room: RoomItem;
-  }
-}
 
 /** The photo's points of interest: percentages, and item pixels on its 1600 × 1600. */
 const pins: readonly (FluidboxHotspotOptions & { readonly name: string })[] = [
@@ -52,6 +41,7 @@ const room = (id: string, extra: Partial<RoomItem> = {}): RoomItem => ({
   height: 1600,
   image,
   thumbnail: image.thumbnail,
+  parts: [],
   ...extra,
 });
 

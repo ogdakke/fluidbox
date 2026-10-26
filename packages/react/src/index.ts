@@ -51,6 +51,7 @@ import {
   fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
+  slideHotspots,
   latestFindTrigger,
   resolveLabels,
   takeOverFluidbox,
@@ -72,6 +73,7 @@ import type {
   FluidboxDownloadProps,
   FluidboxErrorProps,
   FluidboxGroupProps,
+  FluidboxHotspotProps,
   FluidboxIframeProps,
   FluidboxImageProps,
   FluidboxLoadingProps,
@@ -100,6 +102,7 @@ export type {
   FluidboxDownloadProps,
   FluidboxErrorProps,
   FluidboxGroupProps,
+  FluidboxHotspotProps,
   FluidboxIframeProps,
   FluidboxImageProps,
   FluidboxItemContext,
@@ -138,6 +141,8 @@ export type {
   FluidboxSheetSnapPoint,
   FluidboxSlide,
   FluidboxSlideRenderer,
+  FluidboxHotspotCoordinate,
+  FluidboxHotspotOptions,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
@@ -939,7 +944,57 @@ function Media({ zoom, render, children, ...attributes }: FluidboxMediaProps): R
   useIsomorphicLayoutEffect(() => {
     if (zoom !== undefined) slide.zoomable(zoom);
   }, [slide, zoom]);
-  return host && children != null ? createPortal(children, host) : null;
+  return host && children != null
+    ? createPortal(createElement(MediaContext.Provider, { value: true }, children), host)
+    : null;
+}
+
+/** True inside `Media`, where a Hotspot may go. */
+const MediaContext = createContext(false);
+
+/**
+ * A pin on a point of the slide's painted media: your button, in the box's
+ * hotspot layer, which keeps it on its point as the box fits and zooms.
+ */
+function Hotspot({
+  x,
+  y,
+  scaleWithZoom,
+  children,
+  ...attributes
+}: FluidboxHotspotProps): ReactElement | null {
+  const { slide } = useSlideContext("Hotspot");
+  if (!useContext(MediaContext))
+    throw new Error(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "<Fluidbox.Hotspot> must be inside <Fluidbox.Media>.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
+  const hotspots = useMemo(() => slideHotspots(slide), [slide]);
+  const host = useHost();
+  const button = useRef<HTMLButtonElement>(null);
+  useIsomorphicLayoutEffect(() => {
+    if (!host || !hotspots) return;
+    hotspots.element.append(host);
+    return () => host.remove();
+  }, [hotspots, host]);
+  useIsomorphicLayoutEffect(() => {
+    if (button.current) hotspots?.place(button.current, { x, y, scaleWithZoom });
+  }, [hotspots, x, y, scaleWithZoom]);
+  return host
+    ? createPortal(
+        createElement(
+          "button",
+          { type: "button", ...attributes, ref: button, "data-fluidbox-managed": "" },
+          children,
+        ),
+        host,
+      )
+    : null;
 }
 
 /** Draw one of the built-in media into the slide's box, keyed by the item's fields. */
@@ -1582,6 +1637,7 @@ export const Fluidbox = {
   Image,
   Video,
   Iframe,
+  Hotspot,
   Viewer,
   Toolbar,
   ZoomControls,

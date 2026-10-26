@@ -7,6 +7,7 @@ import type {
 } from "react";
 import type {
   FluidboxCommandOptions,
+  FluidboxHotspotCoordinate,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
@@ -146,6 +147,20 @@ export interface FluidboxMediaProps extends ElementAttributes {
   /** Draw into the box with a plain-JS slide renderer, as the add-on parts do. */
   readonly render?: FluidboxSlideRenderer<any>;
   /** Portalled into the box. Fill it: the box is sized from the item. */
+  readonly children?: ReactNode;
+}
+
+export interface FluidboxHotspotProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children"
+> {
+  /** Across the painted media: `"42%"`, or pixels counted on the media's `width`. */
+  readonly x: FluidboxHotspotCoordinate;
+  /** Down the painted media: `"30%"`, or pixels counted on the media's `height`. */
+  readonly y: FluidboxHotspotCoordinate;
+  /** Grow with the zoom instead of keeping its screen size. @default false */
+  readonly scaleWithZoom?: boolean;
+  /** The pin's content. With no text, name it with `aria-label`. */
   readonly children?: ReactNode;
 }
 

@@ -129,11 +129,12 @@ export function hotspotLayer(
     button.dataset.fluidboxHotspot = "";
     button.dataset.fluidboxOwnsInput = "";
     button.toggleAttribute("data-scale-with-zoom", !!scaleWithZoom);
-    // A number is pixels of the media, out of the layer's width or height.
+    // A number is pixels of the media, out of the layer's width or height,
+    // and so is an attribute's "412".
     const along = (value: FluidboxHotspotOptions["x"], side: string) =>
-      typeof value === "number"
-        ? `calc(${value}% * 100 / var(--fluidbox-hotspots-${side}))`
-        : value;
+      `${value}`.endsWith("%")
+        ? `${value}`
+        : `calc(${parseFloat(`${value}`)}% * 100 / var(--fluidbox-hotspots-${side}))`;
     button.style.left = along(x, "width");
     button.style.top = along(y, "height");
     if (!element.contains(button)) element.append(button);
