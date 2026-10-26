@@ -288,7 +288,7 @@ export class DomViewerDriver<
     this.#slideshow = new ViewerSlideshow({
       controller: () => this.#controller,
       loops: () => this.#loop,
-      ready: (index, cap) => this.#strip?.ready(index, cap),
+      ready: (index, cap, signal) => this.#strip?.ready(index, cap, signal),
       slide: () => this.#strip?.current?.element,
       dialog: this.#portal.dialog,
       status: this.#portal.status,
@@ -1031,7 +1031,7 @@ export class DomViewerDriver<
     // The item left behind scrolled away zoomed; coming back, it shows at fit.
     this.#zoom?.release();
     this.#render(context.item, context.index, true);
-    this.#slideshow.moved();
+    this.#slideshow.moved(context.item);
     // The overlay is invisible while open. Moving it between slide frames
     // during native scrolling can invalidate the browser's painted snap.
     // A scrub is a direct preview. The full-size image swaps immediately

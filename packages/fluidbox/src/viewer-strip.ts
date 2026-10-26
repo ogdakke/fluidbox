@@ -873,13 +873,13 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /**
-   * Settles once the slide for an item is ready to show, or after `cap` ms:
+   * Settles once the slide for an item is ready to show, after `cap` ms, or as `signal` aborts:
    * its content has committed, the images and videos in its box can paint and
    * its `waitUntil` promises have settled. The built-in media a slide draws
    * adds no wait, and a built-in slide is ready at once. Callable outside an
    * open, for whatever waits on the next slide.
    */
-  async ready(index: number, cap: number) {
+  async ready(index: number, cap: number, signal?: AbortSignal) {
     const slide = this.#slides.get(this.#near(index));
     if (!slide?.custom || !slide.rendered) return;
     const content = slide.content;
@@ -910,15 +910,19 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       }
     })();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const capped = new Promise<false>((resolve) => (timer = setTimeout(resolve, cap, false)));
+    const capped = new Promise<false>((resolve) => {
+      timer = setTimeout(resolve, cap, false);
+      signal?.addEventListener("abort", () => resolve(false));
+    });
     const done = await Promise.race([ready.then(() => true), capped]);
     clearTimeout(timer);
+    if (signal?.aborted) return;
     // Development builds only; a page without a bundler has no process.
     try {
       if (process.env.NODE_ENV !== "production" && !done && slide.content === content) {
         const waiting = committed ? [...pending.values()] : ["the slide's content to commit"];
         console.warn(
-          `Fluidbox opened ${itemLabel(this.#source.getItem(index))} after ${cap} ms without its slide ready, still waiting for ${waiting.join(", ")}.`,
+          `Fluidbox showed ${itemLabel(this.#source.getItem(index))} after ${cap} ms without its slide ready, still waiting for ${waiting.join(", ")}.`,
         );
       }
     } catch {}

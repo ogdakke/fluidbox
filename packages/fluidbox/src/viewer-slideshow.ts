@@ -6,8 +6,8 @@ export interface SlideshowViewer {
   controller(): SessionController<FluidboxItem> | undefined;
   /** Whether the gallery goes round, which the slideshow follows unless told otherwise. */
   loops(): boolean;
-  /** Settles once the slide for an item is ready, or after `cap` ms. */
-  ready(index: number, cap: number): Promise<void> | undefined;
+  /** Settles once the slide for an item is ready, after `cap` ms, or once `signal` aborts. */
+  ready(index: number, cap: number, signal: AbortSignal): Promise<void> | undefined;
   /** The slide on show, whose videos hold the slideshow while they play. */
   slide(): Element | undefined;
   /** The dialog, where its videos' events pass. */
@@ -32,8 +32,10 @@ export class ViewerSlideshow {
   #autoplayed = false;
   /** The interval under way, and then the wait and the move it ends in; undefined while none is. */
   #timer: ReturnType<typeof setTimeout> | undefined;
-  /** Counts the timer's runs, so a wait that a pause, a hold or a move overtook moves nothing. */
-  #run = 0;
+  /** Ends the interval's wait for its next slide, once a pause, a hold or a move overtakes it. */
+  #run: AbortController | undefined;
+  /** The item the interval belongs to: items set around it don't start it again. */
+  #item: FluidboxItem | null | undefined;
   /** The listeners for the tab and the videos, while it plays. */
   #watching: AbortController | undefined;
   readonly #viewer: SlideshowViewer;
@@ -46,24 +48,40 @@ export class ViewerSlideshow {
     this.#options = options;
   }
 
-  /** Play on an open or opening viewer. A hidden tab or a playing video holds it from the start. */
+  /**
+   * Play on an open or opening viewer that has a slide to move to. A hidden
+   * tab or a playing video holds it from the start. Playing already, it
+   * changes nothing.
+   */
   play() {
-    const status = this.#viewer.controller()?.state.status;
-    if (status === "open" || status === "opening") this.#set(true);
+    const state = this.#viewer.controller()?.state;
+    if (
+      !this.playing &&
+      (state?.status === "open" || state?.status === "opening") &&
+      this.#next() !== null
+    ) {
+      this.#item = state.item;
+      this.#set(true);
+    }
   }
 
   /** A pause that sticks: a person's input, `pause()` or the control. */
   pause() {
-    this.#set(false);
+    if (this.playing) this.#set(false);
   }
 
   /**
    * A person's input to the viewer. The Slideshow control's own press is
-   * left to its click, which plays or pauses.
+   * left to its click, which plays or pauses; any other key on it, a wheel or
+   * a move that starts there, pauses as it does anywhere.
    */
   interaction(event?: Event) {
+    const own =
+      event?.type === "keydown"
+        ? ["Enter", " "].includes((event as KeyboardEvent).key)
+        : event?.type !== "wheel";
     const target = event?.target;
-    if (target instanceof Element && target.closest("[data-fluidbox-slideshow]")) return;
+    if (own && target instanceof Element && target.closest("[data-fluidbox-slideshow]")) return;
     this.pause();
   }
 
@@ -80,8 +98,13 @@ export class ViewerSlideshow {
     }
   }
 
-  /** The viewer settled on another slide, by the slideshow or not: the interval starts again. */
-  moved() {
+  /**
+   * The viewer settled on a slide, by the slideshow or not: on another item,
+   * the interval starts again, and on the last without a loop, it stops.
+   */
+  moved(item: FluidboxItem) {
+    if (item === this.#item) return;
+    this.#item = item;
     this.#arm();
   }
 
@@ -103,34 +126,43 @@ export class ViewerSlideshow {
     if (changed) this.#viewer.controller()?.changed?.();
   }
 
+  /** The slide after the one on show: null on the last without a loop, undefined before there is one. */
+  #next() {
+    const state = this.#viewer.controller()?.state;
+    if (state?.index == null) return;
+    const { index, count } = state;
+    const loop = this.#options?.loop ?? this.#viewer.loops();
+    return index + 1 < count ? index + 1 : loop && count > 1 ? 0 : null;
+  }
+
   /** Start the interval on the slide on show, unless paused or held. */
   #arm() {
     this.#stop();
-    if (!this.playing || this.#held()) return;
-    const run = this.#run;
+    if (!this.playing) return;
+    // Without a loop it stops on the last slide, as soon as it is there.
+    if (this.#next() === null) return this.pause();
+    if (this.#held()) return;
+    const run = (this.#run = new AbortController());
     const interval = this.#options?.interval ?? 5000;
     this.#timer = setTimeout(async () => {
-      const controller = this.#viewer.controller();
-      const state = controller?.state;
-      // Still opening: another interval.
-      if (!state || state.status !== "open" || state.index === null) return this.#arm();
-      const { index, count } = state;
-      const loop = this.#options?.loop ?? this.#viewer.loops();
-      const next = index + 1 < count ? index + 1 : loop && count > 1 ? 0 : null;
-      // Without a loop it stops on the last slide.
-      if (next === null) return this.pause();
-      await this.#viewer.ready(next, interval);
-      if (run !== this.#run) return;
-      await controller.goTo({ index: next }, { reason: "slideshow" });
-      // A move a listener prevented, or one that settled nowhere new, waits another interval.
-      if (run === this.#run) this.#arm();
+      const controller = this.#viewer.controller()!;
+      const next = this.#next();
+      if (controller.state.status === "open" && next != null) {
+        try {
+          await this.#viewer.ready(next, interval, run.signal);
+          if (run.signal.aborted) return;
+          await controller.goTo({ index: next }, { reason: "slideshow" });
+        } catch {}
+      }
+      // Still opening, or a move a listener prevented or that failed: another interval.
+      if (!run.signal.aborted) this.#arm();
     }, interval);
   }
 
   #stop() {
     clearTimeout(this.#timer);
     this.#timer = undefined;
-    this.#run += 1;
+    this.#run?.abort();
   }
 
   /** A hidden tab, or a video playing in the slide on show. */

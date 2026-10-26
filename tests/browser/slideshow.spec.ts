@@ -68,11 +68,26 @@ test.describe("slideshow", () => {
     await expect.poll(() => value(page)).toBe("three");
     await tick(page);
     await expect.poll(() => value(page)).toBe("four");
-    // Without a loop it stops on the last slide.
-    await tick(page);
+    // Without a loop it stops as it reaches the last slide, with nothing left to move to.
     await expect.poll(() => playing(page)).toBe(false);
-    expect(await value(page)).toBe("four");
     await expect(page.locator(control)).toHaveText("Play slideshow");
+    // And there, play() does nothing.
+    await play(page);
+    expect(await playing(page)).toBe(false);
+    await expect(page.locator(control)).toHaveText("Play slideshow");
+    await tick(page, 20_000);
+    expect(await value(page)).toBe("four");
+  });
+
+  test("play() while playing keeps the interval under way", async ({ page }) => {
+    await load(page);
+    await open(page);
+    await play(page);
+    await tick(page, 3000);
+    await play(page);
+    await tick(page, 2100);
+    // The clock runs on in real time too: a restarted interval would take seconds more.
+    await expect.poll(() => value(page), { timeout: 1000 }).toBe("two");
   });
 
   test("a pause in the same task as play(), or during the opening, wins", async ({ page }) => {
@@ -99,6 +114,22 @@ test.describe("slideshow", () => {
     await tick(page, 20_000);
     expect(await value(page)).toBe("one");
   });
+
+  test("items set while it plays leave the interval alone", async ({ page }) => {
+    await load(page);
+    await open(page);
+    await play(page);
+    await tick(page, 4000);
+    // As a reachend handler does: more items after these.
+    await page.evaluate(() => {
+      const { fluidbox, items } = window.slideshowFixture;
+      return fluidbox.setItems([...items, { ...items[0]!, id: "five" }]);
+    });
+    await tick(page, 1100);
+    await expect.poll(() => value(page), { timeout: 1000 }).toBe("two");
+    expect(await playing(page)).toBe(true);
+  });
+
   test("an update of the option while it plays", async ({ page }) => {
     await load(page);
     await open(page);
@@ -158,6 +189,47 @@ test.describe("slideshow", () => {
     await page.evaluate(() => window.slideshowFixture.release());
     await expect.poll(() => value(page)).toBe("held");
   });
+
+  test("a pause during the wait for the next slide moves nothing, and ends the wait", async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning") warnings.push(message.text());
+    });
+    await load(page, "?held");
+    await open(page);
+    await play(page);
+    await tick(page, 6000);
+    await page.evaluate(() => window.slideshowFixture.fluidbox.pause());
+    // The wait's cap ends with it: no warning that the slide wasn't ready.
+    await tick(page, 20_000);
+    await page.evaluate(() => window.slideshowFixture.release());
+    await tick(page, 1000);
+    expect(await value(page)).toBe("one");
+    expect(warnings.filter((text) => text.includes("without its slide ready"))).toEqual([]);
+
+    // Playing again waits for the slide's interval, and play() during the wait changes nothing.
+    await play(page);
+    await tick(page, 5100);
+    await play(page);
+    await expect.poll(() => value(page)).toBe("held");
+  });
+
+  test("a close during the wait for the next slide moves nothing", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page, "?held");
+    await open(page);
+    await play(page);
+    await tick(page, 6000);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
+    await page.evaluate(() => window.slideshowFixture.release());
+    await tick(page, 20_000);
+    expect(await value(page)).toBe(null);
+    expect(await log(page)).not.toContain("move held slideshow");
+  });
+
   test("moves to a slide that is never ready after the interval again", async ({ page }) => {
     await load(page, "?held");
     await open(page);
@@ -223,6 +295,56 @@ test.describe("slideshow", () => {
       await tick(page, 20_000);
       expect(await value(page)).toBe("one");
     });
+
+    test("on an arrow key, which moves without it", async ({ page }) => {
+      await load(page);
+      await open(page);
+      await play(page);
+      await page.keyboard.press("ArrowRight");
+      await expect.poll(() => value(page)).toBe("two");
+      expect(await playing(page)).toBe(false);
+      await tick(page, 20_000);
+      expect(await value(page)).toBe("two");
+    });
+
+    test("on a swipe", async ({ page }) => {
+      await load(page);
+      await open(page);
+      await play(page);
+      const box = (await page.locator(`${dialog} [data-fluidbox-slides]`).boundingBox())!;
+      const y = box.y + box.height / 2;
+      await page.mouse.move(box.x + box.width * 0.7, y);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width * 0.3, y, { steps: 5 });
+      await page.mouse.up();
+      expect(await playing(page)).toBe(false);
+      await tick(page, 20_000);
+      expect(await playing(page)).toBe(false);
+    });
+
+    test("on keys and wheels on the control, but its own Enter and Space", async ({ page }) => {
+      await load(page);
+      await open(page);
+      const button = page.locator(control);
+      await button.focus();
+      await page.keyboard.press("Enter");
+      await expect.poll(() => playing(page)).toBe(true);
+      // An arrow on the control moves, as on any control, and pauses.
+      await page.keyboard.press("ArrowRight");
+      await expect.poll(() => value(page)).toBe("two");
+      expect(await playing(page)).toBe(false);
+      await page.keyboard.press("Space");
+      await expect.poll(() => playing(page)).toBe(true);
+      // So does a zoom key.
+      await page.keyboard.press("+");
+      expect(await playing(page)).toBe(false);
+      await page.keyboard.press("0");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => playing(page)).toBe(true);
+      await button.dispatchEvent("wheel");
+      expect(await playing(page)).toBe(false);
+    });
+
     test("on a key", async ({ page }) => {
       await load(page);
       await open(page);
@@ -293,8 +415,39 @@ test.describe("slideshow", () => {
         video.currentTime = Math.max(0, video.duration - 0.1);
         await new Promise((resolve) => video.addEventListener("ended", resolve, { once: true }));
       });
-      await tick(page);
+      // A full interval from the end, not what was left of it.
+      await tick(page, 4500);
+      expect(await value(page)).toBe("clip");
+      await tick(page, 600);
       await expect.poll(() => value(page)).toBe("three");
+    });
+
+    test("while the tab shows again with the video still playing", async ({ page }) => {
+      await load(page, "?video");
+      await open(page, "clip");
+      await play(page);
+      const video = page.locator(`${dialog} [data-fluidbox-slide][data-active] video`);
+      await video.evaluate((video: HTMLVideoElement) => video.play());
+      for (const state of ["hidden", "visible"]) {
+        await page.evaluate((state) => {
+          Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+          document.dispatchEvent(new Event("visibilitychange"));
+        }, state);
+      }
+      await tick(page, 20_000);
+      expect(await value(page)).toBe("clip");
+      expect(await playing(page)).toBe(true);
+    });
+
+    test("not for a video playing in another slide", async ({ page }) => {
+      await load(page, "?video");
+      await open(page);
+      await play(page);
+      const video = page.locator(`${dialog} [data-fluidbox-slide]:not([data-active]) video`);
+      await expect(video).toHaveCount(1);
+      await video.evaluate((video: HTMLVideoElement) => video.play());
+      await tick(page);
+      await expect.poll(() => value(page)).toBe("clip");
     });
 
     test("for good when the control is pressed during a video", async ({ page }) => {
