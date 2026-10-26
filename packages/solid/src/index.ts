@@ -49,6 +49,7 @@ import {
   fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
+  slideHotspots,
   latestFindTrigger,
   resolveLabels,
   takeOverFluidbox,
@@ -68,6 +69,7 @@ import type {
   FluidboxDownloadProps,
   FluidboxErrorProps,
   FluidboxGroupProps,
+  FluidboxHotspotProps,
   FluidboxIframeProps,
   FluidboxImageProps,
   FluidboxItemContext,
@@ -97,6 +99,7 @@ export type {
   FluidboxDownloadProps,
   FluidboxErrorProps,
   FluidboxGroupProps,
+  FluidboxHotspotProps,
   FluidboxIframeProps,
   FluidboxImageProps,
   FluidboxItemContext,
@@ -135,6 +138,8 @@ export type {
   FluidboxSheetSnapPoint,
   FluidboxSlide,
   FluidboxSlideRenderer,
+  FluidboxHotspotCoordinate,
+  FluidboxHotspotOptions,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
@@ -906,7 +911,14 @@ function Media(props: FluidboxMediaProps): JSX.Element {
   // the slide commits: a suspended slide shows nothing in the box until then.
   const host = slide.media.ownerDocument.createElement("span");
   host.dataset.fluidboxMount = "";
-  insert(host, () => local.children);
+  insert(host, () =>
+    createComponent(MediaContext.Provider, {
+      value: true,
+      get children() {
+        return local.children;
+      },
+    }),
+  );
   createEffect(() =>
     onCleanup(applyAttributes(slide.media, { ...attributes } as Record<string, string | object>)),
   );
@@ -938,6 +950,52 @@ function Media(props: FluidboxMediaProps): JSX.Element {
   createEffect(() => {
     if (local.zoom !== undefined) slide.zoomable(local.zoom);
   });
+  return null;
+}
+
+/** True inside `Media`, where a Hotspot may go. */
+const MediaContext = createContext(false);
+
+/**
+ * A pin on a point of the slide's painted media: your button, in the box's
+ * hotspot layer, which keeps it on its point as the box fits and zooms.
+ */
+function Hotspot(props: FluidboxHotspotProps): JSX.Element {
+  const { slide } = useSlideContext("Hotspot");
+  if (!useContext(MediaContext))
+    throw new Error(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "<Fluidbox.Hotspot> must be inside <Fluidbox.Media>.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
+  const [local, attributes] = splitProps(props, ["x", "y", "scaleWithZoom", "children"]);
+  const hotspots = slideHotspots(slide);
+  const ownerDocument = slide.media.ownerDocument;
+  // In an element of ours, which joins the layer as the slide commits.
+  const host = ownerDocument.createElement("span");
+  host.dataset.fluidboxMount = "";
+  const button = ownerDocument.createElement("button");
+  spread(
+    button,
+    mergeProps({ type: "button" }, attributes, {
+      "data-fluidbox-managed": "",
+      get children() {
+        return local.children;
+      },
+    }),
+  );
+  host.append(button);
+  onMount(() => {
+    hotspots?.element.append(host);
+    onCleanup(() => host.remove());
+  });
+  createEffect(() =>
+    hotspots?.place(button, { x: local.x, y: local.y, scaleWithZoom: local.scaleWithZoom }),
+  );
   return null;
 }
 
@@ -1620,6 +1678,7 @@ export const Fluidbox = {
   Image,
   Video,
   Iframe,
+  Hotspot,
   Viewer,
   Toolbar,
   ZoomControls,

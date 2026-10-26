@@ -1,6 +1,7 @@
 import type { Accessor, JSX, ValidComponent } from "solid-js";
 import type {
   FluidboxCommandOptions,
+  FluidboxHotspotCoordinate,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
@@ -158,6 +159,15 @@ export interface FluidboxMediaProps extends ElementAttributes {
   readonly render?: FluidboxSlideRenderer<any>;
   /** Inserted into the box. Fill it: the box is sized from the item. */
   readonly children?: JSX.Element;
+}
+
+export interface FluidboxHotspotProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Across the painted media: `"42%"`, or pixels counted on the media's `width`. */
+  readonly x: FluidboxHotspotCoordinate;
+  /** Down the painted media: `"30%"`, or pixels counted on the media's `height`. */
+  readonly y: FluidboxHotspotCoordinate;
+  /** Grow with the zoom instead of keeping its screen size. @default false */
+  readonly scaleWithZoom?: boolean;
 }
 
 export interface FluidboxImageProps {
