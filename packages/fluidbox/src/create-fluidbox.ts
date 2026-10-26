@@ -563,11 +563,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   play() {
     // An opening viewer may still be loading; it plays once it has, unless it closed.
-    if (this.#state.status !== "closed") void this.#loadViewer().then((viewer) => viewer?.play());
+    if (this.#viewer) this.#viewer.play();
+    else if (this.#state.status !== "closed") {
+      void this.#loadViewer().then((viewer) => viewer?.play());
+    }
   }
 
   pause() {
-    this.#viewer?.pause();
+    // After a play still waiting for the viewer to load, in turn.
+    if (this.#viewer) this.#viewer.pause();
+    else void this.#viewerLoad?.then((viewer) => viewer?.pause());
   }
 
   /** Run a command on the item on show; with none open it does nothing and resolves false. */
@@ -1445,7 +1450,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       zoom: this.#zoomFor(status, index, item),
       fullscreen: !!this.#viewer?.fullscreen,
       // Closing stops it, before the viewer says so.
-      playing: status === "open" && !!this.#viewer?.playing,
+      playing: !!this.#viewer?.playing,
     });
   }
 

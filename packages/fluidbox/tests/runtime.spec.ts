@@ -71,8 +71,12 @@ class TestDriver {
   setGestures() {}
   playing = false;
   fullscreen = false;
-  play() {}
-  pause() {}
+  play() {
+    this.playing = true;
+  }
+  pause() {
+    this.playing = false;
+  }
   setFullscreen() {
     return Promise.resolve(false);
   }
@@ -156,6 +160,20 @@ describe("the fluidbox runtime", () => {
     expect(() => fluidbox.bindControl(button, "hotspot" as never)).toThrow(
       new TypeError('Fluidbox has no control named "hotspot".'),
     );
+  });
+
+  it("lets a pause in the same task as a play win", async () => {
+    const driver = new TestDriver();
+    const fluidbox = make(driver);
+    const opened = fluidbox.open("two");
+    driver.steps[0]!.resolve();
+    await opened;
+    fluidbox.play();
+    fluidbox.pause();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(driver.playing).toBe(false);
+    fluidbox.play();
+    expect(driver.playing).toBe(true);
   });
 
   it("prepares a valid closed target without publishing state", () => {

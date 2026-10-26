@@ -75,6 +75,30 @@ test.describe("slideshow", () => {
     await expect(page.locator(control)).toHaveText("Play slideshow");
   });
 
+  test("a pause in the same task as play(), or during the opening, wins", async ({ page }) => {
+    await load(page);
+    // The viewer isn't loaded yet, so play() waits for it.
+    await page.evaluate(() => {
+      const { fluidbox } = window.slideshowFixture;
+      void fluidbox.open("one");
+      fluidbox.play();
+      fluidbox.pause();
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    expect(await playing(page)).toBe(false);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
+    await page.evaluate(() => {
+      const { fluidbox } = window.slideshowFixture;
+      void fluidbox.open("one");
+      fluidbox.play();
+      requestAnimationFrame(() => fluidbox.pause());
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    expect(await playing(page)).toBe(false);
+    await tick(page, 20_000);
+    expect(await value(page)).toBe("one");
+  });
   test("an update of the option while it plays", async ({ page }) => {
     await load(page);
     await open(page);
