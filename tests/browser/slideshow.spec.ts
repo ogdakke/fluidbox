@@ -286,19 +286,27 @@ test.describe("slideshow", () => {
     await page.evaluate(() => window.slideshowFixture.fluidbox.pause());
     // The wait's cap ends with it: no warning that the slide wasn't ready.
     await tick(page, 20_000);
-    await page.evaluate(() => window.slideshowFixture.release());
-    await tick(page, 1000);
     expect(await value(page)).toBe("one");
     expect(warnings.filter((text) => text.includes("without its slide ready"))).toEqual([]);
 
-    // Playing again waits for the slide's interval, and play() during the wait changes nothing.
+    // Playing again waits for the slide's interval, then for the slide, and a
+    // play() during that wait changes nothing: the release moves at once.
     await play(page);
     await tick(page, 5100);
     await play(page);
-    await expect.poll(() => value(page)).toBe("held");
+    await tick(page, 1000);
+    expect(await value(page)).toBe("one");
+    await page.evaluate(() => window.slideshowFixture.release());
+    await expect.poll(() => value(page), { timeout: 1000 }).toBe("held");
   });
 
-  test("a close during the wait for the next slide moves nothing", async ({ page }) => {
+  test("a close during the wait for the next slide moves nothing, and ends the wait", async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "warning") warnings.push(message.text());
+    });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await load(page, "?held");
     await open(page);
@@ -306,6 +314,9 @@ test.describe("slideshow", () => {
     await tick(page, 6000);
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
+    // Past the wait's cap: no warning that the slide wasn't ready.
+    await tick(page, 20_000);
+    expect(warnings.filter((text) => text.includes("without its slide ready"))).toEqual([]);
     await page.evaluate(() => window.slideshowFixture.release());
     await tick(page, 20_000);
     expect(await value(page)).toBe(null);
