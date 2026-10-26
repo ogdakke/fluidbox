@@ -245,6 +245,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #frozenLeft = 0;
   #userOwned = false;
   #userScrolled = false;
+  /** A gesture stopped a glide between slides: its settle brings the strip onto one. */
+  #stopped = false;
   #touching = false;
   #fingers = false;
   #lastWheel = 0;
@@ -2095,15 +2097,18 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     clearTimeout(this.#settleTimer);
     const refused = this.#refused !== null;
     this.#unfence();
+    const stopped = this.#stopped;
+    this.#stopped = false;
     if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
     if (this.#userOwned && this.#userScrolled) this.#onSelect(this.index, true);
     this.#userOwned = false;
     this.#userScrolled = false;
     this.#approved = null;
     this.#refused = null;
-    // A refused move the fence did not catch snapped to the neighbour. Go back.
+    // A refused move the fence did not catch snapped to the neighbour, or a
+    // glide stopped between slides: go to the slide.
     const left = (this.#index - this.#base) * this.#width;
-    if (refused && Math.abs(this.#left - left) > 1) {
+    if ((refused || stopped) && Math.abs(this.#left - left) > 1) {
       this.#scrollTo(left, "smooth");
     }
     if (this.#selection?.index === this.#index) this.#resolveSelection();
@@ -2129,18 +2134,20 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #takeControl = (event: Event) => {
-    // A person's gesture takes over from the strip's own scroll, as from the
-    // browser's: the strip is where the glide left it, and the selection
-    // lands as a native smooth one does.
-    if (this.#glide) {
-      this.#stopGlide();
+    // A person's gesture takes over from a smooth move, the strip's glide or
+    // the browser's: the move ends on the slide it had reached, which the
+    // gesture then moves on from as from any other, and settles wherever it ends.
+    const gliding = !!this.#selection;
+    if (gliding) {
+      this.#stopped = true;
+      this.#resolveSelection();
       this.#sync(undefined, false);
-      this.#awaitLanding();
+      this.#onSelect(this.index, false);
     }
     if (event.type === "wheel") this.#lastWheel = performance.now();
     if (event.type === "touchstart") this.#fingers = true;
     this.#userOwned = true;
-    this.#userScrolled = false;
+    this.#userScrolled = gliding;
     this.#touching = event.type === "pointerdown" || event.type === "touchstart";
   };
 

@@ -312,6 +312,53 @@ test.describe("motion speed", () => {
       expect(frames).toBe(0);
     });
 
+    /**
+     * A finger put down on the strip mid-glide, then panning it natively to
+     * each of `stops` (in slide widths), a frame apart, and held for `hold`
+     * ms. How far the strip ever was from where the finger put it, in px.
+     */
+    const pan = (page: Page, stops: number[], hold: number) =>
+      page.locator("[data-fluidbox-slides]").evaluate(
+        async (element, { stops, hold }) => {
+          const frame = () => new Promise(requestAnimationFrame);
+          const width = element.clientWidth;
+          const pointer = { bubbles: true, isPrimary: true, pointerId: 5, pointerType: "touch" };
+          // A finger's pan doesn't snap until it lets go; a script's scroll would.
+          const unsnapped = document.head.appendChild(document.createElement("style"));
+          unsnapped.textContent = "[data-fluidbox-slides] { scroll-snap-type: none !important }";
+          element.dispatchEvent(new PointerEvent("pointerdown", pointer));
+          let drift = 0;
+          for (const stop of stops) {
+            element.scrollLeft = stop * width;
+            await frame();
+            await frame();
+            drift = Math.max(drift, Math.abs(element.scrollLeft - stop * width));
+          }
+          const end = Date.now() + hold;
+          while (Date.now() < end) {
+            await frame();
+            drift = Math.max(drift, Math.abs(element.scrollLeft - stops.at(-1)! * width));
+          }
+          element.dispatchEvent(new PointerEvent("pointerup", pointer));
+          unsnapped.remove();
+          return drift;
+        },
+        { stops, hold },
+      );
+
+    test("by a drag lets the drag go on past the slide it was heading to", async ({ page }) => {
+      await midGlide(page);
+      // On past the second photo's slide, to most of the way to the third's.
+      expect(await pan(page, [0.4, 0.8, 1.2, 1.4, 1.6, 1.8], 300)).toBeLessThan(2);
+      await expect.poll(() => landed(page)).toBe(2);
+    });
+
+    test("by a finger held on it leaves the strip under the finger", async ({ page }) => {
+      await midGlide(page);
+      expect(await pan(page, [0.3], 2_500)).toBeLessThan(2);
+      await expect.poll(() => landed(page)).toBe(0);
+    });
+
     test("by turning loop on ends on the slide it was heading to", async ({ page }) => {
       await midGlide(page);
       await page.evaluate(() => window.flightViewers.scroll!.update({ loop: true }));
