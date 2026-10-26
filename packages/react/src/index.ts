@@ -445,12 +445,11 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     };
   }, [schedule]);
 
-  // Objects are compared by value, so inline labels, zoom or dismiss change nothing.
+  // Objects are compared by value, so inline labels, zoom, dismiss or slideshow change nothing.
   const labelsKey = JSON.stringify(labels ?? {});
   const zoomKey =
     zoom === false ? "off" : [zoom?.step, zoom?.max, zoom?.click, zoom?.tap].join(":");
-  const dismissKey = JSON.stringify(dismiss ?? null);
-  const slideshowKey = JSON.stringify(slideshow ?? null);
+  const optionsKey = JSON.stringify([dismiss, slideshow]);
   const first = useRef(true);
   useIsomorphicLayoutEffect(() => {
     if (first.current) first.current = false;
@@ -465,7 +464,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         slideshow: latest.current.slideshow,
       });
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [fluidbox, labelsKey, zoomKey, dismissKey, slideshowKey, loop, preload, wheel]);
+  }, [fluidbox, labelsKey, zoomKey, optionsKey, loop, preload, wheel]);
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
