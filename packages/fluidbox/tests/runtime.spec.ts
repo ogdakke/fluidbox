@@ -108,7 +108,8 @@ class TestDriver {
   reachedEnd = false;
   reachEnd() {
     if (this.controller && !this.reachedEnd && !this.loop) {
-      this.reachedEnd = reachEnd(this.controller as SessionController<any>);
+      this.reachedEnd = true;
+      if (!reachEnd(this.controller as SessionController<any>)) this.reachedEnd = false;
     }
   }
 
@@ -803,6 +804,12 @@ describe("reachend", () => {
     ]);
     await Promise.resolve();
     expect(fluidbox.state).toMatchObject({ status: "open", value: "photo-7", count: 20 });
+    // The new count re-armed it, though it came during the dispatch.
+    await fluidbox.open(17);
+    expect(reached).toEqual([
+      ["photo-7", 7, 10],
+      ["photo-17", 17, 20],
+    ]);
   });
 
   it("doesn't count an open that never settled", async () => {

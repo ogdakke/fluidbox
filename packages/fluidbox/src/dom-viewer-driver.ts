@@ -739,7 +739,9 @@ export class DomViewerDriver<
   /** Fire `reachend` once per item count, when an open or a move settles near the end. */
   reachEnd() {
     if (this.#controller && !this.#reachedEnd && !this.#loop) {
-      this.#reachedEnd = reachEnd(this.#controller);
+      // Set first: a handler that changes the count re-arms it as it dispatches.
+      this.#reachedEnd = true;
+      if (!reachEnd(this.#controller)) this.#reachedEnd = false;
     }
   }
 
