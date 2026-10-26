@@ -77,13 +77,27 @@ export function hotspotLayer(
             100
           : parseFloat(value) || 0,
       );
-    // The media's place in the box, out of the client rectangles' scale.
-    const rect = main.getBoundingClientRect();
+    // The media's place in the box: its layout offsets, which no flight
+    // moves; else, outside the box's offset tree, out of the client
+    // rectangles' scale.
+    let left = 0;
+    let top = 0;
+    let parent: Element | null = main;
+    while (parent && parent !== media) {
+      left += (parent as HTMLElement).offsetLeft;
+      top += (parent as HTMLElement).offsetTop;
+      parent = (parent as HTMLElement).offsetParent;
+    }
+    if (!parent) {
+      const rect = main.getBoundingClientRect();
+      left = ((rect.left - box.left) * boxWidth) / box.width;
+      top = ((rect.top - box.top) * boxHeight) / box.height;
+    }
     const percent = (value: number, of: number) => `${(value / of) * 100}%`;
     // Shares of the box, so a box that keeps its shape needs no new layout.
     Object.assign(element.style, {
-      left: percent(((rect.left - box.left) * boxWidth) / box.width + positionX, boxWidth),
-      top: percent(((rect.top - box.top) * boxHeight) / box.height + positionY, boxHeight),
+      left: percent(left + positionX, boxWidth),
+      top: percent(top + positionY, boxHeight),
       width: percent(paintedWidth, boxWidth),
       height: percent(paintedHeight, boxHeight),
     });
