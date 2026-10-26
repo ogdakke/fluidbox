@@ -24,6 +24,8 @@ createApp({
           // A render of its own, new on every render, as an inline one is.
           h(Fluidbox.Media, { render: () => {} }, () => [
             h(Fluidbox.Image, { item: item.image }),
+            // An image of the page's own: the photo the viewer drew is still the one measured.
+            h("img", { class: "hotspot-badge", alt: "", src: item.thumbnail!.src }),
             ...parts.value.map((part) =>
               h(
                 Fluidbox.Hotspot,

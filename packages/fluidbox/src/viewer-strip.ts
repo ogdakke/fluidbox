@@ -1505,6 +1505,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     let placing: Promise<(button: HTMLElement, options: FluidboxHotspotOptions) => void>;
     const place = (button: HTMLElement, options: FluidboxHotspotOptions) => {
       if (!button.hasAttribute("type")) button.setAttribute("type", "button");
+      // Hidden until the hotspots' code puts it on its point.
+      if (!button.style.left) button.style.visibility = "hidden";
       for (const name of ["hotspot", "chrome", "owns-input", "managed"]) {
         button.setAttribute(`data-fluidbox-${name}`, "");
       }

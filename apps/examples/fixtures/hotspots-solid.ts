@@ -25,6 +25,12 @@ const slide = ({ item }: { item: RoomItem }): JSX.Element =>
     get children() {
       return [
         createComponent(Fluidbox.Image, { item: item.image }),
+        // An image of the page's own: the photo the viewer drew is still the one measured.
+        Object.assign(document.createElement("img"), {
+          className: "hotspot-badge",
+          alt: "",
+          src: item.thumbnail!.src,
+        }),
         createComponent(For, {
           get each() {
             return parts();

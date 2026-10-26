@@ -130,8 +130,12 @@ test("focusing a hotspot pans a zoomed photo to it", async ({ page }) => {
       );
     });
   expect(await inView()).toBe(false);
-  // Without the browser's own scroll into view: the viewer pans.
-  await books.evaluate((element: HTMLElement) => element.focus({ preventScroll: true }));
+  // From the keyboard, the way a pan on focus is for.
+  await page
+    .locator('[data-pin="Framed print"]')
+    .evaluate((element: HTMLElement) => element.focus({ preventScroll: true }));
+  await page.keyboard.press("Tab");
+  await expect(books).toBeFocused();
   await expect.poll(inView).toBe(true);
   await expect(page.locator(dialog)).toHaveAttribute("data-zoomed", "");
 });
@@ -452,6 +456,50 @@ test("a hotspot taken out before the hotspots' code is in stays out", async ({ p
   }
 });
 
+test("a mouse click on a hotspot at the edge of a zoomed photo reaches it", async ({ page }) => {
+  await open(page, "room");
+  await zoomTo(page, "room", 4);
+  const viewport = page.locator("[data-fluidbox-zoom-viewport]");
+  await expect(viewport).toHaveCount(1);
+  const plant = page.locator('[data-pin="Plant"]');
+  await plant.evaluate((element) =>
+    element.addEventListener("click", () => document.body.setAttribute("data-pressed", "")),
+  );
+  // The plant half off the window's right edge, where a pan on focus would move it.
+  await page.evaluate(() => {
+    const viewport = document.querySelector("[data-fluidbox-zoom-viewport]")!;
+    const rect = document.querySelector('[data-pin="Plant"]')!.getBoundingClientRect();
+    viewport.scrollBy({ left: rect.left + rect.width / 2 - (innerWidth - 4), behavior: "instant" });
+  });
+  const box = (await plant.boundingBox())!;
+  const width = page.viewportSize()!.width;
+  expect(box.x + box.width).toBeGreaterThan(width);
+  // A press a person holds for a moment.
+  await page.mouse.move(width - 3, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await expect(page.locator("body")).toHaveAttribute("data-pressed", "");
+});
+
+test("a hotspot outside the box, or in a positioned wrapper, warns in development", async ({
+  page,
+}) => {
+  const warnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "warning") warnings.push(message.text());
+  });
+  await page.goto("/hotspots.html");
+  await page.evaluate(() => window.hotspotsFixture.custom({ misplaced: true }).open(0));
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect
+    .poll(() => warnings.filter((text) => text.includes("Fluidbox hotspot is")).sort())
+    .toEqual([
+      expect.stringContaining("inside an element that positions it"),
+      expect.stringContaining("outside its slide's media box"),
+    ]);
+});
+
 test("a press on a hotspot let go beside the box doesn't close a viewer without zoom", async ({
   page,
 }) => {
@@ -482,4 +530,30 @@ test("after a click on a hotspot, a click on the photo zooms and one on the page
   const photo = (await page.locator("img[data-custom]").boundingBox())!;
   await page.mouse.click(photo.x + photo.width * 0.35, photo.y + photo.height * 0.85);
   await expect(page.locator(dialog)).toHaveAttribute("data-zoomed", "");
+});
+
+test("pixels count the image's own size when only its width is declared", async ({ page }) => {
+  await openCustom(page, { declared: [3200] });
+  await loaded(page);
+  await expect
+    .poll(async () => Math.max(...(await customMisses(page, "contain"))))
+    .toBeLessThan(0.5);
+});
+
+test("hotspots whose code fails to load stay hidden, with nothing unhandled", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route(/fluidbox\/src\/hotspots\.ts/, (route) => route.abort());
+  await page.goto("/hotspots.html");
+  await page.evaluate(() => {
+    (window as any).unhandled_ = 0;
+    addEventListener("unhandledrejection", () => (window as any).unhandled_++);
+  });
+  await page.locator("#room button").first().click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(page.locator(pin)).toHaveCount(3);
+  await page.waitForTimeout(500);
+  for (const each of await page.locator(pin).all()) await expect(each).toBeHidden();
+  expect(await page.evaluate(() => (window as any).unhandled_)).toBe(0);
+  expect(errors).toEqual([]);
 });

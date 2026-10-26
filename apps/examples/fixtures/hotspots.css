@@ -13,3 +13,13 @@
   outline: 3px solid var(--fb-accent, #2563eb);
   outline-offset: 3px;
 }
+
+/* A sale badge of the page's own over the photo, drawn after it in the box. */
+.hotspot-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+}

@@ -22,13 +22,22 @@ export function hotspotLayer(
   let observed: Element | undefined;
   let frame = 0;
   const layout = () => {
-    // Shown media, not a hotspot's own content or a hidden preview.
-    const main = Array.from(
-      media.querySelectorAll<HTMLImageElement & HTMLVideoElement>(
+    // A frame or a load after the slide went: its observer stays off.
+    if (signal.aborted) return;
+    // The media the viewer drew, else the first shown, not a hotspot's own
+    // content or a hidden preview: wherever a binding renders the rest.
+    const main = [
+      media.querySelector("[data-fluidbox-drawn]"),
+      ...media.querySelectorAll(
         ":is(img, video):not([data-fluidbox-hotspot] *, [aria-hidden=true])",
       ),
-    ).find((each) => each.getClientRects().length);
-    if (main && main !== observed) resize.observe((observed = main));
+    ].find((each) => each?.getClientRects().length) as
+      | (HTMLImageElement & HTMLVideoElement)
+      | undefined;
+    if (main !== observed) {
+      if (observed) resize.unobserve(observed);
+      if ((observed = main)) resize.observe(main);
+    }
     // Pins are absolute in the box's padding box. Its client size is a layout
     // size, which no flight or zoom transforms; out of the page, as a closed
     // viewer's box is, it has none.
@@ -108,15 +117,17 @@ export function hotspotLayer(
     ) => {
       const text = String(value);
       const share = parseFloat(text) / (text.endsWith("%") ? 100 : pixels);
-      // A missing or unreadable coordinate is the start, never NaN.
+      // A missing or unreadable coordinate puts it on the box's corner, never NaN.
       return `${((start + painted * share) / of) * 100 || 0}%`;
     };
-    // Only pins in the box; one placed before it joins is placed as it loads
-    // or resizes, or as its options change. They go with the slide.
+    // A pin no longer in the box is let go; placed again, it comes back.
     for (const [pin, { x, y }] of pins) {
-      if (media.contains(pin)) {
+      if (!media.contains(pin)) pins.delete(pin);
+      else {
         pin.style.left = along(x, left, paintedWidth, boxWidth, width!);
         pin.style.top = along(y, top, paintedHeight, boxHeight, height!);
+        // Shown once it is on its point.
+        pin.style.visibility = "";
       }
     }
   };
@@ -134,6 +145,9 @@ export function hotspotLayer(
     "focusin",
     ({ target }) =>
       pins.has(target as HTMLElement) &&
+      // From the keyboard: a press focuses as it lands, and a pan under it
+      // would take its click away.
+      (target as Element).matches(":focus-visible") &&
       view.requestAnimationFrame(() => {
         const viewport = media.closest<HTMLElement>("[data-fluidbox-zoom-viewport]");
         if (!viewport) return;
@@ -158,6 +172,7 @@ export function hotspotLayer(
     { signal },
   );
   return (button, options) => {
+    if (signal.aborted) return;
     button.toggleAttribute("data-scale-with-zoom", !!options.scaleWithZoom);
     pins.set(button, options);
     // Once a frame, by when a binding has put the button in the box.
@@ -168,10 +183,20 @@ export function hotspotLayer(
     // Development builds only; a page without a bundler has no process.
     try {
       if (process.env.NODE_ENV !== "production") {
-        // Once its content is in: the renderer fills the button after it adds it.
-        queueMicrotask(() => {
+        // Once it is in the box and filled, after the layout of its frame.
+        view.requestAnimationFrame(() => {
+          if (signal.aborted || !button.isConnected) return;
+          if (!media.contains(button))
+            console.warn(
+              "A Fluidbox hotspot is outside its slide's media box: put it inside Media, fluidboxMedia or <fluidbox-media>.",
+            );
+          // Absolute in the box: an element between that positions it (a
+          // position, transform or filter) would hold it off its point.
+          else if (button.offsetParent !== media)
+            console.warn(
+              "A Fluidbox hotspot is inside an element that positions it: keep position, transform and filter off the elements between it and the media box.",
+            );
           if (
-            button.isConnected &&
             !button.textContent!.trim() &&
             !button.querySelector("img[alt]:not([alt=''])") &&
             !["aria-label", "aria-labelledby", "title"].some((name) => button.getAttribute(name))
