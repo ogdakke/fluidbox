@@ -75,6 +75,8 @@ const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
 const WHEEL_HANDOFF_TIMEOUT = 1200;
+/** Content that owns its input: a hotspot, a live model. */
+const OWNS_INPUT = "[data-fluidbox-owns-input]";
 /** Content whose keys are its own: widgets that move with arrow keys, and content that owns its input. */
 const KEY_OWNERS =
   "[data-fluidbox-owns-input], [role=radiogroup], [role=slider], [role=tablist], [role=listbox], [role=menu], [role=menubar], [role=grid], [role=treegrid], [role=tree], [role=toolbar], [role=combobox], [role=spinbutton]";
@@ -224,6 +226,8 @@ export class DomViewerDriver<
   #closeRetargetFrame = 0;
   #closeRetargetSettleFrame = 0;
   #suppressClick = false;
+  /** Whether the last press began on content that owns its input. */
+  #pressOwned = false;
   #suppressClickTimer: ReturnType<typeof setTimeout> | undefined;
   #wheelHandoff:
     | {
@@ -291,6 +295,17 @@ export class DomViewerDriver<
           clearTimeout(this.#suppressClickTimer);
           return;
         }
+        // A press that began on a hotspot or a model and let go beside it is
+        // theirs: its click lands on what holds both, and neither zooms nor closes.
+        if (
+          (event as MouseEvent).detail &&
+          this.#pressOwned &&
+          !(event.target as Element).closest(OWNS_INPUT)
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         if (event instanceof MouseEvent && this.#zoom?.handleClick(event)) {
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -311,6 +326,11 @@ export class DomViewerDriver<
       { signal: this.#lifetime.signal },
     );
     // Ahead of every other listener, the zoom's included: each input a person makes.
+    this.#portal.container.addEventListener(
+      "pointerdown",
+      ({ target }) => (this.#pressOwned = !!(target as Element).closest(OWNS_INPUT)),
+      { capture: true, passive: true, signal: this.#lifetime.signal },
+    );
     for (const type of ["pointerdown", "touchstart", "wheel"] as const) {
       this.#portal.container.addEventListener(type, () => this.#userInteraction(), {
         capture: true,

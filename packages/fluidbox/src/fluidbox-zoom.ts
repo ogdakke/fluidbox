@@ -154,8 +154,6 @@ export class FluidboxZoom {
   #touchMoved = false;
   #cursor: Point = { x: innerWidth / 2, y: innerHeight / 2 };
   #suppressClick = false;
-  /** Whether the last press began on content that owns its input. */
-  #pressOwned = false;
   /** The pointer that pressed last: a mouse zooms with one click, a finger with two taps. */
   #pointerType = "";
   /** What started the zoom on its way, reported when it comes to rest. */
@@ -195,14 +193,10 @@ export class FluidboxZoom {
       },
       { signal },
     );
-    root.addEventListener(
-      "pointerdown",
-      (event) => {
-        this.#pointerType = event.pointerType;
-        this.#pressOwned = !!ownsInput(event);
-      },
-      { capture: true, signal },
-    );
+    root.addEventListener("pointerdown", (event) => (this.#pointerType = event.pointerType), {
+      capture: true,
+      signal,
+    });
     root.addEventListener("dblclick", (event) => event.preventDefault(), { signal });
   }
 
@@ -843,9 +837,6 @@ export class FluidboxZoom {
 
   handleClick(event: MouseEvent) {
     const target = event.target as Element;
-    // A press that began on a hotspot or a model and let go beside it is
-    // theirs: the click lands on what holds both, and does nothing.
-    if (event.detail && this.#pressOwned && !ownsInput(event)) return true;
     const onMedia = !!target.closest(
       "[data-fluidbox-media], [data-fluidbox-content], [data-fluidbox-item-content]",
     );

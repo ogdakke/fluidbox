@@ -451,3 +451,35 @@ test("a hotspot taken out before the hotspots' code is in stays out", async ({ p
     await expect(each).toHaveAttribute("aria-label");
   }
 });
+
+test("a press on a hotspot let go beside the box doesn't close a viewer without zoom", async ({
+  page,
+}) => {
+  await openCustom(page, { noZoom: true });
+  await loaded(page);
+  const plant = (await page.locator('[data-pin="Plant"]').boundingBox())!;
+  const box = (await page.locator(`${dialog} [data-fluidbox-media]`).boundingBox())!;
+  await page.mouse.move(plant.x + plant.width / 2, plant.y + plant.height / 2);
+  await page.mouse.down();
+  // Off the box onto the slide around it, where a click closes the viewer.
+  await page.mouse.move(box.x - 12, box.y + box.height / 2, { steps: 4 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+});
+
+test("after a click on a hotspot, a click on the photo zooms and one on the page's content reaches it", async ({
+  page,
+}) => {
+  await openCustom(page, { content: true });
+  await loaded(page);
+  await page.locator('[data-pin="Plant"]').click();
+  await page.locator("[data-content]").click();
+  await expect(page.locator("body")).toHaveAttribute("data-pressed", "");
+  await expect(page.locator(dialog)).not.toHaveAttribute("data-zoomed", "");
+  await page.locator('[data-pin="Books"]').click();
+  // On the photo, away from the pins and the button.
+  const photo = (await page.locator("img[data-custom]").boundingBox())!;
+  await page.mouse.click(photo.x + photo.width * 0.35, photo.y + photo.height * 0.85);
+  await expect(page.locator(dialog)).toHaveAttribute("data-zoomed", "");
+});

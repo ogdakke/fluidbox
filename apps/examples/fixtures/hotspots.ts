@@ -117,16 +117,23 @@ export interface CustomBox {
   readonly padding?: string;
   /** No image: a canvas, which the pins don't measure. */
   readonly noMedia?: boolean;
-  /** The image's width and height attributes. */
-  readonly declared?: readonly [number, number];
+  /** The image's width and height attributes; a missing one isn't set. */
+  readonly declared?: readonly [number, number?];
   /** @default the room photo */
   readonly src?: string;
+  /** The viewer's zoom off. */
+  readonly noZoom?: boolean;
+  /** A button of the page's own in the box, which sets `data-pressed` on the body. */
+  readonly content?: boolean;
+  /** The books in a positioned wrapper, and the plant in the slide's layer, out of the box. */
+  readonly misplaced?: boolean;
 }
 
 /** A viewer of one 3:2 slide that draws an image of its own as `options` say. */
 const custom = (options: CustomBox): Fluidbox =>
   createFluidbox({
     items: [room("custom", { width: 1500, height: 1000 })],
+    ...(options.noZoom ? { zoom: false } : {}),
     slides: {
       room: (slide) => {
         const { media } = slide;
@@ -135,7 +142,9 @@ const custom = (options: CustomBox): Fluidbox =>
         if (drawn instanceof HTMLImageElement) {
           drawn.alt = "";
           drawn.src = options.src ?? image.src;
-          if (options.declared) [drawn.width, drawn.height] = options.declared;
+          const [width, height] = options.declared ?? [];
+          if (width) drawn.width = width;
+          if (height) drawn.height = height;
         }
         Object.assign(drawn.style, {
           display: "block",
@@ -155,6 +164,22 @@ const custom = (options: CustomBox): Fluidbox =>
         }
         // Taken out before the hotspots' code is in: it stays out.
         slide.hotspot({ x: "10%", y: "10%" }).remove();
+        if (options.content) {
+          const details = document.createElement("button");
+          details.type = "button";
+          details.textContent = "Details";
+          details.dataset.content = "";
+          details.style.cssText = "position: absolute; right: 12px; bottom: 12px";
+          details.addEventListener("click", () => document.body.setAttribute("data-pressed", ""));
+          media.append(details);
+        }
+        if (options.misplaced) {
+          const wrapper = document.createElement("div");
+          wrapper.style.cssText = "position: relative";
+          wrapper.append(media.querySelector('[data-pin="Books"]')!);
+          media.append(wrapper);
+          slide.layer.append(media.querySelector('[data-pin="Plant"]')!);
+        }
         return () => drawn.remove();
       },
     },
