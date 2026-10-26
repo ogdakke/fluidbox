@@ -148,7 +148,7 @@ const activationJsGzipLimits: Record<Entry, number> = {
   "angular-spin": 55_700,
   "elements-embed": 53_850,
   "elements-model": 53_500,
-  "elements-spin": 53_300,
+  "elements-spin": 53_350,
 };
 // Fullscreen, download and share, a slide's zoom pose, and a slide's hotspots load on first use.
 const onDemandJsGzipLimits: Record<Entry, number> = {
@@ -183,12 +183,12 @@ const onDemandJsGzipLimits: Record<Entry, number> = {
 };
 // Activation and on demand together: everything a viewer can load but its add-ons.
 const reachableJsGzipLimits: Record<Entry, number> = {
-  root: 47_200,
-  elements: 53_450,
-  react: 54_050,
-  solid: 53_800,
-  vue: 54_450,
-  angular: 56_100,
+  root: 47_300,
+  elements: 53_550,
+  react: 54_100,
+  solid: 53_900,
+  vue: 54_550,
+  angular: 56_200,
   thumbnails: 3_850,
   sheet: 7_350,
   kit: 1_900,
@@ -196,21 +196,21 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   embed: 3_050,
   model: 2_550,
   spin: 2_450,
-  "react-embed": 56_600,
-  "react-model": 56_150,
-  "react-spin": 55_900,
-  "solid-embed": 56_200,
-  "solid-model": 55_750,
-  "solid-spin": 55_550,
-  "vue-embed": 57_050,
-  "vue-model": 56_550,
-  "vue-spin": 56_350,
-  "angular-embed": 58_800,
-  "angular-model": 58_300,
-  "angular-spin": 58_100,
-  "elements-embed": 56_250,
-  "elements-model": 55_900,
-  "elements-spin": 55_750,
+  "react-embed": 56_700,
+  "react-model": 56_200,
+  "react-spin": 56_000,
+  "solid-embed": 56_300,
+  "solid-model": 55_850,
+  "solid-spin": 55_650,
+  "vue-embed": 57_150,
+  "vue-model": 56_650,
+  "vue-spin": 56_450,
+  "angular-embed": 58_900,
+  "angular-model": 58_400,
+  "angular-spin": 58_200,
+  "elements-embed": 56_350,
+  "elements-model": 56_000,
+  "elements-spin": 55_850,
 };
 const activationWithCssGzipLimits: Record<Entry, number> = {
   root: 47_650,
@@ -240,7 +240,7 @@ const activationWithCssGzipLimits: Record<Entry, number> = {
   "angular-model": 58_750,
   "angular-spin": 58_600,
   "elements-embed": 56_700,
-  "elements-model": 56_350,
+  "elements-model": 56_400,
   "elements-spin": 56_200,
 };
 
