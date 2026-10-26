@@ -610,8 +610,8 @@ export class DomViewerDriver<
    * Every duration and spring response the viewer plays, in milliseconds, as
    * its motion plays it. One place, so a motion speed changes them all.
    */
-  #duration(ms: number) {
-    return ms / this.#motionSpeed();
+  #duration(ms: number, speed = this.#motionSpeed()) {
+    return ms / speed;
   }
 
   /** `--fluidbox-motion-speed` on the viewer: 2 plays every motion twice as fast. */
@@ -1048,6 +1048,8 @@ export class DomViewerDriver<
       this.#returnFocus = context.origin.trigger;
       this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
     }
+    // A move still under way ends on its slide, which the close then leaves from.
+    this.#strip?.land();
     // Every close, flown or not, tells the slide on show where it lands.
     this.#strip?.closing(this.#originVideo(context), originModel(context.origin));
     if (
@@ -1138,6 +1140,8 @@ export class DomViewerDriver<
     } else {
       this.#preparedFlight = undefined;
     }
+    // Read once for the close, and the retargets that replan it.
+    const speed = this.#motionSpeed();
     const closeMotion = (to: ImageTransitionPose, width: number, height: number) =>
       createImageTransitionMotion({
         opening: false,
@@ -1146,8 +1150,8 @@ export class DomViewerDriver<
         width,
         height,
         backdropFrom: Number(start.backdropOpacity),
-        duration: this.#duration(duration),
-        response: this.#duration(duration * 0.9),
+        duration: this.#duration(duration, speed),
+        response: this.#duration(duration * 0.9, speed),
         samples: 60,
         fadeFrame: !originTarget,
         crossfade,
@@ -1511,6 +1515,7 @@ export class DomViewerDriver<
     const response = matchMedia("(hover: none) and (pointer: coarse)").matches
       ? TOUCH_OPENING_SPRING_RESPONSE
       : OPENING_SPRING_RESPONSE;
+    const speed = this.#motionSpeed();
     return createImageTransitionMotion({
       opening: true,
       from: start,
@@ -1518,8 +1523,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: Number(start.backdropOpacity),
-      duration: this.#duration(OPEN_DURATION),
-      response: this.#duration(response),
+      duration: this.#duration(OPEN_DURATION, speed),
+      response: this.#duration(response, speed),
       samples: 24,
       fadeFrame: !start.fromOrigin,
       crossfade,
@@ -2236,6 +2241,7 @@ export class DomViewerDriver<
     const settleX = boundDismissVelocity(state.x, velocityX, "x");
     const settleY = boundDismissVelocity(state.y, velocityY, "y");
     const duration = Math.max(140, 220 - Math.min(80, Math.hypot(settleX, settleY) * 50));
+    const speed = this.#motionSpeed();
     const motion = createImageTransitionMotion({
       opening: true,
       from: current,
@@ -2243,8 +2249,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: opacity,
-      duration: this.#duration(duration),
-      response: this.#duration(duration * 0.8),
+      duration: this.#duration(duration, speed),
+      response: this.#duration(duration * 0.8, speed),
       samples: 24,
     });
     const animations = this.#fly(

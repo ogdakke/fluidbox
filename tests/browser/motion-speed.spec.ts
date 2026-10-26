@@ -223,4 +223,99 @@ test.describe("motion speed", () => {
     await expect(dialog).toHaveCount(0);
     expect(await longest(page)).toBe(0);
   });
+
+  test.describe("a glide interrupted", () => {
+    const shown = (page: Page) => page.locator('[data-fluidbox-slide][aria-hidden="false"]');
+    /** Open at a quarter speed, start a move to the second photo and catch it halfway. */
+    const midGlide = async (page: Page) => {
+      const dialog = await open(page, 0.25);
+      await page.keyboard.press("ArrowRight");
+      await expect(page.locator("[data-fluidbox-slides]")).toHaveAttribute(
+        "style",
+        /scroll-snap-type: none/,
+      );
+      await page.waitForTimeout(300);
+      return dialog;
+    };
+    /** The strip at rest on a slide, snapping again, on the item the viewer's state names. */
+    const landed = async (page: Page) => {
+      const strip = page.locator("[data-fluidbox-slides]");
+      await expect
+        .poll(() =>
+          strip.evaluate((element) => {
+            const slide = element.querySelector('[data-fluidbox-slide][aria-hidden="false"]')!;
+            const offset =
+              slide.getBoundingClientRect().left - element.getBoundingClientRect().left;
+            return Math.abs(offset) < 1 && !element.style.scrollSnapType;
+          }),
+        )
+        .toBe(true);
+      const { index, count } = await page.evaluate(() => window.flightViewers.scroll!.state);
+      await expect(shown(page)).toHaveAttribute("aria-label", `Item ${index! + 1} of ${count}`);
+      return index;
+    };
+
+    test("by another move ends on the new slide", async ({ page }) => {
+      await midGlide(page);
+      await page.keyboard.press("ArrowRight");
+      await expect.poll(() => landed(page)).toBe(2);
+    });
+
+    test("by a tap or a wheel leaves the strip on the slide the state shows", async ({ page }) => {
+      for (const input of ["pointerdown", "wheel"] as const) {
+        await midGlide(page);
+        await page.locator("[data-fluidbox-slides]").evaluate((element, input) => {
+          if (input === "wheel") {
+            element.dispatchEvent(new WheelEvent("wheel", { deltaY: 1, bubbles: true }));
+            return;
+          }
+          const pointer = { bubbles: true, isPrimary: true, pointerId: 3, pointerType: "mouse" };
+          element.dispatchEvent(new PointerEvent("pointerdown", pointer));
+          element.dispatchEvent(new PointerEvent("pointerup", pointer));
+        }, input);
+        await landed(page);
+      }
+    });
+
+    test("by a close leaves from the slide it was heading to", async ({ page }) => {
+      const dialog = await midGlide(page);
+      const leaving = page.evaluate(
+        () =>
+          new Promise<string | null>((resolve) => {
+            new MutationObserver((_, observer) => {
+              const dialog = document.querySelector("[data-fluidbox-dialog]");
+              if (dialog?.getAttribute("data-fluidbox-status") !== "closing") return;
+              observer.disconnect();
+              resolve(
+                dialog
+                  .querySelector('[data-fluidbox-slide][aria-hidden="false"]')!
+                  .getAttribute("aria-label"),
+              );
+            }).observe(document.body, { attributes: true, subtree: true });
+          }),
+      );
+      await page.keyboard.press("Escape");
+      expect(await leaving).toBe("Item 2 of 4");
+      await expect(dialog).toHaveCount(0);
+      // The strip, out of the page, is left at rest: no frame loop waits on it.
+      const frames = await page.evaluate(async () => {
+        let count = 0;
+        const raf = window.requestAnimationFrame;
+        window.requestAnimationFrame = (callback) => {
+          count++;
+          return raf(callback);
+        };
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        window.requestAnimationFrame = raf;
+        return count;
+      });
+      expect(frames).toBe(0);
+    });
+
+    test("by turning loop on ends on the slide it was heading to", async ({ page }) => {
+      await midGlide(page);
+      await page.evaluate(() => window.flightViewers.scroll!.update({ loop: true }));
+      await expect.poll(() => landed(page)).toBe(1);
+    });
+  });
 });

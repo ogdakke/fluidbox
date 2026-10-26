@@ -456,6 +456,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * item moved to, so swapping a product's variant keeps the photos it shares.
    */
   setSource(source: FluidboxSource<TItem>, loop = this.#loop) {
+    // A selection under way ends on its slide.
+    if (this.#selection) this.#index = this.#selection.index;
     this.#resolveSelection();
     this.#focusable(source.count);
     this.#unfence();
@@ -538,6 +540,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   /** The viewer has closed: no slide is on show until the strip mounts again. */
   hide() {
+    // Nothing aligns a strip out of the page: it would wait on it forever.
+    this.#resolveSelection();
+    this.#endInstant();
     this.#hidden = true;
     this.#activate();
   }
@@ -561,6 +566,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // fallback before rebasing its virtual window, otherwise that stale timer
     // can jump to a slide which has already been recycled.
     this.#resolveSelection();
+    // An instant align still under way would put snapping back mid-glide.
+    this.#endInstant();
     this.#unfence();
     if (!this.#slides.has(index)) this.#renderWindow(index, smooth ? this.#index : index);
     if (!this.#mounted || !smooth || index === this.#index) {
@@ -572,6 +579,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       const timing = this.element.animate(null, { duration: 300 / smooth, easing: "ease-in-out" });
       // Snapping would pull every step back to a slide.
       this.element.style.scrollSnapType = "none";
+      // A far slide loads on the way, so it has its picture as it lands.
+      for (const [at, slide] of this.#slides) {
+        if (Math.abs(at - index) <= LOAD_RADIUS) this.#load(at, slide);
+      }
       const step = () => {
         const progress = timing.effect!.getComputedTiming().progress;
         const left = (index - this.#base) * this.#width;
@@ -590,24 +601,41 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     this.#scrollTo((index - this.#base) * this.#width, "smooth");
     return new Promise<void>((resolve) => {
-      // The fallback lands the slide only once the smooth scroll has stalled.
-      // Safari takes well over half a second to cross a wide viewport, and
-      // jumping while it still glides snaps the last stretch into place.
-      const started = performance.now();
-      let last = this.#left;
-      const check = () => {
-        const left = this.#left;
-        const moving = Math.abs(left - last) > 1;
-        last = left;
-        if (moving && performance.now() - started < 2000 && this.#selection) {
-          this.#selection.timeout = setTimeout(check, 120);
-          return;
-        }
-        this.#jump(index);
-        this.#resolveSelection();
-      };
-      this.#selection = { index, resolve, timeout: setTimeout(check, 600) };
+      this.#selection = { index, resolve, timeout: undefined };
+      this.#awaitLanding();
     });
+  }
+
+  /**
+   * Land the pending selection once the scroll stalls, if it hasn't by then.
+   * Safari takes well over half a second to cross a wide viewport, and
+   * jumping while it still glides snaps the last stretch into place.
+   */
+  #awaitLanding() {
+    const started = performance.now();
+    let last = this.#left;
+    const check = () => {
+      const selection = this.#selection;
+      if (!selection) return;
+      const left = this.#left;
+      const moving = Math.abs(left - last) > 1;
+      last = left;
+      if (moving && performance.now() - started < 2000) {
+        selection.timeout = setTimeout(check, 120);
+        return;
+      }
+      this.#jump(selection.index);
+      this.#resolveSelection();
+    };
+    this.#selection!.timeout = setTimeout(check, 600);
+  }
+
+  /** End a selection under way on its slide at once, as a close does. */
+  land() {
+    const selection = this.#selection;
+    if (!selection) return;
+    this.#resolveSelection();
+    this.#jump(selection.index);
   }
 
   destroy() {
@@ -2072,13 +2100,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
   };
 
+  #stopGlide() {
+    if (!this.#glide) return;
+    cancelAnimationFrame(this.#glide.frame);
+    this.#glide.timing.cancel();
+    this.#glide = undefined;
+    this.element.style.removeProperty("scroll-snap-type");
+  }
+
   #resolveSelection() {
-    if (this.#glide) {
-      cancelAnimationFrame(this.#glide.frame);
-      this.#glide.timing.cancel();
-      this.#glide = undefined;
-      this.element.style.removeProperty("scroll-snap-type");
-    }
+    this.#stopGlide();
     if (!this.#selection) return;
     clearTimeout(this.#selection.timeout);
     this.#selection.resolve();
@@ -2086,8 +2117,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #takeControl = (event: Event) => {
-    // A person's gesture takes over from a smooth selection the strip scrolls itself.
-    if (this.#glide) this.#resolveSelection();
+    // A person's gesture takes over from the strip's own scroll, as from the
+    // browser's: the strip is where the glide left it, and the selection
+    // lands as a native smooth one does.
+    if (this.#glide) {
+      this.#stopGlide();
+      this.#sync(undefined, false);
+      this.#awaitLanding();
+    }
     if (event.type === "wheel") this.#lastWheel = performance.now();
     if (event.type === "touchstart") this.#fingers = true;
     this.#userOwned = true;
