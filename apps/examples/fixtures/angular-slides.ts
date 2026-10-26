@@ -176,6 +176,15 @@ class Reel implements OnInit {
     <div fluidboxRoot [items]="photos">
       <app-grid [items]="photos" id="builtin" />
     </div>
+    <h2>A slideshow, with a Slideshow of text and one with an icon</h2>
+    <div fluidboxRoot [items]="photos" [slideshow]="{ interval: 60000 }">
+      <app-grid [items]="photos" id="slideshow" />
+      <ng-template fluidboxViewer>
+        <button fluidboxSlideshow data-test="slideshow-text"></button>
+        <button fluidboxSlideshow data-test="slideshow-icon"><svg aria-hidden="true"></svg></button>
+        <button fluidboxClose></button>
+      </ng-template>
+    </div>
     <div fluidboxRoot [items]="photos">
       <app-grid [items]="photos" id="custom" />
       <ng-template fluidboxSlide="image"><fluidbox-image /></ng-template>

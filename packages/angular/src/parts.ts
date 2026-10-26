@@ -398,6 +398,7 @@ abstract class ControlDirective extends NamedDirective implements OnInit, OnDest
       // A link has no disabled state; Download hides instead.
       disabled: this.control !== "download" && (this.disabled() ?? control.disabled(state)),
       hidden: !!control.hidden?.(this.root.fluidbox, state),
+      active: !!control.active?.(state),
     };
   });
   readonly #zone = inject(NgZone);
@@ -475,6 +476,19 @@ export class FluidboxFullscreenDirective extends ControlDirective {
 @Directive({ selector: "button[fluidboxShare]", standalone: true })
 export class FluidboxShareDirective extends ControlDirective {
   protected readonly control = "share";
+}
+
+/**
+ * Plays and pauses the slideshow, named for what it does next, with
+ * `data-active` while it plays. Hidden without a `slideshow` input.
+ */
+@Directive({
+  selector: "button[fluidboxSlideshow]",
+  standalone: true,
+  host: { "[attr.data-active]": "state().active ? '' : null" },
+})
+export class FluidboxSlideshowDirective extends ControlDirective {
+  protected readonly control = "slideshow";
 }
 
 /** Loads the failed media on show again, for an error of your own. */
