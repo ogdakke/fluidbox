@@ -1,3 +1,4 @@
+import type { FluidboxReachEndEvent } from "./reach-end-event";
 import type { FluidboxLabels } from "./labels";
 
 export type { FluidboxLabels } from "./labels";
@@ -207,6 +208,18 @@ export interface FluidboxItemList<TItem extends FluidboxItem = FluidboxItem> {
   get(index: number): TItem;
   /** The index of the item with this id, or -1. Without it, ids are found by scanning. */
   indexOf?(id: string): number;
+}
+
+/** A list `createItemList` makes. */
+export interface FluidboxLazyItemList<
+  TItem extends FluidboxItem = FluidboxItem,
+> extends FluidboxItemList<TItem> {
+  indexOf(id: string): number;
+  /**
+   * The same list with another count: it makes items with the same `item` and
+   * `index`, and keeps the items already made. Pass it to `setItems` to grow.
+   */
+  withCount(count: number): FluidboxLazyItemList<TItem>;
 }
 
 /** What `createItemList` makes a list from. */
@@ -644,6 +657,9 @@ export class FluidboxMediaErrorEvent<TItem extends FluidboxItem = FluidboxItem> 
   }
 }
 
+// Its own module, which only the viewer imports, so it stays out of the initial chunk.
+export { FluidboxReachEndEvent } from "./reach-end-event";
+
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   /** Before an open, a move or a close. Cancelable: the command resolves false. */
   beforevaluechange: FluidboxValueChangeEvent<TItem>;
@@ -657,6 +673,8 @@ export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   zoomchange: FluidboxZoomEvent;
   /** A slide's media failed, or a zoom image did. */
   mediaerror: FluidboxMediaErrorEvent<TItem>;
+  /** The open item came within `reachEndThreshold` of the last. Never fires with `loop`. */
+  reachend: FluidboxReachEndEvent<TItem>;
 }
 
 // Add-ons. Each needs its entry imported once: `import "@ogdakke/fluidbox/sheet"`.
@@ -833,6 +851,12 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   /** The link Share shares for an item. Without one, Share hides. */
   readonly shareUrl?: (item: TItem) => string | undefined;
   /**
+   * How near the end `reachend` fires: when the open item is this many items
+   * from the last, or nearer.
+   * @default 2
+   */
+  readonly reachEndThreshold?: number;
+  /**
    * Advance on a timer. It never starts by itself: only `play()`, the
    * Slideshow control or `autoplay` start it. Without it, the Slideshow
    * control hides unless it plays; `play()` still plays, with the defaults.
@@ -872,7 +896,8 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
     | "dismiss"
     | "wheel"
     | "shareUrl"
-    | "slideshow"]?: FluidboxOptions<TItem>[K] | undefined;
+    | "slideshow"
+    | "reachEndThreshold"]?: FluidboxOptions<TItem>[K] | undefined;
 };
 
 export interface FluidboxCommandOptions {

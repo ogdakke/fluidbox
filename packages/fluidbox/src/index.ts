@@ -5,6 +5,7 @@ export { imageItem, type FluidboxImageProps } from "./image-item";
 export { videoSlide } from "./video-slide";
 export {
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxSheetEvent,
   FluidboxValueChangeEvent,
   FluidboxZoomEvent,
@@ -25,6 +26,7 @@ export type {
   FluidboxItemTypes,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorKind,

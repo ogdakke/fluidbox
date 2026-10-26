@@ -8,6 +8,7 @@ import {
   useFluidboxSlide,
   type FluidboxApi,
   type FluidboxMediaErrorEvent,
+  type FluidboxReachEndEvent,
   type FluidboxSheetApi,
   type FluidboxSheetEvent,
   type FluidboxSlideApi,
@@ -85,6 +86,8 @@ function ContractExample(): JSX.Element {
       shareUrl={(item) => `https://example.com/${item.id}`}
       slideshow={{ interval: 4000, loop: true, autoplay: false }}
       onMediaError={(event: FluidboxMediaErrorEvent<Photo>) => void event.item.credit}
+      reachEndThreshold={3}
+      onReachEnd={(event: FluidboxReachEndEvent<Photo>) => void [event.value, event.count]}
       onValueChange={(value: string | null, details: FluidboxValueChangeDetails<Photo>) => {
         if (value === null && details.reason === "keyboard") details.cancel();
         void details.item?.credit;

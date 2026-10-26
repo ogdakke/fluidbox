@@ -1,4 +1,70 @@
 import "@ogdakke/fluidbox";
+import type * as AngularBinding from "@ogdakke/fluidbox/angular";
+// An Angular SSR render through platform-server: a fluidboxRoot whose value
+// opens it on an image draws the viewer's copy into the HTML, with room for
+// the thumbnails its part turns on, and turns no add-on on. The binding is a
+// partial build, which @angular/compiler links as the components load.
+{
+  await import("@angular/compiler");
+  const { Component, provideZonelessChangeDetection } = await import("@angular/core");
+  const { bootstrapApplication } = await import("@angular/platform-browser");
+  const { renderApplication } = await import("@angular/platform-server");
+  // The built entry, as an app gets it: the tsconfig path to the source would
+  // load the binding with its own Angular, the 17.3 it compiles against.
+  const { FluidboxModule } = (await import(
+    "../packages/fluidbox/dist/angular/index.js" as string
+  )) as typeof AngularBinding;
+  const photos = ["one", "two"].map((id) => ({
+    type: "image" as const,
+    id,
+    src: `/${id}.jpg`,
+    alt: `Photo ${id}`,
+    width: 800,
+    height: 600,
+  }));
+  @Component({
+    selector: "app-root",
+    standalone: true,
+    imports: [FluidboxModule],
+    template: `
+      <div fluidboxRoot [items]="photos" [value]="'two'">
+        @for (photo of photos; track photo.id) {
+          <button [fluidboxTrigger]="photo.id"><img [src]="photo.src" [alt]="photo.alt" /></button>
+        }
+        <ng-container fluidboxThumbnails />
+        <ng-template fluidboxSheet>Details</ng-template>
+        <ng-template fluidboxViewer><button fluidboxClose></button></ng-template>
+      </div>
+    `,
+  })
+  class App {
+    readonly photos = photos;
+  }
+  const html = await renderApplication(
+    (context) =>
+      bootstrapApplication(App, { providers: [provideZonelessChangeDetection()] }, context),
+    {
+      document: "<!doctype html><html><head></head><body><app-root></app-root></body></html>",
+      url: "/",
+    },
+  );
+  const copy = html.slice(html.indexOf("data-fluidbox-server-viewer"));
+  if (!html.includes("data-fluidbox-server-viewer") || !copy.includes('src="/two.jpg"')) {
+    throw new Error(`An Angular fluidboxRoot open on an image renders no server copy:\n${html}`);
+  }
+  if (!copy.includes("data-fluidbox-thumbnails")) {
+    throw new Error(`The Angular server copy leaves no room for the thumbnails:\n${html}`);
+  }
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const addons = (globalThis as Record<symbol, object | undefined>)[
+    Symbol.for("@ogdakke/fluidbox/addons")
+  ];
+  if (addons && Object.keys(addons).length) {
+    throw new Error(`An Angular server render loaded add-ons: ${Object.keys(addons).join(", ")}`);
+  }
+  console.log("SSR render passed: @ogdakke/fluidbox/angular, a fluidboxRoot open on an image");
+}
+
 // A Nuxt-style server render: a Vue Root open on an image draws the viewer's
 // copy into the HTML, with room for the thumbnails its part turns on. It runs
 // before the imports below, as the thumbnails and sheet entries register add-ons.

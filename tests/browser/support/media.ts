@@ -6,13 +6,21 @@ const still = readFileSync(
   join(import.meta.dirname, "../../../apps/examples/public/products/fjord-room.webp"),
 );
 
+/** A 1×1 PNG. */
+const TEXTURE =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+
 /**
  * A stand-in for `<model-viewer>`: a focusable element that turns on a drag
  * and the arrow keys, zooms on a wheel, and fires `load` once it has a `src`.
  * As the real one, its focus target is a `.userInput` in its shadow root, and
  * it has the camera API a model slide syncs with: the orbit is the drag's
  * turn in degrees (`"<turn>deg 75deg 2m"`), the field of view 30° over the
- * zoom, and `toDataURL` a picture naming the orbit. It records what it got in
+ * zoom. It draws to a canvas marked `show` in its shadow root, as 4.0.0 does,
+ * twice its size, in the top-left corner its content box takes, whose pixels'
+ * red and green are the orbit plus 512, magenta outside it, and `toDataURL`
+ * is a picture naming the orbit, which throws, as the real one does, once a
+ * texture from another origin has tainted the canvas. It records what it got in
  * data attributes (`data-camera-orbit`, `data-camera-target`,
  * `data-field-of-view`, `data-jumps`, `data-snapshots`), and how often it has
  * joined the page: the real element draws nothing, or a clipped frame, once it
@@ -22,16 +30,66 @@ const still = readFileSync(
 const fakeModelViewer = `
 window.__modelViewerLoads = (window.__modelViewerLoads ?? 0) + 1;
 class FakeModelViewer extends HTMLElement {
+  get orbit() {
+    return this.turned ?? 0;
+  }
+  set orbit(value) {
+    this.turned = value;
+    this.paint();
+  }
+  // As 4.0.0's renderer: the canvas is sized for a larger model than this one,
+  // twice its content box, and this model draws its top-left corner, at the
+  // content box's size; the rest is another model's, magenta.
+  paint() {
+    const context = this.canvas?.getContext("2d");
+    const size = this.size;
+    if (!context || !size) return;
+    const dpr = devicePixelRatio;
+    const width = Math.ceil(size.width * 2 * dpr);
+    const height = Math.ceil(size.height * 2 * dpr);
+    if (this.canvas.width !== width) this.canvas.width = width;
+    if (this.canvas.height !== height) this.canvas.height = height;
+    this.canvas.style.width = Math.ceil(size.width * 2) + "px";
+    this.canvas.style.height = Math.ceil(size.height * 2) + "px";
+    context.fillStyle = "rgb(255,0,255)";
+    context.fillRect(0, 0, width, height);
+    const code = Math.round(this.orbit) + 512;
+    context.clearRect(0, 0, Math.ceil(size.width * dpr), Math.ceil(size.height * dpr));
+    context.fillStyle = "rgb(" + (code & 255) + "," + (code >> 8) + ",128)";
+    context.fillRect(0, 0, Math.ceil(size.width * dpr), Math.ceil(size.height * dpr));
+    if (this.texture?.complete && this.texture.naturalWidth) context.drawImage(this.texture, 0, 0, 4, 4);
+  }
   constructor() {
     super();
     this.orbit = 0;
     this.zoom = 1;
     this.target = "0m 0m 0m";
     this.ownFieldOfView = "auto";
-    // \`window.__modelViewerNoInput\` stands in for a version whose focus target is named otherwise.
+    // \`window.__modelViewerNoInput\` stands in for a version whose focus target
+    // is named otherwise, and \`window.__modelViewerNoCanvas\` for one that draws
+    // somewhere else; \`window.__modelViewerUnshown\` leaves its canvas unmarked, as
+    // before 4.0.0 has drawn.
+    // Its .container takes the content box's size, fractions and all, as 4.0.0's does.
     this.attachShadow({ mode: "open", delegatesFocus: true }).innerHTML =
-      '<div class="' + (window.__modelViewerNoInput ? "input" : "userInput") +
-      '" tabindex="0" role="img" aria-label="3D model" style="width:100%;height:100%"></div>';
+      '<div class="container" style="overflow:hidden"><div class="' + (window.__modelViewerNoInput ? "input" : "userInput") +
+      '" tabindex="0" role="img" aria-label="3D model" style="width:100%;height:100%">' +
+      (window.__modelViewerNoCanvas ? "" : '<canvas class="' + (window.__modelViewerUnshown ? "" : "show") + '" style="display:block"></canvas>') +
+      "</div></div>";
+    this.canvas = this.shadowRoot.querySelector("canvas");
+    const container = this.shadowRoot.querySelector(".container");
+    new ResizeObserver(([entry]) => {
+      this.size = entry.contentRect;
+      container.style.width = this.size.width + "px";
+      container.style.height = this.size.height + "px";
+      this.paint();
+    }).observe(this);
+    // \`window.__modelViewerTainted\` stands in for a model with textures from another origin.
+    if (this.canvas && window.__modelViewerTainted) {
+      this.texture = new Image();
+      this.texture.onload = () => this.paint();
+      this.texture.src = "https://textures.fluidbox.test/texture.png";
+    }
+    this.paint();
     let x = null;
     this.addEventListener("pointerdown", (event) => {
       x = event.clientX;
@@ -126,8 +184,9 @@ class FakeModelViewer extends HTMLElement {
     this.dataset.jumps = String(Number(this.dataset.jumps ?? 0) + 1);
   }
   toDataURL() {
-    // \`window.__modelViewerTainted\` stands in for a canvas that drew from another origin.
-    if (window.__modelViewerTainted) throw new DOMException("The canvas is tainted.", "SecurityError");
+    // \`window.__modelViewerThrows\` stands in for a canvas that can't be read back.
+    if (window.__modelViewerThrows) throw new DOMException("The canvas is tainted.", "SecurityError");
+    this.canvas?.toDataURL();
     this.dataset.snapshots = String(Number(this.dataset.snapshots ?? 0) + 1);
     const orbit = Math.round(this.orbit);
     return "data:image/svg+xml," + encodeURIComponent(
@@ -166,6 +225,10 @@ export async function stubMedia(page: Page) {
     requests.stills.push(route.request().url());
     return route.fulfill({ contentType: "image/webp", body: still });
   });
+  // A texture from another origin, which taints a canvas it is drawn on.
+  await page.route("https://textures.fluidbox.test/**", (route) =>
+    route.fulfill({ contentType: "image/png", body: Buffer.from(TEXTURE, "base64") }),
+  );
   await page.route("https://ajax.googleapis.com/**", (route) => {
     requests.modelViewer.push(route.request().url());
     return route.fulfill({

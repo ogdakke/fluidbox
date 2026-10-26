@@ -279,6 +279,22 @@ test.describe("mediaerror", () => {
     await expect.poll(async () => count(await log(page))).toBe(2);
   });
 
+  test("names the item where it is now, after new items", async ({ page }) => {
+    await load(page);
+    await open(page, "broken");
+    await expect.poll(() => log(page)).toContain("mediaerror broken 3 image");
+    // The same items backwards: the broken photo, still on show, is now second.
+    await page.evaluate(() =>
+      window.featuresFixture.fluidbox.setItems([...window.featuresFixture.items].reverse()),
+    );
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 5");
+    await page
+      .locator(`${shown} [data-fluidbox-error]`)
+      .getByRole("button", { name: "Retry" })
+      .click();
+    await expect.poll(() => log(page)).toContain("mediaerror broken 1 image");
+  });
+
   test("fires for a neighbour that fails", async ({ page }) => {
     await load(page);
     await open(page, "off");
@@ -387,14 +403,49 @@ test.describe("turning gestures off", () => {
     await load(page, "?wheel=navigate");
     await open(page, "one");
     await page.mouse.move(400, 300);
-    // One gesture with its inertia: events less than 150 ms apart.
-    for (let step = 0; step < 10; step++) await page.mouse.wheel(0, 40);
+    // One gesture with its inertia: events less than 150 ms apart, sent from
+    // the page, as a loaded browser can space the test's own wheels wider.
+    await page.locator("[data-fluidbox-slides]").evaluate(async (strip) => {
+      for (let step = 0; step < 10; step++) {
+        strip.dispatchEvent(
+          new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      }
+    });
     await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 5");
     await page.waitForTimeout(400);
     await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 5");
     await page.mouse.wheel(0, -40);
     await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 1 of 5");
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  });
+
+  test('wheel "navigate" leaves the move a gesture started to finish, through its inertia', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "A wheel needs a mouse.");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await load(page, "?wheel=navigate");
+    await open(page, "one");
+    // The gesture's inertia, 30 ms apart, while its move still scrolls.
+    const values = await page.locator("[data-fluidbox-slides]").evaluate(async (strip) => {
+      const values: (string | null)[] = [];
+      window.featuresFixture.fluidbox.addEventListener("valuechange", () =>
+        values.push(window.featuresFixture.fluidbox.state.value),
+      );
+      for (let step = 0; step < 10; step++) {
+        strip.dispatchEvent(
+          new WheelEvent("wheel", { deltaY: 40, bubbles: true, cancelable: true }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      return values;
+    });
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 5");
+    expect(values).toHaveLength(1);
   });
 
   test('wheel "zoom" zooms with a plain wheel', async ({ page, isMobile }) => {

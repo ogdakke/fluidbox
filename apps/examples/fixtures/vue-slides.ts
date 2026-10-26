@@ -14,6 +14,7 @@ import type {
   FluidboxCustomItemBase,
   FluidboxImageItem,
   FluidboxItem,
+  FluidboxReachEndEvent,
   FluidboxSlideOrigin,
   FluidboxValueChangeDetails,
 } from "@ogdakke/fluidbox";
@@ -22,6 +23,7 @@ import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/vue";
 import { Embed } from "@ogdakke/fluidbox/vue/embed";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Vue slides · content that suspends, holds the open, or plays on its own",
@@ -218,6 +220,31 @@ const Guarded = defineComponent(() => {
     );
 });
 
+// A gallery that appends four photos each time the viewer nears its end, as
+// `<Fluidbox.Root :reach-end-threshold="1" @reach-end="more">` compiles.
+const Growing = defineComponent(() => {
+  const count = shallowRef(4);
+  // A string, as a static `reach-end-threshold="1"` attribute gives.
+  const threshold = shallowRef<number | string>("1");
+  growth.setCount = (next) => (count.value = next);
+  growth.setThreshold = (next) => (threshold.value = next);
+  return () => {
+    const items = growingPhotos(count.value);
+    return h(
+      Fluidbox.Root,
+      {
+        items,
+        reachEndThreshold: threshold.value as number,
+        onReachEnd: (event: FluidboxReachEndEvent) => {
+          const next = reached(event);
+          if (next) count.value = next;
+        },
+      },
+      () => h(Grid, { items, id: "growing" }),
+    );
+  };
+});
+
 const App = defineComponent(() => {
   const generation = shallowRef(0);
   fixture.remount = () => generation.value++;
@@ -258,6 +285,8 @@ const App = defineComponent(() => {
     h(Guarded),
     h("h2", "The viewer's parts"),
     h(Parts),
+    h("h2", "A gallery that grows as the viewer nears its end"),
+    h(Growing),
     h("h2", "A slide that suspends"),
     h(Fluidbox.Root, { items: lazyItems }, () => [
       h(Grid, { items: lazyItems, id: "lazy" }),

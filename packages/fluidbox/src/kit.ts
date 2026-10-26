@@ -9,13 +9,7 @@ import { fluidboxEventTypes } from "./events";
 import { crossOrigin, downloadName, fileOf } from "./item-file";
 import type { Fluidbox, FluidboxItem, FluidboxRenderer, FluidboxSlide } from "./public-api";
 
-export {
-  controlNames,
-  fluidboxControls,
-  zoomControlNames,
-  type FluidboxControl,
-  type FluidboxIconControlName,
-} from "./controls";
+export { controlNames, fluidboxControls, zoomControlNames, type FluidboxControl } from "./controls";
 export { defaultLabels, resolveLabels };
 export {
   bindTrigger,
@@ -66,14 +60,7 @@ export function unloadFluidbox(fluidbox: Fluidbox<any>) {
 
 export { indexIn };
 
-export {
-  createFluidboxSync,
-  createOpenIndexSync,
-  valueChangeDetails,
-  watchFluidbox,
-  watchOpenIndex,
-  type FluidboxChangeDetails,
-} from "./controlled";
+export { createFluidboxSync, valueChangeDetails, watchFluidbox } from "./controlled";
 export {
   fluidboxStaticViewer,
   fluidboxStaticViewerNodes,

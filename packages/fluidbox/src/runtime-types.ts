@@ -26,6 +26,7 @@ import type {
   Fluidbox,
   FluidboxControlName,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxRevealContext,
   FluidboxState,
   FluidboxViewerRenderer,
@@ -214,6 +215,10 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   changed?(): void;
   /** A slide's media failed, or a zoom image did. */
   mediaError?(event: FluidboxMediaErrorEvent<any>): void;
+  /** The open item came near the end. */
+  reachEnd?(event: FluidboxReachEndEvent): void;
+  /** The `reachEndThreshold` option, as given. */
+  reachEndThreshold?(): unknown;
 }
 
 /** What may close the viewer, and what a vertical wheel does. */

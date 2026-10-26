@@ -76,6 +76,7 @@ const VIEWER_ATTRIBUTES = [
   "loop",
   "preload",
   "wheel",
+  "reach-end-threshold",
 ];
 const PRELOADS: readonly string[] = ["intent", "press", "eager"] satisfies FluidboxPreload[];
 const WHEELS: readonly string[] = ["dismiss", "zoom", "navigate", "none"] satisfies NonNullable<
@@ -455,6 +456,17 @@ export class FluidboxGalleryElement extends HTMLElement {
     else this.removeAttribute("wheel");
   }
 
+  /** How near the end `reachend` fires, as the `reach-end-threshold` attribute says. @default 2 */
+  get reachEndThreshold(): number | undefined {
+    const value = this.getAttribute("reach-end-threshold");
+    return value && Number.isFinite(+value) ? +value : undefined;
+  }
+
+  set reachEndThreshold(threshold: number | undefined) {
+    if (threshold == null) this.removeAttribute("reach-end-threshold");
+    else this.setAttribute("reach-end-threshold", String(threshold));
+  }
+
   /** The link Share shares for an item. Without one, Share hides. */
   get shareUrl(): FluidboxOptions["shareUrl"] {
     return this.#shareUrl;
@@ -731,6 +743,7 @@ export class FluidboxGalleryElement extends HTMLElement {
       sheet: sheetElement ? this.#sheetOptions(sheetElement) : undefined,
       dismiss: this.#dismiss,
       wheel: this.wheel,
+      reachEndThreshold: this.reachEndThreshold,
       shareUrl: this.#shareUrl,
       slideshow: this.#slideshow,
     } satisfies FluidboxUpdateOptions;

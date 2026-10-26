@@ -5,6 +5,7 @@ import {
   Renderer2,
   booleanAttribute,
   computed,
+  numberAttribute,
   inject,
   input,
   model,
@@ -26,6 +27,7 @@ import {
   type FluidboxLabels,
   type FluidboxMediaErrorEvent,
   type FluidboxOptions,
+  type FluidboxReachEndEvent,
   type FluidboxRenderer,
   type FluidboxSheetSnapPoint,
   type FluidboxSlide,
@@ -215,6 +217,12 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly zoomChange = output<FluidboxZoomEvent>();
   /** When a slide's media fails to load, as it shows its error. */
   readonly mediaError = output<FluidboxMediaErrorEvent<TItem>>();
+  /** How near the end `(reachEnd)` fires. @default 2 */
+  readonly reachEndThreshold = input<number | undefined, unknown>(undefined, {
+    transform: (value) => (value == null || value === "" ? undefined : numberAttribute(value)),
+  });
+  /** When the open item comes within `reachEndThreshold` of the last, once per count: load more. */
+  readonly reachEnd = output<FluidboxReachEndEvent<TItem>>();
 
   readonly #zone = inject(NgZone);
   readonly #browser = injectIsBrowser();
@@ -317,6 +325,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
         | "valuechangecomplete"
         | "zoomchange"
         | "mediaerror"
+        | "reachend"
         | "sheetchange"
         | "valuechange",
     >(
@@ -337,6 +346,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     );
     listen("zoomchange", (event: FluidboxZoomEvent) => this.zoomChange.emit(event));
     listen("mediaerror", (event: FluidboxMediaErrorEvent<TItem>) => this.mediaError.emit(event));
+    listen("reachend", (event: FluidboxReachEndEvent<TItem>) => this.reachEnd.emit(event));
     internals.set(this, {
       watch: (listener) => fluidbox.subscribe(() => listener()),
       connect: (kind, part) => {
@@ -383,6 +393,9 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     if (changes["wheel"]) this.#update({ wheel: this.wheel() });
     if (changes["slideshow"]) {
       this.#update({ slideshow: this.slideshow() && { ...this.slideshow() } });
+    }
+    if (changes["reachEndThreshold"]) {
+      this.#update({ reachEndThreshold: this.reachEndThreshold() });
     }
     // Your value wins whenever it changes, once the triggers inside have
     // registered, so an open flies from the item's own. The default value

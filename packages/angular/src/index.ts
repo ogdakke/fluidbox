@@ -83,6 +83,7 @@ export { FluidboxThumbnailsDirective, type FluidboxThumbnailContext } from "./th
 
 export {
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxSheetEvent,
   FluidboxValueChangeEvent,
   FluidboxZoomEvent,
@@ -97,6 +98,7 @@ export type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxOptions,

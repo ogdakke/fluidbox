@@ -245,6 +245,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #frozenLeft = 0;
   #userOwned = false;
   #userScrolled = false;
+  /** A gesture stopped a glide between slides: its settle brings the strip onto one. */
+  #stopped = false;
   #touching = false;
   #fingers = false;
   #lastWheel = 0;
@@ -255,8 +257,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #fence: -1 | 0 | 1 = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #selection:
-    | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
+    | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> | undefined }
     | undefined;
+  /**
+   * A smooth selection the strip scrolls itself, at a motion speed other than
+   * 1. An empty animation keeps its time, so it plays on the document's
+   * timeline as the flights do.
+   */
+  #glide: { frame: number; readonly timing: Animation } | undefined;
   /** While new items are laid out: the old slides whose item is unchanged, by id. */
   /** The item an open waits for, and whether its flight has started. */
   #opening: { readonly index: number; readonly flying: boolean } | undefined;
@@ -268,7 +276,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         readonly model: HTMLElement | null;
       }
     | undefined;
-  #recycled: Map<string, { item: TItem; slide: ViewerSlide }[]> | undefined;
+  #recycled: Map<string, { item: TItem; slide: ViewerSlide; offset: number }[]> | undefined;
 
   constructor(
     ownerDocument: Document,
@@ -449,22 +457,29 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * Show new items. A slide whose item is unchanged stays, loaded, wherever its
    * item moved to, so swapping a product's variant keeps the photos it shares.
    */
-  setSource(source: FluidboxSource<TItem>) {
+  setSource(source: FluidboxSource<TItem>, loop = this.#loop) {
+    // A selection under way ends on its slide.
+    if (this.#selection) this.#sync(this.#selection.index, false);
     this.#resolveSelection();
     this.#focusable(source.count);
     this.#unfence();
     const previous = this.#source;
     const index = this.index;
     const shown = previous.count ? idOf(previous.getItem(index)) : null;
-    const recycled = new Map<string, { item: TItem; slide: ViewerSlide }[]>();
-    for (const [position, slide] of this.#slides) {
+    const recycled = new Map<string, { item: TItem; slide: ViewerSlide; offset: number }[]>();
+    // Nearest first, so an item a loop repeats keeps the slide on show, and the ones beside it.
+    const slides = [...this.#slides].sort(
+      ([a], [b]) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
+    );
+    for (const [position, slide] of slides) {
       const at = this.#item(position);
       const item = previous.getItem(at);
       const id = idOf(item);
       // Most items stay where they were; a lazy list without indexOf finds an id by scanning.
       const next = at < source.count && idOf(source.getItem(at)) === id ? at : source.getIndex(id);
       if (next !== null && sameItem(item, source.getItem(next))) {
-        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide }]);
+        const offset = position - this.#index;
+        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide, offset }]);
       } else {
         this.#unload(slide);
         slide.element.remove();
@@ -472,6 +487,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     this.#slides.clear();
     this.#source = source;
+    this.#loop = loop;
     // The strip stays on the item it shows, wherever that went.
     this.#index =
       (shown === null ? null : source.getIndex(shown)) ??
@@ -487,11 +503,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#align(this.#index);
   }
 
-  /** An unchanged old slide for the item at a position, moved there. */
-  #recycle(position: number) {
+  /**
+   * An unchanged old slide for the item at a position, moved there; with
+   * `same`, only one that was as far from the slide on show.
+   */
+  #recycle(position: number, same?: boolean) {
     const item = this.#source.getItem(this.#item(position));
     const kept = this.#recycled?.get(idOf(item));
-    const found = kept?.findIndex((each) => sameItem(each.item, item)) ?? -1;
+    const found =
+      kept?.findIndex(
+        (each) => sameItem(each.item, item) && (!same || each.offset === position - this.#index),
+      ) ?? -1;
     if (!kept || found < 0) return undefined;
     const { slide } = kept.splice(found, 1)[0]!;
     slide.position = position;
@@ -502,19 +524,12 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return slide;
   }
 
-  /** Go round, or stop at the ends. The slides are made again around the item on show. */
+  /**
+   * Go round, or stop at the ends. Every slide stays, loaded, with its item;
+   * only the slides past the ends come or go.
+   */
   setLoop(loop: boolean) {
-    if (loop === this.#loop) return;
-    const index = this.index;
-    // Positions mean something else now, so no slide carries over.
-    for (const slide of this.#slides.values()) {
-      this.#unload(slide);
-      slide.element.remove();
-    }
-    this.#slides.clear();
-    this.#loop = loop;
-    this.#index = index;
-    this.setSource(this.#source);
+    if (loop !== this.#loop) this.setSource(this.#source, loop);
   }
 
   mount() {
@@ -534,6 +549,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   /** The viewer has closed: no slide is on show until the strip mounts again. */
   hide() {
+    // Nothing aligns a strip out of the page: it would wait on it forever.
+    this.#resolveSelection();
+    this.#endInstant();
     this.#hidden = true;
     this.#activate();
   }
@@ -544,10 +562,12 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#activate();
     this.#observer.disconnect();
     this.#resolveSelection();
+    this.#endInstant();
     for (const slide of this.#slides.values()) this.#unload(slide);
   }
 
-  select(item: number, smooth: boolean, step?: 1 | -1): Promise<void> {
+  /** Go to an item: at once, or smoothly at a motion speed (1 is the browser's own smooth scroll). */
+  select(item: number, smooth: false | number, step?: 1 | -1): Promise<void> {
     if (!Number.isInteger(item) || item < 0 || item >= this.#source.count) {
       throw new RangeError(`Viewer strip index ${item} is out of range.`);
     }
@@ -556,32 +576,76 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // fallback before rebasing its virtual window, otherwise that stale timer
     // can jump to a slide which has already been recycled.
     this.#resolveSelection();
+    // An instant align still under way would put snapping back mid-glide.
+    this.#endInstant();
     this.#unfence();
     if (!this.#slides.has(index)) this.#renderWindow(index, smooth ? this.#index : index);
     if (!this.#mounted || !smooth || index === this.#index) {
       this.#jump(index);
       return Promise.resolve();
     }
-    this.#scrollTo((index - this.#base) * this.#width, "smooth");
-    return new Promise<void>((resolve) => {
-      // The fallback lands the slide only once the smooth scroll has stalled.
-      // Safari takes well over half a second to cross a wide viewport, and
-      // jumping while it still glides snaps the last stretch into place.
-      const started = performance.now();
-      let last = this.#left;
-      const check = () => {
-        const left = this.#left;
-        const moving = Math.abs(left - last) > 1;
-        last = left;
-        if (moving && performance.now() - started < 2000 && this.#selection) {
-          this.#selection.timeout = setTimeout(check, 120);
+    if (smooth !== 1) {
+      const from = this.#left;
+      const timing = this.element.animate(null, { duration: 300 / smooth, easing: "ease-in-out" });
+      // Snapping would pull every step back to a slide.
+      this.element.style.scrollSnapType = "none";
+      // A far slide loads on the way, so it has its picture as it lands.
+      for (const [at, slide] of this.#slides) {
+        if (Math.abs(at - index) <= LOAD_RADIUS) this.#load(at, slide);
+      }
+      const step = () => {
+        const progress = timing.effect!.getComputedTiming().progress;
+        const left = (index - this.#base) * this.#width;
+        this.#scrollTo(progress == null ? left : from + (left - from) * progress, "instant");
+        if (progress != null) {
+          this.#glide!.frame = requestAnimationFrame(step);
           return;
         }
-        this.#jump(index);
         this.#resolveSelection();
+        this.#jump(index);
       };
-      this.#selection = { index, resolve, timeout: setTimeout(check, 600) };
+      return new Promise<void>((resolve) => {
+        this.#selection = { index, resolve, timeout: undefined };
+        this.#glide = { frame: requestAnimationFrame(step), timing };
+      });
+    }
+    this.#scrollTo((index - this.#base) * this.#width, "smooth");
+    return new Promise<void>((resolve) => {
+      this.#selection = { index, resolve, timeout: undefined };
+      this.#awaitLanding();
     });
+  }
+
+  /**
+   * Land the pending selection once the scroll stalls, if it hasn't by then.
+   * Safari takes well over half a second to cross a wide viewport, and
+   * jumping while it still glides snaps the last stretch into place.
+   */
+  #awaitLanding() {
+    const started = performance.now();
+    let last = this.#left;
+    const check = () => {
+      const selection = this.#selection;
+      if (!selection) return;
+      const left = this.#left;
+      const moving = Math.abs(left - last) > 1;
+      last = left;
+      if (moving && performance.now() - started < 2000) {
+        selection.timeout = setTimeout(check, 120);
+        return;
+      }
+      this.#jump(selection.index);
+      this.#resolveSelection();
+    };
+    this.#selection!.timeout = setTimeout(check, 600);
+  }
+
+  /** End a selection under way on its slide at once, as a close does. */
+  land() {
+    const selection = this.#selection;
+    if (!selection) return;
+    this.#resolveSelection();
+    this.#jump(selection.index);
   }
 
   destroy() {
@@ -1084,17 +1148,37 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.element.remove();
       this.#slides.delete(index);
     }
-    let insertionPoint = this.element.firstChild;
-    for (let index = base; index < base + size; index++) {
-      let slide = this.#slides.get(index);
-      if (!slide) {
-        slide = this.#recycle(index) ?? this.#makeSlide(index);
+    const elements: HTMLElement[] = [];
+    // Nearest the slide on show first, so it and the ones beside it keep their
+    // slides where a loop repeats an item.
+    const positions = Array.from({ length: size }, (_, at) => base + at).sort(
+      (a, b) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
+    );
+    // An old slide keeps its place beside the one on show if it can, as when
+    // a loop starts or stops: only then any old slide for the item, or a new one.
+    for (const same of [true, false]) {
+      for (const index of positions) {
+        const slide =
+          this.#slides.get(index) ??
+          this.#recycle(index, same) ??
+          (same ? undefined : this.#makeSlide(index));
+        if (!slide) continue;
         this.#slides.set(index, slide);
+        elements[index - base] = slide.element;
       }
-      // Only a slide out of place moves: moving an embed reloads it.
-      if (slide.element !== insertionPoint)
-        this.element.insertBefore(slide.element, insertionPoint);
-      insertionPoint = slide.element.nextSibling;
+    }
+    // Only a slide out of place moves, as moving an embed reloads it, and
+    // the one on show never does: the others take their places around it.
+    const fixed = Math.max(0, Math.min(size - 1, this.#index - base));
+    if (elements[fixed]!.parentNode !== this.element) this.element.append(elements[fixed]!);
+    for (let at = fixed - 1; at >= 0; at--) {
+      if (elements[at]!.nextSibling !== elements[at + 1]) {
+        this.element.insertBefore(elements[at]!, elements[at + 1]!);
+      }
+    }
+    for (let at = fixed + 1; at < size; at++) {
+      if (elements[at]!.previousSibling !== elements[at - 1])
+        elements[at - 1]!.after(elements[at]!);
     }
     this.#rebasing = true;
     this.#base = base;
@@ -1977,6 +2061,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #onScroll = () => {
+    // The strip's own glide changes slides as it lands, so no work slows it on the way.
+    if (this.#glide) return;
     if (this.#frozen) {
       const offset = this.#left - this.#frozenLeft;
       this.element.style.setProperty("--fluidbox-scroll-compensation", `${this.#sign * offset}px`);
@@ -2007,6 +2093,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #settled = () => {
+    if (this.#glide) return;
     if (this.#touching || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
     // A finger or trackpad still pressing into a fence keeps it up.
     if (this.#fence && (this.#fingers || performance.now() - this.#lastWheel < 180)) {
@@ -2015,6 +2102,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     clearTimeout(this.#settleTimer);
     const refused = this.#refused !== null;
+    const stopped = this.#stopped;
+    this.#stopped = false;
     this.#unfence();
     if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
     if (this.#userOwned && this.#userScrolled) this.#onSelect(this.index, true);
@@ -2022,9 +2111,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#userScrolled = false;
     this.#approved = null;
     this.#refused = null;
-    // A refused move the fence did not catch snapped to the neighbour. Go back.
+    // A refused move the fence did not catch snapped to the neighbour, or a
+    // glide stopped between slides: go to the slide.
     const left = (this.#index - this.#base) * this.#width;
-    if (refused && Math.abs(this.#left - left) > 1) {
+    if ((refused || stopped) && Math.abs(this.#left - left) > 1) {
       this.#scrollTo(left, "smooth");
     }
     if (this.#selection?.index === this.#index) this.#resolveSelection();
@@ -2033,7 +2123,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
   };
 
+  #stopGlide() {
+    if (!this.#glide) return;
+    cancelAnimationFrame(this.#glide.frame);
+    this.#glide.timing.cancel();
+    this.#glide = undefined;
+    this.element.style.removeProperty("scroll-snap-type");
+  }
+
   #resolveSelection() {
+    this.#stopGlide();
     if (!this.#selection) return;
     clearTimeout(this.#selection.timeout);
     this.#selection.resolve();
@@ -2041,10 +2140,24 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #takeControl = (event: Event) => {
+    // A person's gesture takes over from a smooth move, the strip's glide or
+    // the browser's: the move ends on the slide it had reached, which the
+    // gesture then moves on from as from any other, and settles wherever it ends.
+    // A wheel that doesn't scroll the strip, as the viewer's own "navigate",
+    // "dismiss" or "zoom" wheel, leaves the move be: its inertia isn't a new gesture.
+    const gliding =
+      !!this.#selection &&
+      (!(event instanceof WheelEvent) || Math.abs(event.deltaX) > Math.abs(event.deltaY));
+    if (gliding) {
+      this.#stopped = true;
+      this.#resolveSelection();
+      this.#sync(undefined, false);
+      this.#onSelect(this.index, false);
+    }
     if (event.type === "wheel") this.#lastWheel = performance.now();
     if (event.type === "touchstart") this.#fingers = true;
     this.#userOwned = true;
-    this.#userScrolled = false;
+    this.#userScrolled = gliding;
     this.#touching = event.type === "pointerdown" || event.type === "touchstart";
   };
 

@@ -41,6 +41,7 @@ import {
   type FluidboxItemList,
   type FluidboxLabels,
   type FluidboxMediaErrorEvent,
+  type FluidboxReachEndEvent,
   type FluidboxOptions,
   type FluidboxSheetEvent,
   type FluidboxSheetSnapPoint,
@@ -124,9 +125,11 @@ export type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
@@ -313,6 +316,8 @@ type RootEmits<TItem extends FluidboxItem> = {
   zoomChange: (event: FluidboxZoomEvent) => true;
   /** When a slide's media fails to load, as it shows its error. */
   mediaError: (event: FluidboxMediaErrorEvent<TItem>) => true;
+  /** When the open item comes within `reachEndThreshold` of the last, once per count: load more. */
+  reachEnd: (event: FluidboxReachEndEvent<TItem>) => true;
 };
 
 type RootSlots<TItem extends FluidboxItem> = SlotsType<{
@@ -365,6 +370,11 @@ const Root = defineComponent(
     };
     const dismissOption = () => props.dismiss && { ...toRaw(props.dismiss) };
     const slideshowOption = () => props.slideshow && { ...toRaw(props.slideshow) };
+    // An attribute gives a string: "3" is 3.
+    const threshold = () => {
+      const given = props.reachEndThreshold as unknown;
+      return given === "" || given == null ? undefined : Number(given);
+    };
 
     // findTrigger and revealTrigger are read from the newest props on each use.
     const fluidbox = createFluidbox<TItem>(
@@ -378,6 +388,7 @@ const Root = defineComponent(
           dismiss: dismissOption(),
           wheel: props.wheel,
           slideshow: slideshowOption(),
+          reachEndThreshold: threshold(),
           // Share shares the item's href unless shareUrl says otherwise.
           shareUrl: (item) => (props.shareUrl ? props.shareUrl(item) : props.href?.(idOf(item))),
           // Slides are looked up by type as one mounts, so the Slides part's
@@ -482,11 +493,17 @@ const Root = defineComponent(
           slideshow: slideshowOption(),
         }),
     );
+    // On its own, as it changes nothing the viewer shows.
+    watch(
+      () => props.reachEndThreshold,
+      () => fluidbox.update({ reachEndThreshold: threshold() }),
+    );
 
     const events = new AbortController();
     const { signal } = events;
     fluidbox.addEventListener("zoomchange", (event) => emit("zoomChange", event), { signal });
     fluidbox.addEventListener("mediaerror", (event) => emit("mediaError", event), { signal });
+    fluidbox.addEventListener("reachend", (event) => emit("reachEnd", event), { signal });
     fluidbox.addEventListener("sheetchange", (event) => (sheetSnap.value = event.snap), {
       signal,
     });
@@ -624,9 +641,17 @@ const Root = defineComponent(
       wheel: null,
       shareUrl: null,
       slideshow: null,
+      reachEndThreshold: null,
       // Typed as the names, which keeps the generic signature's props.
     } as unknown as (keyof FluidboxRootProps)[],
-    emits: ["valueChange", "update:modelValue", "valueChangeComplete", "zoomChange", "mediaError"],
+    emits: [
+      "valueChange",
+      "update:modelValue",
+      "valueChangeComplete",
+      "zoomChange",
+      "mediaError",
+      "reachEnd",
+    ],
   },
 );
 

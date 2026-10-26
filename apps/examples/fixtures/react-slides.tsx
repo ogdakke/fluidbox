@@ -21,6 +21,7 @@ import { Fluidbox, useFluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/react
 import { Model } from "@ogdakke/fluidbox/react/model";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "React slides · content that suspends, holds the open, or plays on its own",
@@ -209,6 +210,27 @@ function Slideshow() {
   );
 }
 
+/** A gallery that appends four photos each time the viewer nears its end. */
+function Growing() {
+  const [count, setCount] = useState(4);
+  const [threshold, setThreshold] = useState(1);
+  growth.setCount = setCount;
+  growth.setThreshold = setThreshold;
+  const items = growingPhotos(count);
+  return (
+    <Fluidbox.Root
+      items={items}
+      reachEndThreshold={threshold}
+      onReachEnd={(event) => {
+        const next = reached(event);
+        if (next) setCount(next);
+      }}
+    >
+      <Grid items={items} id="growing" />
+    </Fluidbox.Root>
+  );
+}
+
 function App() {
   return (
     <>
@@ -256,6 +278,8 @@ function App() {
         </div>
         <Fluidbox.Slides reel={() => <Reel />} />
       </Fluidbox.Root>
+      <h2>A gallery that grows as the viewer nears its end</h2>
+      <Growing />
       <h2>A live 3D model card, with the value in the page's state</h2>
       <ControlledModel />
       <p className="fb-muted">

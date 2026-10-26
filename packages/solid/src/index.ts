@@ -126,9 +126,11 @@ export type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
@@ -359,6 +361,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
         dismiss: untrack(dismiss),
         wheel: untrack(() => props.wheel),
         slideshow: untrack(slideshow),
+        reachEndThreshold: untrack(() => props.reachEndThreshold),
         // Share shares the item's href unless shareUrl says otherwise.
         shareUrl: (item) => (props.shareUrl ? props.shareUrl(item) : props.href?.(idOf(item))),
         // Slides are looked up by type as one mounts, so the Slides part's
@@ -403,6 +406,15 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
   const { signal } = events;
   fluidbox.addEventListener("zoomchange", (event) => props.onZoomChange?.(event), { signal });
   fluidbox.addEventListener("mediaerror", (event) => props.onMediaError?.(event), { signal });
+  // How near the end reachend fires, and the handler.
+  fluidbox.addEventListener("reachend", (event) => props.onReachEnd?.(event), { signal });
+  createEffect(
+    on(
+      () => props.reachEndThreshold,
+      (reachEndThreshold) => fluidbox.update({ reachEndThreshold }),
+      { defer: true },
+    ),
+  );
   watchFluidbox(
     fluidbox,
     {

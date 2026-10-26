@@ -8,44 +8,36 @@ These are the package's own chunks, as a consumer's bundler first emits them. A 
 
 | Consumer entry | Initial JS gzip | Activation JS gzip | On demand JS gzip | Reachable JS gzip | Activation JS + CSS gzip |
 | -------------- | --------------: | -----------------: | ----------------: | ----------------: | -----------------------: |
-| Root           |         9,802 B |           44,045 B |           1,151 B |          45,196 B |                 46,855 B |
-| Elements       |        13,946 B |           47,387 B |           1,151 B |          48,538 B |                 50,197 B |
-| React          |        17,183 B |           50,787 B |           1,151 B |          51,938 B |                 53,597 B |
-| Solid          |        16,955 B |           50,555 B |           1,151 B |          51,706 B |                 53,365 B |
-| Vue            |        17,625 B |           51,193 B |           1,151 B |          52,344 B |                 54,003 B |
-| Angular        |        14,713 B |           48,233 B |           1,151 B |          49,384 B |                 51,043 B |
+| Root           |        10,117 B |           44,506 B |           1,151 B |          45,657 B |                 47,316 B |
+| Elements       |        15,148 B |           50,693 B |           1,151 B |          51,844 B |                 53,503 B |
+| React          |        17,493 B |           51,260 B |           1,151 B |          52,411 B |                 54,070 B |
+| Solid          |        17,258 B |           51,020 B |           1,151 B |          52,171 B |                 53,830 B |
+| Vue            |        17,923 B |           51,657 B |           1,151 B |          52,808 B |                 54,467 B |
+| Angular        |        19,623 B |           53,306 B |           1,151 B |          54,457 B |                 56,116 B |
+| Thumbnails     |         3,763 B |            3,763 B |               0 B |           3,763 B |                  4,858 B |
+| Sheet          |         7,277 B |            7,277 B |               0 B |           7,277 B |                  8,272 B |
+| Kit            |         1,831 B |            1,831 B |               0 B |           1,831 B |                  4,641 B |
+| Hover zoom     |         1,453 B |            1,453 B |               0 B |           1,453 B |                  4,263 B |
+| Embed          |         2,991 B |            2,991 B |               0 B |           2,991 B |                  5,801 B |
+| Model          |         2,704 B |            2,704 B |               0 B |           2,704 B |                  5,514 B |
+| Spin           |         2,388 B |            2,388 B |               0 B |           2,388 B |                  5,198 B |
+| React embed    |        20,005 B |           53,814 B |           1,151 B |          54,965 B |                 56,624 B |
+| React model    |        19,822 B |           53,559 B |           1,151 B |          54,710 B |                 56,369 B |
+| React spin     |        19,416 B |           53,145 B |           1,151 B |          54,296 B |                 55,955 B |
+| Solid embed    |        19,607 B |           53,424 B |           1,151 B |          54,575 B |                 56,234 B |
+| Solid model    |        19,438 B |           53,174 B |           1,151 B |          54,325 B |                 55,984 B |
+| Solid spin     |        19,016 B |           52,738 B |           1,151 B |          53,889 B |                 55,548 B |
+| Vue embed      |        20,461 B |           54,252 B |           1,151 B |          55,403 B |                 57,062 B |
+| Vue model      |        20,244 B |           53,957 B |           1,151 B |          55,108 B |                 56,767 B |
+| Vue spin       |        19,858 B |           53,569 B |           1,151 B |          54,720 B |                 56,379 B |
+| Angular embed  |        22,269 B |           56,013 B |           1,151 B |          57,164 B |                 58,823 B |
+| Angular model  |        22,020 B |           55,687 B |           1,151 B |          56,838 B |                 58,497 B |
+| Angular spin   |        21,621 B |           55,309 B |           1,151 B |          56,460 B |                 58,119 B |
+| Elements embed |        17,916 B |           53,473 B |           1,151 B |          54,624 B |                 56,283 B |
+| Elements model |        17,781 B |           53,335 B |           1,151 B |          54,486 B |                 56,145 B |
+| Elements spin  |        17,409 B |           52,964 B |           1,151 B |          54,115 B |                 55,774 B |
 
-| Root | 10,113 B | 44,558 B | 1,151 B | 45,709 B | 47,368 B |
-| Elements | 14,261 B | 47,907 B | 1,151 B | 49,058 B | 50,717 B |
-| React | 17,493 B | 51,306 B | 1,151 B | 52,457 B | 54,116 B |
-| Solid | 13,948 B | 47,736 B | 1,151 B | 48,887 B | 50,546 B |
-| Vue | 17,923 B | 51,702 B | 1,151 B | 52,853 B | 54,512 B |
-| Angular | 15,029 B | 48,763 B | 1,151 B | 49,914 B | 51,573 B |
-| Thumbnails | 3,763 B | 3,763 B | 0 B | 3,763 B | 4,858 B |
-| Sheet | 7,277 B | 7,277 B | 0 B | 7,277 B | 8,272 B |
-| Kit | 1,831 B | 1,831 B | 0 B | 1,831 B | 4,641 B |
-| Hover zoom | 1,453 B | 1,453 B | 0 B | 1,453 B | 4,263 B |
-| Embed | 2,991 B | 2,991 B | 0 B | 2,991 B | 5,801 B |
-| Model | 2,488 B | 2,488 B | 0 B | 2,488 B | 5,298 B |
-| Spin | 2,388 B | 2,388 B | 0 B | 2,388 B | 5,198 B |
-| React embed | 19,683 B | 53,333 B | 1,151 B | 54,484 B | 56,143 B |
-| React model | 18,409 B | 51,994 B | 1,151 B | 53,145 B | 54,804 B |
-| React spin | 19,108 B | 52,678 B | 1,151 B | 53,829 B | 55,488 B |
-| Solid embed | 19,297 B | 52,955 B | 1,151 B | 54,106 B | 55,765 B |
-| Solid model | 18,032 B | 51,609 B | 1,151 B | 52,760 B | 54,419 B |
-| Solid spin | 18,724 B | 52,283 B | 1,151 B | 53,434 B | 55,093 B |
-| Vue embed | 20,146 B | 53,776 B | 1,151 B | 54,927 B | 56,586 B |
-| Vue model | 18,827 B | 52,387 B | 1,151 B | 53,538 B | 55,197 B |
-| Vue spin | 19,556 B | 53,108 B | 1,151 B | 54,259 B | 55,918 B |
-
-| React embed | 20,001 B | 53,856 B | 1,151 B | 55,007 B | 56,666 B |
-| React model | 19,621 B | 53,404 B | 1,151 B | 54,555 B | 56,214 B |
-| React spin | 19,413 B | 53,191 B | 1,151 B | 54,342 B | 56,001 B |
-| Vue embed | 20,459 B | 54,294 B | 1,151 B | 55,445 B | 57,104 B |
-| Vue model | 20,024 B | 53,797 B | 1,151 B | 54,948 B | 56,607 B |
-| Vue spin | 19,857 B | 53,615 B | 1,151 B | 54,766 B | 56,425 B |
-
-`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,259 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
+`styles.css` is 2,810 B gzip. The opt-in `baseline.css` is 3,256 B gzip; no entry imports it, so it has its own limit and counts in no activation total. Each limit is the measurement plus 40 B, rounded up to the next 50 B.
 
 The 2026-10-22 increases, about 1.3 KB initial and 4.5 KB activation on each core entry, record the hardening and product-media work merged together:
 
@@ -134,6 +126,22 @@ The fixes after the live thumbnail's review moved every core entry by about 70 B
 
 Merging the live 3D thumbnail into the redesign with every binding moved each entry by what that branch measured on its own base: about 310 B initial and 450 B activation in the core (the trigger's origin getters, the drag slop and the trigger hooks), and about 1.2 KB more in each model entry (the model add-on's quieting, its undo and the snapshot). The limits moved by the rule.
 
+A model slide's snapshot then became a copy of the pixels `<model-viewer>` shows, in place of a PNG of `toDataURL`: the model add-on grew 150 B, to 2,638 B, and each binding's model entry about 145 B. The copy draws the canvas the element shows, the renderer's shared WebGL canvas or the element's own 2D canvas, into a canvas of the slide's, and keeps the PNG for a version without that canvas, with a development warning. On the phone viewport the close's start fell from 30 ms to 10 ms in Chromium and from 187 ms to 7 ms in WebKit. The measurement table is rebuilt whole from this run: the merge before it had left an older table and two partial ones.
+
+Measuring a snapshot's region from the content box, which `<model-viewer>`'s shadow `.container` takes with its fractions, in place of the element's client size, which counts its padding, and at the device's exact pixel ratio while the renderer doesn't throttle, grew the model add-on 66 B, to 2,704 B, and each binding's model entry about 60 B.
+On 2026-10-25 `--fluidbox-motion-speed` (plan step 7, item 1) moved every core entry's activation by about 255 B, all in the viewer chunk, against 51,260 B for React: the driver reads and clamps the speed for every duration, and at a speed other than 1 the strip scrolls a move itself, timed by an empty animation, with snapping off and its scroll work held until it lands. Initial is unchanged. The limits it crossed moved by the rule.
+
+`reachend` (plan step 7, item 2) moved every core entry by about 140 B initial and 145 B activation, all in the initial chunk, which carries the controller: the `FluidboxReachEndEvent` class, the once-per-count rule and `reachEndThreshold` in the controller, and `withCount` on `createItemList` lists. The bindings add 25–40 B each for `reachEndThreshold` and their handler (React 17,659 B initial, Solid 17,437 B, Vue 18,098 B, Angular 19,791 B). The custom elements add about 220 B: the event forwarded from the gallery, and its `reach-end-threshold` attribute and property. The limits it crossed moved by the rule.
+
+Turning `loop` on or off while the viewer is open no longer rebuilds every slide, which reloaded iframes and remade content: the strip keeps each slide with its item, places the others around the slide on show without moving it, and makes or drops only the slides past the ends. That moved every core entry's activation by about 110 B. The limits it crossed moved by the rule.
+
+The review of step 7 moved `reachend`'s rule and dispatch into the viewer chunk, where the driver fires it once a move settles, and the event class into a module of its own. Every core entry's initial chunk is now about 55 B over its size before `reachend` (React 17,576 B, Solid 17,350 B, Vue 17,996 B, Angular 19,707 B, the custom elements 15,256 B), against about 140 B before. The same fixes moved every entry's activation by about 300 B, to 52,093 B for React: the rule and dispatch in the driver, a glide that a gesture, a close or new items end cleanly, with the native smooth scroll's fallback ended the same way, a glide over two or more slides that loads its target first, slides kept at their offset from the one on show when `loop` turns on or off, and `mediaerror` reading the current items. This re-baseline sets every limit step 7 had raised to the measurement plus 40 B, rounded up to 50 B, and never under its limit before step 7, so the initial limits come back down: `solid-model`'s, set from an earlier measurement, is now 19,400 B.
+
+The second review's fixes (a gesture that carries on from an interrupted glide, the threshold taken only as a number, with Vue converting an attribute's string and React and Vue sending a threshold change on its own) moved every core entry's activation by about 30–60 B and Vue's initial chunk by 29 B. Only `vue-spin`'s reachable limit was crossed, at 55,601 B; it moved by the rule to 55,650 B.
+
+Merging step 7's motion speed and `reachend` (feat/step7-motion) onto the live model's pixel copy put both changes into each binding's model entry, which neither branch had measured together. On 2026-10-26 the five binding + model entries' initial, activation, reachable and activation-with-CSS limits were raised to the combined measurement plus 40 B, rounded up to 50 B (react-model initial 19,913 B → 20,000 B, for example). No other limit moved.
+Leaving a smooth move be under a wheel that doesn't scroll the strip (the viewer's own `"navigate"`, `"dismiss"` and `"zoom"` wheel, whose inertia isn't a new gesture) moved every entry's activation by about 27 B. The limits it crossed moved by the rule.
+
 On 2026-10-26 the slideshow moved every core entry by about 70–270 B initial and 840–950 B activation, against 10,117 B initial and 44,506 B activation on the root:
 
 - **Activation, in the viewer.** The timer and its holds live in the viewer chunk, about 660 B: `play()` and `pause()`, `autoplay` once per open, the wait for the next slide's `ready` with the interval as its cap, the pause on a person's input and on a zoom, the hold while the tab is hidden or a video in the slide plays, and the live region turned off while it plays. The control wiring grew about 105 B with the Slideshow control, its default labels and `data-active`; a binding's copy of the wiring, which takes the controls from the kit, about 20 B.
@@ -145,3 +153,5 @@ The limits moved by the rule above.
 The fixes after the slideshow's review moved every core entry by about 10–30 B initial and 90–120 B activation. In the viewer, about 80 B: only the control's own press and Enter or Space are left to it, the slideshow stops as it reaches the last slide without a loop, a pause or close ends the wait for the next slide and its cap timer, a move that rejects waits another interval, and items set around the slide on show leave its interval alone. In the root, 9 B: `play()` and `pause()` act at once on a loaded viewer and in turn on its load otherwise, so a pause wins over a play still waiting for it. The custom elements' `play()` and `pause()` wait for the gallery's pending update, as its other commands do, about 18 B more. React's dismiss and slideshow props share one key, about 5 B less. The limits moved by the rule.
 
 The slideshow's last review round added about 30 B initial and 50 B activation to every core entry: `state.playing` is true only while opening or open, a `play()` queued on the viewer's load is dropped once the state changes before it loads, and a failed load leaves `play()` and `pause()` no unhandled rejection, in the root; the interval matched by the item's id and the strip's abort handled once, in the viewer. Only the limits it crossed moved, by the rule.
+
+Merging step 7's motion speed and `reachend` (feat/api-redesign at a4a68a3) into the slideshow put both features into every entry, which neither branch had measured together: root ends at 10,284 B initial and 46,376 B activation, React at 17,849 B and 53,227 B. Each limit took the larger of the two sides, and the ones still exceeded moved by the rule.
