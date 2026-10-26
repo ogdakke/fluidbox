@@ -50,7 +50,7 @@ for (const binding of ["react", "vue", "solid", "angular", "elements"] as const)
     );
     for (const [index, { name }] of pins.entries()) {
       const pin = hotspots.nth(index);
-      // The app's own content and name, in the hotspot layer inside the box.
+      // The app's own content and name, in the media box where it renders.
       await expect(pin).toHaveAccessibleName(name);
       await expect(pin).toHaveText("+");
       await expect(pin).toHaveAttribute("type", "button");
@@ -103,3 +103,22 @@ for (const binding of ["react", "vue", "solid", "angular", "elements"] as const)
     expect(errors).toEqual([]);
   });
 }
+
+test("elements: a <fluidbox-hotspot> without x or y sits on the box's corner, never NaN", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/hotspots-elements.html");
+  await page.locator('[data-item="bare"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const bare = page.locator(`${dialog} [data-pin="Bare"]`);
+  await expect(bare).toBeVisible();
+  expect(await bare.evaluate((element) => [element.style.left, element.style.top])).toEqual([
+    "0%",
+    "0%",
+  ]);
+  // scale-with-zoom="false" reads false, as zoom="false" does.
+  await expect(bare).not.toHaveAttribute("data-scale-with-zoom");
+  expect(errors).toEqual([]);
+});

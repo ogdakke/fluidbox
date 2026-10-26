@@ -49,6 +49,35 @@
           </template>
         </fluidbox-item>
       </fluidbox-gallery>
+      <h2>A pin without coordinates</h2>
+      <fluidbox-gallery id="bare" class="media-grid" aria-label="Bare pins">
+        <template data-fluidbox-slide="room">
+          <fluidbox-media>
+            <fluidbox-image></fluidbox-image>
+            <fluidbox-hotspot
+              class="hotspot-pin"
+              data-pin="Bare"
+              aria-label="Bare"
+              scale-with-zoom="false"
+            >
+              <span aria-hidden="true">+</span>
+            </fluidbox-hotspot>
+          </fluidbox-media>
+        </template>
+        <fluidbox-item value="bare" type="room">
+          <button slot="trigger" type="button" data-item="bare">
+            <img src="/products/fjord-room-thumb.webp" alt="" width="320" height="320" />
+          </button>
+          <template slot="content">
+            <img
+              src="/products/fjord-room.webp"
+              alt="A framed fjord print over a sideboard"
+              width="1600"
+              height="1600"
+            />
+          </template>
+        </fluidbox-item>
+      </fluidbox-gallery>
     </main>
   </body>
 </html>

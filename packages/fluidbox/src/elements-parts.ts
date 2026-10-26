@@ -329,7 +329,8 @@ export function templateSlide(
       const button = slide.hotspot({
         x: pin.getAttribute("x") as `${number}%`,
         y: pin.getAttribute("y") as `${number}%`,
-        scaleWithZoom: pin.hasAttribute("scale-with-zoom"),
+        // Present reads true, and "false" false, as the box's zoom does.
+        scaleWithZoom: (pin.getAttribute("scale-with-zoom") ?? "false") !== "false",
       });
       for (const { name, value } of Array.from(pin.attributes)) {
         if (!["x", "y", "scale-with-zoom"].includes(name)) button.setAttribute(name, value);
