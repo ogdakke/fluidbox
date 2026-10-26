@@ -481,8 +481,10 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   /** The viewer is the document's fullscreen element. */
   readonly fullscreen: boolean;
   /**
-   * The slideshow is advancing on its timer. False once anything pauses it,
-   * the tab hiding and a video playing included, and while closed.
+   * The slideshow plays: from `play()`, the Slideshow control or `autoplay`
+   * until a person's input, `pause()`, the last slide without a loop, or the
+   * close. A hidden tab or a video playing in the slide only holds its timer,
+   * so it stays true through them.
    */
   readonly playing: boolean;
 }
@@ -980,8 +982,10 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
   /**
    * Start the slideshow on the open viewer, as the Slideshow control does. It
    * moves on every `interval` with the reason "slideshow", and pauses on any
-   * input to the viewer, while the tab is hidden and while a video in the
-   * slide plays. Closed, it does nothing.
+   * input to the viewer. While the tab is hidden or a video in the slide plays
+   * it holds, still playing, and its interval starts again once they end.
+   * Closed, playing already, or on the last slide without a loop, it does
+   * nothing.
    */
   play(): void;
   /** Stop the slideshow. It stays paused until `play()` or the control. */
