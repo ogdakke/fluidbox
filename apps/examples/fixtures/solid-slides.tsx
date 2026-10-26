@@ -33,6 +33,7 @@ declare module "@ogdakke/fluidbox" {
     fetched: FluidboxCustomItemBase<"fetched">;
     held: FluidboxCustomItemBase<"held">;
     reel: FluidboxCustomItemBase<"reel">;
+    card: FluidboxCustomItemBase<"card">;
   }
 }
 
@@ -46,6 +47,10 @@ const fixture = {
   openGate: undefined as (() => void) | undefined,
   /** Each reel slide's origin, read again whenever the test asks. */
   reels: [] as { index: number; read: () => FluidboxSlideOrigin | null }[],
+  /** Each card slide's origin model, as the item its trigger holds, read again whenever the test asks. */
+  cards: [] as { index: number; read: () => string | null }[],
+  /** Where each close from a card slide landed: the item whose model it landed on. */
+  landings: [] as (string | null)[],
   /** Each held slide's index, read again whenever the test asks. */
   held: [] as { id: string; read: () => number }[],
   /** The items of the held viewer, which the test can change. */
@@ -160,7 +165,25 @@ function Reel() {
   );
 }
 
-const custom = (type: "lazy" | "fetched" | "held" | "reel", id: string): FluidboxItem => ({
+/** The item whose trigger holds `model`, which is what a card reports. */
+const holder = (model: HTMLElement | undefined) =>
+  model?.closest<HTMLElement>("[data-item]")?.dataset.item ?? null;
+
+// A slide that reads the trigger's live model, and hears where each close lands.
+function Card() {
+  const slide = useFluidboxSlide<FluidboxCustomItemBase<"card">>();
+  fixture.cards.push({ index: slide.index, read: () => holder(slide.origin?.model) });
+  onCleanup(slide.onClose((landing) => fixture.landings.push(holder(landing?.model))));
+  return (
+    <Fluidbox.Media>
+      <div class="media-probe" data-test="card">
+        {slide.item.title}
+      </div>
+    </Fluidbox.Media>
+  );
+}
+
+const custom = (type: "lazy" | "fetched" | "held" | "reel" | "card", id: string): FluidboxItem => ({
   type,
   id,
   title: `${type} ${id}`,
@@ -168,6 +191,7 @@ const custom = (type: "lazy" | "fetched" | "held" | "reel", id: string): Fluidbo
   height: 600,
 });
 const reels = [custom("reel", "reel-a"), custom("reel", "reel-b")];
+const cards = [custom("card", "card-a"), custom("card", "card-b")];
 const partsItems = [
   { ...photo("square", "/photo-square.svg"), caption: "A square study" },
   photo("broken", "/missing-photo.webp"),
@@ -327,6 +351,19 @@ function App() {
           </Fluidbox.Trigger>
         </div>
         <Fluidbox.Slides reel={() => <Reel />} />
+      </Fluidbox.Root>
+      <h2>A slide that reads the trigger's live model and hears each close</h2>
+      <Fluidbox.Root items={cards}>
+        <div class="media-grid" id="cards">
+          <For each={cards}>
+            {(item) => (
+              <Fluidbox.Trigger value={item.id!} data-item={item.id}>
+                {document.createElement("model-viewer")}
+              </Fluidbox.Trigger>
+            )}
+          </For>
+        </div>
+        <Fluidbox.Slides card={() => <Card />} />
       </Fluidbox.Root>
     </>
   );

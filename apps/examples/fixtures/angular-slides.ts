@@ -1,12 +1,14 @@
 import "@angular/compiler";
 import { mountSite } from "../src/site";
 import {
+  CUSTOM_ELEMENTS_SCHEMA,
   Component,
   Input,
   computed,
   provideZonelessChangeDetection,
   signal,
   ɵDEFER_BLOCK_DEPENDENCY_INTERCEPTOR as DEFER_BLOCK_DEPENDENCY_INTERCEPTOR,
+  type OnDestroy,
   type OnInit,
 } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
@@ -33,6 +35,7 @@ declare module "@ogdakke/fluidbox" {
     tap: FluidboxCustomItemBase<"tap">;
     held: FluidboxCustomItemBase<"held">;
     reel: FluidboxCustomItemBase<"reel">;
+    card: FluidboxCustomItemBase<"card">;
   }
 }
 
@@ -60,6 +63,10 @@ const fixture = {
   openGate: undefined as (() => void) | undefined,
   /** Each reel slide's origin, read again whenever the test asks. */
   reels: [] as { index: number; read: () => FluidboxSlideOrigin | null }[],
+  /** Each card slide's origin model, as the item its trigger holds, read again whenever the test asks. */
+  cards: [] as { index: number; read: () => string | null }[],
+  /** Where each close from a card slide landed: the item whose model it landed on. */
+  landings: [] as (string | null)[],
   /** Each held slide's index, read again whenever the test asks. */
   held: [] as { id: string; read: () => number }[],
   /** What the bound viewer's [(value)] emitted, and the actions its beforeValueChange cancels. */
@@ -86,7 +93,10 @@ const parted: FluidboxImageItem[] = [
   { ...photo("missing", "/missing-photo.svg"), caption: "A photo that is not there" },
 ];
 
-const custom = (type: "lazy" | "layered" | "tap" | "held" | "reel", id: string): FluidboxItem => ({
+const custom = (
+  type: "lazy" | "layered" | "tap" | "held" | "reel" | "card",
+  id: string,
+): FluidboxItem => ({
   type,
   id,
   title: `${type} ${id}`,
@@ -94,6 +104,7 @@ const custom = (type: "lazy" | "layered" | "tap" | "held" | "reel", id: string):
   height: 600,
 });
 const reels = [custom("reel", "reel-a"), custom("reel", "reel-b")];
+const cards = [custom("card", "card-a"), custom("card", "card-b")];
 
 const gate = new Promise<void>((resolve) => (fixture.openGate = resolve));
 
@@ -169,10 +180,42 @@ class Reel implements OnInit {
   }
 }
 
+/** The item whose trigger holds `model`, which is what a card reports. */
+const holder = (model: HTMLElement | undefined) =>
+  model?.closest<HTMLElement>("[data-item]")?.dataset.item ?? null;
+
+// A slide that reads the trigger's live model, and hears where each close lands.
+@Component({
+  selector: "app-card",
+  standalone: true,
+  imports: [FluidboxModule],
+  template: `
+    <ng-template fluidboxMedia>
+      <div class="media-probe" data-test="card">{{ slide.item().title }}</div>
+    </ng-template>
+  `,
+})
+class Card implements OnInit, OnDestroy {
+  readonly slide = injectFluidboxSlide<FluidboxCustomItemBase<"card">>();
+  #stop?: () => void;
+
+  ngOnInit(): void {
+    const slide = this.slide;
+    fixture.cards.push({ index: slide.index(), read: () => holder(slide.origin?.model) });
+    this.#stop = slide.onClose((landing) => fixture.landings.push(holder(landing?.model)));
+  }
+
+  ngOnDestroy(): void {
+    this.#stop?.();
+  }
+}
+
 @Component({
   selector: "angular-slides",
   standalone: true,
-  imports: [FluidboxModule, Grid, LazyCard, Held, Reel],
+  imports: [FluidboxModule, Grid, LazyCard, Held, Reel, Card],
+  // <model-viewer> in the cards' triggers.
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <p id="outside">The page around the viewers.</p>
     <h2>Built-in images, and the same through a slide of your own</h2>
@@ -298,6 +341,17 @@ class Reel implements OnInit {
       </div>
       <ng-template fluidboxSlide="reel"><app-reel /></ng-template>
     </div>
+    <h2>A slide that reads the trigger's live model and hears each close</h2>
+    <div fluidboxRoot [items]="cards">
+      <div class="media-grid" id="cards">
+        @for (card of cards; track card.id) {
+          <button [fluidboxTrigger]="card.id!" [attr.data-item]="card.id">
+            <model-viewer></model-viewer>
+          </button>
+        }
+      </div>
+      <ng-template fluidboxSlide="card"><app-card /></ng-template>
+    </div>
   `,
 })
 class Slides {
@@ -310,6 +364,7 @@ class Slides {
   readonly cancel = fixture.cancel;
   readonly lazy = [custom("lazy", "lazy"), custom("layered", "layered"), custom("tap", "tap")];
   readonly reels = reels;
+  readonly cards = cards;
   readonly held = signal<FluidboxItem[]>([custom("held", "held-a"), custom("held", "held-b")]);
 
   readonly count = signal(4);

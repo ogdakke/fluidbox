@@ -8,6 +8,8 @@ declare global {
       openGate?: () => void;
       reels: { index: number; read: () => { video?: { currentTime: number } } | null }[];
       held: { id: string; read: () => number }[];
+      cards: { index: number; read: () => string | null }[];
+      landings: (string | null)[];
       setHeldItems?: (items: unknown[]) => void;
       values: (string | null)[];
       cancel: string[];
@@ -345,4 +347,30 @@ test("a root open on its first render shows a copy of the viewer, which the view
 test("Slideshow plays and pauses, and is named for what it does next", async ({ page }) => {
   await load(page);
   await expectSlideshowPart(page, "#slideshow");
+});
+
+test("a slide reads the trigger's live model, and hears once where each close lands", async ({
+  page,
+}) => {
+  await load(page);
+  await page.locator('#cards [data-item="card-b"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const origin = (index: number) =>
+    page.evaluate(
+      (index) =>
+        window.angularSlides.cards.findLast((card) => card.index === index)?.read() ?? null,
+      index,
+    );
+  expect(await origin(1)).toBe("card-b");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(`${shown} [data-test="card"]`)).toHaveText("card card-a");
+  // A slide reached by moving has no origin.
+  expect(await origin(0)).toBeNull();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  await page.locator('#cards [data-item="card-b"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  expect(await page.evaluate(() => window.angularSlides.landings)).toEqual(["card-a", "card-b"]);
 });

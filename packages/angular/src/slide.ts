@@ -58,8 +58,9 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
   readonly opening: boolean;
   /**
    * What the trigger showed, on the slide an open started from it: `video`
-   * reads the trigger's `<video>` live. Null on the other slides. Read live,
-   * as an open can start from a trigger after the slide rendered.
+   * reads the trigger's `<video>` live, and `model` is its live
+   * `<model-viewer>`. Null on the other slides. Read live, as an open can start
+   * from a trigger after the slide rendered.
    */
   readonly origin: FluidboxSlideOrigin | null;
   /** Aborted when the slide unloads. */
@@ -70,6 +71,12 @@ export interface FluidboxSlideApi<TItem extends FluidboxItem = FluidboxItem> {
    * this slide. Returns a function that unregisters it; call it in ngOnDestroy.
    */
   returnPlayback(this: void, source: FluidboxPlaybackSource): () => void;
+  /**
+   * Hear a close start from this slide, once per close, with what the trigger
+   * it lands on shows. The listener runs in Angular's zone. Returns a function
+   * that stops listening; call it in ngOnDestroy.
+   */
+  onClose(this: void, listener: (landing: FluidboxSlideOrigin | null) => void): () => void;
   /**
    * Make the opening flight also wait for this promise, at most three seconds
    * in all. Call it in the constructor or ngOnInit. The slide already waits
@@ -195,6 +202,8 @@ export class FluidboxSlideDirective<TItem extends FluidboxItem = FluidboxItem>
       signal: slide.signal,
       onActiveChange: slide.onActiveChange,
       returnPlayback: slide.returnPlayback,
+      // Closes start outside the zone; the page's listener runs in it, as events do.
+      onClose: (listener) => slide.onClose((landing) => this.#zone.run(() => listener(landing))),
       waitUntil: slide.waitUntil,
       fail: slide.fail,
       onZoom: slide.onZoom,

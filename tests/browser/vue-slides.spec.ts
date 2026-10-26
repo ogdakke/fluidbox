@@ -9,6 +9,8 @@ declare global {
       openGate?: () => void;
       reels: { index: number; read: () => { video?: { currentTime: number } } | null }[];
       held: { id: string; read: () => number }[];
+      cards: { index: number; read: () => string | null }[];
+      landings: (string | null)[];
       setHeldItems?: (items: unknown[]) => void;
       remount?: () => void;
       mediaErrors: () => number;
@@ -163,6 +165,31 @@ test("closing hands the trigger's video the time a slide registered with returnP
   expect(back.paused).toBe(false);
   expect(back.time).toBeGreaterThanOrEqual(2.49);
   expect(back.time).toBeLessThan(3.5);
+});
+
+test("a slide reads the trigger's live model, and hears once where each close lands", async ({
+  page,
+}) => {
+  await load(page);
+  await page.locator('#cards [data-item="card-b"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  const origin = (index: number) =>
+    page.evaluate(
+      (index) => window.vueSlides.cards.findLast((card) => card.index === index)?.read() ?? null,
+      index,
+    );
+  expect(await origin(1)).toBe("card-b");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(`${shown} [data-test="card"]`)).toHaveText("card card-a");
+  // A slide reached by moving has no origin.
+  expect(await origin(0)).toBeNull();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  await page.locator('#cards [data-item="card-b"]').click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  expect(await page.evaluate(() => window.vueSlides.landings)).toEqual(["card-a", "card-b"]);
 });
 
 test("a Root mounted again, as a re-created view is, opens and closes as before", async ({
