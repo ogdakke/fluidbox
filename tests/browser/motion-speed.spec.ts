@@ -266,7 +266,7 @@ test.describe("motion speed", () => {
         await midGlide(page);
         await page.locator("[data-fluidbox-slides]").evaluate((element, input) => {
           if (input === "wheel") {
-            element.dispatchEvent(new WheelEvent("wheel", { deltaY: 1, bubbles: true }));
+            element.dispatchEvent(new WheelEvent("wheel", { deltaX: 1, bubbles: true }));
             return;
           }
           const pointer = { bubbles: true, isPrimary: true, pointerId: 3, pointerType: "mouse" };

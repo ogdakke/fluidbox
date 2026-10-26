@@ -2138,7 +2138,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // A person's gesture takes over from a smooth move, the strip's glide or
     // the browser's: the move ends on the slide it had reached, which the
     // gesture then moves on from as from any other, and settles wherever it ends.
-    const gliding = !!this.#selection;
+    // A wheel that doesn't scroll the strip, as the viewer's own "navigate",
+    // "dismiss" or "zoom" wheel, leaves the move be: its inertia isn't a new gesture.
+    const gliding =
+      !!this.#selection &&
+      (!(event instanceof WheelEvent) || Math.abs(event.deltaX) > Math.abs(event.deltaY));
     if (gliding) {
       this.#stopped = true;
       this.#resolveSelection();
