@@ -604,7 +604,7 @@ of each is in §2.11–2.20; this section covers the binding surface.
 | `Fullscreen`         | `<button type="button">` | `enterFullscreen` / `exitFullscreen` | fullscreen isn't available                      | `data-fluidbox-fullscreen`, plus `data-active` while fullscreen |
 | `Download`           | `<a download href>`      | `download`                           | the item has no file                            | `data-fluidbox-download`; `aria-busy` while fetching            |
 | `Share`              | `<button type="button">` | `share`                              | no link, or neither Web Share nor the clipboard | `data-fluidbox-share`; `data-copied` after a copy               |
-| `Slideshow` (step 7) | `<button type="button">` | `playSlideshow` / `pauseSlideshow`   | no `slideshow` option                           | `data-fluidbox-slideshow`, plus `data-active` while playing     |
+| `Slideshow` (step 7) | `<button type="button">` | `playSlideshow` / `pauseSlideshow`   | no `slideshow` option, unless playing           | `data-fluidbox-slideshow`, plus `data-active` while playing     |
 
 They follow the control rules of §3.8: HTML attributes pass through, children replace the label text,
 your `onClick` runs first and `preventDefault()` skips the command. `Download` is an anchor so
@@ -636,7 +636,10 @@ unless placed.
 | `children`      | node                                         | —       | The pin's content; it needs an accessible name.    |
 | HTML attributes |                                              |         | On the `<button data-fluidbox-hotspot>`.           |
 
-Only inside `Media`; elsewhere it throws in development.
+Put it inside `Media`. Outside a slide it throws, as every slide part does. Inside a slide
+but outside the box, or below an element that positions it, it warns in development and never
+throws (§2.17). The bindings render the button themselves and place it with kit's
+`placeHotspot(slide, button, options)`.
 
 ```tsx
 <Fluidbox.Slides
@@ -674,16 +677,16 @@ Only inside `Media`; elsewhere it throws in development.
 
 ### Per framework
 
-| React                                       | Vue            | Solid          | Angular                                     | Elements                                                      |
-| ------------------------------------------- | -------------- | -------------- | ------------------------------------------- | ------------------------------------------------------------- |
-| `Fluidbox.Fullscreen`                       | same           | same           | `button[fluidboxFullscreen]`                | `<fluidbox-fullscreen>`                                       |
-| `Fluidbox.Download`                         | same           | same           | `a[fluidboxDownload]`                       | `<fluidbox-download>`                                         |
-| `Fluidbox.Share`                            | same           | same           | `button[fluidboxShare]`                     | `<fluidbox-share>`                                            |
-| `Fluidbox.Slideshow`                        | same           | same           | `button[fluidboxSlideshow]`                 | `<fluidbox-slideshow>`                                        |
-| `Fluidbox.Hotspot`                          | same           | same           | `button[fluidboxHotspot]` with `[x]`, `[y]` | `<fluidbox-hotspot x y>`                                      |
-| `onMediaError`                              | `@media-error` | `onMediaError` | `(mediaError)`                              | `mediaerror` event                                            |
-| `onReachEnd`                                | `@reach-end`   | `onReachEnd`   | `(reachEnd)`                                | `reachend` event                                              |
-| `dismiss`, `wheel`, `shareUrl`, `slideshow` | `:dismiss` …   | props          | inputs                                      | properties; `wheel` and `reach-end-threshold` also attributes |
+| React                                       | Vue            | Solid          | Angular                                                        | Elements                                                         |
+| ------------------------------------------- | -------------- | -------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `Fluidbox.Fullscreen`                       | same           | same           | `button[fluidboxFullscreen]`                                   | `<fluidbox-fullscreen>`                                          |
+| `Fluidbox.Download`                         | same           | same           | `a[fluidboxDownload]`                                          | `<fluidbox-download>`                                            |
+| `Fluidbox.Share`                            | same           | same           | `button[fluidboxShare]`                                        | `<fluidbox-share>`                                               |
+| `Fluidbox.Slideshow`                        | same           | same           | `button[fluidboxSlideshow]`                                    | `<fluidbox-slideshow>`                                           |
+| `Fluidbox.Hotspot`                          | same           | same           | `button[fluidboxHotspot]` with `[x]`, `[y]`, `[scaleWithZoom]` | `<fluidbox-hotspot x y scale-with-zoom>`, replaced by the button |
+| `onMediaError`                              | `@media-error` | `onMediaError` | `(mediaError)`                                                 | `mediaerror` event                                               |
+| `onReachEnd`                                | `@reach-end`   | `onReachEnd`   | `(reachEnd)`; `reachEndThreshold` input (`numberAttribute`)    | `reachend` event                                                 |
+| `dismiss`, `wheel`, `shareUrl`, `slideshow` | `:dismiss` …   | props          | inputs                                                         | properties; `wheel` and `reach-end-threshold` also attributes    |
 
 Plain JS adds `"fullscreen"`, `"download"`, `"share"` and `"slideshow"` to
 `FluidboxControlName`, so `controls: ["share", "download", "fullscreen", "close"]` draws them in

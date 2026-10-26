@@ -341,7 +341,8 @@ line for every user and two bundle-check consumers per framework, to save less t
 removal already did.
 
 The fallback is unchanged: if step 7's measurement exceeds the upper estimate in §9.3, those two
-move to their own entries before they ship.
+move to their own entries before they ship. (Step 7 did exceed it, and the user accepted the
+sizes instead. The fallback was not taken; see §8.26.)
 
 ## 8.25 Trigger video playback and click zoom: the open choices
 
@@ -370,3 +371,11 @@ through `event.detail`. If a real need appears, it can be added without a break.
 
 **No `tap: "single"` for now.** On touch, pinch is the main way to zoom, and a single tap that
 zooms would fire on taps meant for something else. It can be added later without a break.
+
+## 8.26 Step 7's sizes are accepted over the estimates
+
+**Decided by the user.** Step 7 came in over §9.3's estimates. The measured numbers are in §9.3.
+The excess came from correctness fixes made in review. The cheap trims were measured and taken.
+Slideshow and Hotspot stay in the binding entries, and the §8.20 and §8.24 fallback of moving them
+to their own entries is not taken. The hotspots' code is an on-demand chunk loaded on the first
+hotspot (§2.17), so pages without hotspots don't pay for it.

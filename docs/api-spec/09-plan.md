@@ -199,20 +199,22 @@ dozen lines (§4.1). Done by whoever does that framework in step 4.
 
 ### Step 7: motion speed, hotspots, slideshow, reachend, deep zoom
 
-A later session, after React (step 2) has landed, so it builds on the final binding code. It
-adds nothing to steps 1–3 beyond the hooks of sub-step 1.11. In order:
+Built and merged on `feat/api-redesign` at 1285e6d, except deep zoom. §2.16–2.20 describe the
+built behaviour. In order:
 
 1. **Motion speed** (§2.16): `--fluidbox-motion-speed` read in `#duration`, clamped; the strip's
-   own scroll animation at speeds other than 1; `css-api.ts` entry.
+   own glide at speeds other than 1, which a gesture ends; an `@input` doc in `styles.css`
+   (`css-api.ts` lists only published properties).
 2. **`reachend`** (§2.20): the event and the once-per-count rule in the controller; `withCount`
    on `createItemList` lists; `onReachEnd` in each binding.
 3. **Slideshow** (§2.19): the timer in the viewer chunk on `#userInteraction`, `visibilitychange`
    and video `play`/`pause`; `ready(index, interval)` before each advance; the live region off
    while playing; `play`/`pause`/`state.playing`; the `"slideshow"` control and `Slideshow` part;
    `reason: "slideshow"`.
-4. **Hotspots** (§2.17): the hotspot layer sized to the painted content rectangle, the
-   counter-scale, focus panning, hiding during flights; `slide.hotspot`; `Hotspot` in each binding
-   and `<fluidbox-hotspot>`.
+4. **Hotspots** (§2.17): buttons placed in the media box as percentages of its padding box, on
+   the painted rectangle of the drawn media; the counter-scale; keyboard-focus panning; hiding
+   with the chrome; the development warnings; an on-demand chunk; `slide.hotspot`, kit's
+   `placeHotspot`, `Hotspot` in each binding and `<fluidbox-hotspot>`.
 5. **Deep zoom** (§2.18), after 1.0: `@ogdakke/fluidbox/deep-zoom` with IIIF and DZI readers, the
    tile layer on `onZoom`, and parts per framework. Its own bundle-check consumer.
 
@@ -247,27 +249,51 @@ in the core's `index.js`. The bindings' own icon builders (React `defaultIcon`, 
 Solid `defaultIcon`, Angular `#icon()`) come out too. The third amendment's four new icons are
 never added.
 
-| Entry                         | Redesign (above) |                + features 1–5 |                                                                                       + fourth amendment |             Step 7 |         Total initial vs today |
-| ----------------------------- | ---------------: | ----------------------------: | -------------------------------------------------------------------------------------------------------: | -----------------: | -----------------------------: |
-| Root initial                  |    +50 to +150 B |                +120 to +200 B |                                                        +40 to +80 B (`bindControl` stub, `icons` option) |      +60 to +120 B |                 +270 to +550 B |
-| React initial                 | +600 to +1,200 B |                +300 to +500 B |             −300 to −500 B (icons, `defaultIcon`), +150 to +250 B (`Loading`, `Error`, `Retry`, `label`) |     +250 to +400 B | **+1,000 to +1,850 B (7–12%)** |
-| Vue, Solid initial            | +500 to +1,200 B |                +300 to +500 B |                                                                           −300 to −450 B, +150 to +250 B |     +250 to +400 B |               +900 to +1,900 B |
-| Angular initial               | +700 to +1,300 B |                +350 to +550 B |                                                                           −300 to −450 B, +200 to +300 B |     +300 to +450 B |             +1,250 to +2,150 B |
-| Elements initial              |   +500 to +900 B |                +300 to +450 B |                −250 to −400 B, +150 to +250 B (`<fluidbox-loading>`, `<fluidbox-error>`, icon templates) |     +250 to +400 B |               +950 to +1,600 B |
-| Activation (every core entry) | +550 to +1,050 B | +1,100 to +1,450 B (no icons) | −250 to −350 B (icon builder and paths), +200 to +300 B (`bindControl`, `icons`, default error UI hooks) | +1,550 to +2,000 B |             +3,150 to +4,450 B |
-| `styles.css`                  |          3,565 B |                               |                                                                                         2,650 to 2,800 B |                    |                 −750 to −900 B |
-| `thumbnails.css`              |          1,372 B |                               |                                                                                         1,050 to 1,150 B |                    |                 −220 to −320 B |
-| `sheet.css`                   |          1,310 B |                               |                                                                                         1,000 to 1,050 B |                    |                 −260 to −310 B |
-| `baseline.css`                |                — |                               |                                                                                 2,600 to 3,400 B, opt-in |                    |                 its own budget |
+| Entry                         | Redesign (above) |                + features 1–5 |                                                                                       + fourth amendment |    Step 7 estimate |
+| ----------------------------- | ---------------: | ----------------------------: | -------------------------------------------------------------------------------------------------------: | -----------------: |
+| Root initial                  |    +50 to +150 B |                +120 to +200 B |                                                        +40 to +80 B (`bindControl` stub, `icons` option) |      +60 to +120 B |
+| React initial                 | +600 to +1,200 B |                +300 to +500 B |             −300 to −500 B (icons, `defaultIcon`), +150 to +250 B (`Loading`, `Error`, `Retry`, `label`) |     +250 to +400 B |
+| Vue, Solid initial            | +500 to +1,200 B |                +300 to +500 B |                                                                           −300 to −450 B, +150 to +250 B |     +250 to +400 B |
+| Angular initial               | +700 to +1,300 B |                +350 to +550 B |                                                                           −300 to −450 B, +200 to +300 B |     +300 to +450 B |
+| Elements initial              |   +500 to +900 B |                +300 to +450 B |                −250 to −400 B, +150 to +250 B (`<fluidbox-loading>`, `<fluidbox-error>`, icon templates) |     +250 to +400 B |
+| Activation (every core entry) | +550 to +1,050 B | +1,100 to +1,450 B (no icons) | −250 to −350 B (icon builder and paths), +200 to +300 B (`bindControl`, `icons`, default error UI hooks) | +1,550 to +2,000 B |
+| `styles.css`                  |          3,565 B |                               |                                                                                         2,650 to 2,800 B |                    |
+| `thumbnails.css`              |          1,372 B |                               |                                                                                         1,050 to 1,150 B |                    |
+| `sheet.css`                   |          1,310 B |                               |                                                                                         1,000 to 1,050 B |                    |
+| `baseline.css`                |                — |                               |                                                                                 2,600 to 3,400 B, opt-in |                    |
+
+**Step 7, measured.** Gzip, against b7ff976, the tree just before step 7:
+
+| Entry    | Initial: step 7 (total) | Activation: step 7 (total) | Initial vs 2026-10-23 | Activation vs 2026-10-23 |
+| -------- | ----------------------: | -------------------------: | --------------------: | -----------------------: |
+| Root     |       +166 B (10,283 B) |        +2,102 B (46,608 B) |       +1,157 B (+13%) |          +9,377 B (+25%) |
+| Elements |       +319 B (15,467 B) |        +2,391 B (53,084 B) |       +2,385 B (+18%) |         +12,464 B (+31%) |
+| React    |       +437 B (17,930 B) |        +2,280 B (53,540 B) |       +3,066 B (+21%) |         +10,989 B (+26%) |
+| Solid    |       +485 B (17,743 B) |        +2,334 B (53,354 B) |       +5,020 B (+39%) |         +12,975 B (+32%) |
+| Vue      |       +501 B (18,424 B) |        +2,354 B (54,011 B) |       +4,981 B (+37%) |         +12,873 B (+31%) |
+| Angular  |       +506 B (20,129 B) |        +2,373 B (55,679 B) |       +6,231 B (+45%) |         +14,101 B (+34%) |
+
+- **On demand.** The hotspots chunk is about 1,320 B, loaded on the first hotspot. With the
+  `viewer-actions` and `zoom-pose` chunks, 2,473 B loads on demand in all.
+- **`styles.css`** is 2,877 B after step 7.
+- **Over the estimate, and accepted.** Step 7 came in over its estimates: React initial +437 B
+  against +250 to +400 B, and activation +2.1 to +2.4 KB against +1.55 to +2.0 KB. The excess came
+  from correctness fixes made in review, and the cheap trims were measured and taken. The user
+  accepted the sizes. Slideshow and Hotspot stay in the binding entries, and the §8.20 and §8.24
+  fallback is not taken (§8.26).
+- **The totals since the 2026-10-23 baseline** (the last two columns) are much larger than the
+  totals estimated above for steps 1–7. React's initial, for one, is +3,066 B against an
+  estimated +1,000 to +1,850 B. They cover everything built since the baseline, steps 1–6 and the
+  amendments included, as measured, so most of the gap is from before step 7.
 
 **React initial, worked out.** Each new control is one line on the existing `action()` factory
 (`react/src/index.ts:685-715`), about 20 B. Removing icons drops the 209 B of paths, the icon
 attributes and the `defaultIcon` switch (`:712-729`). In their place a part needs only
 `children ?? label`. Features 1–5 now cost their labels (80–100 B), control descriptors
 (100–150 B), state and command stubs (60–100 B) and the `Download` and `Share` specifics
-(150–200 B). `Loading`, `Error` and `Retry` add about 150–250 B. Altogether React grows by
-1.0–1.85 KB including step 7, or 7–12% on 14,864 B. That is down from 11–17% before this
-amendment, and it needs no lazy-icon workaround: the `hostOf(fluidbox).icon()` mitigation is
+(150–200 B). `Loading`, `Error` and `Retry` add about 150–250 B. The estimate was that React would grow
+by 1.0–1.85 KB including step 7, or 7–12% on 14,864 B, down from 11–17% before this amendment.
+The measurement is above (+3,066 B). The amendment needs no lazy-icon workaround: the `hostOf(fluidbox).icon()` mitigation is
 dropped.
 
 A page that also imports `baseline.css` pays its 2.6–3.4 KB of CSS, once and cacheable. A page
@@ -275,11 +301,10 @@ that styles the viewer itself pays nothing for looks it replaces. Together with 
 CSS, `styles.css` plus `baseline.css` is about 1.7–2.6 KB more than today's `styles.css`, almost
 all of it the glyph data URLs that replace the JS icons.
 
-**Slideshow and Hotspot entry points: recommendation, keep them in the binding entries.** The
-pressure to split them came from the icon cost, which is gone. Each is 150–300 B, and with them
-the React total stays within 7–12%. Separate entries would cost every user an import line and the
-bundle check two consumers per framework. The fallback stays (§8.20): move them out if step 7's
-measurement exceeds the upper estimate.
+**Slideshow and Hotspot entry points: kept in the binding entries.** The pressure to split
+them came from the icon cost, which is gone. Separate entries would cost every user an import
+line and the bundle check two consumers per framework. Step 7 measured over its estimate, the
+user accepted it, and the fallback of §8.20 was not taken (§8.26).
 
 **Fifth amendment.** `origin`, `returnPlayback` and the click and tap modes add about 150–250 B
 to activation (the viewer chunk), and 20–40 B to each binding's initial chunk for the two hook
@@ -458,17 +483,26 @@ Fourth amendment (sub-step 1.12):
 
 Step 7:
 
-- Motion speed: at `--fluidbox-motion-speed: 2` the open, close, release and move take half as
-  long (measured from animation timing); reduced motion still has no flights.
-- `reachend`: fires within the threshold, once per count, again after `setItems` grows the count,
-  never with `loop`; the open `value` doesn't change on `setItems`; `withCount` keeps made items.
-- Slideshow: doesn't start without `play()`/`autoplay`; advances after the interval and only once
-  the next slide is ready; pauses on a pointer, a key, a zoom, a hidden tab and a playing video,
-  and resumes only after the latter two; the live region is off while playing; instant moves under
-  reduced motion; axe passes with the control.
+Built in `tests/browser/motion-speed.spec.ts`, `reach-end.spec.ts`, `loop.spec.ts`,
+`slideshow.spec.ts`, `hotspots.spec.ts`, `hotspot-parts.spec.ts` and the unit specs beside them.
+
+- Motion speed: at `--fluidbox-motion-speed: 2` the open, close, release, zoom and move take half
+  as long; reduced motion still has no flights; value events fire at the same points at every
+  speed; a pointer, touch or horizontal wheel ends a glide and a vertical wheel doesn't.
+- `reachend`: fires once the move settles, within the threshold, once per count (not again on a
+  reopen at the same count), again after `setItems` changes the count, never with `loop`; a bad
+  threshold means 2; `withCount` keeps made items, and a shorter list answers -1 and throws past
+  its end; loop toggles keep the slides.
+- Slideshow: doesn't start without `play()` or `autoplay`; counts from the settled move and
+  gives the next slide one more interval; holds through a hidden tab and a playing video with
+  `playing` still true; pauses on a pointer, key, wheel or zoom but not the control's own press;
+  stops on the last slide without a loop; a queued `play()` is dropped on change and loses to
+  `pause()`; the live region is off while playing; instant moves under reduced motion.
 - Hotspots: stay on their point at zoom 1, 2 and 4, with `object-fit: contain` and in a fill box;
-  keep screen size unless `scaleWithZoom`; tab order; focus pans a zoomed image; hidden during
-  flights.
+  pixel coordinates use the declared size; keep screen size unless `scaleWithZoom`; hidden until
+  placed and during flights and drag-dismiss; keyboard focus pans a zoomed image and pointer
+  focus doesn't; a press from a hotspot ending outside it neither zooms nor closes; the
+  development warnings fire.
 
 ## 9.5 What runs in parallel
 
