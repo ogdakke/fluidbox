@@ -168,6 +168,37 @@ function quiet(model: HTMLElement) {
 // Imported, the add-on quiets the live models in every trigger.
 triggerHooks.add(quietModels);
 
+/** Whether the development warning about a `<model-viewer>` without its canvas ran. */
+let warnedCanvas = false;
+
+/**
+ * The canvas a loaded `<model-viewer>` 4.0.0 shows, marked `show` in its
+ * shadow root: the renderer's shared WebGL canvas while it is the one model in
+ * view, which the renderer moves into it, else its own 2D canvas, which the
+ * renderer copies each frame into. Both are sized for the largest model in
+ * view, and this one's pixels are their top-left corner. The WebGL canvas
+ * keeps its drawing buffer, so it holds the last frame between frames. Null
+ * before it has drawn, and for a version laid out otherwise, which the
+ * development build warns of once.
+ */
+function shownCanvas(model: ModelViewerElement) {
+  const root = model.shadowRoot;
+  const canvas = root?.querySelector<HTMLCanvasElement>("canvas.show");
+  if (canvas) return canvas;
+  // Development builds only; a page without a bundler has no process. A
+  // canvas not yet marked has drawn nothing, and warns of nothing.
+  try {
+    if (process.env.NODE_ENV !== "production" && !warnedCanvas && !root?.querySelector("canvas")) {
+      warnedCanvas = true;
+      console.warn(
+        "Fluidbox can't reach the canvas this <model-viewer> draws to, so its snapshots encode a PNG, which is slower. Fluidbox is checked against <model-viewer> 4.0.0:",
+        model,
+      );
+    }
+  } catch {}
+  return null;
+}
+
 /** Where a model's camera is: `<model-viewer>`'s camera properties. */
 interface ModelView {
   readonly orbit: string;
@@ -214,13 +245,53 @@ function applyView(model: ModelViewerElement, view: ModelView) {
   model.jumpCameraToGoal?.();
 }
 
-/** A picture of what a loaded model draws now, or null. */
-function snapshot(model: ModelViewerElement) {
-  if (!model.loaded || !model.toDataURL) return null;
+/**
+ * A picture of what a loaded model draws now, or null: a copy of the pixels
+ * it shows, made at once, so it holds the frame on screen as a close starts;
+ * else, without that canvas, the PNG of its `toDataURL`. WebGL takes no
+ * texture from another origin without CORS, so 4.0.0's canvases don't taint,
+ * and the guard on `toDataURL` is defensive; a copy of a tainted canvas would
+ * still draw, and only reading it back would fail.
+ */
+function snapshot(
+  model: ModelViewerElement,
+  ownerDocument: Document,
+): HTMLCanvasElement | HTMLImageElement | null {
+  if (!model.loaded) return null;
+  const source = shownCanvas(model);
+  if (source) {
+    // The renderer draws at the device's pixel ratio, lower while it throttles,
+    // when it shows its canvas larger than its pixels; its scene is the
+    // content box, whose size, fractions and all, its .container takes.
+    const ratio = model.ownerDocument.defaultView?.devicePixelRatio ?? 1;
+    const scale =
+      Math.abs(source.width / ratio - source.clientWidth) < 1
+        ? ratio
+        : source.width / (source.clientWidth || 1);
+    const content = source.closest<HTMLElement>(".container")?.style;
+    const copy = ownerDocument.createElement("canvas");
+    copy.width = Math.min(
+      source.width,
+      Math.ceil((Number.parseFloat(content?.width ?? "") || model.clientWidth) * scale),
+    );
+    copy.height = Math.min(
+      source.height,
+      Math.ceil((Number.parseFloat(content?.height ?? "") || model.clientHeight) * scale),
+    );
+    const context = copy.getContext("2d");
+    if (!context || !copy.width || !copy.height) return null;
+    context.drawImage(source, 0, 0, copy.width, copy.height, 0, 0, copy.width, copy.height);
+    return copy;
+  }
+  if (!model.toDataURL) return null;
   try {
-    // PNG: the canvas is clear around the model, which JPEG loses, and WebP
-    // encoded slower than PNG where it was measured (a phone viewport in Chromium).
-    return model.toDataURL();
+    // PNG: the canvas is clear around the model, which JPEG loses.
+    const image = ownerDocument.createElement("img");
+    image.alt = "";
+    image.draggable = false;
+    image.decoding = "sync";
+    image.src = model.toDataURL();
+    return image;
   } catch {
     return null;
   }
@@ -303,19 +374,12 @@ export function createModelSlide(
     // A picture of a live model's view, over the posters: the trigger's as an
     // opening flies, before the slide's own model has drawn; the slide's as a
     // close carries it home.
-    const paintSnapshot = (src: string | null) => {
-      if (!src) return;
-      let image = box.querySelector<HTMLImageElement>('[data-fluidbox-media-poster="snapshot"]');
-      if (!image) {
-        image = ownerDocument.createElement("img");
-        image.alt = "";
-        image.setAttribute("aria-hidden", "true");
-        image.draggable = false;
-        image.decoding = "sync";
-        image.dataset.fluidboxMediaPoster = "snapshot";
-      }
-      image.src = src;
-      box.insertBefore(image, model?.parentNode === box ? model : null);
+    const paintSnapshot = (picture: HTMLCanvasElement | HTMLImageElement | null) => {
+      if (!picture) return;
+      picture.setAttribute("aria-hidden", "true");
+      picture.dataset.fluidboxMediaPoster = "snapshot";
+      box.querySelector('[data-fluidbox-media-poster="snapshot"]')?.remove();
+      box.insertBefore(picture, model?.parentNode === box ? model : null);
     };
     // The trigger's live model showing this item, whose view an opening starts from.
     const card = () => {
@@ -394,7 +458,7 @@ export function createModelSlide(
       const run = ++shows;
       const synced = slide.opening;
       // Until the model draws, the opening flies on the trigger's view.
-      if (synced && card()) paintSnapshot(snapshot(card()!));
+      if (synced && card()) paintSnapshot(snapshot(card()!, ownerDocument));
       return (shown = show(run, synced).catch(() => {
         if (run !== shows) return;
         // A failed load of the element tries again when the slide next comes on show.
@@ -417,7 +481,7 @@ export function createModelSlide(
     // lands on, if it shows this item, to that view.
     slide.onClose((landing) => {
       if (!model) return;
-      paintSnapshot(snapshot(model));
+      paintSnapshot(snapshot(model, ownerDocument));
       const view = readView(model);
       const home = landing?.model as ModelViewerElement | undefined;
       if (view && home && showsSrc(home, item.src)) applyView(home, view);

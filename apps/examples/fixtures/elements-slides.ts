@@ -1,3 +1,4 @@
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox/elements";
 import { mountSite } from "../src/site";
 import "@ogdakke/fluidbox/baseline.css";
 import "@ogdakke/fluidbox/elements";
@@ -6,6 +7,7 @@ import "@ogdakke/fluidbox/elements/model";
 import "@ogdakke/fluidbox/elements/spin";
 import "./media.css";
 import "./elements-slides.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Custom elements · slide templates, the parts, and the add-ons read from markup",
@@ -42,3 +44,24 @@ for (const gallery of document.querySelectorAll("fluidbox-gallery")) {
     });
   }
 }
+
+// A slideshow slow enough that the test sees it play without it moving on.
+document.querySelector<FluidboxGalleryElement>("#slideshow")!.slideshow = { interval: 60_000 };
+/** The growing gallery: its first `count` photos, as items in its markup. */
+const growing = document.querySelector<HTMLElementTagNameMap["fluidbox-gallery"]>("#growing")!;
+growth.setCount = (count) => {
+  const photos = growingPhotos(count);
+  while (growing.children.length > count) growing.lastElementChild!.remove();
+  for (const photo of photos.slice(growing.children.length)) {
+    const item = document.createElement("fluidbox-item");
+    item.setAttribute("value", photo.id!);
+    item.innerHTML = `<button slot="trigger" type="button" data-item="${photo.id}"><img src="${photo.src}" alt="${photo.alt}" width="160" height="160" /></button><template slot="content"><img src="${photo.src}" alt="${photo.alt}" width="${photo.width}" height="${photo.height}" /></template>`;
+    growing.append(item);
+  }
+};
+growth.setThreshold = (threshold) => (growing.reachEndThreshold = threshold);
+growth.setCount(4);
+growing.addEventListener("reachend", (event) => {
+  const next = reached(event);
+  if (next) growth.setCount(next);
+});

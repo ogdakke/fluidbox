@@ -41,6 +41,7 @@ import {
   type FluidboxItemList,
   type FluidboxLabels,
   type FluidboxMediaErrorEvent,
+  type FluidboxReachEndEvent,
   type FluidboxOptions,
   type FluidboxSheetEvent,
   type FluidboxSheetSnapPoint,
@@ -127,9 +128,11 @@ export type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
@@ -298,6 +301,7 @@ const stateKeys = [
   "hasNext",
   "zoom",
   "fullscreen",
+  "playing",
 ] as const satisfies readonly (keyof FluidboxState)[];
 
 type RootEmits<TItem extends FluidboxItem> = {
@@ -317,6 +321,8 @@ type RootEmits<TItem extends FluidboxItem> = {
   zoomChange: (event: FluidboxZoomEvent) => true;
   /** When a slide's media fails to load, as it shows its error. */
   mediaError: (event: FluidboxMediaErrorEvent<TItem>) => true;
+  /** When the open item comes within `reachEndThreshold` of the last, once per count: load more. */
+  reachEnd: (event: FluidboxReachEndEvent<TItem>) => true;
 };
 
 type RootSlots<TItem extends FluidboxItem> = SlotsType<{
@@ -368,6 +374,12 @@ const Root = defineComponent(
       return zoom === false ? false : zoom ? { ...toRaw(zoom) } : undefined;
     };
     const dismissOption = () => props.dismiss && { ...toRaw(props.dismiss) };
+    const slideshowOption = () => props.slideshow && { ...toRaw(props.slideshow) };
+    // An attribute gives a string: "3" is 3.
+    const threshold = () => {
+      const given = props.reachEndThreshold as unknown;
+      return given === "" || given == null ? undefined : Number(given);
+    };
 
     // findTrigger and revealTrigger are read from the newest props on each use.
     const fluidbox = createFluidbox<TItem>(
@@ -380,6 +392,8 @@ const Root = defineComponent(
           preload: props.preload,
           dismiss: dismissOption(),
           wheel: props.wheel,
+          slideshow: slideshowOption(),
+          reachEndThreshold: threshold(),
           // Share shares the item's href unless shareUrl says otherwise.
           shareUrl: (item) => (props.shareUrl ? props.shareUrl(item) : props.href?.(idOf(item))),
           // Slides are looked up by type as one mounts, so the Slides part's
@@ -468,6 +482,7 @@ const Root = defineComponent(
           props.labels ?? {},
           props.zoom ?? null,
           props.dismiss ?? null,
+          props.slideshow ?? null,
           props.loop,
           props.preload,
           props.wheel,
@@ -480,13 +495,20 @@ const Root = defineComponent(
           preload: props.preload,
           dismiss: dismissOption(),
           wheel: props.wheel,
+          slideshow: slideshowOption(),
         }),
+    );
+    // On its own, as it changes nothing the viewer shows.
+    watch(
+      () => props.reachEndThreshold,
+      () => fluidbox.update({ reachEndThreshold: threshold() }),
     );
 
     const events = new AbortController();
     const { signal } = events;
     fluidbox.addEventListener("zoomchange", (event) => emit("zoomChange", event), { signal });
     fluidbox.addEventListener("mediaerror", (event) => emit("mediaError", event), { signal });
+    fluidbox.addEventListener("reachend", (event) => emit("reachEnd", event), { signal });
     fluidbox.addEventListener("sheetchange", (event) => (sheetSnap.value = event.snap), {
       signal,
     });
@@ -554,6 +576,8 @@ const Root = defineComponent(
       setFullscreen: (on) => fluidbox.setFullscreen(on),
       download: () => fluidbox.download(),
       share: () => fluidbox.share(),
+      play: () => fluidbox.play(),
+      pause: () => fluidbox.pause(),
       setItems: (next) => fluidbox.setItems(rawTarget(next)),
       preload: (target) => fluidbox.preload(rawTarget(target)),
       load: () => fluidbox.load(),
@@ -621,9 +645,18 @@ const Root = defineComponent(
       dismiss: null,
       wheel: null,
       shareUrl: null,
+      slideshow: null,
+      reachEndThreshold: null,
       // Typed as the names, which keeps the generic signature's props.
     } as unknown as (keyof FluidboxRootProps)[],
-    emits: ["valueChange", "update:modelValue", "valueChangeComplete", "zoomChange", "mediaError"],
+    emits: [
+      "valueChange",
+      "update:modelValue",
+      "valueChangeComplete",
+      "zoomChange",
+      "mediaError",
+      "reachEnd",
+    ],
   },
 );
 
@@ -1136,7 +1169,7 @@ function named(
     : { naming: { "data-fluidbox-default": "", "aria-label": ariaLabel }, content: name };
 }
 
-/** The disabled and hidden states, name and Download's link of a control, as the state has it. */
+/** The disabled, hidden and active states, name and Download's link of a control, as the state has it. */
 function useControl(name: FluidboxControlName) {
   const { fluidbox, state, labels } = useRootContext();
   const control = fluidboxControls[name];
@@ -1144,6 +1177,7 @@ function useControl(name: FluidboxControlName) {
     disabled: control.disabled(state.value),
     hidden: !!control.hidden?.(fluidbox, state.value),
     label: control.label(labels.value, state.value),
+    active: !!control.active?.(state.value),
   }));
   return { fluidbox, state, control, shown };
 }
@@ -1166,7 +1200,7 @@ function control(name: Exclude<FluidboxControlName, "download" | "counter">, dis
         void control.run(fluidbox, event);
       };
       return () => {
-        const { disabled, hidden, label } = shown.value;
+        const { disabled, hidden, label, active } = shown.value;
         const { naming, content } = named(
           slots.default?.(),
           props.label,
@@ -1178,6 +1212,7 @@ function control(name: Exclude<FluidboxControlName, "download" | "counter">, dis
           mergeProps({ type: "button", disabled, hidden: hidden || undefined }, attrs, naming, {
             [control.attribute]: "",
             "data-fluidbox-managed": "",
+            "data-active": active ? "" : undefined,
             onClick: run,
           }),
           content,
@@ -1203,6 +1238,8 @@ const ZoomReset = control("zoomReset", "FluidboxZoomReset");
 const Fullscreen = control("fullscreen", "FluidboxFullscreen");
 /** Shares the item's link, or copies it. Hidden without a link or a way to share it. */
 const Share = control("share", "FluidboxShare");
+/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option, unless it plays. */
+const Slideshow = control("slideshow", "FluidboxSlideshow");
 /** Loads the failed media again. */
 const Retry = control("retry", "FluidboxRetry");
 const parts = {
@@ -1675,6 +1712,7 @@ export const Fluidbox = {
   Fullscreen,
   Download,
   Share,
+  Slideshow,
   Counter,
   Caption,
   Loading,

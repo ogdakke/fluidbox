@@ -1,3 +1,4 @@
+import type { FluidboxReachEndEvent } from "./reach-end-event";
 import type { FluidboxLabels } from "./labels";
 
 export type { FluidboxLabels } from "./labels";
@@ -207,6 +208,18 @@ export interface FluidboxItemList<TItem extends FluidboxItem = FluidboxItem> {
   get(index: number): TItem;
   /** The index of the item with this id, or -1. Without it, ids are found by scanning. */
   indexOf?(id: string): number;
+}
+
+/** A list `createItemList` makes. */
+export interface FluidboxLazyItemList<
+  TItem extends FluidboxItem = FluidboxItem,
+> extends FluidboxItemList<TItem> {
+  indexOf(id: string): number;
+  /**
+   * The same list with another count: it makes items with the same `item` and
+   * `index`, and keeps the items already made. Pass it to `setItems` to grow.
+   */
+  withCount(count: number): FluidboxLazyItemList<TItem>;
 }
 
 /** What `createItemList` makes a list from. */
@@ -504,6 +517,13 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
   readonly zoom: FluidboxZoomState | null;
   /** The viewer is the document's fullscreen element. */
   readonly fullscreen: boolean;
+  /**
+   * The slideshow plays: from `play()`, the Slideshow control or `autoplay`
+   * until a person's input, `pause()`, the last slide without a loop, or the
+   * close. A hidden tab or a video playing in the slide only holds its timer,
+   * so it stays true through them.
+   */
+  readonly playing: boolean;
 }
 
 /**
@@ -511,10 +531,17 @@ export interface FluidboxState<TItem extends FluidboxItem = FluidboxItem> {
  * a click on a trigger, and "keyboard" the arrow keys, Escape, or a page-scrolling
  * key that closes the viewer. "pointer" is a swipe or scroll through the slides, a
  * drag to dismiss or a tap on the backdrop, and "wheel" a wheel or trackpad scroll
- * that dismisses. "items" is a move made by `setItems`. A move from the thumbnails
- * has the reason of its input.
+ * that dismisses. "items" is a move made by `setItems`, and "slideshow" one the
+ * slideshow's timer made. A move from the thumbnails has the reason of its input.
  */
-export type FluidboxReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items";
+export type FluidboxReason =
+  | "api"
+  | "trigger"
+  | "keyboard"
+  | "pointer"
+  | "wheel"
+  | "items"
+  | "slideshow";
 
 /** The open item's id, or null while the viewer is closed. */
 export type FluidboxValue = string | null;
@@ -654,6 +681,9 @@ export class FluidboxMediaErrorEvent<TItem extends FluidboxItem = FluidboxItem> 
   }
 }
 
+// Its own module, which only the viewer imports, so it stays out of the initial chunk.
+export { FluidboxReachEndEvent } from "./reach-end-event";
+
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   /** Before an open, a move or a close. Cancelable: the command resolves false. */
   beforevaluechange: FluidboxValueChangeEvent<TItem>;
@@ -667,6 +697,8 @@ export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   zoomchange: FluidboxZoomEvent;
   /** A slide's media failed, or a zoom image did. */
   mediaerror: FluidboxMediaErrorEvent<TItem>;
+  /** The open item came within `reachEndThreshold` of the last. Never fires with `loop`. */
+  reachend: FluidboxReachEndEvent<TItem>;
 }
 
 // Add-ons. Each needs its entry imported once: `import "@ogdakke/fluidbox/sheet"`.
@@ -732,7 +764,8 @@ export type FluidboxControlName =
   | "fullscreen"
   | "download"
   | "share"
-  | "retry";
+  | "retry"
+  | "slideshow";
 
 /**
  * When the viewer's code loads. `"intent"` loads it when a mouse rests on a
@@ -841,6 +874,32 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   readonly wheel?: "dismiss" | "zoom" | "navigate" | "none";
   /** The link Share shares for an item. Without one, Share hides. */
   readonly shareUrl?: (item: TItem) => string | undefined;
+  /**
+   * How near the end `reachend` fires: when the open item is this many items
+   * from the last, or nearer.
+   * @default 2
+   */
+  readonly reachEndThreshold?: number;
+  /**
+   * Advance on a timer. It never starts by itself: only `play()`, the
+   * Slideshow control or `autoplay` start it. Without it, the Slideshow
+   * control hides unless it plays; `play()` still plays, with the defaults.
+   */
+  readonly slideshow?: FluidboxSlideshowOptions;
+}
+
+/** How the slideshow plays. */
+export interface FluidboxSlideshowOptions {
+  /**
+   * Time on each slide, in ms. The next slide then has as long again to be
+   * ready before the slideshow moves to it.
+   * @default 5000
+   */
+  readonly interval?: number;
+  /** Go from the last slide to the first. Without it, the slideshow stops on the last. @default the `loop` option */
+  readonly loop?: boolean;
+  /** Start playing as the viewer opens. @default false */
+  readonly autoplay?: boolean;
 }
 
 /**
@@ -860,7 +919,9 @@ export type FluidboxUpdateOptions<TItem extends FluidboxItem = FluidboxItem> = {
     | "preload"
     | "dismiss"
     | "wheel"
-    | "shareUrl"]?: FluidboxOptions<TItem>[K] | undefined;
+    | "shareUrl"
+    | "slideshow"
+    | "reachEndThreshold"]?: FluidboxOptions<TItem>[K] | undefined;
 };
 
 export interface FluidboxCommandOptions {
@@ -967,6 +1028,17 @@ export interface Fluidbox<TItem extends FluidboxItem = FluidboxItem> extends Eve
    * clipboard. Resolves whether it was shared or copied.
    */
   share(): Promise<boolean>;
+  /**
+   * Start the slideshow on the open viewer, as the Slideshow control does. It
+   * moves on every `interval` with the reason "slideshow", and pauses on any
+   * input to the viewer. While the tab is hidden or a video in the slide plays
+   * it holds, still playing, and its interval starts again once they end.
+   * Closed, playing already, or on the last slide without a loop, it does
+   * nothing.
+   */
+  play(): void;
+  /** Stop the slideshow. It stays paused until `play()` or the control. */
+  pause(): void;
   /**
    * Change options without closing the viewer. Labels and zoom apply in place, so
    * a zoomed photo zooms out when zoom turns off. A change of `controls`, `viewer`

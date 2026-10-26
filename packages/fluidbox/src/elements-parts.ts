@@ -39,6 +39,7 @@ const CONTROLS: Readonly<Record<FluidboxControlName, string>> = {
   fullscreen: "data-fluidbox-fullscreen",
   download: "data-fluidbox-download",
   share: "data-fluidbox-share",
+  slideshow: "data-fluidbox-slideshow",
   retry: "data-fluidbox-retry",
 };
 const NAMES = Object.keys(CONTROLS) as FluidboxControlName[];
@@ -49,10 +50,11 @@ const ELEMENT_CONTROLS: Readonly<Record<string, FluidboxControlName>> = {
   "FLUIDBOX-FULLSCREEN": "fullscreen",
   "FLUIDBOX-DOWNLOAD": "download",
   "FLUIDBOX-SHARE": "share",
+  "FLUIDBOX-SLIDESHOW": "slideshow",
 };
 
 const PARTS =
-  "fluidbox-toolbar, fluidbox-zoom-controls, fluidbox-counter, fluidbox-caption, fluidbox-loading, fluidbox-error, fluidbox-fullscreen, fluidbox-download, fluidbox-share";
+  "fluidbox-toolbar, fluidbox-zoom-controls, fluidbox-counter, fluidbox-caption, fluidbox-loading, fluidbox-error, fluidbox-fullscreen, fluidbox-download, fluidbox-share, fluidbox-slideshow";
 
 const nameOf = (element: Element) => NAMES.find((name) => element.hasAttribute(CONTROLS[name]))!;
 
@@ -111,8 +113,8 @@ function adopt(from: Element, to: HTMLElement) {
 /**
  * Expand the parts in `root`: `<fluidbox-toolbar>`, `<fluidbox-zoom-controls>`,
  * `<fluidbox-counter>`, `<fluidbox-caption>`, `<fluidbox-loading>`,
- * `<fluidbox-error>`, and `<fluidbox-fullscreen>`, `<fluidbox-download>` and
- * `<fluidbox-share>`. An empty control button shows its label as text, as
+ * `<fluidbox-error>`, and `<fluidbox-fullscreen>`, `<fluidbox-download>`,
+ * `<fluidbox-share>` and `<fluidbox-slideshow>`. An empty control button shows its label as text, as
  * the defaults do, and `data-fluidbox-text="field"` shows that field of the
  * item. In a slide, the controls are bound here, since the viewer's layer
  * wires only its own.

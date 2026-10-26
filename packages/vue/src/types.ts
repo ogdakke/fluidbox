@@ -85,6 +85,10 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly wheel?: FluidboxOptions<TItem>["wheel"];
   /** The link Share shares for an item. @default the `href` of its id */
   readonly shareUrl?: FluidboxOptions<TItem>["shareUrl"];
+  /** Advance on a timer, once `play()`, the Slideshow part or `autoplay` starts it. Compared by value. */
+  readonly slideshow?: FluidboxOptions<TItem>["slideshow"];
+  /** How near the end `@reach-end` fires. @default 2 */
+  readonly reachEndThreshold?: number;
 }
 
 export interface FluidboxTriggerProps<TItem extends FluidboxItem = FluidboxItem> {
@@ -184,6 +188,10 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   readonly download: () => Promise<boolean>;
   /** Share the open item's link, or copy it. */
   readonly share: () => Promise<boolean>;
+  /** Start the slideshow on the open viewer. */
+  readonly play: () => void;
+  /** Stop the slideshow, until `play()` or the Slideshow part. */
+  readonly pause: () => void;
   readonly setItems: (items: FluidboxItems<TItem>) => Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   readonly preload: (target: FluidboxTarget<TItem>) => () => void;

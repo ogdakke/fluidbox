@@ -230,7 +230,21 @@ assert<Equal<ReturnType<typeof fluidbox.close>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.setItems>, Promise<boolean>>>();
 assert<Equal<ReturnType<typeof fluidbox.load>, Promise<boolean>>>();
 assert<Equal<Root.FluidboxPreload, "intent" | "press" | "eager">>();
-assert<Equal<FluidboxReason, "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items">>();
+assert<
+  Equal<
+    FluidboxReason,
+    "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "items" | "slideshow"
+  >
+>();
+// The slideshow: commands, state, options and its control.
+assert<Equal<ReturnType<typeof fluidbox.play>, void>>();
+assert<Equal<ReturnType<typeof fluidbox.pause>, void>>();
+assert<Equal<typeof fluidbox.state.playing, boolean>>();
+createFluidbox({ items: photos, slideshow: { interval: 3000, loop: true, autoplay: true } });
+fluidbox.update({ slideshow: { interval: 4000 } });
+fluidbox.bindControl(document.createElement("button"), "slideshow");
+// @ts-expect-error the interval is a number of ms
+createFluidbox({ items: photos, slideshow: { interval: "5s" } });
 // A scrub is a kind of move, not a source of one.
 void fluidbox.open(1, { scrub: true });
 
@@ -482,6 +496,20 @@ const productVideo: Root.FluidboxSlideRenderer<Root.FluidboxVideoItem> = (slide)
   slide.drawVideo(slide.item, { attach: (element) => void element });
 void productVideo;
 
+// A lazy list grows with withCount; reachend says when, once per count.
+const growing: Root.FluidboxLazyItemList<FluidboxImageItem> = createItemList({
+  count: 10,
+  item: (index) => ({ type: "image", src: `/photo-${index}.jpg`, alt: "", width: 4, height: 3 }),
+  index: (id) => Number(id.slice(7, -4)),
+});
+const grown = createFluidbox({ items: growing, reachEndThreshold: 3 });
+grown.addEventListener("reachend", (event: Root.FluidboxReachEndEvent) => {
+  const at: [string, number, number] = [event.value, event.index, event.count];
+  void at;
+  void grown.setItems(growing.withCount(event.count + 10));
+});
+grown.update({ reachEndThreshold: undefined });
+
 // The root holds no kit helpers, elements or old names.
 type RootValues = keyof typeof Root;
 assert<
@@ -494,6 +522,7 @@ assert<
     | "imageItem"
     | "videoSlide"
     | "FluidboxMediaErrorEvent"
+    | "FluidboxReachEndEvent"
     | "FluidboxSheetEvent"
     | "FluidboxValueChangeEvent"
     | "FluidboxZoomEvent"
@@ -563,6 +592,9 @@ gallery.addEventListener("mediaerror", (event) => void [event.kind, event.cause]
 void gallery.setFullscreen();
 void gallery.download();
 void gallery.share();
+gallery.slideshow = { interval: 4000, autoplay: true };
+gallery.play();
+gallery.pause();
 gallery.viewer = ({ target }) => {
   target.append("Caption");
 };

@@ -47,6 +47,16 @@ export interface FluidboxLabels {
   readonly share: string;
   /** Announced once Share copied the link. */
   readonly linkCopied: string;
+  /**
+   * The slideshow control, while the slideshow is paused. Its default lives with the control.
+   * @default "Play slideshow"
+   */
+  readonly playSlideshow?: string;
+  /**
+   * The slideshow control, while the slideshow plays.
+   * @default "Pause slideshow"
+   */
+  readonly pauseSlideshow?: string;
 }
 
 /** The labels the viewer uses for any you don't pass. */

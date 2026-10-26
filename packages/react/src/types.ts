@@ -14,6 +14,7 @@ import type {
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxOptions,
   FluidboxSheetEvent,
   FluidboxSheetOptions,
@@ -97,10 +98,16 @@ export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
   readonly wheel?: FluidboxOptions<TItem>["wheel"];
   /** The link Share shares for an item. @default the `href` of its id */
   readonly shareUrl?: FluidboxOptions<TItem>["shareUrl"];
+  /** Advance on a timer, once `play()`, the Slideshow part or `autoplay` starts it. Compared by value. */
+  readonly slideshow?: FluidboxOptions<TItem>["slideshow"];
   /** When the image on show comes to rest at another zoom. */
   readonly onZoomChange?: (event: FluidboxZoomEvent) => void;
   /** When a slide's media fails to load, as it shows its error. */
   readonly onMediaError?: (event: FluidboxMediaErrorEvent<TItem>) => void;
+  /** How near the end `onReachEnd` fires. @default 2 */
+  readonly reachEndThreshold?: number;
+  /** When the open item comes within `reachEndThreshold` of the last, once per count: load more. */
+  readonly onReachEnd?: (event: FluidboxReachEndEvent<TItem>) => void;
   readonly children?: ReactNode;
 }
 
@@ -275,6 +282,10 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   readonly download: () => Promise<boolean>;
   /** Share the open item's link, or copy it. */
   readonly share: () => Promise<boolean>;
+  /** Start the slideshow on the open viewer. */
+  readonly play: () => void;
+  /** Stop the slideshow, until `play()` or the Slideshow part. */
+  readonly pause: () => void;
   readonly setItems: (items: FluidboxItems<TItem>) => Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   readonly preload: (target: FluidboxTarget<TItem>) => () => void;

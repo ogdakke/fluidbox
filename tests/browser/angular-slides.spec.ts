@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectSlideshowPart } from "./support/slideshow-part";
 
 declare global {
   interface Window {
@@ -339,4 +340,9 @@ test("a root open on its first render shows a copy of the viewer, which the view
   await expect(page.locator("[data-fluidbox-server-viewer]")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator(dialog)).toHaveCount(0);
+});
+
+test("Slideshow plays and pauses, and is named for what it does next", async ({ page }) => {
+  await load(page);
+  await expectSlideshowPart(page, "#slideshow");
 });

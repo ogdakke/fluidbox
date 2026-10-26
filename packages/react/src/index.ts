@@ -132,9 +132,11 @@ export type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
@@ -288,6 +290,7 @@ function useHost(): HTMLElement | null {
 
 function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): ReactElement {
   const { items, value, defaultValue, labels, zoom, loop, preload, dismiss, wheel, href } = props;
+  const { slideshow } = props;
   const slotsRef = useRef<{
     thumbnails: FluidboxSlots<TItem>;
     sheet: FluidboxSlots<TItem>;
@@ -371,6 +374,8 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         preload,
         dismiss: dismissOption(),
         wheel,
+        slideshow,
+        reachEndThreshold: props.reachEndThreshold,
         // Share shares the item's href unless shareUrl says otherwise.
         shareUrl: (item) => {
           const { shareUrl, href } = latest.current;
@@ -448,11 +453,11 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     };
   }, [schedule]);
 
-  // Objects are compared by value, so inline labels, zoom or dismiss change nothing.
+  // Objects are compared by value, so inline labels, zoom, dismiss or slideshow change nothing.
   const labelsKey = JSON.stringify(labels ?? {});
   const zoomKey =
     zoom === false ? "off" : [zoom?.step, zoom?.max, zoom?.click, zoom?.tap].join(":");
-  const dismissKey = JSON.stringify(dismiss ?? null);
+  const optionsKey = JSON.stringify([dismiss, slideshow]);
   const first = useRef(true);
   useIsomorphicLayoutEffect(() => {
     if (first.current) first.current = false;
@@ -464,9 +469,14 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         preload,
         dismiss: dismissOption(),
         wheel,
+        slideshow: latest.current.slideshow,
       });
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [fluidbox, labelsKey, zoomKey, dismissKey, loop, preload, wheel]);
+  }, [fluidbox, labelsKey, zoomKey, optionsKey, loop, preload, wheel]);
+  // On its own, as it changes nothing the viewer shows.
+  useIsomorphicLayoutEffect(() => {
+    fluidbox.update({ reachEndThreshold: props.reachEndThreshold });
+  }, [fluidbox, props.reachEndThreshold]);
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
@@ -475,6 +485,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       signal,
     });
     fluidbox.addEventListener("mediaerror", (event) => latest.current.onMediaError?.(event), {
+      signal,
+    });
+    fluidbox.addEventListener("reachend", (event) => latest.current.onReachEnd?.(event), {
       signal,
     });
     watchFluidbox(
@@ -553,6 +566,8 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       setFullscreen: (on) => fluidbox.setFullscreen(on),
       download: () => fluidbox.download(),
       share: () => fluidbox.share(),
+      play: () => fluidbox.play(),
+      pause: () => fluidbox.pause(),
       setItems: (next) => fluidbox.setItems(next),
       preload: (target) => fluidbox.preload(target),
       load: () => fluidbox.load(),
@@ -997,7 +1012,10 @@ function Iframe({ item }: FluidboxIframeProps): null {
   return useDraw("Iframe", (slide) => slide.drawIframe(item), item);
 }
 
-/** The name, disabled and hidden states, and Download's link, of a control as the state has it. */
+/**
+ * The name, disabled, hidden and active states, and Download's link, of a
+ * control as the state has it.
+ */
 function useControl(name: FluidboxControlName) {
   const { fluidbox, labels } = useFluidboxContext();
   const control = fluidboxControls[name];
@@ -1008,15 +1026,17 @@ function useControl(name: FluidboxControlName) {
       !!control.hidden?.(fluidbox, state),
       control.label(labels, state),
       name === "download" && downloadLink(state.item),
+      !!control.active?.(state),
     ]),
   );
-  const [disabled, hidden, label, link] = JSON.parse(shown) as [
+  const [disabled, hidden, label, link, active] = JSON.parse(shown) as [
     boolean,
     boolean,
     string,
     ReturnType<typeof downloadLink> | false,
+    boolean,
   ];
-  return { fluidbox, control, disabled, hidden, label, link: link || null };
+  return { fluidbox, control, disabled, hidden, label, link: link || null, active };
 }
 
 /**
@@ -1040,7 +1060,7 @@ function control(name: Exclude<FluidboxControlName, "download" | "counter">) {
     { children, label, onClick, ...attributes },
     ref,
   ) {
-    const { fluidbox, control, disabled, hidden, label: text } = useControl(name);
+    const { fluidbox, control, disabled, hidden, label: text, active } = useControl(name);
     const { children: content, ...naming } = named(children, label, text, attributes["aria-label"]);
     return createElement(
       "button",
@@ -1053,6 +1073,7 @@ function control(name: Exclude<FluidboxControlName, "download" | "counter">) {
         hidden: attributes.hidden ?? (hidden || undefined),
         [control.attribute]: "",
         "data-fluidbox-managed": "",
+        "data-active": active ? "" : undefined,
         onClick(event: ReactMouseEvent<HTMLButtonElement>) {
           onClick?.(event);
           if (event.defaultPrevented) return;
@@ -1074,6 +1095,8 @@ const ZoomOut = control("zoomOut");
 const ZoomReset = control("zoomReset");
 const Fullscreen = control("fullscreen");
 const Share = control("share");
+/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option, unless it plays. */
+const Slideshow = control("slideshow");
 const Retry = control("retry");
 const parts = {
   previous: Previous,
@@ -1613,6 +1636,7 @@ export const Fluidbox = {
   Fullscreen,
   Download,
   Share,
+  Slideshow,
   Counter,
   Caption,
   Loading,

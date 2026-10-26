@@ -76,6 +76,7 @@ const VIEWER_ATTRIBUTES = [
   "loop",
   "preload",
   "wheel",
+  "reach-end-threshold",
 ];
 const PRELOADS: readonly string[] = ["intent", "press", "eager"] satisfies FluidboxPreload[];
 const WHEELS: readonly string[] = ["dismiss", "zoom", "navigate", "none"] satisfies NonNullable<
@@ -141,6 +142,7 @@ const closedState: FluidboxState = Object.freeze({
   hasNext: false,
   zoom: null,
   fullscreen: false,
+  playing: false,
 });
 
 function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined {
@@ -219,6 +221,7 @@ export class FluidboxGalleryElement extends HTMLElement {
   #zoom: FluidboxOptions["zoom"] | undefined;
   #dismiss: FluidboxOptions["dismiss"];
   #shareUrl: FluidboxOptions["shareUrl"];
+  #slideshow: FluidboxOptions["slideshow"];
   #definitions = new Map<string, DeclarativeFluidboxDefinition>();
   /** The slides of markup content, by the item type it gets. */
   #markupSlides = new Map<string, FluidboxSlideRenderer<any>>();
@@ -453,6 +456,17 @@ export class FluidboxGalleryElement extends HTMLElement {
     else this.removeAttribute("wheel");
   }
 
+  /** How near the end `reachend` fires, as the `reach-end-threshold` attribute says. @default 2 */
+  get reachEndThreshold(): number | undefined {
+    const value = this.getAttribute("reach-end-threshold");
+    return value && Number.isFinite(+value) ? +value : undefined;
+  }
+
+  set reachEndThreshold(threshold: number | undefined) {
+    if (threshold == null) this.removeAttribute("reach-end-threshold");
+    else this.setAttribute("reach-end-threshold", String(threshold));
+  }
+
   /** The link Share shares for an item. Without one, Share hides. */
   get shareUrl(): FluidboxOptions["shareUrl"] {
     return this.#shareUrl;
@@ -460,6 +474,19 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   set shareUrl(shareUrl: FluidboxOptions["shareUrl"]) {
     this.#shareUrl = shareUrl;
+    this.#queueUpdate();
+  }
+
+  /**
+   * Advance on a timer, once `play()`, `<fluidbox-slideshow>` or `autoplay`
+   * starts it. Without it, `<fluidbox-slideshow>` hides unless it plays.
+   */
+  get slideshow(): FluidboxOptions["slideshow"] {
+    return this.#slideshow;
+  }
+
+  set slideshow(slideshow: FluidboxOptions["slideshow"]) {
+    this.#slideshow = slideshow;
     this.#queueUpdate();
   }
 
@@ -608,6 +635,16 @@ export class FluidboxGalleryElement extends HTMLElement {
     return this.#run((fluidbox) => fluidbox.share());
   }
 
+  /** Start the slideshow on the open viewer. */
+  play(): void {
+    this.#run((fluidbox) => (fluidbox.play(), Promise.resolve(true))).catch(() => {});
+  }
+
+  /** Stop the slideshow, until `play()` or `<fluidbox-slideshow>`. */
+  pause(): void {
+    this.#run((fluidbox) => (fluidbox.pause(), Promise.resolve(true))).catch(() => {});
+  }
+
   /**
    * Run a command at once when nothing is queued to rebuild or update the
    * fluidbox, as a press or a key does, so it lands in order with them.
@@ -706,7 +743,9 @@ export class FluidboxGalleryElement extends HTMLElement {
       sheet: sheetElement ? this.#sheetOptions(sheetElement) : undefined,
       dismiss: this.#dismiss,
       wheel: this.wheel,
+      reachEndThreshold: this.reachEndThreshold,
       shareUrl: this.#shareUrl,
+      slideshow: this.#slideshow,
     } satisfies FluidboxUpdateOptions;
   }
 

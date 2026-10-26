@@ -15,6 +15,8 @@ export interface FluidboxControl {
    * sit in the tab order disabled.
    */
   readonly hidden?: (fluidbox: Fluidbox<any>, state: FluidboxState<any>) => boolean;
+  /** For a control that switches, as Slideshow does: whether it is on, shown as `data-active`. */
+  readonly active?: (state: FluidboxState<any>) => boolean;
   /** Run the command. Pass the click, so its events tell a key from a pointer. */
   readonly run: (fluidbox: Fluidbox<any>, click?: { readonly detail: number }) => Promise<boolean>;
 }
@@ -46,16 +48,22 @@ const zoomControl = (
 const closed = (state: FluidboxState<any>) => state.status === "closed";
 
 const action = (
-  attribute: "data-fluidbox-fullscreen" | "data-fluidbox-download" | "data-fluidbox-share",
+  attribute:
+    | "data-fluidbox-fullscreen"
+    | "data-fluidbox-download"
+    | "data-fluidbox-share"
+    | "data-fluidbox-slideshow",
   label: FluidboxControl["label"],
   hidden: NonNullable<FluidboxControl["hidden"]>,
   run: (fluidbox: Fluidbox<any>) => Promise<boolean>,
+  active?: FluidboxControl["active"],
 ): FluidboxControl => ({
   attribute,
   label,
   disabled: closed,
   hidden,
   run,
+  active,
 });
 
 /** Each default control's attribute, label, disabled rule and command. */
@@ -79,6 +87,7 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
     (labels, state) => (state?.fullscreen ? labels.exitFullscreen : labels.enterFullscreen),
     () => !canGoFullscreen(),
     (fluidbox) => fluidbox.setFullscreen(),
+    (state) => state.fullscreen,
   ),
   download: action(
     "data-fluidbox-download",
@@ -91,6 +100,22 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
     (labels) => labels.share,
     (fluidbox, state) => !state.item || !canShare() || !hostOf(fluidbox).shareLink(state.item),
     (fluidbox) => fluidbox.share(),
+  ),
+  slideshow: action(
+    "data-fluidbox-slideshow",
+    // The defaults live here, so only a page with the control carries them.
+    (labels, state) =>
+      state?.playing
+        ? (labels.pauseSlideshow ?? "Pause slideshow")
+        : (labels.playSlideshow ?? "Play slideshow"),
+    // Without the option it hides, but never while it plays: it is how to stop.
+    (fluidbox, state) => !state.playing && !hostOf(fluidbox).slideshow(),
+    (fluidbox) => {
+      if (fluidbox.state.playing) fluidbox.pause();
+      else fluidbox.play();
+      return Promise.resolve(true);
+    },
+    (state) => state.playing,
   ),
   // For an error of your own: it loads the slide on show again.
   retry: {
@@ -107,11 +132,6 @@ export const controlNames = ["previous", "next", "close"] as const;
 /** The zoom controls, shown when `controls` lists them. */
 export const zoomControlNames = ["zoomIn", "zoomOut", "zoomReset"] as const;
 
-/** One of the default controls or the zoom controls. */
-export type FluidboxIconControlName =
-  | (typeof controlNames)[number]
-  | (typeof zoomControlNames)[number];
-
 /** Every control a button can be marked as. */
 export const allControlNames: readonly FluidboxControlName[] = [
   ...controlNames,
@@ -120,5 +140,6 @@ export const allControlNames: readonly FluidboxControlName[] = [
   "fullscreen",
   "download",
   "share",
+  "slideshow",
   "retry",
 ];

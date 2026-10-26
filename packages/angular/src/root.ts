@@ -5,6 +5,7 @@ import {
   Renderer2,
   booleanAttribute,
   computed,
+  numberAttribute,
   inject,
   input,
   model,
@@ -26,6 +27,7 @@ import {
   type FluidboxLabels,
   type FluidboxMediaErrorEvent,
   type FluidboxOptions,
+  type FluidboxReachEndEvent,
   type FluidboxRenderer,
   type FluidboxSheetSnapPoint,
   type FluidboxSlide,
@@ -78,6 +80,10 @@ export interface FluidboxCommands<TItem extends FluidboxItem = FluidboxItem> {
   download(): Promise<boolean>;
   /** Share the open item's link, or copy it. */
   share(): Promise<boolean>;
+  /** Start the slideshow on the open viewer. */
+  play(): void;
+  /** Stop the slideshow, until `play()` or the Slideshow part. */
+  pause(): void;
   setItems(items: FluidboxItems<TItem>): Promise<boolean>;
   /** Start loading an item a press is likely to open. Call the result to let go. */
   preload(target: FluidboxTarget<TItem>): () => void;
@@ -197,6 +203,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly href = input<(value: string | null) => string | undefined>();
   /** The link Share shares for an item. @default the `href` of its id */
   readonly shareUrl = input<FluidboxOptions<TItem>["shareUrl"]>();
+  /** Advance on a timer, once `play()`, the Slideshow part or `autoplay` starts it. */
+  readonly slideshow = input<FluidboxOptions<TItem>["slideshow"]>();
 
   /**
    * Before every open, move and close, from any input. `$event.preventDefault()`
@@ -209,6 +217,12 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   readonly zoomChange = output<FluidboxZoomEvent>();
   /** When a slide's media fails to load, as it shows its error. */
   readonly mediaError = output<FluidboxMediaErrorEvent<TItem>>();
+  /** How near the end `(reachEnd)` fires. @default 2 */
+  readonly reachEndThreshold = input<number | undefined, unknown>(undefined, {
+    transform: (value) => (value == null || value === "" ? undefined : numberAttribute(value)),
+  });
+  /** When the open item comes within `reachEndThreshold` of the last, once per count: load more. */
+  readonly reachEnd = output<FluidboxReachEndEvent<TItem>>();
 
   readonly #zone = inject(NgZone);
   readonly #browser = injectIsBrowser();
@@ -289,6 +303,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
       setFullscreen: (on) => this.setFullscreen(on),
       download: () => this.download(),
       share: () => this.share(),
+      play: () => this.play(),
+      pause: () => this.pause(),
       setItems: (items) => this.setItems(items),
       preload: (target) => this.preload(target),
       load: () => this.load(),
@@ -309,6 +325,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
         | "valuechangecomplete"
         | "zoomchange"
         | "mediaerror"
+        | "reachend"
         | "sheetchange"
         | "valuechange",
     >(
@@ -329,6 +346,7 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     );
     listen("zoomchange", (event: FluidboxZoomEvent) => this.zoomChange.emit(event));
     listen("mediaerror", (event: FluidboxMediaErrorEvent<TItem>) => this.mediaError.emit(event));
+    listen("reachend", (event: FluidboxReachEndEvent<TItem>) => this.reachEnd.emit(event));
     internals.set(this, {
       watch: (listener) => fluidbox.subscribe(() => listener()),
       connect: (kind, part) => {
@@ -373,6 +391,12 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
     if (changes["preloadMode"]) this.#update({ preload: this.preloadMode() });
     if (changes["dismiss"]) this.#update({ dismiss: this.dismiss() && { ...this.dismiss() } });
     if (changes["wheel"]) this.#update({ wheel: this.wheel() });
+    if (changes["slideshow"]) {
+      this.#update({ slideshow: this.slideshow() && { ...this.slideshow() } });
+    }
+    if (changes["reachEndThreshold"]) {
+      this.#update({ reachEndThreshold: this.reachEndThreshold() });
+    }
     // Your value wins whenever it changes, once the triggers inside have
     // registered, so an open flies from the item's own. The default value
     // opens once, as the root starts.
@@ -510,6 +534,16 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
   /** Share the open item's link, or copy it. */
   share(): Promise<boolean> {
     return this.#zone.runOutsideAngular(() => this.fluidbox.share());
+  }
+
+  /** Start the slideshow on the open viewer. Its timer runs outside the zone. */
+  play(): void {
+    this.#zone.runOutsideAngular(() => this.fluidbox.play());
+  }
+
+  /** Stop the slideshow, until `play()` or the Slideshow part. */
+  pause(): void {
+    this.#zone.runOutsideAngular(() => this.fluidbox.pause());
   }
 
   setItems(items: FluidboxItems<TItem>): Promise<boolean> {

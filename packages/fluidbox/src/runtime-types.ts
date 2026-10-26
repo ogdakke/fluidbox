@@ -12,7 +12,7 @@ export type {
   FluidboxThumbnail,
   FluidboxVideoItem,
 } from "./public-api";
-import type { FluidboxItem } from "./public-api";
+import type { FluidboxItem, FluidboxSlideshowOptions } from "./public-api";
 
 /** A finite, immutable snapshot for one controller revision. */
 export interface FluidboxSource<TItem extends FluidboxItem = FluidboxItem> {
@@ -26,6 +26,7 @@ import type {
   Fluidbox,
   FluidboxControlName,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxRevealContext,
   FluidboxState,
   FluidboxViewerRenderer,
@@ -53,7 +54,7 @@ export interface FluidboxOriginAdapter {
   revealOrigin?(id: string, index: number, context: FluidboxRevealContext): void | Promise<void>;
 }
 
-export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel";
+export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "slideshow";
 
 export type SessionChangeReason = SessionReason | "source-update" | "source-empty";
 
@@ -98,6 +99,8 @@ export interface FluidboxViewerLayer {
   readonly viewer?: FluidboxViewerRenderer<any>;
   readonly labels: FluidboxLabels;
   readonly icons?: Partial<Record<FluidboxControlName, () => Node>>;
+  /** The slideshow's options, which the viewer's timer reads. */
+  readonly slideshow?: FluidboxSlideshowOptions;
 }
 
 export type FluidboxThumbnailOverlayBehavior = "host" | "travel" | "frame";
@@ -205,10 +208,17 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   zoomed?(scale: number, reason: SessionReason | undefined): void;
   /** The box on show may have started or stopped being zoomable. */
   zoomableChanged?(): void;
-  /** The viewer became the document's fullscreen element, or stopped being it. */
-  fullscreenChanged?(on: boolean): void;
+  /**
+   * The viewer's own state changed: it became the document's fullscreen
+   * element or stopped being it, or the slideshow started or stopped playing.
+   */
+  changed?(): void;
   /** A slide's media failed, or a zoom image did. */
   mediaError?(event: FluidboxMediaErrorEvent<any>): void;
+  /** The open item came near the end. */
+  reachEnd?(event: FluidboxReachEndEvent): void;
+  /** The `reachEndThreshold` option, as given. */
+  reachEndThreshold?(): unknown;
 }
 
 /** What may close the viewer, and what a vertical wheel does. */

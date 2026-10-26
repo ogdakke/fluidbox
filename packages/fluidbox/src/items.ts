@@ -2,6 +2,7 @@ import type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxTarget,
 } from "./public-api";
@@ -132,41 +133,46 @@ function checkIndex(index: number, count: number) {
  */
 export function createItemList<TItem extends FluidboxItem>(
   options: FluidboxItemListOptions<TItem>,
-): FluidboxItemList<TItem> {
-  const { count, item, index } = options;
-  checkCount(count);
+): FluidboxLazyItemList<TItem> {
+  const { item, index } = options;
+  // Shared by every count of the list, so a longer one keeps what was made.
   const made = new Map<number, TItem>();
   const indices = new Map<string, number>();
-  const get = (at: number) => {
-    checkIndex(at, count);
-    let found = made.get(at);
-    if (!found) {
-      found = item(at);
-      checkItem(found);
-      made.set(at, found);
-      indices.set(idOf(found), at);
-    }
-    return found;
+  const list = (count: number): FluidboxLazyItemList<TItem> => {
+    checkCount(count);
+    const get = (at: number) => {
+      checkIndex(at, count);
+      let found = made.get(at);
+      if (!found) {
+        found = item(at);
+        checkItem(found);
+        made.set(at, found);
+        indices.set(idOf(found), at);
+      }
+      return found;
+    };
+    const holds = (at: number, id: string) =>
+      Number.isInteger(at) && at >= 0 && at < count && idOf(get(at)) === id;
+    return Object.freeze({
+      count,
+      get,
+      indexOf(id: string) {
+        const known = indices.get(id);
+        if (known !== undefined) return known < count ? known : -1;
+        if (index) {
+          const guess = index(id);
+          return holds(guess, id) ? guess : -1;
+        }
+        // A scan reads ids without keeping every item it passes.
+        for (let at = 0; at < count; at++) {
+          if (idOf(made.get(at) ?? item(at)) === id) return at;
+        }
+        return -1;
+      },
+      withCount: list,
+    });
   };
-  const holds = (at: number, id: string) =>
-    Number.isInteger(at) && at >= 0 && at < count && idOf(get(at)) === id;
-  return Object.freeze({
-    count,
-    get,
-    indexOf(id: string) {
-      const known = indices.get(id);
-      if (known !== undefined) return known;
-      if (index) {
-        const guess = index(id);
-        return holds(guess, id) ? guess : -1;
-      }
-      // A scan reads ids without keeping every item it passes.
-      for (let at = 0; at < count; at++) {
-        if (idOf(made.get(at) ?? item(at)) === id) return at;
-      }
-      return -1;
-    },
-  });
+  return list(options.count);
 }
 
 /** What an item's `data` names may be: lower case, digits and single dashes. */

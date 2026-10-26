@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { stubMedia } from "./support/media";
+import { expectSlideshowPart } from "./support/slideshow-part";
 
 declare global {
   interface Window {
@@ -280,4 +281,9 @@ test("an Embed's default slot renders into its Play button, which then plays", a
     /youtube-nocookie\.com\/embed\/M7lc1UVf-VE/,
   );
   expect(requests.players).toHaveLength(1);
+});
+
+test("Slideshow plays and pauses, and is named for what it does next", async ({ page }) => {
+  await load(page);
+  await expectSlideshowPart(page, "#slideshow");
 });

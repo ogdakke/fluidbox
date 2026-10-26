@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
+import type { FluidboxGalleryElement } from "@ogdakke/fluidbox/elements";
 import { stubMedia } from "./support/media";
+import { expectSlideshowPart } from "./support/slideshow-part";
 
 /**
  * apps/examples/elements-slides.html: a `<fluidbox-gallery>` with a viewer
@@ -536,4 +538,32 @@ test.describe("slides and parts", () => {
     await expect(close.locator("svg")).toHaveCount(1);
     await expect(close).toHaveAccessibleName("Close");
   });
+});
+
+test("<fluidbox-slideshow> plays and pauses, named by its content or its label", async ({
+  page,
+}) => {
+  await load(page);
+  await expectSlideshowPart(page, "#slideshow", { trigger: '[slot="trigger"]', managed: false });
+});
+
+test("play() waits for the gallery's pending refresh, as its other commands do", async ({
+  page,
+}) => {
+  await load(page);
+  // New slides make a new viewer, which opens on the value: play() plays on that one.
+  await page.evaluate(() => {
+    const gallery = document.querySelector<FluidboxGalleryElement>("#slideshow")!;
+    gallery.slides = {};
+    gallery.value = "dawn";
+    gallery.play();
+  });
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.querySelector<FluidboxGalleryElement>("#slideshow")!.state.playing,
+      ),
+    )
+    .toBe(true);
 });
