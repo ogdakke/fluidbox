@@ -827,16 +827,17 @@ describe("reachend", () => {
     expect(reached).toEqual([["photo-9", 9, 10]]);
   });
 
-  it("re-arms when the count goes down and back up", async () => {
+  it("re-arms when the count goes up and back down to one it fired at", async () => {
     const { list, fluidbox, reached } = lazy(10);
     await fluidbox.open(9);
-    await fluidbox.setItems(list.withCount(5));
-    expect(reached.at(-1)).toEqual(["photo-4", 4, 5]);
+    expect(reached).toEqual([["photo-9", 9, 10]]);
+    // Twenty: far from the end, so nothing yet, but armed.
+    await fluidbox.setItems(list.withCount(20));
+    expect(reached).toHaveLength(1);
+    // Back to ten, still on photo-9: near the end of a new count.
     await fluidbox.setItems(list.withCount(10));
-    await fluidbox.open(9);
     expect(reached).toEqual([
       ["photo-9", 9, 10],
-      ["photo-4", 4, 5],
       ["photo-9", 9, 10],
     ]);
   });

@@ -61,10 +61,25 @@ for (const [binding, url] of bindings) {
       ["grow-6", 6, 8],
     ]);
 
+    // More photos re-arm it, far from their end, and back to eight it fires again.
+    await page.evaluate(() => window.growth.setCount(12));
+    await expect(triggers).toHaveCount(12);
+    await page.waitForTimeout(300);
+    expect(await reachEnds(page)).toHaveLength(2);
+    await page.evaluate(() => window.growth.setCount(8));
+    await expect(triggers).toHaveCount(8);
+    await expect
+      .poll(() => reachEnds(page))
+      .toEqual([
+        ["grow-1", 1, 4],
+        ["grow-6", 6, 8],
+        ["grow-7", 7, 8],
+      ]);
+
     // Fewer photos re-arm it, and back to eight again.
     await page.evaluate(() => window.growth.setCount(4));
     await expect(shown).toHaveAttribute("alt", "Photo grow-3");
-    await expect.poll(() => reachEnds(page)).toHaveLength(3);
+    await expect.poll(() => reachEnds(page)).toHaveLength(4);
     await page.evaluate(() => window.growth.setCount(8));
     await expect(triggers).toHaveCount(8);
     for (const index of [4, 5, 6]) await go(index);
@@ -73,6 +88,7 @@ for (const [binding, url] of bindings) {
       .toEqual([
         ["grow-1", 1, 4],
         ["grow-6", 6, 8],
+        ["grow-7", 7, 8],
         ["grow-3", 3, 4],
         ["grow-6", 6, 8],
       ]);
