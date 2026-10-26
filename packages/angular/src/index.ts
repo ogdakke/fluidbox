@@ -25,6 +25,7 @@ import {
 import { FluidboxRootDirective } from "./root.js";
 import { FluidboxSheetDirective } from "./sheet.js";
 import {
+  FluidboxHotspotDirective,
   FluidboxIframeComponent,
   FluidboxImageComponent,
   FluidboxMediaDirective,
@@ -68,6 +69,7 @@ export {
 } from "./root.js";
 export { FluidboxSheetDirective } from "./sheet.js";
 export {
+  FluidboxHotspotDirective,
   FluidboxIframeComponent,
   FluidboxImageComponent,
   FluidboxMediaDirective,
@@ -103,6 +105,8 @@ export type {
   FluidboxSheetSnapPoint,
   FluidboxSlide,
   FluidboxSlideRenderer,
+  FluidboxHotspotCoordinate,
+  FluidboxHotspotOptions,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
@@ -121,6 +125,7 @@ const parts = [
   FluidboxOverlayComponent,
   FluidboxSlideDirective,
   FluidboxMediaDirective,
+  FluidboxHotspotDirective,
   FluidboxImageComponent,
   FluidboxVideoComponent,
   FluidboxIframeComponent,

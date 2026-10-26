@@ -30,7 +30,7 @@ const misses = (page: Page) =>
     });
   }, pins);
 
-for (const binding of ["react", "vue", "solid"]) {
+for (const binding of ["react", "vue", "solid", "angular"]) {
   test(`${binding}: Hotspot renders the pin, on its point, and takes focus`, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
