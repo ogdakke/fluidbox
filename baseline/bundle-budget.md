@@ -133,3 +133,11 @@ The fixes after the live thumbnail's review moved every core entry by about 70 B
 - **The model add-on** gives a live model its own accessibility back when its trigger is unbound or it leaves the trigger, undoing exactly what it changed, and drops a slide's snapshot when the slide leaves, so a slide that comes back shows its own view, not a stale picture. React model and Vue model grew about 270 B initial with it and the core's change.
 
 Merging the live 3D thumbnail into the redesign with every binding moved each entry by what that branch measured on its own base: about 310 B initial and 450 B activation in the core (the trigger's origin getters, the drag slop and the trigger hooks), and about 1.2 KB more in each model entry (the model add-on's quieting, its undo and the snapshot). The limits moved by the rule.
+
+On 2026-10-26 the slideshow moved every core entry by about 70–270 B initial and 840–950 B activation, against 10,117 B initial and 44,506 B activation on the root:
+
+- **Activation, in the viewer.** The timer and its holds live in the viewer chunk, about 660 B: `play()` and `pause()`, `autoplay` once per open, the wait for the next slide's `ready` with the interval as its cap, the pause on a person's input and on a zoom, the hold while the tab is hidden or a video in the slide plays, and the live region turned off while it plays. The control wiring grew about 105 B with the Slideshow control, its default labels and `data-active`; a binding's copy of the wiring, which takes the controls from the kit, about 20 B.
+- **Initial, in the root.** 69 B: the `slideshow` option carried to the viewer, `state.playing` read from it, `play()` and `pause()` as forwards that load the viewer, and the hook that publishes its state, which fullscreen now shares.
+- **Initial, in the bindings.** The kit's controls, which every binding carries, grew 85 B with the Slideshow control and its labels; each binding's own chunk grew about 75–110 B with its `slideshow` prop or input, `play`, `pause` and `playing`, `data-active`, and its `Slideshow` part. The custom elements' initial chunk grew 151 B with the `slideshow` property, `play()` and `pause()`, and their parts chunk 29 B with `<fluidbox-slideshow>`.
+
+The limits moved by the rule above.
