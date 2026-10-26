@@ -835,7 +835,7 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Advance on a timer. It never starts by itself: only `play()`, the
    * Slideshow control or `autoplay` start it. Without it, the Slideshow
-   * control hides; `play()` still plays, with the defaults.
+   * control hides unless it plays; `play()` still plays, with the defaults.
    */
   readonly slideshow?: FluidboxSlideshowOptions;
 }

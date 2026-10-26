@@ -1189,7 +1189,7 @@ const ZoomReset = control("zoomReset", "FluidboxZoomReset");
 const Fullscreen = control("fullscreen", "FluidboxFullscreen");
 /** Shares the item's link, or copies it. Hidden without a link or a way to share it. */
 const Share = control("share", "FluidboxShare");
-/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option. */
+/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option, unless it plays. */
 const Slideshow = control("slideshow", "FluidboxSlideshow");
 /** Loads the failed media again. */
 const Retry = control("retry", "FluidboxRetry");

@@ -880,6 +880,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * open, for whatever waits on the next slide.
    */
   async ready(index: number, cap: number, signal?: AbortSignal) {
+    if (signal?.aborted) return;
     const slide = this.#slides.get(this.#near(index));
     if (!slide?.custom || !slide.rendered) return;
     const content = slide.content;
@@ -912,7 +913,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const capped = new Promise<false>((resolve) => {
       timer = setTimeout(resolve, cap, false);
-      signal?.addEventListener("abort", () => resolve(false));
+      signal?.addEventListener("abort", () => resolve(false), { once: true });
     });
     const done = await Promise.race([ready.then(() => true), capped]);
     clearTimeout(timer);

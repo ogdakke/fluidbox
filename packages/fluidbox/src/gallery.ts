@@ -467,7 +467,7 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   /**
    * Advance on a timer, once `play()`, `<fluidbox-slideshow>` or `autoplay`
-   * starts it. Without it, `<fluidbox-slideshow>` hides.
+   * starts it. Without it, `<fluidbox-slideshow>` hides unless it plays.
    */
   get slideshow(): FluidboxOptions["slideshow"] {
     return this.#slideshow;

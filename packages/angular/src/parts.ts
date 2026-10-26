@@ -480,7 +480,8 @@ export class FluidboxShareDirective extends ControlDirective {
 
 /**
  * Plays and pauses the slideshow, named for what it does next, with
- * `data-active` while it plays. Hidden without a `slideshow` input.
+ * `data-active` while it plays. Hidden without a `slideshow` input, unless
+ * it plays.
  */
 @Directive({
   selector: "button[fluidboxSlideshow]",

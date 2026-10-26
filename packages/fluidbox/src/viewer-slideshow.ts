@@ -72,9 +72,9 @@ export class ViewerSlideshow {
   }
 
   /**
-   * A person's input to the viewer. The Slideshow control's own press is
-   * left to its click, which plays or pauses; any other key on it, a wheel or
-   * a move that starts there, pauses as it does anywhere.
+   * A person's input to the viewer. A press on the Slideshow control, and
+   * Enter or Space on it, are left to its click, which plays or pauses; any
+   * other key on it, or a wheel, pauses as it does anywhere.
    */
   interaction(event?: Event) {
     const own =

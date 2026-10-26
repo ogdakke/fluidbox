@@ -1112,7 +1112,7 @@ const ZoomOut = control("zoomOut");
 const ZoomReset = control("zoomReset");
 const Fullscreen = control("fullscreen");
 const Share = control("share");
-/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option. */
+/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option, unless it plays. */
 const Slideshow = control("slideshow");
 const Retry = control("retry");
 const parts = {
