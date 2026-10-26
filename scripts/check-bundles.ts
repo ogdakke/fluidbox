@@ -78,7 +78,8 @@ const bindingPrefix = new RegExp(
 // pass after step 3 took 634 B back, mostly development-only checks and messages. The Vue
 // binding's added about 1,850 B to its own. The custom elements' value, slide templates and
 // registry added about 740 B to theirs; their parts load only for a gallery with templates.
-// reachend added about 140 B to every core entry, and 220 B to the custom elements'.
+// reachend added about 55 B to every core entry, its rule being in the viewer chunk, and more
+// to the custom elements' for their reach-end-threshold attribute and the forwarded event.
 const initialGzipLimits: Record<Entry, number> = {
   root: 10_250,
   elements: 15_300,
@@ -121,6 +122,8 @@ const baselineCssGzipLimit = 3_300;
 // zoom steps that add up before a zoom rests about 90 B, and fitting an image a
 // zoom left once the viewer closes or moves on about 100 B. The motion speed, with the strip's
 // own scroll at speeds other than 1, about 255 B. Keeping the slides through a loop toggle, 110 B.
+// After step 7's review, about 330 B more: reachend's rule, glides that a gesture, a close or
+// new items end cleanly, slides kept at their offset through a loop toggle, and mediaerror's item.
 const activationJsGzipLimits: Record<Entry, number> = {
   root: 45_400,
   // The gallery loads the thumbnails and sheet entries when it holds their elements.
