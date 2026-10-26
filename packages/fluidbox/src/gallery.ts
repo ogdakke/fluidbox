@@ -625,12 +625,12 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   /** Start the slideshow on the open viewer. */
   play(): void {
-    this.#fluidbox?.play();
+    this.#run((fluidbox) => (fluidbox.play(), Promise.resolve(true))).catch(() => {});
   }
 
   /** Stop the slideshow, until `play()` or `<fluidbox-slideshow>`. */
   pause(): void {
-    this.#fluidbox?.pause();
+    this.#run((fluidbox) => (fluidbox.pause(), Promise.resolve(true))).catch(() => {});
   }
 
   /**
