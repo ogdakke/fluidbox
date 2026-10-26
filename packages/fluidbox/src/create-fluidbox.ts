@@ -1449,8 +1449,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
       zoom: this.#zoomFor(status, index, item),
       fullscreen: !!this.#viewer?.fullscreen,
-      // Closing stops it, before the viewer says so.
-      playing: !!this.#viewer?.playing,
+      // Closing stops it at once, before the viewer hears of the close.
+      playing: (status === "open" || status === "opening") && !!this.#viewer?.playing,
     });
   }
 

@@ -152,6 +152,22 @@ test.describe("slideshow", () => {
     await expect(page.locator(control)).toBeHidden();
   });
 
+  test("state stops playing as the close starts, not once it ends", async ({ page }) => {
+    await load(page);
+    await open(page);
+    await play(page);
+    const states = await page.evaluate(() => {
+      const { fluidbox } = window.slideshowFixture;
+      const seen: string[] = [];
+      fluidbox.subscribe((state) => seen.push(`${state.status} ${state.playing}`));
+      void fluidbox.close();
+      return seen;
+    });
+    expect(states[0]).toBe("closing false");
+    await expect(page.locator(control)).toHaveText("Play slideshow");
+    await expect(page.locator(control)).not.toHaveAttribute("data-active");
+  });
+
   test("goes round with loop", async ({ page }) => {
     await load(page, "?loop");
     await open(page, "four");
