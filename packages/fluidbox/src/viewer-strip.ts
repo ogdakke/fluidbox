@@ -459,7 +459,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    */
   setSource(source: FluidboxSource<TItem>, loop = this.#loop) {
     // A selection under way ends on its slide.
-    if (this.#selection) this.#index = this.#selection.index;
+    if (this.#selection) this.#sync(this.#selection.index, false);
     this.#resolveSelection();
     this.#focusable(source.count);
     this.#unfence();
@@ -562,6 +562,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#activate();
     this.#observer.disconnect();
     this.#resolveSelection();
+    this.#endInstant();
     for (const slide of this.#slides.values()) this.#unload(slide);
   }
 
@@ -2096,9 +2097,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     clearTimeout(this.#settleTimer);
     const refused = this.#refused !== null;
-    this.#unfence();
     const stopped = this.#stopped;
     this.#stopped = false;
+    this.#unfence();
     if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
     if (this.#userOwned && this.#userScrolled) this.#onSelect(this.index, true);
     this.#userOwned = false;
