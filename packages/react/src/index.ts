@@ -129,9 +129,11 @@ export type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
   FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
   FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
@@ -366,6 +368,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         preload,
         dismiss: dismissOption(),
         wheel,
+        reachEndThreshold: props.reachEndThreshold,
         // Share shares the item's href unless shareUrl says otherwise.
         shareUrl: (item) => {
           const { shareUrl, href } = latest.current;
@@ -462,6 +465,10 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       });
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [fluidbox, labelsKey, zoomKey, dismissKey, loop, preload, wheel]);
+  // On its own, as it changes nothing the viewer shows.
+  useIsomorphicLayoutEffect(() => {
+    fluidbox.update({ reachEndThreshold: props.reachEndThreshold });
+  }, [fluidbox, props.reachEndThreshold]);
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();
@@ -470,6 +477,9 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
       signal,
     });
     fluidbox.addEventListener("mediaerror", (event) => latest.current.onMediaError?.(event), {
+      signal,
+    });
+    fluidbox.addEventListener("reachend", (event) => latest.current.onReachEnd?.(event), {
       signal,
     });
     watchFluidbox(

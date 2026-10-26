@@ -21,6 +21,7 @@ import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/solid";
 import "@ogdakke/fluidbox/baseline.css";
 import "@ogdakke/fluidbox/thumbnails.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Solid slides · content that suspends, holds the open, or plays on its own",
@@ -220,6 +221,27 @@ function HeldViewer() {
   );
 }
 
+/** A gallery that appends four photos each time the viewer nears its end. */
+function Growing() {
+  const [count, setCount] = createSignal(4);
+  const [threshold, setThreshold] = createSignal(1);
+  growth.setCount = setCount;
+  growth.setThreshold = setThreshold;
+  const items = () => growingPhotos(count());
+  return (
+    <Fluidbox.Root
+      items={items()}
+      reachEndThreshold={threshold()}
+      onReachEnd={(event) => {
+        const next = reached(event);
+        if (next) setCount(next);
+      }}
+    >
+      <Grid items={items()} id="growing" />
+    </Fluidbox.Root>
+  );
+}
+
 function App() {
   return (
     <>
@@ -241,6 +263,8 @@ function App() {
         <Grid items={[custom("fetched", "fetched")]} id="fetched" />
         <Fluidbox.Slides fetched={() => <Fetched />} />
       </Fluidbox.Root>
+      <h2>A gallery that grows as the viewer nears its end</h2>
+      <Growing />
       <h2>A controlled value</h2>
       <ControlledViewer />
       <h2>Thumbnails that switch between yours and the default ones</h2>

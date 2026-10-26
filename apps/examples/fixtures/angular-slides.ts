@@ -3,6 +3,7 @@ import { mountSite } from "../src/site";
 import {
   Component,
   Input,
+  computed,
   provideZonelessChangeDetection,
   signal,
   ɵDEFER_BLOCK_DEPENDENCY_INTERCEPTOR as DEFER_BLOCK_DEPENDENCY_INTERCEPTOR,
@@ -13,11 +14,13 @@ import type {
   FluidboxCustomItemBase,
   FluidboxImageItem,
   FluidboxItem,
+  FluidboxReachEndEvent,
   FluidboxSlideOrigin,
 } from "@ogdakke/fluidbox";
 import { FluidboxModule, injectFluidboxSlide } from "@ogdakke/fluidbox/angular";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Angular slides · content that defers, holds the open, or plays on its own",
@@ -253,6 +256,15 @@ class Reel implements OnInit {
         </ng-template>
       </ng-template>
     </div>
+    <h2>A gallery that grows as the viewer nears its end</h2>
+    <div
+      fluidboxRoot
+      [items]="growing()"
+      [reachEndThreshold]="threshold()"
+      (reachEnd)="grow($event)"
+    >
+      <app-grid [items]="growing()" id="growing" />
+    </div>
     <h2>A slide that holds the open</h2>
     <div fluidboxRoot [items]="held()">
       <app-grid [items]="held()" id="held" />
@@ -291,8 +303,21 @@ class Slides {
   readonly reels = reels;
   readonly held = signal<FluidboxItem[]>([custom("held", "held-a"), custom("held", "held-b")]);
 
+  readonly count = signal(4);
+  readonly growing = computed(() => growingPhotos(this.count()));
+  // A string at first, as a static reachEndThreshold="1" attribute gives.
+  readonly threshold = signal<number | string>("1");
+
   constructor() {
     fixture.setHeldItems = (items) => this.held.set(items);
+    growth.setCount = (count) => this.count.set(count);
+    growth.setThreshold = (threshold) => this.threshold.set(threshold);
+  }
+
+  /** Append four photos as the viewer nears the end. */
+  grow(event: FluidboxReachEndEvent): void {
+    const next = reached(event);
+    if (next) this.count.set(next);
   }
 }
 

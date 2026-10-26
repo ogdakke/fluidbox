@@ -1,6 +1,7 @@
 import { controlSelector, drawViewerLayer } from "./viewer-layer";
 import { idOf, itemLabel } from "./items";
 import { FluidboxMediaErrorEvent, type FluidboxOptions } from "./public-api";
+import { reachEnd } from "./reach-end-event";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
@@ -193,6 +194,8 @@ export class DomViewerDriver<
   #loop = false;
   #portalDispose: FluidboxDispose | undefined;
   #source: FluidboxSource<TItem> | undefined;
+  /** Whether `reachend` fired for this item count. */
+  #reachedEnd = false;
   #extensions: FluidboxExtensionInstance<TItem>[] = [];
   /** Aborted when the mounted extensions are replaced. */
   #extensionLifetime: AbortController | undefined;
@@ -607,8 +610,16 @@ export class DomViewerDriver<
    * Every duration and spring response the viewer plays, in milliseconds, as
    * its motion plays it. One place, so a motion speed changes them all.
    */
-  #duration(ms: number) {
-    return ms;
+  #duration(ms: number, speed = this.#motionSpeed()) {
+    return ms / speed;
+  }
+
+  /** `--fluidbox-motion-speed` on the viewer: 2 plays every motion twice as fast. */
+  #motionSpeed() {
+    const speed = Number.parseFloat(
+      getComputedStyle(this.#portal.dialog).getPropertyValue("--fluidbox-motion-speed"),
+    );
+    return Number.isFinite(speed) ? Math.min(4, Math.max(0.25, speed)) : 1;
   }
 
   /** Listeners for a person's input to the open viewer. */
@@ -680,6 +691,8 @@ export class DomViewerDriver<
   }
 
   setSource(source: FluidboxSource<TItem>) {
+    // A new count re-arms reachend.
+    if (source.count !== this.#source?.count) this.#reachedEnd = false;
     this.#source = source;
     for (const extension of this.#extensions) extension.setSource?.(source);
     this.#discardPreparation();
@@ -714,13 +727,22 @@ export class DomViewerDriver<
     };
     this.#strip.onZoomableChange = () => this.#controller?.zoomableChanged?.();
     this.#strip.onMediaError = (index, kind, cause) => {
-      const item = source.getItem(index);
+      const item = this.#source!.getItem(index);
       this.#controller?.mediaError?.(
         new FluidboxMediaErrorEvent("mediaerror", { value: idOf(item), index, item, kind, cause }),
       );
     };
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
+  }
+
+  /** Fire `reachend` once per item count, when an open or a move settles near the end. */
+  reachEnd() {
+    if (this.#controller && !this.#reachedEnd && !this.#loop) {
+      // Set first: a handler that changes the count re-arms it as it dispatches.
+      this.#reachedEnd = true;
+      if (!reachEnd(this.#controller)) this.#reachedEnd = false;
+    }
   }
 
   revealed() {
@@ -989,7 +1011,7 @@ export class DomViewerDriver<
     if (!selected) {
       const smooth =
         !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
-      await this.#strip?.select(context.index, smooth, context.step);
+      await this.#strip?.select(context.index, smooth && this.#motionSpeed(), context.step);
       if (context.signal.aborted || this.#destroyed) return;
     }
     // The item left behind scrolled away zoomed; coming back, it shows at fit.
@@ -1026,6 +1048,8 @@ export class DomViewerDriver<
       this.#returnFocus = context.origin.trigger;
       this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
     }
+    // A move still under way ends on its slide, which the close then leaves from.
+    this.#strip?.land();
     // Every close, flown or not, tells the slide on show where it lands.
     this.#strip?.closing(this.#originVideo(context), originModel(context.origin));
     if (
@@ -1116,6 +1140,8 @@ export class DomViewerDriver<
     } else {
       this.#preparedFlight = undefined;
     }
+    // Read once for the close, and the retargets that replan it.
+    const speed = this.#motionSpeed();
     const closeMotion = (to: ImageTransitionPose, width: number, height: number) =>
       createImageTransitionMotion({
         opening: false,
@@ -1124,8 +1150,8 @@ export class DomViewerDriver<
         width,
         height,
         backdropFrom: Number(start.backdropOpacity),
-        duration: this.#duration(duration),
-        response: this.#duration(duration * 0.9),
+        duration: this.#duration(duration, speed),
+        response: this.#duration(duration * 0.9, speed),
         samples: 60,
         fadeFrame: !originTarget,
         crossfade,
@@ -1489,6 +1515,7 @@ export class DomViewerDriver<
     const response = matchMedia("(hover: none) and (pointer: coarse)").matches
       ? TOUCH_OPENING_SPRING_RESPONSE
       : OPENING_SPRING_RESPONSE;
+    const speed = this.#motionSpeed();
     return createImageTransitionMotion({
       opening: true,
       from: start,
@@ -1496,8 +1523,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: Number(start.backdropOpacity),
-      duration: this.#duration(OPEN_DURATION),
-      response: this.#duration(response),
+      duration: this.#duration(OPEN_DURATION, speed),
+      response: this.#duration(response, speed),
       samples: 24,
       fadeFrame: !start.fromOrigin,
       crossfade,
@@ -2214,6 +2241,7 @@ export class DomViewerDriver<
     const settleX = boundDismissVelocity(state.x, velocityX, "x");
     const settleY = boundDismissVelocity(state.y, velocityY, "y");
     const duration = Math.max(140, 220 - Math.min(80, Math.hypot(settleX, settleY) * 50));
+    const speed = this.#motionSpeed();
     const motion = createImageTransitionMotion({
       opening: true,
       from: current,
@@ -2221,8 +2249,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: opacity,
-      duration: this.#duration(duration),
-      response: this.#duration(duration * 0.8),
+      duration: this.#duration(duration, speed),
+      response: this.#duration(duration * 0.8, speed),
       samples: 24,
     });
     const animations = this.#fly(

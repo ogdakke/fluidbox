@@ -276,6 +276,22 @@ test.describe("mediaerror", () => {
     await expect.poll(async () => count(await log(page))).toBe(2);
   });
 
+  test("names the item where it is now, after new items", async ({ page }) => {
+    await load(page);
+    await open(page, "broken");
+    await expect.poll(() => log(page)).toContain("mediaerror broken 3 image");
+    // The same items backwards: the broken photo, still on show, is now second.
+    await page.evaluate(() =>
+      window.featuresFixture.fluidbox.setItems([...window.featuresFixture.items].reverse()),
+    );
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 5");
+    await page
+      .locator(`${shown} [data-fluidbox-error]`)
+      .getByRole("button", { name: "Retry" })
+      .click();
+    await expect.poll(() => log(page)).toContain("mediaerror broken 1 image");
+  });
+
   test("fires for a neighbour that fails", async ({ page }) => {
     await load(page);
     await open(page, "off");

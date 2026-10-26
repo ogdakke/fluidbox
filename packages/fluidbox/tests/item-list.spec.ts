@@ -50,6 +50,28 @@ describe("createItemList", () => {
     expect(item).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the items it made in a list withCount makes", () => {
+    const item = vi.fn(photo);
+    const index = vi.fn((id: string) => Number(id.slice(6)));
+    const list = createItemList({ count: 5, item, index });
+    const third = list.get(2);
+    const longer = list.withCount(20);
+    expect(longer.count).toBe(20);
+    expect(list.count).toBe(5);
+    expect(longer.get(2)).toBe(third);
+    expect(longer.indexOf("photo-2")).toBe(2);
+    expect(index).not.toHaveBeenCalled();
+    expect(longer.indexOf("photo-12")).toBe(12);
+    expect(longer.get(12)).toBe(longer.withCount(30).get(12));
+    expect(item).toHaveBeenCalledTimes(2);
+    // A shorter list keeps the items, but not the ones past its end.
+    const shorter = longer.withCount(3);
+    expect(shorter.get(2)).toBe(third);
+    expect(shorter.indexOf("photo-12")).toBe(-1);
+    expect(() => shorter.get(12)).toThrow(RangeError);
+    expect(() => list.withCount(-1)).toThrow(RangeError);
+  });
+
   it("finds an item it already made without asking", () => {
     const index = vi.fn(() => -1);
     const list = createItemList({ count: 5, item: photo, index });

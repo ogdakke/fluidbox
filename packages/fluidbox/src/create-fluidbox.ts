@@ -198,6 +198,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #fullscreen = false;
   #gestures: Pick<FluidboxOptions, "dismiss" | "wheel">;
   #shareUrl: FluidboxOptions<TItem>["shareUrl"];
+  #reachEndThreshold: number | undefined;
   readonly [hostKey]: FluidboxHost;
 
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
@@ -216,6 +217,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#slides = options.slides;
     this.#gestures = { dismiss: options.dismiss, wheel: options.wheel };
     this.#shareUrl = options.shareUrl;
+    this.#reachEndThreshold = options.reachEndThreshold;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
     this.#makeAddons();
@@ -342,6 +344,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         this.#publish(this.#state.status, this.#state.index);
       },
       mediaError: (event) => void this.dispatchEvent(event),
+      reachEnd: (event) => void this.dispatchEvent(event),
+      reachEndThreshold: () => this.#reachEndThreshold,
     };
   }
 
@@ -402,6 +406,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#settings = next;
     if (has("preload")) this.#setPreload(options.preload);
     if (has("shareUrl")) this.#shareUrl = options.shareUrl;
+    if (has("reachEndThreshold")) this.#reachEndThreshold = options.reachEndThreshold;
     if (has("dismiss") || has("wheel")) {
       this.#gestures = {
         dismiss: has("dismiss") ? options.dismiss : this.#gestures.dismiss,
@@ -1160,6 +1165,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         this.#complete(opening ? "open" : "move", idOf(item), opening ? null : from, reason);
       }
       this.#finish(operation, completed(changed));
+      // Once the move is done, so a handler's new items don't interrupt it,
+      // and not while a valuechangecomplete handler's own move is on its way.
+      if (!this.#pending) this.#viewer?.reachEnd();
     });
     return operation.promise;
   }

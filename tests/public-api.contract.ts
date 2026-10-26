@@ -477,6 +477,20 @@ const productVideo: Root.FluidboxSlideRenderer<Root.FluidboxVideoItem> = (slide)
   slide.drawVideo(slide.item, { attach: (element) => void element });
 void productVideo;
 
+// A lazy list grows with withCount; reachend says when, once per count.
+const growing: Root.FluidboxLazyItemList<FluidboxImageItem> = createItemList({
+  count: 10,
+  item: (index) => ({ type: "image", src: `/photo-${index}.jpg`, alt: "", width: 4, height: 3 }),
+  index: (id) => Number(id.slice(7, -4)),
+});
+const grown = createFluidbox({ items: growing, reachEndThreshold: 3 });
+grown.addEventListener("reachend", (event: Root.FluidboxReachEndEvent) => {
+  const at: [string, number, number] = [event.value, event.index, event.count];
+  void at;
+  void grown.setItems(growing.withCount(event.count + 10));
+});
+grown.update({ reachEndThreshold: undefined });
+
 // The root holds no kit helpers, elements or old names.
 type RootValues = keyof typeof Root;
 assert<
@@ -489,6 +503,7 @@ assert<
     | "imageItem"
     | "videoSlide"
     | "FluidboxMediaErrorEvent"
+    | "FluidboxReachEndEvent"
     | "FluidboxSheetEvent"
     | "FluidboxValueChangeEvent"
     | "FluidboxZoomEvent"

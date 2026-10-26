@@ -559,6 +559,23 @@ test.describe("video sources and attach", () => {
     await expect(page.locator(video)).toHaveAttribute("src", "/video/drift.webm");
     expect(await page.evaluate(() => window.slidesFixture.attached)).toContain("load stream-2");
   });
+
+  test("a slide a glide lands on through new items is told it shows", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await load(page);
+    await open(page, "#streamed", "stream");
+    // A slow glide, and loop turned on while it is on its way.
+    await page
+      .locator(dialog)
+      .evaluate((element: HTMLElement) =>
+        element.style.setProperty("--fluidbox-motion-speed", "0.25"),
+      );
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(300);
+    await page.evaluate(() => window.slidesFixture.streamed.update({ loop: true }));
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 2 of 4");
+    await expect(page.locator(video)).toHaveAttribute("src", "/video/drift.webm");
+  });
 });
 
 test.describe("fill boxes", () => {
