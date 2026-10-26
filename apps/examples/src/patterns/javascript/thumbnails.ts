@@ -27,7 +27,7 @@ function gallery(root: HTMLElement, thumbnails: FluidboxOptions["thumbnails"]) {
 
 export function mountThumbnails(root: HTMLElement) {
   const standard = gallery(root, true);
-  // Your own thumbnails. The selected button has data-fluidbox-selected.
+  // Your own thumbnails. The selected button has data-active.
   const custom = gallery(root, {
     render({ index, target }) {
       const thumb = document.createElement("span");

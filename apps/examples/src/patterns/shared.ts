@@ -50,7 +50,7 @@ export const strip: WithId[] = art("strip", [
   "canyon",
 ]);
 
-/** 4 renderers: a note, an item type of the examples' own. */
+/** 4 renderers: a note, an item type of the examples' own, declared for the types below. */
 export interface NoteItem extends FluidboxCustomItemBase<"note"> {
   readonly id: string;
 }
@@ -61,7 +61,7 @@ declare module "@ogdakke/fluidbox" {
   }
 }
 
-/** 4 renderers: one custom note, one live map, one video, one YouTube embed. */
+/** 4 renderers: a note, a live map, a video and a YouTube embed. */
 export const media: WithId<FluidboxItem>[] = [
   {
     type: "note",
@@ -180,7 +180,7 @@ export const productMedia: WithId<FluidboxItem>[] = [
 export const modelViewerUrl =
   "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
 
-/** The value each framework provides through its own context, read by the custom renderer. */
+/** The value each framework provides through its own context, read by the note slide. */
 export const theme = "dusk";
 
 /** The picture a trigger shows for an item: its thumbnail, a video's poster, or the image. */

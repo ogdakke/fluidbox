@@ -22,7 +22,7 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
   basic: { title: "Gallery", note: "A trigger per photo, with the default controls." },
   overlay: {
     title: "One trigger for an album",
-    note: "Every photo returns to the cover, which shows the last one viewed. The count travels with the flight.",
+    note: "One cover for the whole album: every photo closes back onto it, and it shows the last one viewed. The count flies with the photo.",
   },
   origins: {
     title: "Rich origins",
@@ -30,7 +30,7 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
   },
   renderers: {
     title: "Custom content",
-    note: "A component that reads app context, a live map and a video.",
+    note: "A note slide of your own that reads app context, beside a live map, a video and a YouTube embed.",
   },
   programmatic: {
     title: "Programmatic control",
@@ -43,7 +43,7 @@ export const patternInfo: Record<PatternName, { title: string; note: string }> =
   thumbnails: { title: "Thumbnails", note: "The default strip, and one with your own thumbnails." },
   sheet: {
     title: "Sheet",
-    note: "A panel under the photo with snap points, stop buttons and a text field.",
+    note: "A panel under the photo with snap points, snap buttons and a text field.",
   },
   headless: { title: "Headless controls", note: "Your own caption bar and buttons." },
   rtl: {
