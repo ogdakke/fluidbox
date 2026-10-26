@@ -562,17 +562,26 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   play() {
-    // An opening viewer may still be loading; it plays once it has, unless it closed.
+    // An opening viewer may still be loading; it plays once it has, unless
+    // anything changed meanwhile: a close, a move or another open.
+    const state = this.#state;
     if (this.#viewer) this.#viewer.play();
-    else if (this.#state.status !== "closed") {
-      void this.#loadViewer().then((viewer) => viewer?.play());
+    else if (state.status !== "closed") {
+      this.#loadViewer().then(
+        (viewer) => state === this.#state && viewer?.play(),
+        () => {},
+      );
     }
   }
 
   pause() {
     // After a play still waiting for the viewer to load, in turn.
     if (this.#viewer) this.#viewer.pause();
-    else void this.#viewerLoad?.then((viewer) => viewer?.pause());
+    else
+      this.#viewerLoad?.then(
+        (viewer) => viewer?.pause(),
+        () => {},
+      );
   }
 
   /** Run a command on the item on show; with none open it does nothing and resolves false. */

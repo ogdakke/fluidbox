@@ -115,6 +115,62 @@ test.describe("slideshow", () => {
     expect(await value(page)).toBe("one");
   });
 
+  test("a play() while the viewer loads plays, unless the viewer closed meanwhile", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await load(page);
+    // Closed and opened again before the viewer loaded: the play was for the first.
+    await page.evaluate(() => {
+      const { fluidbox } = window.slideshowFixture;
+      void fluidbox.open("one");
+      fluidbox.play();
+      void fluidbox.close();
+      void fluidbox.open("two");
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    expect(await value(page)).toBe("two");
+    expect(await playing(page)).toBe(false);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
+    // Loaded now, a play during the opening plays.
+    await page.evaluate(() => {
+      const { fluidbox } = window.slideshowFixture;
+      void fluidbox.open("one");
+      fluidbox.play();
+    });
+    await expect.poll(() => playing(page)).toBe(true);
+  });
+
+  test("a viewer that fails to load leaves play() and pause() no unhandled rejection", async ({
+    page,
+  }) => {
+    await page.route(/dom-viewer-driver/, (route) => route.abort());
+    await load(page);
+    const rejections = await page.evaluate(async () => {
+      const { fluidbox } = window.slideshowFixture;
+      let count = 0;
+      window.addEventListener("unhandledrejection", () => count++);
+      fluidbox.open("one").catch(() => {});
+      fluidbox.play();
+      fluidbox.pause();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return count;
+    });
+    expect(rejections).toBe(0);
+  });
+
+  test("a play() in the opening that loads the viewer plays", async ({ page }) => {
+    await load(page);
+    await page.evaluate(() => {
+      const { fluidbox } = window.slideshowFixture;
+      void fluidbox.open("one");
+      fluidbox.play();
+    });
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    await expect.poll(() => playing(page)).toBe(true);
+  });
+
   test("items set while it plays leave the interval alone", async ({ page }) => {
     await load(page);
     await open(page);
