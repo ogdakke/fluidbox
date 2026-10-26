@@ -274,7 +274,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         readonly model: HTMLElement | null;
       }
     | undefined;
-  #recycled: Map<string, { item: TItem; slide: ViewerSlide }[]> | undefined;
+  #recycled: Map<string, { item: TItem; slide: ViewerSlide; offset: number }[]> | undefined;
 
   constructor(
     ownerDocument: Document,
@@ -464,7 +464,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const previous = this.#source;
     const index = this.index;
     const shown = previous.count ? idOf(previous.getItem(index)) : null;
-    const recycled = new Map<string, { item: TItem; slide: ViewerSlide }[]>();
+    const recycled = new Map<string, { item: TItem; slide: ViewerSlide; offset: number }[]>();
     // Nearest first, so an item a loop repeats keeps the slide on show, and the ones beside it.
     const slides = [...this.#slides].sort(
       ([a], [b]) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
@@ -476,7 +476,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       // Most items stay where they were; a lazy list without indexOf finds an id by scanning.
       const next = at < source.count && idOf(source.getItem(at)) === id ? at : source.getIndex(id);
       if (next !== null && sameItem(item, source.getItem(next))) {
-        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide }]);
+        const offset = position - this.#index;
+        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide, offset }]);
       } else {
         this.#unload(slide);
         slide.element.remove();
@@ -500,11 +501,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#align(this.#index);
   }
 
-  /** An unchanged old slide for the item at a position, moved there. */
-  #recycle(position: number) {
+  /**
+   * An unchanged old slide for the item at a position, moved there; with
+   * `same`, only one that was as far from the slide on show.
+   */
+  #recycle(position: number, same?: boolean) {
     const item = this.#source.getItem(this.#item(position));
     const kept = this.#recycled?.get(idOf(item));
-    const found = kept?.findIndex((each) => sameItem(each.item, item)) ?? -1;
+    const found =
+      kept?.findIndex(
+        (each) => sameItem(each.item, item) && (!same || each.offset === position - this.#index),
+      ) ?? -1;
     if (!kept || found < 0) return undefined;
     const { slide } = kept.splice(found, 1)[0]!;
     slide.position = position;
@@ -1139,13 +1146,18 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const positions = Array.from({ length: size }, (_, at) => base + at).sort(
       (a, b) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
     );
-    for (const index of positions) {
-      let slide = this.#slides.get(index);
-      if (!slide) {
-        slide = this.#recycle(index) ?? this.#makeSlide(index);
+    // An old slide keeps its place beside the one on show if it can, as when
+    // a loop starts or stops: only then any old slide for the item, or a new one.
+    for (const same of [true, false]) {
+      for (const index of positions) {
+        const slide =
+          this.#slides.get(index) ??
+          this.#recycle(index, same) ??
+          (same ? undefined : this.#makeSlide(index));
+        if (!slide) continue;
         this.#slides.set(index, slide);
+        elements[index - base] = slide.element;
       }
-      elements[index - base] = slide.element;
     }
     // Only a slide out of place moves, as moving an embed reloads it, and
     // the one on show never does: the others take their places around it.
