@@ -61,23 +61,21 @@ export function holdSlideCommit(slide: FluidboxSlide<any>): () => void {
   return hold ? hold() : () => {};
 }
 
-/** A slide's hotspot layer, and how to put a hotspot a binding renders on its point. */
-export interface FluidboxHotspots {
-  /** The layer: render hotspots into it, as a portal. */
-  readonly element: HTMLElement;
-  /** Put `button` on its point and keep it there; it joins the layer if it isn't in it. */
-  place(this: void, button: HTMLElement, options: FluidboxHotspotOptions): void;
-}
-
 /**
- * The hotspot layer of a slide, made on first use. Null outside a slide's
- * renderer, as on the server.
+ * Keep `button`, which you render in the slide's media box, on its point of
+ * the painted media, hidden with the controls. Call it again as the options
+ * change. Nothing outside a slide's renderer, as on the server.
  */
-export function slideHotspots(slide: FluidboxSlide<any>): FluidboxHotspots | null {
-  const layer = (slide as unknown as { [key: symbol]: (() => FluidboxHotspots) | undefined })[
-    Symbol.for("fluidbox.hotspots")
-  ];
-  return layer ? layer() : null;
+export function placeHotspot(
+  slide: FluidboxSlide<any>,
+  button: HTMLElement,
+  options: FluidboxHotspotOptions,
+): void {
+  (
+    slide as unknown as {
+      [key: symbol]: ((button: HTMLElement, options: FluidboxHotspotOptions) => void) | undefined;
+    }
+  )[Symbol.for("fluidbox.hotspots")]?.(button, options);
 }
 
 /**

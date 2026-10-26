@@ -9,6 +9,7 @@ import {
   TemplateRef,
   booleanAttribute,
   computed,
+  effect,
   inject,
   input,
   signal,
@@ -19,7 +20,7 @@ import {
   type Signal,
   type SimpleChanges,
 } from "@angular/core";
-import { slideHotspots } from "@ogdakke/fluidbox/kit";
+import { placeHotspot } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxHotspotCoordinate,
   FluidboxIframeItem,
@@ -247,9 +248,6 @@ export class FluidboxSlideDirective<TItem extends FluidboxItem = FluidboxItem>
   }
 }
 
-/** Provided to `fluidboxMedia`'s content, where a hotspot may go. */
-const IN_MEDIA = new InjectionToken<true>("fluidbox media");
-
 /**
  * The slide's media box: the element that flies, follows a drag to dismiss
  * and zooms. It is the viewer's own element; the template's content renders
@@ -263,12 +261,7 @@ const IN_MEDIA = new InjectionToken<true>("fluidbox media");
  * </ng-template>
  * ```
  */
-@Directive({
-  selector: "ng-template[fluidboxMedia]",
-  standalone: true,
-  // Its content may hold hotspots.
-  providers: [{ provide: IN_MEDIA, useValue: true }],
-})
+@Directive({ selector: "ng-template[fluidboxMedia]", standalone: true })
 export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
   /**
    * Whether pinch, double-tap, wheel and the zoom controls zoom the box.
@@ -367,9 +360,9 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
 }
 
 /**
- * A pin on a point of the slide's painted media: your button, which goes into
- * the box's hotspot layer, where the viewer keeps it on its point as the box
- * fits and zooms. Only inside `fluidboxMedia`.
+ * A pin on a point of the slide's painted media: your button, inside
+ * `fluidboxMedia`, which the viewer keeps on its point as the box fits and
+ * zooms.
  *
  * ```html
  * <ng-template fluidboxMedia>
@@ -380,12 +373,8 @@ export class FluidboxMediaDirective implements OnChanges, OnInit, OnDestroy {
  * </ng-template>
  * ```
  */
-@Directive({
-  selector: "button[fluidboxHotspot]",
-  standalone: true,
-  host: { "data-fluidbox-managed": "" },
-})
-export class FluidboxHotspotDirective implements OnChanges, OnInit, OnDestroy {
+@Directive({ selector: "button[fluidboxHotspot]", standalone: true })
+export class FluidboxHotspotDirective {
   /** Across the painted media: `"42%"`, or pixels counted on the media's `width`. */
   readonly x = input.required<FluidboxHotspotCoordinate>();
   /** Down the painted media: `"30%"`, or pixels counted on the media's `height`. */
@@ -393,50 +382,14 @@ export class FluidboxHotspotDirective implements OnChanges, OnInit, OnDestroy {
   /** Grow with the zoom instead of keeping its screen size. */
   readonly scaleWithZoom = input(false, { transform: booleanAttribute });
 
-  readonly #button = inject<ElementRef<HTMLButtonElement>>(ElementRef).nativeElement;
-  readonly #hotspots = slideHotspots(requireSlide("button[fluidboxHotspot]").slide);
-  #placed = false;
-  #destroyed = false;
-
   constructor() {
-    if (!inject(IN_MEDIA, { optional: true }))
-      throw new Error(
-        (() => {
-          try {
-            if (process.env.NODE_ENV !== "production")
-              return "button[fluidboxHotspot] must be inside an ng-template with fluidboxMedia.";
-          } catch {}
-          return "fluidbox";
-        })(),
-      );
-  }
-
-  ngOnChanges(): void {
-    if (this.#placed) this.#place();
-  }
-
-  ngOnInit(): void {
-    if (!this.#button.hasAttribute("type")) this.#button.type = "button";
-    // Once fluidboxMedia has put its content in the box, into the layer.
-    queueMicrotask(() => {
-      if (this.#destroyed) return;
-      this.#hotspots?.element.append(this.#button);
-      this.#placed = true;
-      this.#place();
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.#destroyed = true;
-    // Out of the layer too, where its view no longer finds it.
-    this.#button.remove();
-  }
-
-  #place(): void {
-    this.#hotspots?.place(this.#button, {
-      x: this.x(),
-      y: this.y(),
-      scaleWithZoom: this.scaleWithZoom(),
+    const button = inject<ElementRef<HTMLButtonElement>>(ElementRef).nativeElement;
+    const { slide } = requireSlide("button[fluidboxHotspot]");
+    const zone = inject(NgZone);
+    effect(() => {
+      const options = { x: this.x(), y: this.y(), scaleWithZoom: this.scaleWithZoom() };
+      // The hotspots' code, its listeners and its frames run outside the zone.
+      zone.runOutsideAngular(() => placeHotspot(slide, button, options));
     });
   }
 }

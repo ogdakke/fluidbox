@@ -49,7 +49,7 @@ import {
   fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
-  slideHotspots,
+  placeHotspot,
   latestFindTrigger,
   resolveLabels,
   takeOverFluidbox,
@@ -911,14 +911,7 @@ function Media(props: FluidboxMediaProps): JSX.Element {
   // the slide commits: a suspended slide shows nothing in the box until then.
   const host = slide.media.ownerDocument.createElement("span");
   host.dataset.fluidboxMount = "";
-  insert(host, () =>
-    createComponent(MediaContext.Provider, {
-      value: true,
-      get children() {
-        return local.children;
-      },
-    }),
-  );
+  insert(host, () => local.children);
   createEffect(() =>
     onCleanup(applyAttributes(slide.media, { ...attributes } as Record<string, string | object>)),
   );
@@ -953,50 +946,19 @@ function Media(props: FluidboxMediaProps): JSX.Element {
   return null;
 }
 
-/** True inside `Media`, where a Hotspot may go. */
-const MediaContext = createContext(false);
-
 /**
- * A pin on a point of the slide's painted media: your button, in the box's
- * hotspot layer, which keeps it on its point as the box fits and zooms.
+ * A pin on a point of the slide's painted media: your button, inside `Media`,
+ * which the viewer keeps on its point as the box fits and zooms.
  */
 function Hotspot(props: FluidboxHotspotProps): JSX.Element {
   const { slide } = useSlideContext("Hotspot");
-  if (!useContext(MediaContext))
-    throw new Error(
-      (() => {
-        try {
-          if (process.env.NODE_ENV !== "production")
-            return "<Fluidbox.Hotspot> must be inside <Fluidbox.Media>.";
-        } catch {}
-        return "fluidbox";
-      })(),
-    );
-  const [local, attributes] = splitProps(props, ["x", "y", "scaleWithZoom", "children"]);
-  const hotspots = slideHotspots(slide);
-  const ownerDocument = slide.media.ownerDocument;
-  // In an element of ours, which joins the layer as the slide commits.
-  const host = ownerDocument.createElement("span");
-  host.dataset.fluidboxMount = "";
-  const button = ownerDocument.createElement("button");
-  spread(
-    button,
-    mergeProps({ type: "button" }, attributes, {
-      "data-fluidbox-managed": "",
-      get children() {
-        return local.children;
-      },
-    }),
-  );
-  host.append(button);
-  onMount(() => {
-    hotspots?.element.append(host);
-    onCleanup(() => host.remove());
-  });
+  const [local, attributes] = splitProps(props, ["x", "y", "scaleWithZoom"]);
+  const button = slide.media.ownerDocument.createElement("button");
+  spread(button, mergeProps({ type: "button" }, attributes));
   createEffect(() =>
-    hotspots?.place(button, { x: local.x, y: local.y, scaleWithZoom: local.scaleWithZoom }),
+    placeHotspot(slide, button, { x: local.x, y: local.y, scaleWithZoom: local.scaleWithZoom }),
   );
-  return null;
+  return button;
 }
 
 /** Draw one of the built-in media into the slide's box, again as the item's fields change. */

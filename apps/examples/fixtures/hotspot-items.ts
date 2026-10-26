@@ -18,6 +18,21 @@ declare module "@ogdakke/fluidbox" {
   }
 }
 
+type Part = RoomItem["parts"][number];
+
+/** The pin the tests add between the two, to see it take its place in the Tab order. */
+export const lamp: Part = { id: "lamp", name: "Lamp", x: "30%", y: "60%" };
+
+/** The parts with the lamp after the first. */
+export const withLamp = (parts: readonly Part[]): Part[] => [parts[0]!, lamp, ...parts.slice(1)];
+
+declare global {
+  interface Window {
+    /** Adds the lamp between the slide's pins. */
+    addLamp: () => void;
+  }
+}
+
 export const rooms: RoomItem[] = [
   {
     type: "room",

@@ -535,27 +535,22 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slide-layer] > * {
   pointer-events: auto;
 }
-/* A slide's hotspots sit on the painted media, in a layer inside the box the
-   runtime sizes to it, so they zoom with it; the box's will-change makes it
-   the layer's containing block. Each is centred on its point and keeps its
-   screen size by undoing the zoom's scale. */
-:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-hotspots] {
-  position: absolute;
-  z-index: 3;
-  pointer-events: none;
-}
+/* A slide's hotspots sit in the box, which its will-change makes their
+   containing block, on points of the painted media the runtime works out, so
+   they zoom with it. Each is centred on its point and keeps its screen size
+   by undoing the zoom's scale. */
 :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-hotspot] {
   position: absolute;
+  z-index: 3;
   translate: -50% -50%;
   scale: calc(1 / var(--fluidbox-zoom-scale, 1));
-  pointer-events: auto;
 }
 :where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-hotspot][data-scale-with-zoom] {
   scale: none;
 }
-/* They don't fly: a flight carries the box out of the dialog. */
-[data-fluidbox-flight] [data-fluidbox-hotspots] {
+/* They don't fly, and can't take focus while the box does. */
+[data-fluidbox-flight] [data-fluidbox-hotspot] {
   visibility: hidden;
 }
 /**

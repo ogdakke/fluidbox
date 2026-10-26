@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import type { Fluidbox } from "@ogdakke/fluidbox";
+import type { CustomBox } from "../../apps/examples/fixtures/hotspots";
 
 declare global {
   interface Window {
@@ -8,6 +9,7 @@ declare global {
       boxes: Record<"room" | "wide" | "filled" | "growing", Fluidbox>;
       pins: readonly { name: string; x: string | number; y: string | number }[];
       unnamed: Fluidbox;
+      custom: (options: CustomBox) => Fluidbox;
     };
   }
 }
@@ -77,20 +79,6 @@ for (const grid of ["room", "wide", "filled"]) {
     }
   });
 }
-
-test("the letterboxed photo's layer is the painted square, not the wide box", async ({ page }) => {
-  await open(page, "wide");
-  const [layer, box] = await page.evaluate(() =>
-    ["[data-fluidbox-hotspots]", "[data-fluidbox-item-content]"].map((selector) => {
-      const { width, height } = document
-        .querySelector(`[data-fluidbox-dialog] ${selector}`)!
-        .getBoundingClientRect();
-      return width / height;
-    }),
-  );
-  expect(box).toBeCloseTo(1.5, 1);
-  expect(layer).toBeCloseTo(1, 2);
-});
 
 test("hotspots keep their screen size as the photo zooms", async ({ page }) => {
   await open(page, "room");
@@ -178,7 +166,7 @@ test("hotspots are hidden while the photo flies, and fade in with the controls",
       const status =
         document.querySelector("[data-fluidbox-dialog]")?.getAttribute("data-fluidbox-status") ??
         "none";
-      frames.push([status, opacity("[data-fluidbox-hotspots]")]);
+      frames.push([status, opacity("[data-fluidbox-hotspot]")]);
       requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
@@ -239,12 +227,43 @@ test("a viewer without hotspots never loads their code", async ({ page }) => {
   await page.locator('#slides [data-item="product"]').click();
   await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
   await page.evaluate(() => (window as any).slidesFixture.fluidbox.zoomTo(2));
+  // Long enough for a request the open or the zoom set off to have gone out.
+  await page.waitForTimeout(500);
   expect(loaded).toEqual([]);
   // And a slide that adds one does.
   await page.goto("/hotspots.html");
   await page.locator("#room button").first().click();
   await expect(page.locator(pin)).toHaveCount(3);
   expect(loaded.length).toBeGreaterThan(0);
+});
+
+test("hotspots can't take focus while the photo flies", async ({ page }) => {
+  await open(page, "room");
+  // Every frame of the close in which the box flies: whether a pin takes focus.
+  await page.evaluate(() => {
+    const frames: boolean[] = ((window as any).focusable_ = []);
+    const sample = () => {
+      const pin = document.querySelector<HTMLElement>("[data-fluidbox-hotspot]");
+      if (!pin) return;
+      if (pin.closest("[data-fluidbox-flight]")) {
+        pin.focus();
+        frames.push(document.activeElement === pin);
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.locator(dialog)).toHaveCount(0);
+  const frames = await page.evaluate(() => (window as any).focusable_ as boolean[]);
+  expect(frames.length).toBeGreaterThan(0);
+  expect(frames).not.toContain(true);
+});
+
+test("hotspots follow the photo as the window resizes", async ({ page }) => {
+  await open(page, "room");
+  await page.setViewportSize({ width: 700, height: 500 });
+  await expect.poll(async () => Math.max(...(await misses(page)))).toBeLessThan(0.5);
 });
 
 test("a mouse press on a hotspot of a zoomed photo doesn't pan it", async ({ page }) => {
@@ -289,4 +308,146 @@ test("a mouse press on a hotspot of a zoomed photo doesn't pan it", async ({ pag
   expect(Math.abs(after[0]! - before[0]!)).toBeLessThan(20);
   expect(Math.abs(after[1]! - before[1]!)).toBeLessThan(20);
   await expect(page.locator(dialog)).toHaveAttribute("data-zoomed", "");
+});
+
+/** Open a `custom` box: an `<img>` of the fixture's own, as `options` say. */
+async function openCustom(page: Page, options: CustomBox) {
+  await page.goto("/hotspots.html");
+  await page.evaluate((options) => window.hotspotsFixture.custom(options).open(0), options);
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(page.locator(pin)).toHaveCount(3);
+}
+
+/**
+ * How far each pin is from its point, worked out apart from the runtime: on
+ * the custom `<img>` painted as `fit`, at `P% + Lpx` of the space left on
+ * each side, its pixels counted on `space`; without one, on the box.
+ */
+async function customMisses(
+  page: Page,
+  fit: string,
+  position: readonly [readonly [number, number], readonly [number, number]] = [
+    [50, 0],
+    [50, 0],
+  ],
+  space?: readonly [number, number],
+) {
+  return page.evaluate(
+    ({ fit, position, space }) => {
+      const drawn = document.querySelector<HTMLImageElement>("img[data-custom]");
+      const box = (
+        drawn ?? document.querySelector("[data-fluidbox-dialog] [data-fluidbox-media]")!
+      ).getBoundingClientRect();
+      let { left, top, width, height } = box;
+      const [spaceWidth, spaceHeight] =
+        space ?? (drawn ? [drawn.naturalWidth, drawn.naturalHeight] : [1500, 1000]);
+      if (drawn) {
+        const contain = Math.min(box.width / drawn.naturalWidth, box.height / drawn.naturalHeight);
+        const cover = Math.max(box.width / drawn.naturalWidth, box.height / drawn.naturalHeight);
+        const scale =
+          fit === "cover"
+            ? cover
+            : fit === "none"
+              ? 1
+              : fit === "scale-down"
+                ? Math.min(1, contain)
+                : contain;
+        width = drawn.naturalWidth * scale;
+        height = drawn.naturalHeight * scale;
+        left += (position[0][0] / 100) * (box.width - width) + position[0][1];
+        top += (position[1][0] / 100) * (box.height - height) + position[1][1];
+      }
+      const fraction = (value: string | number, of: number) =>
+        typeof value === "number" ? value / of : parseFloat(value) / 100;
+      return window.hotspotsFixture.pins.map(({ name, x, y }) => {
+        const rect = document.querySelector(`[data-pin="${name}"]`)!.getBoundingClientRect();
+        return Math.hypot(
+          rect.left + rect.width / 2 - (left + fraction(x, spaceWidth) * width),
+          rect.top + rect.height / 2 - (top + fraction(y, spaceHeight) * height),
+        );
+      });
+    },
+    { fit, position, space },
+  );
+}
+
+const loaded = (page: Page) =>
+  expect(page.locator("img[data-custom]")).toHaveJSProperty("complete", true);
+
+for (const fit of ["cover", "none", "scale-down"]) {
+  test(`hotspots stay on an object-fit: ${fit} photo`, async ({ page }) => {
+    await openCustom(page, { fit });
+    await loaded(page);
+    await expect.poll(async () => Math.max(...(await customMisses(page, fit)))).toBeLessThan(0.5);
+  });
+}
+
+for (const [position, expected] of [
+  [
+    "right 10px bottom 20px",
+    [
+      [100, -10],
+      [100, -20],
+    ],
+  ],
+  [
+    "calc(25% + 10px) 0",
+    [
+      [25, 10],
+      [0, 0],
+    ],
+  ],
+] as const) {
+  test(`hotspots follow object-position: ${position}`, async ({ page }) => {
+    await openCustom(page, { position });
+    await loaded(page);
+    await expect
+      .poll(async () => Math.max(...(await customMisses(page, "contain", expected))))
+      .toBeLessThan(0.5);
+  });
+}
+
+test("hotspots stay on their points in a padded box", async ({ page }) => {
+  await openCustom(page, { padding: "40px 10px" });
+  await loaded(page);
+  await expect
+    .poll(async () => Math.max(...(await customMisses(page, "contain"))))
+    .toBeLessThan(0.5);
+});
+
+test("pixels count the image's declared size where it differs from its own", async ({ page }) => {
+  await openCustom(page, { declared: [3200, 3200] });
+  await loaded(page);
+  await expect
+    .poll(async () => Math.max(...(await customMisses(page, "contain", undefined, [3200, 3200]))))
+    .toBeLessThan(0.5);
+});
+
+test("hotspots on a box without an image are on the box", async ({ page }) => {
+  await openCustom(page, { noMedia: true });
+  await expect
+    .poll(async () => Math.max(...(await customMisses(page, "contain"))))
+    .toBeLessThan(0.5);
+});
+
+test("hotspots move to their points once a late image loads", async ({ page }) => {
+  await page.route("**/fjord-room.webp?late", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.continue();
+  });
+  await openCustom(page, { src: "/products/fjord-room.webp?late" });
+  await loaded(page);
+  await expect
+    .poll(async () => Math.max(...(await customMisses(page, "contain"))))
+    .toBeLessThan(0.5);
+});
+
+test("a hotspot taken out before the hotspots' code is in stays out", async ({ page }) => {
+  await openCustom(page, {});
+  await loaded(page);
+  await page.waitForTimeout(300);
+  await expect(page.locator(pin)).toHaveCount(3);
+  for (const each of await page.locator(pin).all()) {
+    await expect(each).toHaveAttribute("aria-label");
+  }
 });

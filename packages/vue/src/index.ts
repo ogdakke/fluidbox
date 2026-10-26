@@ -69,7 +69,7 @@ import {
   fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
-  slideHotspots,
+  placeHotspot,
   latestFindTrigger,
   resolveLabels,
   takeOverFluidbox,
@@ -986,7 +986,6 @@ const Media = defineComponent({
   props: ["zoom", "render"],
   setup(props: { zoom?: boolean | ""; render?: FluidboxSlideRenderer<any> }, { attrs, slots }) {
     const { slide } = useSlideContext("Media");
-    provide(MediaKey, true);
     // In the box from the start, so what renders into it is never moved there.
     const host = slide.media.ownerDocument.createElement("span");
     host.dataset.fluidboxMount = "";
@@ -1029,54 +1028,22 @@ const Media = defineComponent({
   },
 });
 
-/** Provided inside `Media`, where a Hotspot may go. */
-const MediaKey: InjectionKey<true> = Symbol("fluidbox-media");
-
 /**
- * A pin on a point of the slide's painted media: your button, in the box's
- * hotspot layer, which keeps it on its point as the box fits and zooms.
+ * A pin on a point of the slide's painted media: your button, inside `Media`,
+ * which the viewer keeps on its point as the box fits and zooms.
  */
 const Hotspot = defineComponent({
   name: "FluidboxHotspot",
-  inheritAttrs: false,
   props: {
     x: { type: [String, Number] as PropType<FluidboxHotspotCoordinate>, required: true },
     y: { type: [String, Number] as PropType<FluidboxHotspotCoordinate>, required: true },
     scaleWithZoom: { type: Boolean, default: undefined },
   },
-  setup(props, { attrs, slots }) {
+  setup(props, { slots }) {
     const { slide } = useSlideContext("Hotspot");
-    if (!inject(MediaKey, false))
-      throw new Error(
-        (() => {
-          try {
-            if (process.env.NODE_ENV !== "production")
-              return "<Fluidbox.Hotspot> must be inside <Fluidbox.Media>.";
-          } catch {}
-          return "fluidbox";
-        })(),
-      );
-    const hotspots = slideHotspots(slide);
-    // In the layer from the start, so what renders into it is never moved there.
-    const host = slide.media.ownerDocument.createElement("span");
-    host.dataset.fluidboxMount = "";
-    hotspots?.element.append(host);
-    onUnmounted(() => host.remove());
-    const button = shallowRef<HTMLButtonElement | null>(null);
-    onMounted(() =>
-      watchEffect(() => {
-        const { x, y, scaleWithZoom } = props;
-        if (button.value) hotspots?.place(button.value, { x, y, scaleWithZoom });
-      }),
-    );
-    return () =>
-      h(Teleport, { to: host }, [
-        h(
-          "button",
-          mergeProps({ type: "button" }, attrs, { ref: button, "data-fluidbox-managed": "" }),
-          slots.default?.(),
-        ),
-      ]);
+    const button = shallowRef<HTMLButtonElement>();
+    onMounted(() => watchEffect(() => placeHotspot(slide, button.value!, { ...props })));
+    return () => h("button", { type: "button", ref: button }, slots.default?.());
   },
 });
 

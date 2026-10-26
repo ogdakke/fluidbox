@@ -51,7 +51,7 @@ import {
   fluidboxStaticViewerNodes,
   holdSlideCommit,
   idOf,
-  slideHotspots,
+  placeHotspot,
   latestFindTrigger,
   resolveLabels,
   takeOverFluidbox,
@@ -944,57 +944,20 @@ function Media({ zoom, render, children, ...attributes }: FluidboxMediaProps): R
   useIsomorphicLayoutEffect(() => {
     if (zoom !== undefined) slide.zoomable(zoom);
   }, [slide, zoom]);
-  return host && children != null
-    ? createPortal(createElement(MediaContext.Provider, { value: true }, children), host)
-    : null;
+  return host && children != null ? createPortal(children, host) : null;
 }
 
-/** True inside `Media`, where a Hotspot may go. */
-const MediaContext = createContext(false);
-
 /**
- * A pin on a point of the slide's painted media: your button, in the box's
- * hotspot layer, which keeps it on its point as the box fits and zooms.
+ * A pin on a point of the slide's painted media: your button, inside `Media`,
+ * which the viewer keeps on its point as the box fits and zooms.
  */
-function Hotspot({
-  x,
-  y,
-  scaleWithZoom,
-  children,
-  ...attributes
-}: FluidboxHotspotProps): ReactElement | null {
+function Hotspot({ x, y, scaleWithZoom, ...attributes }: FluidboxHotspotProps): ReactElement {
   const { slide } = useSlideContext("Hotspot");
-  if (!useContext(MediaContext))
-    throw new Error(
-      (() => {
-        try {
-          if (process.env.NODE_ENV !== "production")
-            return "<Fluidbox.Hotspot> must be inside <Fluidbox.Media>.";
-        } catch {}
-        return "fluidbox";
-      })(),
-    );
-  const hotspots = useMemo(() => slideHotspots(slide), [slide]);
-  const host = useHost();
   const button = useRef<HTMLButtonElement>(null);
   useIsomorphicLayoutEffect(() => {
-    if (!host || !hotspots) return;
-    hotspots.element.append(host);
-    return () => host.remove();
-  }, [hotspots, host]);
-  useIsomorphicLayoutEffect(() => {
-    if (button.current) hotspots?.place(button.current, { x, y, scaleWithZoom });
-  }, [hotspots, x, y, scaleWithZoom]);
-  return host
-    ? createPortal(
-        createElement(
-          "button",
-          { type: "button", ...attributes, ref: button, "data-fluidbox-managed": "" },
-          children,
-        ),
-        host,
-      )
-    : null;
+    placeHotspot(slide, button.current!, { x, y, scaleWithZoom });
+  }, [slide, x, y, scaleWithZoom]);
+  return createElement("button", { type: "button", ...attributes, ref: button });
 }
 
 /** Draw one of the built-in media into the slide's box, keyed by the item's fields. */

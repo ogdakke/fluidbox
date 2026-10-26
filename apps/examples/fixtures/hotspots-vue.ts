@@ -1,12 +1,15 @@
 import { mountSite } from "../src/site";
-import { createApp, h } from "vue";
+import { createApp, h, shallowRef } from "vue";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
 import "./hotspots.css";
-import { rooms, type RoomItem } from "./hotspot-items";
+import { rooms, withLamp, type RoomItem } from "./hotspot-items";
 
 mountSite("fixtures", { fixture: "Vue hotspots · Fluidbox.Hotspot pins inside Media" });
+
+const parts = shallowRef(rooms[0]!.parts);
+window.addLamp = () => (parts.value = withLamp(parts.value));
 
 createApp({
   render: () =>
@@ -18,9 +21,10 @@ createApp({
       ),
       h(Fluidbox.Slides, null, {
         room: ({ item }: { item: RoomItem }) =>
-          h(Fluidbox.Media, null, () => [
+          // A render of its own, new on every render, as an inline one is.
+          h(Fluidbox.Media, { render: () => {} }, () => [
             h(Fluidbox.Image, { item: item.image }),
-            ...item.parts.map((part, index) =>
+            ...parts.value.map((part) =>
               h(
                 Fluidbox.Hotspot,
                 {
@@ -28,7 +32,7 @@ createApp({
                   x: part.x,
                   y: part.y,
                   // The second as a template's bare `scale-with-zoom` passes it.
-                  ...(index ? { scaleWithZoom: "" as unknown as boolean } : {}),
+                  ...(part.id === "books" ? { scaleWithZoom: "" as unknown as boolean } : {}),
                   class: "hotspot-pin",
                   "data-pin": part.name,
                   "aria-label": part.name,

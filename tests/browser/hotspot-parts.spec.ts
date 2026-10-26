@@ -5,6 +5,12 @@ import { expect, test, type Page } from "@playwright/test";
  * renders the app's pin, the core puts it on its point, and it takes focus.
  */
 
+declare global {
+  interface Window {
+    addLamp: () => void;
+  }
+}
+
 const dialog = "[data-fluidbox-dialog]";
 const pins = [
   { name: "Framed print", x: 0.5, y: 0.28 },
@@ -12,7 +18,7 @@ const pins = [
 ];
 
 /** How far each pin's centre is from its point on the drawn photo, contained in its box. */
-const misses = (page: Page) =>
+const misses = (page: Page, points = pins) =>
   page.evaluate((points) => {
     const image = document.querySelector<HTMLImageElement>(
       "[data-fluidbox-slide][data-active] [data-fluidbox-drawn]",
@@ -28,9 +34,9 @@ const misses = (page: Page) =>
         rect.top + rect.height / 2 - (box.top + (box.height - height) / 2 + y * height),
       );
     });
-  }, pins);
+  }, points);
 
-for (const binding of ["react", "vue", "solid", "angular", "elements"]) {
+for (const binding of ["react", "vue", "solid", "angular", "elements"] as const) {
   test(`${binding}: Hotspot renders the pin, on its point, and takes focus`, async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -49,23 +55,51 @@ for (const binding of ["react", "vue", "solid", "angular", "elements"]) {
       await expect(pin).toHaveText("+");
       await expect(pin).toHaveAttribute("type", "button");
       await expect(pin).toHaveClass(/hotspot-pin/);
-      expect(
-        await pin.evaluate((element) =>
-          element.matches("[data-fluidbox-media] [data-fluidbox-hotspots] *"),
-        ),
-      ).toBe(true);
+      expect(await pin.evaluate((element) => element.matches("[data-fluidbox-media] *"))).toBe(
+        true,
+      );
     }
     for (const miss of await misses(page)) expect(miss).toBeLessThan(0.5);
     // The second is given scaleWithZoom, as a bare attribute where markup has one.
     await expect(hotspots.first()).not.toHaveAttribute("data-scale-with-zoom");
     await expect(hotspots.nth(1)).toHaveAttribute("data-scale-with-zoom", "");
-    if (binding !== "elements") {
-      await expect(hotspots.first()).toHaveAttribute("data-fluidbox-managed", "");
-    }
+    await expect(hotspots.first()).toHaveAttribute("data-fluidbox-managed", "");
     await hotspots.first().focus();
     await expect(hotspots.first()).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(hotspots.nth(1)).toBeFocused();
+    expect(errors).toEqual([]);
+  });
+
+  if (binding === "elements") continue;
+  test(`${binding}: a Hotspot added between two takes its place in the Tab order`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(`/hotspots-${binding}.html`);
+    await page.locator('[data-item="room"]').click();
+    await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+    const hotspots = page.locator(`${dialog} [data-fluidbox-hotspot]`);
+    await expect(hotspots).toHaveCount(2);
+    await expect(page.locator(`${dialog} [data-fluidbox-drawn]`)).not.toHaveAttribute(
+      "data-fluidbox-image-pending",
+    );
+    // The slide renders again, and React's and Vue's Media with a new render.
+    await page.evaluate(() => window.addLamp());
+    await expect(hotspots).toHaveCount(3);
+    const lamp = { name: "Lamp", x: 0.3, y: 0.6 };
+    const all = [pins[0]!, lamp, pins[1]!];
+    for (const [index, { name }] of all.entries()) {
+      await expect(hotspots.nth(index)).toHaveAccessibleName(name);
+      await expect(hotspots.nth(index)).toBeVisible();
+    }
+    await expect.poll(async () => Math.max(...(await misses(page, all)))).toBeLessThan(0.5);
+    await hotspots.first().focus();
+    for (const name of ["Lamp", "Books"]) {
+      await page.keyboard.press("Tab");
+      await expect(page.locator(`[data-pin="${name}"]`)).toBeFocused();
+    }
     expect(errors).toEqual([]);
   });
 }

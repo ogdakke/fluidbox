@@ -107,4 +107,57 @@ const unnamed = createFluidbox({
   },
 });
 
-Object.assign(window, { hotspotsFixture: { boxes, pins, unnamed } });
+/** What a `custom` box draws: its own `<img>`, or none, in a 3:2 box. */
+export interface CustomBox {
+  /** The image's `object-fit`. @default "contain" */
+  readonly fit?: string;
+  /** The image's `object-position`. */
+  readonly position?: string;
+  /** The box's padding. */
+  readonly padding?: string;
+  /** No image: a canvas, which the pins don't measure. */
+  readonly noMedia?: boolean;
+  /** The image's width and height attributes. */
+  readonly declared?: readonly [number, number];
+  /** @default the room photo */
+  readonly src?: string;
+}
+
+/** A viewer of one 3:2 slide that draws an image of its own as `options` say. */
+const custom = (options: CustomBox): Fluidbox =>
+  createFluidbox({
+    items: [room("custom", { width: 1500, height: 1000 })],
+    slides: {
+      room: (slide) => {
+        const { media } = slide;
+        media.style.padding = options.padding ?? "";
+        const drawn = document.createElement(options.noMedia ? "canvas" : "img");
+        if (drawn instanceof HTMLImageElement) {
+          drawn.alt = "";
+          drawn.src = options.src ?? image.src;
+          if (options.declared) [drawn.width, drawn.height] = options.declared;
+        }
+        Object.assign(drawn.style, {
+          display: "block",
+          width: "100%",
+          height: "100%",
+          objectFit: options.fit ?? "contain",
+          objectPosition: options.position ?? "",
+        });
+        drawn.dataset.custom = "";
+        media.append(drawn);
+        slide.zoomable(true);
+        for (const { name, ...point } of pins) {
+          const pin = slide.hotspot(point);
+          pin.className = "hotspot-pin";
+          pin.setAttribute("aria-label", name);
+          pin.dataset.pin = name;
+        }
+        // Taken out before the hotspots' code is in: it stays out.
+        slide.hotspot({ x: "10%", y: "10%" }).remove();
+        return () => drawn.remove();
+      },
+    },
+  });
+
+Object.assign(window, { hotspotsFixture: { boxes, pins, unnamed, custom } });

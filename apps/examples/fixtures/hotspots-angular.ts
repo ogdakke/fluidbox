@@ -1,12 +1,12 @@
 import "@angular/compiler";
 import { mountSite } from "../src/site";
-import { Component, provideZonelessChangeDetection } from "@angular/core";
+import { Component, provideZonelessChangeDetection, signal } from "@angular/core";
 import { bootstrapApplication } from "@angular/platform-browser";
 import { FluidboxModule } from "@ogdakke/fluidbox/angular";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
 import "./hotspots.css";
-import { rooms } from "./hotspot-items";
+import { rooms, withLamp } from "./hotspot-items";
 
 mountSite("fixtures", {
   fixture: "Angular hotspots · button[fluidboxHotspot] pins inside fluidboxMedia",
@@ -27,8 +27,8 @@ mountSite("fixtures", {
       <ng-template fluidboxSlide="room" let-item>
         <ng-template fluidboxMedia>
           <fluidbox-image [item]="item.image" />
-          @for (part of item.parts; track part.id; let first = $first) {
-            @if (first) {
+          @for (part of parts(); track part.id) {
+            @if (part.id !== "books") {
               <button
                 fluidboxHotspot
                 [x]="part.x"
@@ -61,6 +61,11 @@ mountSite("fixtures", {
 })
 class Hotspots {
   readonly rooms = rooms;
+  readonly parts = signal(rooms[0]!.parts);
+
+  constructor() {
+    window.addLamp = () => this.parts.update(withLamp);
+  }
 }
 
 document.querySelector("#root")!.append(document.createElement("angular-hotspots"));
