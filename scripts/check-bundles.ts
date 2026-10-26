@@ -206,7 +206,7 @@ const reachableJsGzipLimits: Record<Entry, number> = {
   "solid-spin": 54_800,
   "vue-embed": 56_300,
   "vue-model": 55_800,
-  "vue-spin": 55_600,
+  "vue-spin": 55_650,
   "angular-embed": 58_100,
   "angular-model": 57_550,
   "angular-spin": 57_400,

@@ -25,10 +25,9 @@ export class FluidboxReachEndEvent<_TItem extends FluidboxItem = FluidboxItem> e
  */
 export function reachEnd(controller: SessionController<any>): boolean {
   const { status, value, index, count } = controller.state;
-  // A threshold that isn't a number from 0 up, or a numeric string, is the default.
+  // A threshold that isn't a finite number from 0 up is the default.
   const given = controller.reachEndThreshold?.();
-  const number = given === "" || given == null ? NaN : Number(given);
-  const threshold = number >= 0 && number < Infinity ? number : 2;
+  const threshold = typeof given === "number" && given >= 0 && given < Infinity ? given : 2;
   if (status !== "open" || value === null || index === null || index < count - 1 - threshold) {
     return false;
   }

@@ -368,6 +368,11 @@ const Root = defineComponent(
       return zoom === false ? false : zoom ? { ...toRaw(zoom) } : undefined;
     };
     const dismissOption = () => props.dismiss && { ...toRaw(props.dismiss) };
+    // An attribute gives a string: "3" is 3.
+    const threshold = () => {
+      const given = props.reachEndThreshold as unknown;
+      return given === "" || given == null ? undefined : Number(given);
+    };
 
     // findTrigger and revealTrigger are read from the newest props on each use.
     const fluidbox = createFluidbox<TItem>(
@@ -380,7 +385,7 @@ const Root = defineComponent(
           preload: props.preload,
           dismiss: dismissOption(),
           wheel: props.wheel,
-          reachEndThreshold: props.reachEndThreshold,
+          reachEndThreshold: threshold(),
           // Share shares the item's href unless shareUrl says otherwise.
           shareUrl: (item) => (props.shareUrl ? props.shareUrl(item) : props.href?.(idOf(item))),
           // Slides are looked up by type as one mounts, so the Slides part's
@@ -472,7 +477,6 @@ const Root = defineComponent(
           props.loop,
           props.preload,
           props.wheel,
-          props.reachEndThreshold,
         ]),
       () =>
         fluidbox.update({
@@ -482,8 +486,12 @@ const Root = defineComponent(
           preload: props.preload,
           dismiss: dismissOption(),
           wheel: props.wheel,
-          reachEndThreshold: props.reachEndThreshold,
         }),
+    );
+    // On its own, as it changes nothing the viewer shows.
+    watch(
+      () => props.reachEndThreshold,
+      () => fluidbox.update({ reachEndThreshold: threshold() }),
     );
 
     const events = new AbortController();

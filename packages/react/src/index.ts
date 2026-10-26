@@ -462,10 +462,13 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
         preload,
         dismiss: dismissOption(),
         wheel,
-        reachEndThreshold: props.reachEndThreshold,
       });
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [fluidbox, labelsKey, zoomKey, dismissKey, loop, preload, wheel, props.reachEndThreshold]);
+  }, [fluidbox, labelsKey, zoomKey, dismissKey, loop, preload, wheel]);
+  // On its own, as it changes nothing the viewer shows.
+  useIsomorphicLayoutEffect(() => {
+    fluidbox.update({ reachEndThreshold: props.reachEndThreshold });
+  }, [fluidbox, props.reachEndThreshold]);
 
   useIsomorphicLayoutEffect(() => {
     const events = new AbortController();

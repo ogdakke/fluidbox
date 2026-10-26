@@ -856,16 +856,14 @@ describe("reachend", () => {
     await vi.waitFor(() => expect(reached).toEqual([["photo-7", 7, 10]]));
   });
 
-  it("takes a numeric string for the threshold, and the default for one that isn't a number", async () => {
-    const { fluidbox, reached } = lazy(10, { reachEndThreshold: "4" as unknown as number });
-    await fluidbox.open(5);
-    expect(reached).toEqual([["photo-5", 5, 10]]);
-    const nan = lazy(10, { reachEndThreshold: Number.NaN });
-    await nan.fluidbox.open(0);
-    await nan.fluidbox.open(6);
-    expect(nan.reached).toEqual([]);
-    await nan.fluidbox.open(7);
-    expect(nan.reached).toEqual([["photo-7", 7, 10]]);
+  it("takes the default for a threshold that isn't a finite number from 0 up", async () => {
+    for (const given of ["4", true, [4], Number.NaN, -1, Infinity, null]) {
+      const { fluidbox, reached } = lazy(10, { reachEndThreshold: given as unknown as number });
+      await fluidbox.open(6);
+      expect(reached).toEqual([]);
+      await fluidbox.open(7);
+      expect(reached).toEqual([["photo-7", 7, 10]]);
+    }
   });
 
   it("never fires with loop", async () => {
