@@ -1165,8 +1165,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         this.#complete(opening ? "open" : "move", idOf(item), opening ? null : from, reason);
       }
       this.#finish(operation, completed(changed));
-      // Once the move is done, so a handler's new items don't interrupt it.
-      this.#viewer?.reachEnd();
+      // Once the move is done, so a handler's new items don't interrupt it,
+      // and not while a valuechangecomplete handler's own move is on its way.
+      if (!this.#pending) this.#viewer?.reachEnd();
     });
     return operation.promise;
   }

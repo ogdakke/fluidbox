@@ -841,6 +841,21 @@ describe("reachend", () => {
     ]);
   });
 
+  it("waits for a move a valuechangecomplete handler starts", async () => {
+    const { fluidbox, reached, driver } = lazy(10, {}, false);
+    const opening = fluidbox.open(5);
+    for (const step of driver.steps) step.resolve();
+    await opening;
+    fluidbox.addEventListener("valuechangecomplete", () => void fluidbox.next(), { once: true });
+    const moving = fluidbox.next();
+    driver.steps.at(-1)!.resolve();
+    await moving;
+    // On its way to photo-7, from photo-6: not there yet.
+    expect(reached).toEqual([]);
+    driver.steps.at(-1)!.resolve();
+    await vi.waitFor(() => expect(reached).toEqual([["photo-7", 7, 10]]));
+  });
+
   it("takes a numeric string for the threshold, and the default for one that isn't a number", async () => {
     const { fluidbox, reached } = lazy(10, { reachEndThreshold: "4" as unknown as number });
     await fluidbox.open(5);
