@@ -20,6 +20,7 @@ import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/react";
 import { Model } from "@ogdakke/fluidbox/react/model";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "React slides · content that suspends, holds the open, or plays on its own",
@@ -52,9 +53,7 @@ const fixture = {
   /** The controlled value of the model viewer, which the test can set. */
   setModelValue: undefined as ((value: string | null) => void) | undefined,
 };
-/** Each reachend the growing gallery heard: its value, index and count. */
-const reachEnds: [string, number, number][] = [];
-Object.assign(window, { reactSlides: fixture, reachEnds });
+Object.assign(window, { reactSlides: fixture });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -179,25 +178,20 @@ function ControlledModel() {
   );
 }
 
-/** The first `count` photos of a gallery that grows, the same objects each time. */
-const grown: FluidboxImageItem[] = [];
-const growing = (count: number) => {
-  for (let index = grown.length; index < count; index++) {
-    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
-  }
-  return grown.slice(0, count);
-};
-
 /** A gallery that appends four photos each time the viewer nears its end. */
 function Growing() {
-  const [items, setItems] = useState(() => growing(4));
+  const [count, setCount] = useState(4);
+  const [threshold, setThreshold] = useState(1);
+  growth.setCount = setCount;
+  growth.setThreshold = setThreshold;
+  const items = growingPhotos(count);
   return (
     <Fluidbox.Root
       items={items}
-      reachEndThreshold={1}
-      onReachEnd={({ value, index, count }) => {
-        reachEnds.push([value, index, count]);
-        setItems(growing(count + 4));
+      reachEndThreshold={threshold}
+      onReachEnd={(event) => {
+        const next = reached(event);
+        if (next) setCount(next);
       }}
     >
       <Grid items={items} id="growing" />

@@ -6,6 +6,7 @@ import "@ogdakke/fluidbox/elements/model";
 import "@ogdakke/fluidbox/elements/spin";
 import "./media.css";
 import "./elements-slides.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Custom elements · slide templates, the parts, and the add-ons read from markup",
@@ -17,8 +18,6 @@ declare global {
     defineModelViewer: () => void;
     /** The gallery events, in order: `type value`. */
     galleryEvents: string[];
-    /** Each reachend the growing gallery heard: its value, index and count. */
-    reachEnds: [string, number, number][];
   }
 }
 
@@ -45,21 +44,21 @@ for (const gallery of document.querySelectorAll("fluidbox-gallery")) {
   }
 }
 
-/** Append photos to the growing gallery, up to `count` items. */
+/** The growing gallery: its first `count` photos, as items in its markup. */
 const growing = document.querySelector<HTMLElementTagNameMap["fluidbox-gallery"]>("#growing")!;
-const grow = (count: number) => {
-  for (let index = growing.children.length; index < count; index++) {
-    const src = index % 2 ? "/photo-portrait.svg" : "/photo-square.svg";
+growth.setCount = (count) => {
+  const photos = growingPhotos(count);
+  while (growing.children.length > count) growing.lastElementChild!.remove();
+  for (const photo of photos.slice(growing.children.length)) {
     const item = document.createElement("fluidbox-item");
-    item.setAttribute("value", `grow-${index}`);
-    item.innerHTML = `<button slot="trigger" type="button" data-item="grow-${index}"><img src="${src}" alt="Photo grow-${index}" width="160" height="160" /></button><template slot="content"><img src="${src}" alt="Photo grow-${index}" width="800" height="800" /></template>`;
+    item.setAttribute("value", photo.id!);
+    item.innerHTML = `<button slot="trigger" type="button" data-item="${photo.id}"><img src="${photo.src}" alt="${photo.alt}" width="160" height="160" /></button><template slot="content"><img src="${photo.src}" alt="${photo.alt}" width="${photo.width}" height="${photo.height}" /></template>`;
     growing.append(item);
   }
 };
-grow(4);
-window.reachEnds = [];
+growth.setThreshold = (threshold) => (growing.reachEndThreshold = threshold);
+growth.setCount(4);
 growing.addEventListener("reachend", (event) => {
-  const { value, index, count } = event;
-  window.reachEnds.push([value, index, count]);
-  grow(count + 4);
+  const next = reached(event);
+  if (next) growth.setCount(next);
 });

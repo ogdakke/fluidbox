@@ -21,6 +21,7 @@ import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/solid";
 import "@ogdakke/fluidbox/baseline.css";
 import "@ogdakke/fluidbox/thumbnails.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Solid slides · content that suspends, holds the open, or plays on its own",
@@ -67,9 +68,7 @@ const fixture = {
   /** How many times each slide reported mounting its content. */
   mounted: {} as Record<string, number>,
 };
-/** Each reachend the growing gallery heard: its value, index and count. */
-const reachEnds: [string, number, number][] = [];
-Object.assign(window, { solidSlides: fixture, reachEnds });
+Object.assign(window, { solidSlides: fixture });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -222,25 +221,20 @@ function HeldViewer() {
   );
 }
 
-/** The first `count` photos of a gallery that grows, the same objects each time. */
-const grown: FluidboxImageItem[] = [];
-const growing = (count: number) => {
-  for (let index = grown.length; index < count; index++) {
-    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
-  }
-  return grown.slice(0, count);
-};
-
 /** A gallery that appends four photos each time the viewer nears its end. */
 function Growing() {
-  const [items, setItems] = createSignal(growing(4));
+  const [count, setCount] = createSignal(4);
+  const [threshold, setThreshold] = createSignal(1);
+  growth.setCount = setCount;
+  growth.setThreshold = setThreshold;
+  const items = () => growingPhotos(count());
   return (
     <Fluidbox.Root
       items={items()}
-      reachEndThreshold={1}
-      onReachEnd={({ value, index, count }) => {
-        reachEnds.push([value, index, count]);
-        setItems(growing(count + 4));
+      reachEndThreshold={threshold()}
+      onReachEnd={(event) => {
+        const next = reached(event);
+        if (next) setCount(next);
       }}
     >
       <Grid items={items()} id="growing" />

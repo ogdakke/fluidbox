@@ -23,6 +23,7 @@ import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/vue";
 import { Embed } from "@ogdakke/fluidbox/vue/embed";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Vue slides · content that suspends, holds the open, or plays on its own",
@@ -55,9 +56,7 @@ const fixture = {
   /** The v-model of the viewer that cancels swipes. */
   model: () => null as string | null,
 };
-/** Each reachend the growing gallery heard: its value, index and count. */
-const reachEnds: [string, number, number][] = [];
-Object.assign(window, { vueSlides: fixture, reachEnds });
+Object.assign(window, { vueSlides: fixture });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -221,32 +220,29 @@ const Guarded = defineComponent(() => {
     );
 });
 
-/** The first `count` photos of a gallery that grows, the same objects each time. */
-const grown: FluidboxImageItem[] = [];
-const growing = (count: number) => {
-  for (let index = grown.length; index < count; index++) {
-    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
-  }
-  return grown.slice(0, count);
-};
-
 // A gallery that appends four photos each time the viewer nears its end, as
 // `<Fluidbox.Root :reach-end-threshold="1" @reach-end="more">` compiles.
 const Growing = defineComponent(() => {
-  const items = shallowRef(growing(4));
-  return () =>
-    h(
+  const count = shallowRef(4);
+  // A string, as a static `reach-end-threshold="1"` attribute gives.
+  const threshold = shallowRef<number | string>("1");
+  growth.setCount = (next) => (count.value = next);
+  growth.setThreshold = (next) => (threshold.value = next);
+  return () => {
+    const items = growingPhotos(count.value);
+    return h(
       Fluidbox.Root,
       {
-        items: items.value,
-        reachEndThreshold: 1,
-        onReachEnd: ({ value, index, count }: FluidboxReachEndEvent) => {
-          reachEnds.push([value, index, count]);
-          items.value = growing(count + 4);
+        items,
+        reachEndThreshold: threshold.value as number,
+        onReachEnd: (event: FluidboxReachEndEvent) => {
+          const next = reached(event);
+          if (next) count.value = next;
         },
       },
-      () => h(Grid, { items: items.value, id: "growing" }),
+      () => h(Grid, { items, id: "growing" }),
     );
+  };
 });
 
 const App = defineComponent(() => {

@@ -3,6 +3,7 @@ import { mountSite } from "../src/site";
 import {
   Component,
   Input,
+  computed,
   provideZonelessChangeDetection,
   signal,
   ɵDEFER_BLOCK_DEPENDENCY_INTERCEPTOR as DEFER_BLOCK_DEPENDENCY_INTERCEPTOR,
@@ -19,6 +20,7 @@ import type {
 import { FluidboxModule, injectFluidboxSlide } from "@ogdakke/fluidbox/angular";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
+import { growingPhotos, growth, reached } from "./growing";
 
 mountSite("fixtures", {
   fixture: "Angular slides · content that defers, holds the open, or plays on its own",
@@ -66,9 +68,7 @@ const fixture = {
   /** The items of the held viewer, which the test can change. */
   setHeldItems: undefined as ((items: FluidboxItem[]) => void) | undefined,
 };
-/** Each reachend the growing gallery heard: its value, index and count. */
-const reachEnds: [string, number, number][] = [];
-Object.assign(window, { angularSlides: fixture, reachEnds });
+Object.assign(window, { angularSlides: fixture });
 
 const photo = (id: string, src: string): FluidboxImageItem => ({
   type: "image",
@@ -79,15 +79,6 @@ const photo = (id: string, src: string): FluidboxImageItem => ({
   height: 800,
 });
 const photos = [photo("one", "/photo-square.svg"), photo("two", "/photo-portrait.svg")];
-
-/** The first `count` photos of a gallery that grows, the same objects each time. */
-const grown: FluidboxImageItem[] = [];
-const growing = (count: number) => {
-  for (let index = grown.length; index < count; index++) {
-    grown.push(photo(`grow-${index}`, index % 2 ? "/photo-portrait.svg" : "/photo-square.svg"));
-  }
-  return grown.slice(0, count);
-};
 
 /** A viewer of parts: the second photo's file is missing. */
 const parted: FluidboxImageItem[] = [
@@ -266,7 +257,12 @@ class Reel implements OnInit {
       </ng-template>
     </div>
     <h2>A gallery that grows as the viewer nears its end</h2>
-    <div fluidboxRoot [items]="growing()" reachEndThreshold="1" (reachEnd)="grow($event)">
+    <div
+      fluidboxRoot
+      [items]="growing()"
+      [reachEndThreshold]="threshold()"
+      (reachEnd)="grow($event)"
+    >
       <app-grid [items]="growing()" id="growing" />
     </div>
     <h2>A slide that holds the open</h2>
@@ -307,16 +303,21 @@ class Slides {
   readonly reels = reels;
   readonly held = signal<FluidboxItem[]>([custom("held", "held-a"), custom("held", "held-b")]);
 
-  readonly growing = signal(growing(4));
+  readonly count = signal(4);
+  readonly growing = computed(() => growingPhotos(this.count()));
+  // A string at first, as a static reachEndThreshold="1" attribute gives.
+  readonly threshold = signal<number | string>("1");
 
   constructor() {
     fixture.setHeldItems = (items) => this.held.set(items);
+    growth.setCount = (count) => this.count.set(count);
+    growth.setThreshold = (threshold) => this.threshold.set(threshold);
   }
 
   /** Append four photos as the viewer nears the end. */
-  grow({ value, index, count }: FluidboxReachEndEvent): void {
-    reachEnds.push([value, index, count]);
-    this.growing.set(growing(count + 4));
+  grow(event: FluidboxReachEndEvent): void {
+    const next = reached(event);
+    if (next) this.count.set(next);
   }
 }
 

@@ -472,6 +472,7 @@ const Root = defineComponent(
           props.loop,
           props.preload,
           props.wheel,
+          props.reachEndThreshold,
         ]),
       () =>
         fluidbox.update({
@@ -481,6 +482,7 @@ const Root = defineComponent(
           preload: props.preload,
           dismiss: dismissOption(),
           wheel: props.wheel,
+          reachEndThreshold: props.reachEndThreshold,
         }),
     );
 
@@ -488,11 +490,6 @@ const Root = defineComponent(
     const { signal } = events;
     fluidbox.addEventListener("zoomchange", (event) => emit("zoomChange", event), { signal });
     fluidbox.addEventListener("mediaerror", (event) => emit("mediaError", event), { signal });
-    // How near the end reachend fires, and the event.
-    watch(
-      () => props.reachEndThreshold,
-      (reachEndThreshold) => fluidbox.update({ reachEndThreshold }),
-    );
     fluidbox.addEventListener("reachend", (event) => emit("reachEnd", event), { signal });
     fluidbox.addEventListener("sheetchange", (event) => (sheetSnap.value = event.snap), {
       signal,

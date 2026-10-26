@@ -1,6 +1,7 @@
 import { controlSelector, drawViewerLayer } from "./viewer-layer";
 import { idOf, itemLabel } from "./items";
 import { FluidboxMediaErrorEvent, type FluidboxOptions } from "./public-api";
+import { reachEnd } from "./reach-end-event";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
@@ -193,6 +194,8 @@ export class DomViewerDriver<
   #loop = false;
   #portalDispose: FluidboxDispose | undefined;
   #source: FluidboxSource<TItem> | undefined;
+  /** Whether `reachend` fired for this item count. */
+  #reachedEnd = false;
   #extensions: FluidboxExtensionInstance<TItem>[] = [];
   /** Aborted when the mounted extensions are replaced. */
   #extensionLifetime: AbortController | undefined;
@@ -688,6 +691,8 @@ export class DomViewerDriver<
   }
 
   setSource(source: FluidboxSource<TItem>) {
+    // A new count re-arms reachend.
+    if (source.count !== this.#source?.count) this.#reachedEnd = false;
     this.#source = source;
     for (const extension of this.#extensions) extension.setSource?.(source);
     this.#discardPreparation();
@@ -729,6 +734,13 @@ export class DomViewerDriver<
     };
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
+  }
+
+  /** Fire `reachend` once per item count, when an open or a move settles near the end. */
+  reachEnd() {
+    if (this.#controller && !this.#reachedEnd && !this.#loop) {
+      this.#reachedEnd = reachEnd(this.#controller);
+    }
   }
 
   revealed() {

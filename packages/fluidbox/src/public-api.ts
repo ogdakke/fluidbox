@@ -1,3 +1,4 @@
+import type { FluidboxReachEndEvent } from "./reach-end-event";
 import type { FluidboxLabels } from "./labels";
 
 export type { FluidboxLabels } from "./labels";
@@ -642,22 +643,8 @@ export class FluidboxMediaErrorEvent<TItem extends FluidboxItem = FluidboxItem> 
   }
 }
 
-// The item type keeps it in step with the other events, which carry the item.
-/** The open item came within `reachEndThreshold` of the last: time to load more. */
-export class FluidboxReachEndEvent<_TItem extends FluidboxItem = FluidboxItem> extends Event {
-  // Declared, as the constructor sets them: a field would cost bytes in every entry.
-  declare readonly value: string;
-  declare readonly index: number;
-  /** The item count it fired for. It fires once per count. */
-  declare readonly count: number;
-
-  constructor(type: "reachend", init: EventInit & { value: string; index: number; count: number }) {
-    super(type, init);
-    this.value = init.value;
-    this.index = init.index;
-    this.count = init.count;
-  }
-}
+// Its own module, which only the viewer imports, so it stays out of the initial chunk.
+export { FluidboxReachEndEvent } from "./reach-end-event";
 
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   /** Before an open, a move or a close. Cancelable: the command resolves false. */
