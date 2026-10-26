@@ -12,6 +12,7 @@ declare global {
       setHeldItems?: (items: unknown[]) => void;
       loadModels: () => Promise<unknown>;
       setModelValue?: (value: string | null) => void;
+      setSlideshow?: (slideshow: { interval?: number } | undefined) => void;
     };
   }
 }
@@ -213,4 +214,27 @@ test("a live model card opens on its view, and a value of null brings the slide'
 test("Slideshow plays and pauses, and is named for what it does next", async ({ page }) => {
   await load(page);
   await expectSlideshowPart(page, "#slideshow");
+});
+
+test("useFluidbox reads playing, and the slideshow prop shows and hides the part", async ({
+  page,
+}) => {
+  await load(page);
+  const output = page.locator('#slideshow ~ output[data-test="playing"]');
+  await page.locator("#slideshow [data-item]").first().click();
+  await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
+  await expect(output).toHaveText("false");
+  const part = page.locator(`${dialog} [data-test="slideshow-text"]`);
+  await part.focus();
+  await page.keyboard.press("Enter");
+  await expect(output).toHaveText("true");
+  // Without the prop it plays on, and the part stays to stop it.
+  await page.evaluate(() => window.reactSlides.setSlideshow!(undefined));
+  await expect(part).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(output).toHaveText("false");
+  await expect(part).toBeHidden();
+  await page.evaluate(() => window.reactSlides.setSlideshow!({ interval: 60_000 }));
+  await expect(part).toBeVisible();
+  await expect(part).toHaveText("Play slideshow");
 });

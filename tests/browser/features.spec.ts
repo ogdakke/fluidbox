@@ -88,11 +88,14 @@ test.describe("headless controls", () => {
     await open(page, "one");
     const control = page.locator(`${dialog} [data-fluidbox-fullscreen]`);
     await expect(control).toHaveText("Enter full screen");
+    await expect(control).not.toHaveAttribute("data-active");
     await control.click();
     await expect(control).toHaveText("Exit full screen");
+    await expect(control).toHaveAttribute("data-active", "");
     await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute("data-fullscreen", "");
     await control.click();
     await expect(control).toHaveText("Enter full screen");
+    await expect(control).not.toHaveAttribute("data-active");
   });
 
   test("bindControl makes the page's own elements controls", async ({ page }) => {

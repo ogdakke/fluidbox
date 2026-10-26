@@ -75,6 +75,28 @@ test.describe("slideshow", () => {
     await expect(page.locator(control)).toHaveText("Play slideshow");
   });
 
+  test("an update of the option while it plays", async ({ page }) => {
+    await load(page);
+    await open(page);
+    await play(page);
+    // A new interval counts from the next move.
+    await page.evaluate(() =>
+      window.slideshowFixture.fluidbox.update({ slideshow: { interval: 1000 } }),
+    );
+    await tick(page, 5100);
+    await expect.poll(() => value(page)).toBe("two");
+    await tick(page, 1100);
+    await expect.poll(() => value(page)).toBe("three");
+    // Without the option it plays on, and the control stays to stop it.
+    await page.evaluate(() => window.slideshowFixture.fluidbox.update({ slideshow: undefined }));
+    expect(await playing(page)).toBe(true);
+    await expect(page.locator(control)).toBeVisible();
+    await expect(page.locator(control)).toHaveText("Pause slideshow");
+    await page.locator(control).evaluate((button: HTMLElement) => button.click());
+    await expect.poll(() => playing(page)).toBe(false);
+    await expect(page.locator(control)).toBeHidden();
+  });
+
   test("goes round with loop", async ({ page }) => {
     await load(page, "?loop");
     await open(page, "four");
@@ -112,7 +134,6 @@ test.describe("slideshow", () => {
     await page.evaluate(() => window.slideshowFixture.release());
     await expect.poll(() => value(page)).toBe("held");
   });
-
   test("moves to a slide that is never ready after the interval again", async ({ page }) => {
     await load(page, "?held");
     await open(page);
@@ -156,12 +177,14 @@ test.describe("slideshow", () => {
     await expect(own).toHaveAttribute("data-active", "");
   });
 
-  test("hides without a slideshow option; play() still plays", async ({ page }) => {
+  test("hides without a slideshow option, but not while play() plays", async ({ page }) => {
     await load(page, "?noslideshow");
     await open(page);
     await expect(page.locator(control)).toBeHidden();
     await play(page);
     expect(await playing(page)).toBe(true);
+    await expect(page.locator(control)).toBeVisible();
+    await expect(page.locator(control)).toHaveText("Pause slideshow");
     await tick(page);
     await expect.poll(() => value(page)).toBe("two");
   });
@@ -176,7 +199,6 @@ test.describe("slideshow", () => {
       await tick(page, 20_000);
       expect(await value(page)).toBe("one");
     });
-
     test("on a key", async ({ page }) => {
       await load(page);
       await open(page);

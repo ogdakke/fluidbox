@@ -48,16 +48,22 @@ const zoomControl = (
 const closed = (state: FluidboxState<any>) => state.status === "closed";
 
 const action = (
-  attribute: "data-fluidbox-fullscreen" | "data-fluidbox-download" | "data-fluidbox-share",
+  attribute:
+    | "data-fluidbox-fullscreen"
+    | "data-fluidbox-download"
+    | "data-fluidbox-share"
+    | "data-fluidbox-slideshow",
   label: FluidboxControl["label"],
   hidden: NonNullable<FluidboxControl["hidden"]>,
   run: (fluidbox: Fluidbox<any>) => Promise<boolean>,
+  active?: FluidboxControl["active"],
 ): FluidboxControl => ({
   attribute,
   label,
   disabled: closed,
   hidden,
   run,
+  active,
 });
 
 /** Each default control's attribute, label, disabled rule and command. */
@@ -81,6 +87,7 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
     (labels, state) => (state?.fullscreen ? labels.exitFullscreen : labels.enterFullscreen),
     () => !canGoFullscreen(),
     (fluidbox) => fluidbox.setFullscreen(),
+    (state) => state.fullscreen,
   ),
   download: action(
     "data-fluidbox-download",
@@ -94,22 +101,22 @@ export const fluidboxControls: Readonly<Record<FluidboxControlName, FluidboxCont
     (fluidbox, state) => !state.item || !canShare() || !hostOf(fluidbox).shareLink(state.item),
     (fluidbox) => fluidbox.share(),
   ),
-  slideshow: {
-    attribute: "data-fluidbox-slideshow",
+  slideshow: action(
+    "data-fluidbox-slideshow",
     // The defaults live here, so only a page with the control carries them.
-    label: (labels, state) =>
+    (labels, state) =>
       state?.playing
         ? (labels.pauseSlideshow ?? "Pause slideshow")
         : (labels.playSlideshow ?? "Play slideshow"),
-    disabled: closed,
-    hidden: (fluidbox) => !hostOf(fluidbox).slideshow(),
-    active: (state) => state.playing,
-    run: (fluidbox) => {
+    // Without the option it hides, but never while it plays: it is how to stop.
+    (fluidbox, state) => !state.playing && !hostOf(fluidbox).slideshow(),
+    (fluidbox) => {
       if (fluidbox.state.playing) fluidbox.pause();
       else fluidbox.play();
       return Promise.resolve(true);
     },
-  },
+    (state) => state.playing,
+  ),
   // For an error of your own: it loads the slide on show again.
   retry: {
     attribute: "data-fluidbox-retry",

@@ -14,9 +14,10 @@ import type {
   FluidboxImageItem,
   FluidboxItem,
   FluidboxSlideOrigin,
+  FluidboxSlideshowOptions,
 } from "@ogdakke/fluidbox";
 import { modelItem } from "@ogdakke/fluidbox/model";
-import { Fluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/react";
+import { Fluidbox, useFluidbox, useFluidboxSlide } from "@ogdakke/fluidbox/react";
 import { Model } from "@ogdakke/fluidbox/react/model";
 import "@ogdakke/fluidbox/baseline.css";
 import "./media.css";
@@ -51,6 +52,10 @@ const fixture = {
   loadModels: () => import(/* @vite-ignore */ MODEL_VIEWER),
   /** The controlled value of the model viewer, which the test can set. */
   setModelValue: undefined as ((value: string | null) => void) | undefined,
+  /** The slideshow prop of the slideshow section, which the test can change. */
+  setSlideshow: undefined as
+    | ((slideshow: FluidboxSlideshowOptions | undefined) => void)
+    | undefined,
 };
 Object.assign(window, { reactSlides: fixture });
 
@@ -177,6 +182,33 @@ function ControlledModel() {
   );
 }
 
+/** Whether the slideshow plays, as the binding's own state says. */
+function Playing() {
+  const { playing } = useFluidbox();
+  return <output data-test="playing">{String(playing)}</output>;
+}
+
+/** A slideshow whose option the page's state owns. */
+function Slideshow() {
+  const [slideshow, setSlideshow] = useState<FluidboxSlideshowOptions | undefined>({
+    interval: 60_000,
+  });
+  fixture.setSlideshow = setSlideshow;
+  return (
+    <Fluidbox.Root items={photos} slideshow={slideshow}>
+      <Grid items={photos} id="slideshow" />
+      <Playing />
+      <Fluidbox.Viewer>
+        <Fluidbox.Slideshow data-test="slideshow-text" />
+        <Fluidbox.Slideshow data-test="slideshow-icon">
+          <svg aria-hidden="true" />
+        </Fluidbox.Slideshow>
+        <Fluidbox.Close />
+      </Fluidbox.Viewer>
+    </Fluidbox.Root>
+  );
+}
+
 function App() {
   return (
     <>
@@ -204,16 +236,7 @@ function App() {
         </Fluidbox.Viewer>
       </Fluidbox.Root>
       <h2>A slideshow, with a Slideshow of text and one with an icon</h2>
-      <Fluidbox.Root items={photos} slideshow={{ interval: 60_000 }}>
-        <Grid items={photos} id="slideshow" />
-        <Fluidbox.Viewer>
-          <Fluidbox.Slideshow data-test="slideshow-text" />
-          <Fluidbox.Slideshow data-test="slideshow-icon">
-            <svg aria-hidden="true" />
-          </Fluidbox.Slideshow>
-          <Fluidbox.Close />
-        </Fluidbox.Viewer>
-      </Fluidbox.Root>
+      <Slideshow />
       <h2>A slide that suspends</h2>
       <Fluidbox.Root items={[custom("lazy", "lazy")]}>
         <Grid items={[custom("lazy", "lazy")]} id="lazy" />
