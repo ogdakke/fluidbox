@@ -133,3 +133,12 @@ The fixes after the live thumbnail's review moved every core entry by about 70 B
 - **The model add-on** gives a live model its own accessibility back when its trigger is unbound or it leaves the trigger, undoing exactly what it changed, and drops a slide's snapshot when the slide leaves, so a slide that comes back shows its own view, not a stale picture. React model and Vue model grew about 270 B initial with it and the core's change.
 
 Merging the live 3D thumbnail into the redesign with every binding moved each entry by what that branch measured on its own base: about 310 B initial and 450 B activation in the core (the trigger's origin getters, the drag slop and the trigger hooks), and about 1.2 KB more in each model entry (the model add-on's quieting, its undo and the snapshot). The limits moved by the rule.
+
+On 2026-10-26 hotspots (step 7) moved the entries, against the redesign at 6998382:
+
+- **Activation, in the viewer: about 148 B on every entry.** `slide.hotspot()`, the slide's lazy hotspot layer and the hook the bindings reach through the kit's `slideHotspots`, about 140 B in the viewer chunk, and 6 B in the zoom chunk, where a mouse press on a hotspot doesn't pan.
+- **On demand: a `hotspots` chunk of about 1,285 B,** loaded the first time a slide calls `hotspot()`, so a viewer without hotspots never does. It sizes the layer to the painted media (`object-fit`, `object-position`), lays it out again as the box resizes and its media loads, places each pin, and pans a zoomed image to a focused pin.
+- **Initial, in each binding: its `Hotspot` part.** React +149 B (17,642 B), Solid +175 B (17,433 B), Vue +178 B (18,101 B), Angular +196 B (19,819 B, `button[fluidboxHotspot]`); their add-on entries moved by the same. The custom elements' initial chunk is unchanged: `<fluidbox-hotspot>` lives in the parts chunk, about 85 B of its 232 B activation growth.
+- **CSS: 77 B,** to 2,887 B: the layer, the pins' counter-scale under zoom and their hiding during flights.
+
+The limits it crossed moved by the rule: the measurement plus 40 B, rounded up to 50 B.
