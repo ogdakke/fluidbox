@@ -246,3 +246,47 @@ test("a viewer without hotspots never loads their code", async ({ page }) => {
   await expect(page.locator(pin)).toHaveCount(3);
   expect(loaded.length).toBeGreaterThan(0);
 });
+
+test("a mouse press on a hotspot of a zoomed photo doesn't pan it", async ({ page }) => {
+  await open(page, "room");
+  await zoomTo(page, "room", 2);
+  // Where the photo is on the screen: a pan would move it.
+  const photo = page.locator(
+    `${dialog} [data-fluidbox-drawn], [data-fluidbox-zoom-viewport] [data-fluidbox-drawn]`,
+  );
+  const scroll = async () => {
+    const { x, y } = (await photo.first().boundingBox())!;
+    return [Math.round(x), Math.round(y)];
+  };
+  // Once the zoom has settled: the photo still, and the pin on it.
+  const plant = page.locator('[data-pin="Plant"]');
+  let last = "";
+  await expect
+    .poll(async () => {
+      const now = JSON.stringify([await photo.first().boundingBox(), await plant.boundingBox()]);
+      const settled = now === last;
+      last = now;
+      return settled;
+    })
+    .toBe(true);
+  const box = (await plant.boundingBox())!;
+  expect(
+    await page.evaluate(
+      ([x, y]) =>
+        document.elementFromPoint(x!, y!)?.closest("[data-pin]")?.getAttribute("data-pin"),
+      [box.x + box.width / 2, box.y + box.height / 2],
+    ),
+  ).toBe("Plant");
+  const before = await scroll();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 150, box.y - 100, { steps: 6 });
+  await page.mouse.up();
+  // Long enough for a zoom out the release set off to show.
+  await page.waitForTimeout(300);
+  // A pan would follow the mouse's 150 and 100 px, and a zoom out move it too.
+  const after = await scroll();
+  expect(Math.abs(after[0]! - before[0]!)).toBeLessThan(20);
+  expect(Math.abs(after[1]! - before[1]!)).toBeLessThan(20);
+  await expect(page.locator(dialog)).toHaveAttribute("data-zoomed", "");
+});
