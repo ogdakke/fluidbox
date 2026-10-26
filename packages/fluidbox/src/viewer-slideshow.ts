@@ -1,3 +1,4 @@
+import { idOf } from "./items";
 import type { FluidboxItem, FluidboxSlideshowOptions } from "./public-api";
 import type { SessionController } from "./runtime-types";
 
@@ -34,8 +35,8 @@ export class ViewerSlideshow {
   #timer: ReturnType<typeof setTimeout> | undefined;
   /** Ends the interval's wait for its next slide, once a pause, a hold or a move overtakes it. */
   #run: AbortController | undefined;
-  /** The item the interval belongs to: items set around it don't start it again. */
-  #item: FluidboxItem | null | undefined;
+  /** The id of the item the interval belongs to: items set around it, fresh objects or not, don't start it again. */
+  #item: string | undefined;
   /** The listeners for the tab and the videos, while it plays. */
   #watching: AbortController | undefined;
   readonly #viewer: SlideshowViewer;
@@ -60,7 +61,7 @@ export class ViewerSlideshow {
       (state?.status === "open" || state?.status === "opening") &&
       this.#next() !== null
     ) {
-      this.#item = state.item;
+      this.#item = state.item ? idOf(state.item) : undefined;
       this.#set(true);
     }
   }
@@ -103,8 +104,9 @@ export class ViewerSlideshow {
    * the interval starts again, and on the last without a loop, it stops.
    */
   moved(item: FluidboxItem) {
-    if (item === this.#item) return;
-    this.#item = item;
+    const id = idOf(item);
+    if (id === this.#item) return;
+    this.#item = id;
     this.#arm();
   }
 

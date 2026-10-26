@@ -184,6 +184,16 @@ test.describe("slideshow", () => {
     await tick(page, 1100);
     await expect.poll(() => value(page), { timeout: 1000 }).toBe("two");
     expect(await playing(page)).toBe(true);
+    // Fresh objects for the same ids, as items={data.map(...)} makes after an edit: the same slide.
+    await tick(page, 4000);
+    await page.evaluate(() => {
+      const { fluidbox, items } = window.slideshowFixture;
+      return fluidbox.setItems(
+        [...items, { ...items[0]!, id: "five" }].map((item) => ({ ...item, caption: "Updated" })),
+      );
+    });
+    await tick(page, 1100);
+    await expect.poll(() => value(page), { timeout: 1000 }).toBe("three");
   });
 
   test("an update of the option while it plays", async ({ page }) => {
