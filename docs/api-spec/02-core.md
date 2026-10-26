@@ -846,51 +846,79 @@ Thumbnails button, and on the server copy's slide:
 - `data-active` on the slide on show (§1.11) is what makes viewer-wide rules like the second
   example work.
 
-## 2.16 Motion speed (plan step 7)
+## 2.16 Motion speed (built in step 7)
 
-Flight timing is fixed today: the open is `OPEN_DURATION` 300 ms (`dom-viewer-driver.ts:60`), the
-close 220–480 ms by distance (`:819`), the drag release 140–220 ms (`:1914`), each with a spring
-`response` proportional to its duration (`:873`, `:1923`).
+Before step 7, flight timing was fixed: the open was `OPEN_DURATION` 300 ms
+(`dom-viewer-driver.ts:60`), the close 220–480 ms by distance (`:819`), the drag release
+140–220 ms (`:1914`), each with a spring `response` proportional to its duration (`:873`, `:1923`).
 
-One CSS custom property, `--fluidbox-motion-speed`: a number, default `1`, clamped to
-`0.25`–`4`. `2` is twice as fast. The driver reads it from the viewer root with one
-`getComputedStyle` when it plans a flight, a close, a release or a zoom animation, and divides
-every duration and spring `response` by it. Being CSS, it can change by breakpoint, theme or
-`:has()`. Reduced motion is unchanged: no flights, whatever the speed.
+`--fluidbox-motion-speed` is a number, default `1`, clamped to `0.25`–`4`. `2` is twice as fast.
+It divides the duration and spring `response` of the open, the close, a drag release, a zoom
+animation and a move between slides. Each motion reads it as it starts. Reduced motion is
+unchanged: no flights, whatever the speed. Being CSS, it can change by breakpoint, theme or
+`:has()`.
 
-One gap: a move between slides is the strip's native smooth scroll (`viewer-strip.ts:220`),
-whose duration the browser picks. At a speed other than 1, the strip drives that scroll with its
-own animation (`scrollLeft` per frame, 300 ms ÷ speed) and keeps scroll-snap for gestures.
+- **Documented as an `@input` in `styles.css`** (`@on Viewer`). It is not in `css-api.ts`,
+  which lists only the properties the runtime publishes.
+- **Where to set it.** As the viewer opens, it copies the `--fluidbox-*` custom properties from
+  around the trigger. So a value set on the page applies from the next open. A value set on the
+  viewer itself (`[data-fluidbox-viewer]`) applies at once, from the next motion.
+- **Moves between slides.** At speed 1 the strip uses the browser's smooth scroll, as before. At
+  any other speed the strip glides itself (300 ms ÷ speed) with scroll-snap off, and holds its
+  internal slide sync until it lands. The value events (`beforevaluechange`, `valuechange`,
+  `valuechangecomplete`) fire at the same points at every speed.
+- **A gesture ends a glide.** A `pointerdown`, a `touchstart` or a horizontal wheel stops the
+  glide, or a native smooth move, where it is, and the gesture carries on natively from there
+  with snapping back on. A vertical wheel never takes over a move in flight.
 
-Hook now: step 1.4 routes every duration through one `#duration(ms)` helper in the driver and the
-zoom engine, so step 7 changes one function.
-
-## 2.17 Hotspots (plan step 7)
+## 2.17 Hotspots (built in step 7)
 
 `<Fluidbox.Hotspot x="42%" y="30%">` inside `Media` (§3.18) marks a point on the media.
 
-- **Positioned against the painted content, not the box.** The runtime keeps a hotspot layer
-  inside the media box sized to the painted rectangle of the box's main `<img>` or `<video>`.
-  That rectangle comes from its natural size, `object-fit` and `object-position`, so a hotspot
-  stays on the product with `object-fit: contain` and in a fill box (§5.4). Without an image or
-  video, the layer is the box. `x` and `y` are percentages of that layer, or numbers in the
-  item's pixel space (`x={412}`), converted with `width` and `height`.
-- **Zoom.** The layer is inside the box, so it zooms with it. Pins keep their screen size by
-  `scale: calc(1 / var(--fluidbox-zoom-scale))`, a property the zoom engine sets on the box (hook
-  below). `scaleWithZoom` turns that off.
-- **Accessibility.** Each hotspot is a `<button>` with the app's content and an accessible name,
-  in DOM order inside the slide, which is reading order. Focusing a hotspot while zoomed pans it
-  into view. It stops pointer events from starting a pan or a dismiss
-  (`data-fluidbox-owns-input`).
-- **Flights.** Hotspots hide during the flights and fade in with the controls, so they don't fly
-  as a smear of small buttons.
-- Elements: `<fluidbox-hotspot x="42%" y="30%">` inside a slide template's media. Plain JS:
-  `slide.hotspot({ x, y, scaleWithZoom }): HTMLButtonElement`, which returns the positioned button
-  for the app to fill.
-
-Hook now: step 1.4 sets `--fluidbox-zoom-scale` on the media box on every pose (1 at rest), and
-keeps the box's children inside the element the zoom transforms. Both are true of the design in
-§5.1; the plan states them as requirements so step 1.4 doesn't drop them.
+- **No layer element.** Each hotspot is a `<button>` that its binding renders where the app puts
+  it, inside the media box (`Media`, `fluidboxMedia`, `<fluidbox-media>`). The runtime marks it
+  `data-fluidbox-hotspot`, gives it `type="button"` if it has none, and sets its `left` and `top`
+  as percentages of the box's padding box.
+- **Placed on the painted media, not the box.** The reference is the media the viewer drew
+  (`[data-fluidbox-drawn]`). Failing that, it is the first shown `<img>` or `<video>` that isn't
+  inside a hotspot or `aria-hidden`, and failing that, the box. The painted rectangle comes from
+  that media's shape, `object-fit` and `object-position`, so a hotspot stays on the product with
+  `object-fit: contain` and in a fill box (§5.4). Hotspots lay out again when the box or the
+  media resizes and when media loads.
+- **Coordinates.** `x` and `y` are `` `${number}%` `` of the painted media, or a number of
+  pixels (`FluidboxHotspotCoordinate`). Pixels count on the drawn media's declared `width` and
+  `height` attributes, when it has both. Otherwise they count on its natural size, and with no
+  media, on the item's `width` and `height`. A string without `%` (an attribute's `"412"`) is
+  pixels. An unreadable value puts the pin on the box's corner, never at `NaN`.
+- **The containing-block rule.** The box's `will-change` makes it the hotspots' containing
+  block. Nothing between a hotspot and the box may establish another one: no `position`,
+  `transform`, `filter` or `will-change`. Development builds warn when that is broken, when a
+  hotspot is outside its slide's box, and when a hotspot has no accessible name. These are
+  warnings and never throw.
+- **Zoom.** The pins are inside the box, so they zoom with it. Each is centred on its point
+  (`translate: -50% -50%`) and keeps its screen size by `scale: calc(1 / var(--fluidbox-zoom-scale, 1))`.
+  The zoom engine sets `--fluidbox-zoom-scale` on the box. `scaleWithZoom` sets
+  `data-scale-with-zoom`, which turns the counter-scale off.
+- **Hidden through the chrome.** A pin stays hidden until it is first placed. Pins are hidden
+  during flights and drag-dismiss, and fade in with the controls.
+- **Focus.** When a hotspot takes keyboard focus (`:focus-visible`) on a zoomed image and is
+  outside the stage, the image pans to put it in the middle. Pointer focus doesn't pan, since a
+  pan under a press would take its click away. The pan is smooth, and instant under reduced
+  motion.
+- **Input.** A hotspot owns its input (`data-fluidbox-owns-input`), so a pointer on it doesn't
+  start a pan or a dismiss. A press that begins on content owning its input (a hotspot, a live
+  model) and ends outside it does nothing: no zoom and no close.
+- **On demand.** The code is its own chunk, about 1,320 B gzip, loaded the first time a slide
+  adds a hotspot. It is not part of the viewer chunk (§8.24).
+- **Surface.**
+  - Plain JS: `slide.hotspot({ x, y, scaleWithZoom }): HTMLButtonElement` returns the button
+    for the app to fill.
+  - Bindings call kit's `placeHotspot(slide, button, options)`, and again whenever the options
+    change.
+  - Elements: `<fluidbox-hotspot x y scale-with-zoom>` inside a slide template's media becomes
+    the hotspot button, keeping its other attributes and its children. `scale-with-zoom="false"`
+    reads as false.
+  - CSS API: `[data-fluidbox-hotspot]`, `[data-scale-with-zoom]` and `--fluidbox-zoom-scale`.
 
 ## 2.18 The zoom pose hook, and deep zoom (deep zoom after 1.0)
 
@@ -934,71 +962,89 @@ the pyramid level for `scale` and loads the tiles that intersect `visible`. Whil
 only loads tiles; once at rest it also evicts tiles off screen. Images without `tiles` get the
 plain built-in slide. Size estimate: 3–5 KB gzip, its own bundle-check consumer.
 
-## 2.19 Slideshow (plan step 7)
+## 2.19 Slideshow (built in step 7)
 
 ```ts
 export interface FluidboxSlideshowOptions {
-  /** Time on each slide once it is ready, in ms. @default 5000 */
+  /**
+   * Time on each slide, in ms. The next slide then has as long again to be
+   * ready before the slideshow moves to it. @default 5000
+   */
   readonly interval?: number;
-  /** Go from the last slide to the first. @default the Root's `loop` */
+  /** Go from the last slide to the first. Without it, it stops on the last. @default the `loop` option */
   readonly loop?: boolean;
-  /** Start playing when the viewer opens. @default false */
+  /** Start playing as the viewer opens. @default false */
   readonly autoplay?: boolean;
 }
 ```
 
 `play()`, `pause()`, `state.playing`, the `"slideshow"` control name and the `Slideshow` part
-(§3.18), named `playSlideshow` or `pauseSlideshow`.
+(§3.18), named by the optional labels `playSlideshow` and `pauseSlideshow`.
 
-- **Never starts by itself** unless `autoplay: true` or the app calls `play()`.
-- **Advancing.** After `interval` on a slide, it moves with `reason: "slideshow"` (a new
-  `FluidboxReason`). It first waits for the next slide's readiness: the commit and media wait of
-  §5.3, capped at the interval. Without `loop` it stops on the last slide and `playing` turns
-  false.
-- **Pauses on any user interaction**: a pointer or touch gesture on the viewer, a key, a zoom, a
-  move the user made, opening the sheet. It pauses when the tab is hidden (`visibilitychange`) and
-  while a `<video>` in the active slide plays. It stays paused until `play()` or the control.
-  Only the tab coming back and a video ending resume it, and only if those paused it.
-- **WCAG 2.2.2 (Pause, Stop, Hide).** The control is always reachable while playing, and
-  interaction pauses. While playing, the viewer's live region is set to `aria-live="off"`, so a
-  screen reader isn't interrupted every few seconds, as the WAI carousel tutorial recommends. It
-  goes back to polite on pause.
-- **Reduced motion.** Moves are instant, with no flight and no strip animation.
-- Closing stops it.
+- **It never starts by itself.** Only `autoplay`, `play()` or the control start it.
+- **`play()`** works without the `slideshow` option, using the defaults. It acts once the viewer
+  has loaded. A queued `play()` is dropped if anything changes before then, and a `pause()` wins
+  over it. When closed, already playing, or on the last slide without a loop, it does nothing.
+- **`state.playing`** is true only while the viewer is open or opening. It turns false as soon
+  as a close starts.
+- **The interval** counts from the moment the previous move settles. Then the next slide gets up
+  to one more interval to be ready, using the readiness wait of §5.3, before the slideshow moves
+  with `reason: "slideshow"`. New items given as fresh objects for the same ids keep the
+  interval running.
+- **The last slide without a loop.** `playing` turns false when the slideshow arrives there.
+- **Holds don't pause.** A hidden tab or a video playing in the active slide holds the timer
+  while `playing` stays true. The interval starts again once the hold ends. A muted, looping
+  autoplay video holds it indefinitely.
+- **Input pauses.** A pointer, a key, a wheel or a zoom (by gesture or command) pauses the
+  slideshow until `play()` or the control. The control's own press (`pointerdown` or
+  `touchstart`, Enter or Space) is exempt.
+- **The control.** Without the `slideshow` option it is hidden unless the slideshow is playing.
+  It carries `data-active` while playing. The Fullscreen control now also carries `data-active`
+  while active.
+- **WCAG 2.2.2 (Pause, Stop, Hide).** The control is reachable while playing, and input pauses.
+  While playing, the viewer's live region is `aria-live="off"`, so a screen reader isn't
+  interrupted every few seconds. It goes back to polite on pause.
+- **Reduced motion.** Moves are instant.
 
-Hooks now: §5.3's `ready(index, cap)` is index-based and must stay callable outside an open (step
-1.5). The driver gets one choke point that every user gesture, key and zoom goes through
-(`#userInteraction()`), which step 7 subscribes to. `waitUntil` promises a slide registered while
-mounting stay pending for the slideshow's wait, rather than being dropped outside an open.
-
-## 2.20 `reachend` (plan step 7)
+## 2.20 `reachend` (built in step 7)
 
 ```ts
-export class FluidboxReachEndEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
+// The item type keeps it in step with the other events; it carries no item.
+export class FluidboxReachEndEvent<_TItem extends FluidboxItem = FluidboxItem> extends Event {
   readonly value: string;
   readonly index: number;
+  /** The item count it fired for. */
   readonly count: number;
 }
 ```
 
-- Fires when the open item's index comes to `count - 1 - reachEndThreshold` or later (default
-  threshold 2), on an open or a move.
-- Once per count: after it fires for a count it doesn't fire again until `count` changes. Then it
-  re-arms, and fires at once if the open item is already within the threshold of the new end.
-- Never fires with `loop` on, since there is no end.
-- Bindings: `onReachEnd` (React, Solid), `@reach-end` (Vue), `(reachEnd)` (Angular), `reachend`
-  on `<fluidbox-gallery>`.
+- **When it fires.** It fires when the open item's index is `count - 1 - reachEndThreshold` or
+  later, once the move settles, not at `valuechange`. If a `valuechangecomplete` handler starts
+  another move, it waits for that one. It fires again after `setItems` when the count changed,
+  at once if the open item is already within the threshold of the new end.
+- **Once per count, literally.** A close and reopen at the same count doesn't fire again. Any
+  change of count re-arms it, including a change made by its own handler.
+- **Never with `loop`.**
+- **`reachEndThreshold`** is an option, and can be changed through `update()`. Default 2. A value
+  that isn't a finite number of 0 or more means 2.
+- **Bindings.** React and Solid: `onReachEnd`. Vue: `@reach-end`. Angular: `(reachEnd)`, with a
+  `reachEndThreshold` input taking `numberAttribute`. Elements: the `reachend` event and the
+  `reach-end-threshold` attribute. `FluidboxReachEndEvent` and `FluidboxLazyItemList` are
+  re-exported by every binding.
 
-**Appending.** The app appends with `setItems`. The viewer keeps the open item by id, which
-`#setSource` already does (`create-fluidbox.ts:844-866`): it finds the previous id in the new
-source and keeps that index, and slides are reused by id. So `value` doesn't change, and nothing
-moves or reloads.
+**Appending.** The app appends with `setItems`. The viewer keeps the open item by id
+(`#setSource`): it finds the previous id in the new source, keeps that index, and reuses slides
+by id. So `value` doesn't change, and nothing moves or reloads.
 
-**Growing a `FluidboxItemList`.** A list is immutable: `count` is fixed when it is made
-(`items.ts:97`). To grow, make a new list with a larger count and pass it to `setItems`.
-`setItems` always applies a lazy list (`create-fluidbox.ts:500-503`). The only cost is the id
-lookup that keeps the open item, which for `createItemList` scans without an `index` option. A
-helper keeps the cache:
+**Loop changes.** Turning `loop` on or off while open keeps the slides, each at its offset from
+the shown one, instead of rebuilding them. A two-item loop makes a −1 duplicate, with its own
+copy of an iframe.
+
+**Growing a lazy list.** `createItemList` now returns the exported type `FluidboxLazyItemList`.
+Its `indexOf` is required, and it adds `withCount(count)`: a new list over the same `item` and
+`index` functions that keeps the items already made, so the ids already known resolve at once. A
+shorter list from `withCount` answers -1 for ids past its end, and throws a `RangeError` for an
+index past its end.
 
 ```ts
 const list = createItemList({
@@ -1008,13 +1054,9 @@ const list = createItemList({
 });
 viewer.addEventListener("reachend", async () => {
   await fetchMore();
-  fluidbox.setItems(list.withCount(total())); // same item() and index(), and the items already made
+  fluidbox.setItems(list.withCount(total()));
 });
 ```
-
-`withCount(count)` is new on the lists `createItemList` returns: a new list over the same
-`item`/`index` functions that shares the made-items map, so the ids already known resolve at
-once. Hook now: none beyond what `setItems` does today.
 
 ## 2.21 Headless controls: no icons, `bindControl`, `icons`
 

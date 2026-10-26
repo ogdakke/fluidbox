@@ -88,12 +88,14 @@ The main changes:
     continues the trigger's video and hands its time back on close (§2.22);
   - `zoom.click` (`"single"`, `"double"`, `false`) and `zoom.tap` (`"double"`, `false`) (§2.23).
 
-  These come later (step 7):
+  These were built in step 7 (merged at 1285e6d), with their sizes accepted over the estimates
+  (§8.26):
   - a `--fluidbox-motion-speed` property;
-  - `Hotspot`;
+  - `Hotspot`, with its code loaded on the first hotspot;
   - a `Slideshow`;
-  - `reachend` for appending;
-  - deep zoom as an add-on after 1.0.
+  - `reachend` for appending.
+
+  Deep zoom follows as an add-on after 1.0.
 
   The sheet's `dismiss` becomes `dismissMotion` (§2.11–2.20, §3.18, §8.14).
 
