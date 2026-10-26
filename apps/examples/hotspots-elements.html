@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fluidbox custom elements hotspots</title>
+    <script type="module" src="/fixtures/hotspots-elements.ts"></script>
+  </head>
+  <body>
+    <main class="lab-page">
+      <h1>Custom elements hotspots on a product photo</h1>
+      <fluidbox-gallery id="root" class="media-grid" aria-label="Rooms">
+        <template data-fluidbox-slide="room">
+          <fluidbox-media>
+            <fluidbox-image></fluidbox-image>
+            <fluidbox-hotspot
+              x="50%"
+              y="28%"
+              class="hotspot-pin"
+              data-pin="Framed print"
+              aria-label="Framed print"
+            >
+              <span aria-hidden="true">+</span>
+            </fluidbox-hotspot>
+            <!-- Pixels of the photo, and a bare attribute that reads as true. -->
+            <fluidbox-hotspot
+              x="360"
+              y="950"
+              scale-with-zoom
+              class="hotspot-pin"
+              data-pin="Books"
+              aria-label="Books"
+            >
+              <span aria-hidden="true">+</span>
+            </fluidbox-hotspot>
+          </fluidbox-media>
+        </template>
+        <fluidbox-item value="room" type="room">
+          <button slot="trigger" type="button" data-item="room">
+            <img src="/products/fjord-room-thumb.webp" alt="" width="320" height="320" />
+          </button>
+          <template slot="content">
+            <img
+              src="/products/fjord-room.webp"
+              alt="A framed fjord print over a sideboard"
+              width="1600"
+              height="1600"
+            />
+          </template>
+        </fluidbox-item>
+      </fluidbox-gallery>
+    </main>
+  </body>
+</html>

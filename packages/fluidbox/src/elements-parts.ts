@@ -323,6 +323,20 @@ export function templateSlide(
       disposers.push(slide.drawImage(source));
     }
     expandParts(content, { ...context(), signal, slide });
+    // Each <fluidbox-hotspot x y> in the box becomes the slide's hotspot
+    // button, with its attributes and children: the core places it.
+    for (const pin of box?.querySelectorAll("fluidbox-hotspot") ?? []) {
+      const button = slide.hotspot({
+        x: pin.getAttribute("x") as `${number}%`,
+        y: pin.getAttribute("y") as `${number}%`,
+        scaleWithZoom: pin.hasAttribute("scale-with-zoom"),
+      });
+      for (const { name, value } of Array.from(pin.attributes)) {
+        if (!["x", "y", "scale-with-zoom"].includes(name)) button.setAttribute(name, value);
+      }
+      button.append(...pin.childNodes);
+      pin.remove();
+    }
     if (box) {
       media.append(...box.childNodes);
       box.remove();
