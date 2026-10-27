@@ -583,6 +583,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // fallback before rebasing its virtual window, otherwise that stale timer
     // can jump to a slide which has already been recycled.
     this.#resolveSelection();
+    // So does it over a gesture that has let go: that gesture's settle would
+    // otherwise send the viewer back to the slide it stopped on.
+    if (!this.#touching && !this.#fingers) this.#userOwned = this.#userScrolled = false;
     // An instant align still under way would put snapping back mid-glide.
     this.#endInstant();
     this.#unfence();
