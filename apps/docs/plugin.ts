@@ -150,9 +150,7 @@ function checkExampleData(overview: string, patterns: readonly string[]) {
         for (const name of dataImports(code)) {
           if (!defined.has(name)) missing.add(`${name} (${key}/${file})`);
         }
-        // The framework media examples bridge to the plain-JS add-ons through the
-        // examples' addon-slide helper until the add-ons have parts of their own.
-        const local = /from\s*"(\.{1,2}\/(?!data"|\.\.\/addon-slide")[^"]*)"/.exec(code);
+        const local = /from\s*"(\.{1,2}\/(?!data")[^"]*)"/.exec(code);
         if (local) missing.add(`${local[1]} (${key}/${file})`);
       }
     }
