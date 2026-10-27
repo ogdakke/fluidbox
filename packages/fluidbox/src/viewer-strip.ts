@@ -462,7 +462,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    */
   setSource(source: FluidboxSource<TItem>, loop = this.#loop) {
     // A selection under way ends on its slide.
-    if (this.#selection) this.#sync(this.#selection.index, false);
+    const moving = this.#selection;
+    if (moving) this.#sync(moving.index, false);
     this.#resolveSelection();
     this.#focusable(source.count);
     this.#unfence();
@@ -503,7 +504,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#unload(slide);
       slide.element.remove();
     }
-    this.#align(this.#index);
+    // A smooth scroll under way can carry on past an instant one, as Chrome's
+    // on Android does: hold the slide in place until the strip is still.
+    if (moving) this.#jump(this.#index);
+    else this.#align(this.#index);
   }
 
   /**
