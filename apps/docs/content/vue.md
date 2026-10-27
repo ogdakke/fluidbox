@@ -232,7 +232,7 @@ const pins: Record<string, Pin[]> = {
 </template>
 ```
 
-- **Coordinates.** A percentage of the picture, as `"42%"`, or a number of pixels of the media's declared `width` and `height`, else of its natural size. They follow `object-fit` and `object-position`. Without an image or video in the box, they are relative to the box.
+- **Coordinates.** A percentage of the picture, as `"42%"`, or a number of pixels of the media's declared `width` and `height`, else of its natural size. The types take a number or `"N%"`; only the custom elements' attributes and untyped JavaScript read a bare string as pixels. They follow `object-fit` and `object-position`. Without an image or video in the box, they are relative to the box.
 - **Zoom.** A hotspot keeps its screen size as the photo zooms, unless `scale-with-zoom`. Keyboard focus on one pans a zoomed photo to it.
 - **Presses.** A press on a hotspot doesn't zoom or close the viewer.
 - **Motion.** Hotspots hide during flights and a drag to dismiss, and fade in with the controls.
