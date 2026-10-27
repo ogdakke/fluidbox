@@ -17,11 +17,13 @@ pnpm add @ogdakke/fluidbox
 
 ## The stylesheets
 
-Import them once, in the root layout. A server component can import CSS. The thumbnails and the sheet each need their own stylesheet on top of the base one.
+Import them once, in the root layout. A server component can import CSS. `styles.css` holds what makes the viewer work and draws no look of its own; `baseline.css` is the default look, which you can leave out to style the viewer yourself (see [Styling](./styling.md)). The thumbnails and the sheet each need their own stylesheet on top of the base one.
 
 ```tsx
 // app/layout.tsx
 import "@ogdakke/fluidbox/styles.css";
+// Optional: the default look.
+import "@ogdakke/fluidbox/baseline.css";
 // Only with <Fluidbox.Thumbnails />:
 import "@ogdakke/fluidbox/thumbnails.css";
 // Only with <Fluidbox.Sheet>:
@@ -117,6 +119,7 @@ The same `Gallery` works in `pages/`. Import the stylesheets in `pages/_app.tsx`
 ```tsx
 // pages/_app.tsx
 import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/baseline.css";
 import "@ogdakke/fluidbox/thumbnails.css";
 import "@ogdakke/fluidbox/sheet.css";
 import type { AppProps } from "next/app";
@@ -142,7 +145,69 @@ export default function Photos({ photos }: { photos: Photo[] }) {
 
 ## The open photo in the URL
 
-The [photo in the address](./patterns/url.md) pattern works in Next as it is. It reads `?photo=` after hydration, since the server has no `location`, so a link with `?photo=2` opens the second photo as soon as the page runs, flying from its trigger. Put it in the client component with the gallery.
+With the App Router, read `?photo=` with `useSearchParams` and write it with the History API. Next.js folds `history.pushState` and `replaceState` into its router, so `useSearchParams` follows them, and the page doesn't fetch again as `router.push` would. The id is the item's own, so the link survives a reordering:
+
+```tsx
+// app/gallery.tsx
+"use client";
+
+import { Fluidbox } from "@ogdakke/fluidbox/react";
+import { useSearchParams } from "next/navigation";
+import type { Photo } from "./photos";
+
+export function Gallery({ photos }: { photos: Photo[] }) {
+  const id = useSearchParams().get("photo");
+  // `?photo=canyon` opens that photo.
+  const shown = photos.find((photo) => photo.id === id)?.id ?? null;
+
+  return (
+    <Fluidbox.Root
+      items={photos}
+      value={shown}
+      onValueChange={(value) => {
+        const url = new URL(location.href);
+        if (value === null) {
+          // Back past the entry the open added, or drop the photo from a link you came in on.
+          if (history.state?.photo) return history.back();
+          url.searchParams.delete("photo");
+          return history.replaceState(null, "", url);
+        }
+        url.searchParams.set("photo", value);
+        // Opening adds an entry, so Back closes the viewer; a move replaces it.
+        if (shown === null) history.pushState({ photo: true }, "", url);
+        else history.replaceState({ photo: true }, "", url);
+      }}
+    >
+      <div className="grid">
+        {photos.map((photo) => (
+          <Fluidbox.Trigger key={photo.id} value={photo.id}>
+            <img {...photo.thumb} />
+          </Fluidbox.Trigger>
+        ))}
+      </div>
+    </Fluidbox.Root>
+  );
+}
+```
+
+```tsx
+// app/page.tsx
+import { Suspense } from "react";
+import { Gallery } from "./gallery";
+import { photos } from "./photos";
+
+export default function Page() {
+  return (
+    <Suspense>
+      <Gallery photos={photos} />
+    </Suspense>
+  );
+}
+```
+
+- A statically rendered page has no query on the server, so `useSearchParams` needs a `Suspense` boundary around the component that reads it. The grid renders on the server; the viewer opens on `?photo=` once the page hydrates, flying from its trigger.
+- On a dynamically rendered page the server reads the query too, and a `value` that names an image renders the open viewer's copy in the HTML, which the viewer takes over without motion. Give Root `href` so the copy's controls link to the other photos before JavaScript runs.
+- The [photo in the address](./patterns/url.md) pattern is the same without Next.js.
 
 ## A page per photo
 
