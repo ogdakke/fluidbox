@@ -277,6 +277,26 @@ test.describe("motion speed", () => {
       }
     });
 
+    test("by a tap, then a move, ends on the move's slide", async ({ page }) => {
+      // The browser's own smooth scroll, at speed 1.
+      await open(page, 1);
+      await page.keyboard.press("ArrowRight");
+      // The tap stops the scroll on its way and settles a moment later, after the next move
+      // has begun.
+      await page.locator("[data-fluidbox-slides]").evaluate(async (element) => {
+        const start = element.scrollLeft;
+        while (Math.abs(element.scrollLeft - start) < 2) {
+          await new Promise(requestAnimationFrame);
+        }
+        const pointer = { bubbles: true, isPrimary: true, pointerId: 3, pointerType: "mouse" };
+        element.dispatchEvent(new PointerEvent("pointerdown", pointer));
+        element.dispatchEvent(new PointerEvent("pointerup", pointer));
+      });
+      const stopped = await page.evaluate(() => window.flightViewers.scroll!.state.index!);
+      await page.keyboard.press("ArrowRight");
+      await expect.poll(() => landed(page)).toBe(stopped + 1);
+    });
+
     test("by a close leaves from the slide it was heading to", async ({ page }) => {
       const dialog = await midGlide(page);
       const leaving = page.evaluate(
