@@ -11,13 +11,15 @@ Import the elements and styles in a browser entry:
 ```ts
 import "@ogdakke/fluidbox/elements";
 import "@ogdakke/fluidbox/styles.css";
+// Optional: the package's look. Without it the viewer is unstyled, its controls plain buttons with text.
+import "@ogdakke/fluidbox/baseline.css";
 ```
 
 Add a gallery to the page:
 
 ```html
 <fluidbox-gallery role="group" aria-label="Photos">
-  <fluidbox-item item-id="mountain">
+  <fluidbox-item value="mountain">
     <button slot="trigger" type="button">
       <img src="/photos/mountain-thumb.jpg" alt="A mountain at dusk" width="300" height="200" />
     </button>
@@ -46,7 +48,7 @@ import "@ogdakke/fluidbox/styles.css";
 const fluidbox = createFluidbox({
   items: [
     {
-      type: "img",
+      type: "image",
       src: "/photos/mountain.jpg",
       alt: "A mountain at dusk",
       width: 2400,
@@ -62,7 +64,7 @@ Items are plain objects whose fields are the attributes of the element the viewe
 
 ## Frameworks
 
-The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue` and `/angular`. The framework packages are optional peers, so install `@ogdakke/fluidbox` alongside the one your app already uses. Every binding has the same parts (`Root`, `Trigger`, `Viewer`, `Controls`, `Thumbnails`, `Sheet`, ...) and the same patterns. See the [patterns](apps/docs/content/patterns/index.md).
+The package exports framework bindings at `@ogdakke/fluidbox/react`, `/solid`, `/vue` and `/angular`. The framework packages are optional peers, so install `@ogdakke/fluidbox` alongside the one your app already uses. Every binding has the same parts (`Root`, `Trigger`, `Viewer`, `Media`, `Toolbar`, `Thumbnails`, `Sheet`, ...) and the same patterns. See the [patterns](apps/docs/content/patterns/index.md).
 
 The package root is safe to import on the server. `@ogdakke/fluidbox/elements` defines the elements on import, so it is browser only. In a server-rendered app, `await import("@ogdakke/fluidbox/elements")` after hydration.
 
