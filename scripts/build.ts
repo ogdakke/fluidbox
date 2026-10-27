@@ -25,6 +25,26 @@ async function run(command: string[], cwd: string) {
 const deadRules = checkBaselineCss();
 if (deadRules.length) throw new Error(deadRules.join("\n"));
 await run(["bun", "run", "build:core"], core);
+// A bundler drops a module the package doesn't list in sideEffects when nothing
+// is imported from it, so a chunk that defines elements or registers an add-on
+// must be listed, shared chunks included: `import "@ogdakke/fluidbox/elements"`
+// reaches its definitions through one.
+const { sideEffects } = JSON.parse(await readFile(resolve(core, "package.json"), "utf8")) as {
+  sideEffects: string[];
+};
+const listed = sideEffects.map(
+  (pattern) =>
+    new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")}$`),
+);
+for (const file of new Bun.Glob("dist/**/*.js").scanSync(core)) {
+  const code = await readFile(resolve(core, file), "utf8");
+  if (!/customElements\.define\(|^registerAddon\(/m.test(code)) continue;
+  if (!listed.some((pattern) => pattern.test(`./${file}`))) {
+    throw new Error(
+      `${file} has side effects but isn't in packages/fluidbox/package.json's sideEffects`,
+    );
+  }
+}
 // The stylesheets' comments document them for the CSS reference; consumers get
 // the rules alone, minified for the browsers in apps/docs/content/browser-support.md.
 const major = (version: number) => version << 16;
