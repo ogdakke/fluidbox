@@ -15,9 +15,31 @@
   </button>
 </fluidbox-gallery>
 <template>
-  <!-- Previous, Next and Close, then Zoom in, Zoom out and Fit. -->
+  <!-- Previous, Next and Close, then Zoom in, Zoom out and Fit with your icons.
+       The package ships none; the buttons take their names from the labels. -->
   <fluidbox-toolbar></fluidbox-toolbar>
-  <fluidbox-zoom-controls></fluidbox-zoom-controls>
+  <fluidbox-zoom-controls>
+    <button type="button" data-fluidbox-zoom-in>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" />
+      </svg>
+    </button>
+    <button type="button" data-fluidbox-zoom-out>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="2" />
+      </svg>
+    </button>
+    <button type="button" data-fluidbox-zoom-reset>
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <path
+          d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        />
+      </svg>
+    </button>
+  </fluidbox-zoom-controls>
   <output class="pattern-zoom-level" data-test="zoom-level"></output>
 </template>
 <fluidbox-gallery class="pattern-grid" nozoom>
