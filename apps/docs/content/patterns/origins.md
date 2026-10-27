@@ -7,10 +7,10 @@ description: Fly from a photo inside a card, and bring the closing item back int
 
 # Rich origins
 
-The origin is the element the viewer flies from and back to. By default it is the trigger's first image or video, or the trigger itself. A card can mark a different element, and a scroller gets its closing item scrolled back into view.
+The origin is the element the viewer flies from and back to. By default it is the trigger's first image or video, or the trigger itself. A card can mark a different element, and a scroller gets the item it closes on scrolled back into view.
 
 <!-- pattern: origins -->
 
 - **`data-fluidbox-origin`** on any element inside the trigger makes it the origin. The flight copies its box, crop (`object-fit`, `object-position`) and corner radius.
-- **Reveal on close.** Each time the selection settles, and on close if it hasn't yet, the viewer scrolls the item's trigger into view (nearest edge), so the closing flight lands on it. To control this yourself, give the viewer an `origins` adapter with `revealOrigin(id, index, { signal, reason })` (see [The origin adapter](../items-and-origins.md#the-origin-adapter)).
-- **As child.** The framework `Trigger` parts render a button by default, and with `asChild` decorate your own element instead. See each framework page. Angular's `fluidboxTrigger` is an attribute, so it always decorates. In plain JavaScript, `fluidbox.bind()` always decorates the element you give it.
+- **Reveal on close.** Before the opening flight and each time the viewer moves, it scrolls the item's trigger into view (nearest edge), so the closing flight lands on it. To do this yourself, as a virtualised grid must, pass `revealTrigger(item, index, { signal, phase })`, and `findTrigger(item, index)` for items whose trigger isn't mounted (see [Items and origins](../items-and-origins.md)).
+- **As child.** The framework `Trigger` parts render a `<button>`, and with `asChild` decorate your own element instead. Angular's `fluidboxTrigger` is an attribute, so it always decorates. In plain JavaScript, `fluidbox.bind()` decorates the element you give it.

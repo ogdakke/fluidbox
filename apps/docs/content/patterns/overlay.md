@@ -2,15 +2,21 @@
 title: One trigger for an album
 section: Patterns
 order: 2
-description: Several items behind one thumbnail that shows the last one viewed, with a count that travels in the flight.
+description: Several items behind one thumbnail that shows the last one viewed, with a count that flies with the photo.
 ---
 
 # One trigger for an album
 
-One thumbnail stands for a whole album. It opens the first item, and every item in the album returns to it on close. It shows whichever item the viewer showed last, so the closing flight lands on a matching picture.
+One thumbnail stands for a whole album. Its `value` is the list of the album's items: it opens the first, and every one of them closes back onto it. It shows whichever item the viewer showed last, so the closing flight lands on a matching picture.
 
 <!-- pattern: overlay -->
 
-- **Multi-item trigger.** The trigger opens its own item, and `returns` lists every item that may close back onto it. Set it as `returns` in `fluidbox.bind` and on the framework `Trigger` (`fluidboxReturns` in Angular), or as `returns="id id …"` on a `<fluidbox-item>`. It may hold the whole album, the opened item included.
-- **Preview follows the selection.** The framework triggers hand their content the item they show (`{ item, index, status }`). Plain JavaScript gets `onPreviewChange(item, index)`. On custom elements, the `<fluidbox-item>` dispatches `fluidbox-preview-change` with `{ id, item }`, and you swap the trigger's image in its handler. Changes inside a trigger never make the gallery re-read its items. The preview updates before the closing flight measures it.
-- **Thumbnail overlays.** For a badge or caption on the thumbnail, use `fluidbox.bindOverlay()`, the `ThumbnailOverlay` part, or `data-fluidbox-thumbnail-overlay`. With `travel` the overlay flies with the image and fades on landing; `travel` can also be a renderer that draws live content into the flying frame. The framework parts render their content live there on their own. Angular's part takes it as an `<ng-template>` child. Without `travel`, the overlay stays in the page and gets `--fluidbox-closed` to animate against. A frame layer moves into the flying frame itself and scales with it, as a scrim does. It is `FrameLayer` in the frameworks (`fluidboxFrameLayer` in Angular), `frameLayer` in plain JavaScript, and `data-fluidbox-frame-layer` in markup.
+- **A list as the value.** Pass the items, or their ids, as the trigger's `value`: on the framework `Trigger`, as `[fluidboxTrigger]` in Angular, to `fluidbox.bind(cover, album)`, or as `value="id id …"` on a `<fluidbox-item>` (`data-fluidbox-value` on a button). The first opens; every one closes back onto this trigger.
+- **The preview follows the selection.** The framework triggers hand their content the item they show (`{ item, index, status }`); Angular reads it from `trigger.preview()`. Plain JavaScript gets `onPreviewChange(item, index)` in `bind`'s options. On custom elements, the `<fluidbox-item>` dispatches `fluidbox-preview-change` with `{ id, item }`, and you swap the trigger's image in its handler. The preview changes before the closing flight measures the trigger.
+- **Overlays.** A badge or caption on the thumbnail is an `Overlay` part (`fluidboxOverlay` in Angular, `fluidbox.bindOverlay()` in plain JavaScript, `data-fluidbox-trigger-overlay` in markup). Its `flight` says how it goes with the photo:
+  - `"none"`, the default, stays on the card and gets `--fluidbox-closed` to animate against;
+  - `"copy"` flies a still copy of it and fades it on landing;
+  - `"live"` renders its content live in the flying frame (in plain JavaScript, `flight: { live: render }`);
+  - `"frame"` moves the element itself into the flying frame, where it scales with the photo, as a scrim does.
+
+  A trigger can have several, such as a `"frame"` scrim beside a `"live"` count.
