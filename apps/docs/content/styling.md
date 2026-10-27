@@ -138,15 +138,23 @@ The trigger of the open item gets `data-fluidbox-status="open"` and `data-open`.
 
 ## Controls
 
-The default controls are buttons marked `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`, each showing its label as text. With `baseline.css`, Close sits in the top-right corner, and with more than one item Previous and Next sit at the middle of each side, each with its glyph. Full screen, Download, Share and the counter, when `controls` lists them, run from the top-left corner. All of them keep 16 pixels inside the stage. A disabled Previous or Next fades to `--fluidbox-gallery-control-opacity: 0.35`. Right to left, the sides swap.
+The default controls are buttons marked `data-fluidbox-previous`, `data-fluidbox-next` and `data-fluidbox-close`, each showing its label as text. With `baseline.css`, Close sits in the top-right corner, and with more than one item Previous and Next sit at the middle of each side, each with its glyph. Full screen, Download, Share, Slideshow and the counter, when `controls` lists them, run from the top-left corner in that order; one that can't work here hides, and the rest close up. All of them keep 16 pixels inside the stage. A disabled Previous or Next fades to `--fluidbox-gallery-control-opacity: 0.35`. Right to left, the sides swap.
 
 You choose which controls exist:
 
 - **Plain JavaScript.** You get all three unless you pass `viewer`. Then you keep Close until your content has its own `data-fluidbox-close` button, and `controls: true`, or a list such as `controls: ["previous", "next"]`, keeps more next to your own content.
-- **Frameworks.** Put the `Controls` part, or `Previous`, `Next` and `Close`, in the `Viewer` part. Without them there is only the default Close. Each renders its label as text when it is empty, or your children.
+- **Frameworks.** Put the `Controls` part, or `Previous`, `Next` and `Close`, in the `Viewer` part. Without them there is only the default Close, until your content has a Close of its own. Each part renders your children, or its label as text when it has none.
 - **Custom elements.** The gallery adds all three. A `<template slot="viewer">` replaces them, apart from Close while the template has none of its own. Put `<fluidbox-controls>` in it to keep them. Any button marked `data-fluidbox-close`, `-previous` or `-next` in the viewer runs that command, in every API.
 
 The button names come from the `close`, `previous` and `next` [labels](./api.md#labels).
+
+A control that switches has `data-active` while it is on: Slideshow while the [slideshow](./slideshow.md) plays, and Full screen while the viewer is full screen. Your own buttons bound to them get it too, so one rule styles both states:
+
+```css
+[data-fluidbox-slideshow][data-active] {
+  color: var(--accent);
+}
+```
 
 ### Your own controls
 
@@ -166,14 +174,20 @@ The stage is the part of the dialog the media fits into. By default it is all of
 
 A zoomed image still pans under the insets, so a see-through bar floats over it. `--fluidbox-zoom-clip` on the dialog keeps it inside them: `stage` for every side, or a list of sides such as `right` or `top bottom`. To place something against the picture, read `--fluidbox-media-width` and `--fluidbox-media-height` on the dialog. The picture is centred in the stage.
 
-## Thumbnail overlays
+## Hotspots
 
-A badge, a play icon or a count on a thumbnail can follow the flight. Make it a thumbnail overlay: `fluidbox.bindOverlay()` in plain JavaScript, the `ThumbnailOverlay` part in the frameworks, `data-fluidbox-thumbnail-overlay` inside a `<fluidbox-item>` trigger.
+`baseline.css` doesn't style hotspots: what a hotspot shows is yours, its label or its content. The functional CSS centres each one on its point with `translate: -50% -50%`, and keeps it at its screen size under zoom with `scale: calc(1 / var(--fluidbox-zoom-scale))`, unless it has `data-scale-with-zoom`. Style it through `[data-fluidbox-hotspot]`, and leave `translate` and `scale` to the package. See [Hotspots](./hotspots.md).
 
-- By default the overlay stays on the thumbnail.
-- With `travel`, it flies with the photo and fades as the flight lands. What flies is a copy of its content, or live content that a renderer draws into the flying frame. On the custom elements, `data-fluidbox-thumbnail-overlay="travel"`.
+## Trigger overlays
 
-The runtime sets `--fluidbox-closed` on the overlay, from `1` at the thumbnail to `0` fully open, and `data-fluidbox-phase` to `idle`, `opening`, `open`, `dragging` or `closing`:
+A badge, a play icon, a scrim or a count on a trigger can follow the flight. Make it a trigger overlay: `fluidbox.bindOverlay()` in plain JavaScript, the `Overlay` part in React, Vue and Solid, `[fluidboxOverlay]` in Angular, and `data-fluidbox-trigger-overlay` inside a trigger of the custom elements. Its `flight` says how it goes with the photo:
+
+- `none`, the default, stays on the trigger.
+- `copy` flies a still copy of it, which fades as the flight lands.
+- `live` draws live content into the flying frame.
+- `frame` moves the element itself into the flying frame, where it scales with the photo, as a scrim does.
+
+The runtime sets `--fluidbox-closed` on the overlay, from `1` at the trigger to `0` fully open, and `data-fluidbox-phase` to `idle`, `opening`, `open`, `dragging` or `closing`:
 
 ```css
 .photo-count {
@@ -185,13 +199,35 @@ While an item is open, its thumbnail image on the page gets `data-fluidbox-thumb
 
 ## Reduced motion
 
-With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights, moves between slides without smooth scrolling, zooms and moves the sheet without animation, and its controls and thumbnails appear without fading. You don't need to set anything. Give your own chrome its transitions only when motion is welcome, as `baseline.css` does:
+With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights, moves between slides without smooth scrolling, zooms and moves the sheet without animation, and its controls and thumbnails appear without fading. A slideshow's moves are instant. You don't need to set anything, and [`--fluidbox-motion-speed`](#motion-speed) doesn't bring the flights back. Give your own chrome its transitions only when motion is welcome, as `baseline.css` does:
 
 ```css
 @media (prefers-reduced-motion: no-preference) {
   .caption {
     transition: opacity 180ms linear;
   }
+}
+```
+
+## Motion speed
+
+`--fluidbox-motion-speed` sets how fast the viewer moves. It is a number, `1` by default, clamped to `0.25`–`4`. It divides the duration of the open, the close, a release after a drag, a zoom and a move between slides, so `2` plays each twice as fast and `0.5` at half speed. The viewer reads it as each motion starts. Reduced motion still has no flights, at any speed.
+
+Set it on the viewer, or anywhere around the trigger. When the viewer opens, it copies the `--fluidbox-*` properties it finds there, so a change on the page applies from the next open. It works with breakpoints, themes and `:has()` as any custom property does:
+
+```css
+:root {
+  --fluidbox-motion-speed: 1.5;
+}
+
+@media (pointer: coarse) {
+  :root {
+    --fluidbox-motion-speed: 1;
+  }
+}
+
+.hero-gallery {
+  --fluidbox-motion-speed: 0.75;
 }
 ```
 

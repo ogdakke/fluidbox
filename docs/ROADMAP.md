@@ -1,134 +1,39 @@
 # Roadmap to 1.0
 
-This records the implemented beta contract, remaining migration work, and release gates.
+Where fluidbox stands, what gates 1.0, and what comes after it. The user-facing summary is
+[Roadmap](../apps/docs/content/roadmap.md).
 
-Fluidbox is a headless lightbox interaction library. Its purpose is to provide exceptionally fluid opening, closing, navigation, zoom, and media handoff across touch, trackpad, mouse, and keyboard. Applications compose their own viewer UI on the same runtime. Framework bindings must make that composition idiomatic without reimplementing interaction behavior.
-
-The first public beta targets plain JavaScript, custom elements, and composed React parts/hooks. The 1.0 target also includes composed Solid, Vue, and Angular bindings. Responsive media support is core work; named CDN adapters follow demonstrated consumer needs. A preset viewer or simpler all-in-one React component is not a prerequisite.
+Fluidbox is a headless lightbox: one runtime owns the opening, closing, navigation, zoom and
+media handoff across touch, trackpad, mouse and keyboard, and pages compose their own viewer on
+it. The package draws no icons; the look is the opt-in `baseline.css`.
 
 ## Where the project stands
 
-The package is private at `0.0.0`. The root now exports an SSR-safe `createFluidbox()` runtime with
-finite indexed sources, origin registration, host reveal, source replacement, command settlement,
-thumbnail overlays, responsive images, video, iframe, custom renderers, gestures, zoom, a body
-portal, and a bounded native slide strip. The composed React parts use that runtime and do not
-register custom elements. The Photos-style example combines it with TanStack Virtual at 10,000 and
-100,000 items.
+The package is private at `0.0.0`. The API redesign (`docs/API_SPEC.md`, `docs/api-spec/`) is in:
 
-Custom elements remain as a compatibility binding. Solid, Vue, and Angular still wrap that binding
-and must move to the headless runtime. Shared behavior tests also still contain custom-element
-fixtures; retain adapter-contract coverage, but move interaction assertions to the direct runtime as
-each area is migrated. The audited behavior mapping is in
-[CUSTOM_ELEMENT_PARITY.md](CUSTOM_ELEMENT_PARITY.md).
+- One runtime behind `createFluidbox()`, SSR-safe at the root: items and lazy lists, triggers and
+  origins, `slides` by item type with `FluidboxSlide`, the viewer's layer, the thumbnails and the
+  sheet as add-ons, value changes with reasons, zoom with a sharper `zoom` image, full screen,
+  download, share and media errors.
+- Native bindings for React, Vue, Solid and Angular, built on the plain API and the binding kit
+  (`@ogdakke/fluidbox/kit`), with composable parts. The custom elements are an adapter over the
+  same runtime ([CUSTOM_ELEMENT_PARITY.md](CUSTOM_ELEMENT_PARITY.md)).
+- The add-ons `embed`, `spin`, `model` (with live 3D thumbnails) and `hover-zoom`, each with parts
+  in every binding and an elements entry where it has a slide.
+- Plan step 7: `--fluidbox-motion-speed`, `reachend` with `withCount` for lists that grow, the
+  slideshow (`play`, `pause`, `state.playing`, the Slideshow part) and hotspots
+  (`slide.hotspot()`, the Hotspot part).
+- 13 patterns in every framework, plain JavaScript and the elements, checked by
+  `tests/browser/patterns.spec.ts`; bundle budgets in [baseline/bundle-budget.md](../baseline/bundle-budget.md).
 
-The current source contract requires synchronous lookups, a stable count, and stable IDs for each
-revision. Media descriptors support responsive pictures, video, iframe, and custom renderer keys.
-The stylesheet exposes data attributes and CSS variables without `@scope`, but structural and
-appearance exports are not split yet.
-
-Automated tests cover bounded DOM, navigation, transition interruption, crop and radius continuity,
-thumbnail hiding, virtual-host reveal, source replacement, loading failures, teardown, and desktop
-and iPhone browser profiles. They still do not establish physical iOS quality, Android quality,
-bounded decoded-image memory, or comparative performance. The matrix in [TESTING.md](TESTING.md)
-remains a release gate.
-
-## Implementation checkpoint
-
-The plain runtime and React contract spike are working. Stage 0 measurement and the remaining
-binding migration are incomplete.
-
-- Locked and implemented the first headless API contract in [PUBLIC_API.md](PUBLIC_API.md), including
-  `arraySource()`, `createFluidbox()`, the controller, renderers, origins, overlays, and composed
-  React parts.
-- Began the runtime extraction behind the compatibility elements. Origin marker resolution,
-  clipping visibility, abortable host reveal ownership, and crop/radius transition geometry now
-  live in independent modules, with the existing motion and virtualized-source suites protecting
-  their behavior.
-- Added the plain TypeScript viewer session behind a motion-driver boundary. Unit tests now
-  cover synchronous validation, immutable state, event order, prevention, command sharing and
-  supersession, external abort, source reconciliation, host-reveal cancellation, overlay ownership,
-  runtime failure, and teardown.
-- Extracted body-portal construction, modal isolation, active-viewer ownership, origin resolution,
-  source reconciliation, and direct DOM motion into runtime modules. `createFluidbox()` constructs
-  those modules without loading or registering custom elements.
-- Added the first plain DOM image driver and a plain-JavaScript composition example using the proposed
-  `createFluidbox`, source, origin, controller, portal-renderer, data-attribute, and CSS-variable
-  contracts. It opens, navigates, closes, restores current-origin focus, and passes all six browser
-  profiles without registering custom elements.
-- The plain runtime now preserves interrupted motion, handles touch and vertical trackpad dismissal
-  through the shared spring controller, publishes drag state through data attributes and CSS variables,
-  and builds native responsive image candidates and picture sources. `createFluidbox` is exported from
-  the SSR-safe root; custom elements remain available as a compatibility binding.
-- `createFluidbox({ source })` now owns a native horizontal gallery strip without custom elements.
-  It keeps at most 31 slide shells, loads the active image and its immediate neighbors, rebases around
-  distant selections, and has browser coverage against a 100,000-item source. This is the gallery
-  JavaScript API; a separate `createGallery` factory is unnecessary.
-- Added deterministic open/close interruption geometry checks, focus/inert restoration checks, and trace/video evidence in `tests/browser/motion.spec.ts`. This protects pose continuity at command handoff, not gesture velocity or compositor performance.
-- Fixed indexed-source opening preparation to resolve mounted thumbnails before the gallery becomes active; added opening-pose and missing-origin scale/fade regressions.
-- Fixed rounded indexed origins to honor explicit preview/target markers, with screen-space corner checks through opening, closing, and reversal.
-- Added the React/TanStack Virtual photo-library pilot with 10k and 100k datasets, responsive rows, and a thumbnails toggle. Its source can reveal the selected item in the background. Closing uses an available target immediately or falls back without waiting. See [virtualized host integration](VIRTUALIZATION.md).
-- Added total activation bundle accounting, including lazy chunks and `unlazy`, with separate CSS and combined budgets. See [bundle baseline](../baseline/bundle-budget.md).
-- Removed stylesheet dependence on `@scope`. Viewer selectors use data-attribute roots, with tests for outside-element isolation, stylesheet override order, and host theme copying. [Styling documentation](FLUIDBOX.md) distinguishes author inputs from runtime-published motion values.
-- Recorded the recent-browser target and available physical devices in [browser support policy](BROWSER_SUPPORT.md). Exact supported versions and physical-device results remain pending.
-
-The immediate milestone is to finish behavior ownership after the public API lock. Migrate the
-Solid, Vue, and Angular bindings and reduce the custom elements to declarative adapters. The legacy
-thumbnails now reuses the extracted runtime, and pointerdown opening preparation is available through
-the controller API. Keep compatibility-specific tests, while making the direct runtime the canonical
-interaction suite.
-
-Stage 0 measurement work continues alongside that extraction: pinch-to-pan and wheel ownership coverage, broader recycled-origin cases, a second independent host virtualizer, and cold-media/first-useful-paint measurements. Pending physical-device checks and performance benchmarks do not block a bounded internal extraction. They remain release gates and are required before making comparative performance claims.
-
-## Public API lock
-
-The initial plain JavaScript and React contract is locked in [PUBLIC_API.md](PUBLIC_API.md). It has
-these concrete artifacts:
-
-1. An export list for the root, custom-element adapter, each framework binding, and styles. Do not treat internal DOM nodes or undocumented CSS variables as extension points.
-2. Type signatures and examples for `createFluidbox`, source creation/replacement, origin registration, host reveal, subscriptions, commands, and destruction. Specify synchronous validation, command results, cancellation, event order, and accepted versus settled selection. Closing must never wait for host reveal.
-3. A source contract covering image, video, iframe, and custom-content identity, responsive media metadata, stable IDs, synchronous lookup, missing origins, and source replacement. Keep remote fetching and CDN-specific URL generation outside metadata lookup. Separate the supported initial source model from later asynchronous pagination.
-4. A renderer ownership table and working plain-JavaScript and composed-React examples. Identify runtime-owned measurement/portal nodes, framework-owned descendants, ref attachment and disposal, and the lifecycle of virtualized content. Application code in either example must use only the proposed public interfaces, without custom-element registration or private runtime fields. The contract spike may adapt the existing runtime internally; complete internal decoupling is the subsequent extraction milestone.
-5. Exact names, types, defaults, and event semantics for the composed React parts and hooks.
-   Controlled open/selection props remain outside the locked API until delayed acceptance,
-   rejection, interruption, and teardown behavior is proven.
-6. An explicit public list of data attributes and CSS variables. Give each variable its publishing part, units, lifetime, and input/output ownership. Specify required structural styles and optional appearance styles, selector specificity, and supported override behavior without `@scope`.
-
-The plain and React examples run through these interfaces, type fixtures and lifecycle tests pass,
-and the declaration/export baseline matches the specification. Any breaking change must update the
-contract and migration notes explicitly. The lock does not include controlled React props, composed
-Solid/Vue/Angular APIs, a structural/theme stylesheet split, or a CDN adapter.
-
-## Product and ownership contract
-
-### What headless means
-
-- The runtime owns interaction state, gesture arbitration, zoom, transition geometry, gallery windowing, the body-level portal, media scheduling, and accessibility mechanics.
-- Applications own visual design, icons, control placement, captions, toolbars, and framework-authored content. No default toolbar, thumbnails, or visual theme is mandatory.
-- Framework bindings connect composed parts to the runtime and render framework content through native portals or equivalent facilities. They do not implement separate gesture or animation systems.
-- Per-frame transforms and gesture samples stay inside the runtime. Framework subscriptions expose discrete semantic state, not a render for every pointer move.
-- Headless does not mean arbitrary markup can replace every internal node. Publish supported parts and their layout constraints; keep scroll tracks, flight layers, and measurement nodes private.
-- Public data attributes and engine-driven CSS custom properties are the primary styling API. Document variable units, ranges, which part publishes each value, and whether it is an author input or runtime output. Let applications consume motion outputs in their own effects without subscribing to every gesture frame. Do not require CSS `@scope`; use ordinary selectors with deliberate specificity and data-attribute isolation.
-- Structural styles required for positioning, sizing, touch behavior, scroll snapping, and visibility are part of the behavior contract. Separate them from optional appearance CSS. Consumers can restyle supported parts without copying interaction code.
-
-Preserve the body-level custom portal. Do not replace it with a native `dialog`. Keep root and framework imports safe without browser globals; constructing a browser session may require the DOM. Keep all bindings as subpath exports in the same package, with no framework dependency entering the runtime.
-
-### Public composition points
-
-The initial parts are `Root`, `Item`, `Trigger`, `Portal`, `Content`, `Close`, `Previous`, `Next`, and optional `Thumbnails`. Provide a caption/description association and state hooks for application-authored controls. Exact names are validated in the contract spike.
-
-`Portal` places application-authored viewer controls/content into the runtime-owned body portal. `Content` connects media or framework-rendered content to the runtime's measured frame. Navigation and close parts supply command wiring and applicable accessibility/disabled state; consumers supply appearance and children. `Thumbnails` uses the runtime's bounded rendering and selection behavior rather than requiring one thumbnail component per source item.
-
-Document which element receives refs, state attributes, accessible relationships, and required styles for every part. Do not expose every internal node as a public component or promise unrestricted replacement of geometry-critical markup.
-
-## Browser support
-
-Target recent browsers with an explicit, versioned release matrix. The proposed window is current/previous stable desktop browsers and current/previous macOS/iOS major releases on their latest updates, subject to the capability audit. Keep legacy compatibility optional and deferred. See [browser support policy](BROWSER_SUPPORT.md) for exact scope, fallback requirements, and manual test records.
-
-Physical devices currently available are an iPhone 15 Pro and an M1 MacBook. Their OS/browser versions and test results still need recording. Android remains a target with an explicit physical-validation gap; it does not block independent automated work or a clearly labeled image beta. Do not claim verified Android interaction quality before obtaining device evidence.
+Automated tests cover bounded DOM, navigation, interruption, crop and radius continuity, origins,
+item replacement, loading failures, teardown, server rendering and the desktop and phone browser
+profiles ([TESTING.md](TESTING.md)). They don't establish physical iOS or Android quality, bounded
+decoded-image memory, or comparative performance.
 
 ## Interaction quality is a release contract
 
-Capture the current behavior before extraction, then add assertions for the cases that distinguish this library. Existing settled screenshots remain useful but are not sufficient motion tests.
+Assertions for the cases that distinguish this library. Settled screenshots are useful but are not motion tests.
 
 | Scenario                                 | Required behavior and evidence                                                                                                                                                                    |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -147,226 +52,46 @@ Use deterministic geometry assertions for continuity, browser automation for sta
 
 Before setting numeric budgets, collect raw samples on a stable runner for 1, 1,000, 10,000, and 100,000 items, plus a realistic 12-image gallery on a slower phone. Measure cold/warm first useful paint, interaction frame gaps, decode/upgrade work, network requests, and repeated-session retention. Keep synchronous opening cost and DOM bounds as separate checks. Track initial import bytes and total viewer activation bytes, including required dependencies and behavior CSS.
 
-Stage 0 must check in the baseline report, measurement definitions, runner configuration, and calibrated regression thresholds. Until this happens, frame/latency budgets are explicitly unresolved rather than claimed to pass. Repeated interrupted sessions must be checked for retained media, listeners, observers, timers, animations, and background loading as well as DOM cleanup. Compare selected scenarios with other lightboxes using the same assets and devices before making public superiority claims.
-
-## Long photo-library example and benchmark
-
-Build a Photos-style example with a genuinely scrollable, virtualized host grid. The current indexed example mounts 12 cards and replaces their window through a jump form; it does not exercise continuous host scrolling or thumbnail recycling under normal browsing.
-
-Use [TanStack Virtual](https://tanstack.com/virtual/latest/docs/introduction) for the first host implementation, through its core or appropriate framework adapter. Use stable item keys and its documented measurement/scrolling APIs. The example application owns grid layout and virtualization. Fluidbox consumes its indexed source and resolves currently mounted origins by stable ID. Do not add a photo-grid engine or virtualizer dependency to the runtime package.
-
-Define the integration checks against public source/origin APIs so they can be repeated with a second independent library, such as [React Virtuoso Grid](https://virtuoso.dev/react-virtuoso/), before claiming broad virtualizer compatibility. Test actual library behavior, not a mock with our preferred recycling semantics. Framework adapters must not need private Fluidbox DOM or library-specific branches in the interaction engine.
-
-- Default to 10,000 items with a 100,000-item stress option, date sections, mixed portrait/landscape dimensions, and responsive columns. Keep host and viewer DOM independently bounded.
-- Provide a deterministic local fixture mode for CI and a documented varied-photo mode for manual decode/memory testing. Repeated SVGs are useful for geometry but cannot establish realistic image-memory or transfer behavior. Use redistributable assets or caller-supplied photos; record the dataset and candidate dimensions with results.
-- Lazy-load thumbnails within a bounded host overscan range. Record host thumbnail requests separately from viewer preview/full-image requests. Exercise slow and failed media without making CI depend on a remote image service.
-- Open from a visible image after scrolling deep into the library; assert the opening pose matches that thumbnail. Navigate beyond the mounted host range and jump far away through the thumbnails while keeping the viewer mounted.
-- Change the host window programmatically while the modal is open to simulate recycling/source updates; do not unlock background scrolling merely for the benchmark. A recycled node must never become another item's close target.
-- Follow the selected item in the background by default in this example, including distant thumbnails navigation. Ask the host virtualizer to reveal it through an explicit public source hook, then re-resolve the mounted origin for closing and focus. Coalesce rapid navigation and cancel stale reveal work so an older request cannot move the host away from the final selection. Closing never waits for the host. Abort pending reveal work and use a matching visible origin immediately, or use the fallback transition.
-- Test repeated open/navigate/close sessions, reverse scroll direction, viewport/column changes, keyboard use, and physical touch/trackpad input. Assert selected IDs, visible ranges, focus, DOM bounds, and request cleanup; record first useful paint, frame gaps, and retained memory separately.
-
-Deliver a linked playground route, reproducible dataset/seed, browser scenarios, and raw measurements for both item counts. This is the next substantial example/benchmark part after the initial transition and bundle checks; it contributes evidence to Stage 0 without claiming that all performance gates are complete.
-
-## Source, state, and lifecycle contract
-
-### One source for DOM and indexed galleries
-
-Use synchronous metadata lookup for the initial contract. Media loading remains asynchronous. A source snapshot provides:
-
-- A finite `count`, unique stable item IDs, and `getItem(index)` returning a normalized descriptor.
-- `getIndex(id)` returning an index or a missing result. Opening by ID must not require scanning an arbitrary indexed source. `arraySource` may construct an ID map once per snapshot.
-- Optional origin resolution returning an element associated with an item ID. Revalidate that association, connection, and usable geometry before close handoff or focus restoration.
-- An optional host reveal hook for scrolling the actual gallery container or asking a virtualizer to mount the selected item. Keep source metadata synchronous; revealing an origin may complete asynchronously. Define cancellation, failure, and rapid-close behavior explicitly. A plain DOM adapter can scroll its item into view; an indexed adapter delegates scrolling to the host.
-
-`Item`/`Trigger` parts register origins, not a second copy of source metadata. The full source remains available when only a few triggers are mounted. DOM-authored galleries may build a source through an adapter; they must obey the same runtime contract.
-
-Start live updates with explicit `setSource(snapshot)`, not observation of arbitrary mutable arrays. Preserve the active ID if it still exists. If it was removed, select the item at the previous index clamped to the new count. If the new source is empty, close with reason `source-empty`. Reordering preserves identity, not the old index. A snapshot change invalidates stale item loads and lookups; responses from an older revision cannot replace current content.
-
-Invalid indices, duplicate IDs in array sources, and failed metadata lookups need documented errors. A provider lookup failure must leave a recoverable session and must not leak the portal or background inertness. Define the failure behavior in the contract tests before adding provider integrations.
-
-Unknown-length pagination and asynchronous item lookup are deferred. Applications can fetch data separately and replace a known-count snapshot.
-
-### Commands and semantic state
-
-Proposed commands are `open({ id } | { index })`, `close()`, `goTo({ id } | { index })`, `next()`, `previous()`, `setSource(source)`, `subscribe(listener)`, and `destroy()`. Readonly state includes `status: closed | opening | open | closing`, current ID/index, count, and requested destination while navigation is pending. Publish a separate settled notification so consumers do not confuse accepted navigation with completed motion.
-
-Adopt these proposed rules in the contract spike:
-
-- Motion commands resolve after their requested state settles. Return a discriminated result for completed, superseded, prevented, or aborted work. Invalid arguments reject. No promise remains pending after interruption or destruction.
-- A newer incompatible command supersedes the old command and continues from the painted pose. Repeated requests for the same pending destination share its outcome. `destroy()` is immediate and idempotent, cancels pending work, and releases all session resources.
-- Before-events are synchronous and cancelable for application-requested or user-requested actions. They cannot veto mandatory cleanup on destroy or prevent recovery from an empty source.
-- Carry reasons through commands and notifications, including trigger, keyboard, pointer, wheel, thumbnails, API, source update, and teardown as applicable.
-- Separate accepted selection changes from settlement; specify event order for prevention, interruption, no-op requests, source replacement, and reduced motion with trace-based tests.
-- Accept an `AbortSignal` for commands/loading that may outlive the caller. Aborting a command must settle it and leave a documented valid viewer state; it is not synonymous with destroying the viewer.
-
-Controlled framework state must use request callbacks and committed props without feedback loops. An uncontrolled root accepts requests immediately. A controlled root waits for the owning prop update before committing an open/close or item change; gesture tracking stays local and immediate, and unaccepted gestures settle back to committed state. The spike must prove parent acceptance, rejection, delayed updates, and teardown. Do not publish controlled props until their callback order and interrupted-motion behavior are tested.
-
-### Proposed plain JavaScript API
-
-Names and exact types remain drafts. Importing `createFluidbox` is SSR-safe; calling it creates browser behavior. The final API must not require custom-element registration.
-
-```ts
-import { createFluidbox, arraySource } from "@ogdakke/fluidbox";
-
-const viewer = createFluidbox({
-  source: arraySource(photos),
-  getOrigin: (id) => document.querySelector(`[data-photo-id="${CSS.escape(id)}"]`),
-  onChange: ({ id, index, reason }) => console.log(id, index, reason),
-});
-
-await viewer.open({ id: "photo-1" });
-await viewer.next();
-await viewer.close();
-viewer.destroy();
-```
-
-The spike must also demonstrate attaching application-authored controls and custom content to the body portal using public APIs alone. Specify attachment/disposal handles for plain JS parts alongside framework parts; the command-only example above is not the whole headless contract.
-
-Keep `registerFluidboxElements()` and `./elements` as the declarative adapter. Decide final tag names and attribute/event mapping before beta. Existing `app-*` names are provisional. Preserve live-content movement and template-based content options for DOM-owned content.
-
-## Framework composition
-
-### React
-
-Composed parts and hooks are the primary React API. Do not replace them with a mandatory preset viewer. The following illustrates the target composition, not working code. `photos` contains normalized media descriptors; `Content` resolves its item from that source rather than declaring a conflicting second `src`.
-
-```tsx
-import { Fluidbox, useFluidbox, useFluidboxState } from "@ogdakke/fluidbox/react";
-
-function PhotoGallery({ photos }) {
-  return (
-    <Fluidbox.Root items={photos}>
-      {photos.map((photo) => (
-        <Fluidbox.Item key={photo.id} id={photo.id}>
-          <Fluidbox.Trigger asChild>
-            <button>
-              <img src={photo.thumbnailSrc} alt={photo.alt} />
-            </button>
-          </Fluidbox.Trigger>
-        </Fluidbox.Item>
-      ))}
-      <Fluidbox.Portal>
-        <Fluidbox.Content />
-        <GalleryControls />
-      </Fluidbox.Portal>
-    </Fluidbox.Root>
-  );
-}
-
-function GalleryControls() {
-  const { next, previous, close } = useFluidbox();
-  const currentIndex = useFluidboxState((state) => state.currentIndex);
-  const count = useFluidboxState((state) => state.count);
-  return (
-    <nav aria-label="Gallery controls">
-      <button onClick={() => void previous()}>Previous</button>
-      <span>
-        {currentIndex === null ? 0 : currentIndex + 1}/{count}
-      </span>
-      <button onClick={() => void next()}>Next</button>
-      <button onClick={() => void close()}>Close</button>
-    </nav>
-  );
-}
-```
-
-The composed `Previous`, `Next`, and `Close` parts offer equivalent wiring for consumers who prefer parts over command hooks. Their examples must include finite-gallery disabled states. A `Content` render function receives item metadata and a runtime-provided mounting target for each retained custom-content slide; its exact signature is a stage 1 deliverable.
-
-A virtualized host supplies the full indexed source to `Root` and mounts only visible `Item`/`Trigger` parts. `Content` must render the runtime's bounded slide set without requiring a component for every item. Implement `useFluidboxState(selector)` with stable `useSyncExternalStore` snapshots and selector behavior; `useFluidbox()` exposes stable commands.
-
-The framework owns custom-content descendants. The runtime owns the outer measured frame and transforms. Render React content through React portals into stable targets for its mounted lifetime; do not manually reparent React-owned descendants. Eviction unmounts through React, and revisiting may remount. Persisting state across eviction is an application responsibility unless a bounded retention policy is explicitly added later. Test context, local state while mounted, events, refs, cleanup, Strict Mode, and hydration before freezing this shape.
-
-`asChild` must compose refs and handlers, honor consumer prevention of the part action, and document its single-child and accessibility requirements. Include a styled custom button and an anchor trigger with progressive fallback in the examples.
-
-### Thumbnail overlay composition
-
-Include a `ThumbnailOverlay` part in the contract spike. It inherits the item identity from `Item` and hosts application-authored badges, captions, play icons, counts, or other content over the thumbnail. Provide an equivalent plain-DOM attachment through the same runtime. The typed `host` and `travel` behaviors are the implementation target; they become supported runtime values only after the renderer ownership spike passes.
-
-Publish `data-fluidbox-phase` and `--fluidbox-progress` on the overlay's animation target. Keep the existing progress convention: `1` at the thumbnail pose and `0` at the fully open pose. Applications can use `opacity: var(--fluidbox-progress, 1)` for a continuous fade, phase selectors for immediate hiding, or their own transforms. Reversal and gesture cancellation must continue from the painted progress. These effects must not require per-frame framework state updates or independent CSS animation timers.
-
-The spike must distinguish a decoration that stays on the host card from content that travels with the opening/closing image. Define clipping, scaling, pointer-event and accessibility behavior for each. Framework-owned descendants must be rendered and disposed through their framework rather than manually reparented. Demonstrate what happens when the host virtualizer unmounts the originating `Item`, another item becomes selected, or closing falls back without an origin. If traveling overlay content needs a renderer owned by `Root`, make that registration explicit before freezing the component signature.
-
-### Other bindings
-
-| Binding         | Native shape                                                                        | Required proof                                                                              |
-| --------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Solid           | Composed parts and hooks using signals/accessors                                    | Controlled state, trigger composition, context in portal content, virtualized host, cleanup |
-| Vue             | Components, slots, composable commands/state, `v-model:open` and `v-model:activeId` | Slot forwarding, trigger composition, SSR hydration, portal context, source replacement     |
-| Angular         | Root/provider, item/trigger directives, content templates, signals and outputs      | Existing-element composition, projected content, hydration, updates, focus return           |
-| Custom elements | Tags, attributes, properties, DOM events                                            | Explicit registration, DOM/template content, same controller state and events               |
-
-Build one demanding example per binding using only public runtime APIs. Include DOM and indexed sources, source replacement while open, missing origins, and custom content. Framework-specific fixes must remain in bindings; gesture and portal behavior must remain shared. Keep current integrations usable during migration, with an explicit compatibility/deprecation path before release.
-
-## Media and CDN contract
-
-### Responsive images first
-
-Define a discriminated media descriptor shared by DOM adapters, indexed sources, and framework bindings. First implement image descriptors with stable ID, intrinsic dimensions, fallback URL, preview/thumbnail metadata, responsive width candidates, optional picture sources for format/art direction, alt text, and separate caption/description metadata.
-
-Define how picture-source dimensions affect the measured aspect ratio. Freeze handoff geometry during an active transition, then reconcile a changed ratio without a discontinuous gesture pose. Preserve the decoded preview until replacement is ready. Resolution upgrades must preserve zoom focal point and pan position.
-
-The runtime owns candidate selection inputs, decode scheduling, active-item priority, bounded adjacent preload, retries, and stale-result suppression. Prefer browser `srcset`/`sizes` selection for supplied candidates. Derive displayed size from viewport and zoom, cap it by source resolution, and use discrete upgrade thresholds rather than requesting a unique URL on every pinch event. Document that cancellation invalidates results and performs best-effort request cleanup; do not promise immediate browser decode or GPU-memory cancellation.
-
-Test slow, failed, retried, cached, and out-of-order loads; rapid direction changes; close during decode; DPR/viewport changes; and large images on a constrained device. Assert both visible continuity and bounded requests. The opening frame must not wait for a full-resolution image when a usable preview exists.
-
-### Video, iframe, and custom content
-
-Prove these through the same descriptor and renderer lifecycle before claiming media parity between DOM and indexed sources. Distinguish mount, activate, deactivate, and dispose: custom slides now do, through `active` and `onActiveChange` on their render context. Make zoom eligibility and gesture ownership explicit per content kind; `data-fluidbox-owns-input` now covers pinch as well as drags, wheel and keys.
-
-- Video retains native control interaction, pauses on deactivation, and has tested playback/fullscreen behavior on physical mobile devices. A renderer may provide provider-specific control later.
-- Iframes have dimensions, an accessible title, explicit embedding attributes, and an external close control. Cross-origin frame interiors are not a universal drag/keyboard interception area. Define whether eviction reloads content; do not promise persistence merely because an element is reused.
-- Custom content can contain forms and nested scroll regions. It must be able to reserve native interaction areas. Framework renderers retain ownership of descendants and receive lifecycle notifications without being manually moved by the runtime.
-
-Image beta can precede full mixed-media support, but the renderer ownership prototype must exist before extraction. Existing DOM media behavior must not regress during migration.
-
-### URL adapters and distribution
-
-Arbitrary URLs and precomputed responsive candidates work without an adapter. Define a pure, SSR-safe adapter that converts provider input into normalized descriptors/candidates; the runtime retains loading policy. Pilot one provider required by a real consumer after responsive images work end to end.
-
-Provider-specific tests cover width/DPR, format, crop/aspect ratio, URL encoding, existing query parameters, and signed URLs. Signing secrets never enter browser code. Accept pre-signed candidates; defer token refresh and server-specific signing helpers until required. Provider imports must not enter the default runtime bundle.
-
-Loading the library itself from a CDN is a separate release requirement. Test a plain HTML page using a version-pinned browser module and required behavior CSS, with documented dependency resolution and no bundler. Do not assume npm package publication alone proves this path.
+The measurement work must check in the baseline report, measurement definitions, runner configuration, and calibrated regression thresholds. Until then, frame/latency budgets are explicitly unresolved rather than claimed to pass. Repeated interrupted sessions must be checked for retained media, listeners, observers, timers, animations, and background loading as well as DOM cleanup. Compare selected scenarios with other lightboxes using the same assets and devices before making public superiority claims.
 
 ## Accessibility and styling gates
 
-Accessibility mechanics belong to the headless contract. Custom appearance must not remove required dialog semantics, naming, focus handling, background inertness, keyboard behavior, or reduced-motion support. Provide accessible parts and document consumer responsibilities for labels and arbitrary content.
+Custom appearance must not remove dialog semantics, naming, focus handling, background inertness,
+keyboard behaviour or reduced-motion support. Editing text or operating a native media or form
+control must not trigger gallery shortcuts. Test Escape ownership, focus traversal, nested scroll
+containers, open shadow roots, disabled and hidden controls, recycled-origin focus fallback and
+teardown, with RTL, forced colours, reduced motion and screen reader announcements. Reduced motion
+keeps state and event order, not only shorter animations. Two substantially different viewers built
+from the same parts, with their own controls, captions and thumbnails placement, must pass the
+interaction and accessibility checks without `baseline.css`.
 
-Audit keyboard routing before advertising arbitrary content. Editing text or operating a native media/form control must not trigger gallery shortcuts. Test Escape ownership, focus traversal, nested scroll containers, open shadow roots, disabled/hidden controls, recycled-origin focus fallback, and teardown. Provide configurable UI/status labels and test RTL, high contrast, reduced motion, and screen reader announcements. Reduced motion must preserve correct state and event ordering, not just shorten animation duration.
+## Before 1.0
 
-Audit every current CSS rule into required behavior, optional appearance, or portfolio-specific presentation. Replace `@scope` dependence with explicit data-attribute isolation; test both stylesheet orders against application overrides. Preserve accessible state hooks and document motion variables so consumers can customize appearance and coordinated effects without replacing the engine. Keep the existing `./styles.css` path during migration; settle the behavior/appearance export names before beta. Verify two substantially different application-designed viewers using the same parts and behavior styles, including custom captions, controls, and thumbnails placement. Both must pass interaction and accessibility checks without relying on an example theme.
+| Work                 | Remaining                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Protect interactions | Physical iPhone, Mac and Android results; calibrated cold-load, frame-gap, memory and repeated-session budgets.                                    |
+| Docs and examples    | Plan step 6: every page on the new API, the patterns and `CONTRACT.md`, URL sync for each router.                                                  |
+| Integration          | Adoption in `portfolio-v4`, feedback from an independent consumer, physical mixed-media checks.                                                    |
+| Release              | Final names, license, browser matrix with tested versions ([BROWSER_SUPPORT.md](BROWSER_SUPPORT.md)), changelog, clean installs, release evidence. |
 
-## Delivery order and exit criteria
+## Open decisions
 
-| Stage                         | Status      | Remaining exit work                                                                                                                      |
-| ----------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 0. Protect interactions       | In progress | Record physical iPhone/Mac results and calibrated cold-load, frame-gap, memory, and repeated-session budgets.                            |
-| 1. Contract spike             | Complete    | Plain JS and React use the locked source, controller, renderer, origin, overlay, styling, and composition contracts.                     |
-| 2. Finish behavior extraction | In progress | Delegate custom elements to runtime modules, restore pointerdown preparation, and move shared regressions off element fixtures.          |
-| 3. Headless image beta        | In progress | Add a second custom UI, Strict Mode/hydration coverage, the behavior/theme CSS decision, and beta documentation.                         |
-| 4. Integration and media      | In progress | Finish portfolio adoption, independent-consumer feedback, physical mixed-media checks, and one demanded optional CDN adapter.            |
-| 5. Framework parity           | Not started | Replace the Solid, Vue, and Angular element wrappers with native bindings and run their lifecycle, portal, update, and hydration suites. |
-| 6. Stable release             | Not started | Finalize names, license, migration guide, browser matrix, CDN module example, changelog, clean installs, and release evidence.           |
+1. Caller-selected focus fallback and origin discovery in open shadow roots. The fallback is the
+   nearest focusable host.
+2. Geometry when responsive art direction or new items change the aspect ratio while zoomed.
 
-Stages 0–3 define the image beta. All listed framework bindings remain the 1.0 target; they do not delay image-beta feedback. Named CDN provider count and a registry recipe are not release gates. A later shadcn recipe should install editable composition/style code depending on the maintained runtime, never a copied gesture implementation.
+## After 1.0
 
-## Open contract decisions
+- Deep zoom: `@ogdakke/fluidbox/deep-zoom`, with IIIF and DZI tiles on `onZoom` and
+  `zoomable({ max, sharpen })`, and parts per framework.
+- A Svelte binding.
+- Lists of unknown length fetched page by page beyond `reachend`, persistent offscreen custom
+  content, CDN URL adapters on demand, and a shadcn registry recipe that installs editable parts
+  over the maintained runtime, never a copied gesture implementation.
 
-The first lock settled renderer attachment, portal ownership, command abort results, synchronous
-source validation, finite navigation, one-active-viewer ownership, recycled origin identity, host
-reveal cancellation, and immediate close fallback. These remain open:
+## Framework references
 
-1. Controlled React state and its delayed-acceptance callback order.
-2. Caller-selected focus fallback and open-shadow-root origin discovery. The current fallback uses
-   the nearest explicitly focusable host.
-3. Geometry changes when responsive art direction or source replacement changes aspect ratio while
-   zoomed.
-4. Whether looping belongs in the runtime. The locked beta navigation is finite.
-5. The structural/theme stylesheet split and final custom-element tag names.
-
-## Deferred work
-
-Unknown-length async pagination, arbitrary provider fetching in navigation, persistent offscreen custom-content trees, enormous-image tiling, a general plugin framework, numerous CDN providers, preset viewers, slideshow, fullscreen/share/download utilities, URL-history integration, and a shadcn registry recipe are not prerequisites for the headless image beta. Preserve enough commands, state, and composition points for applications to implement optional controls without depending on private DOM. Add dedicated runtime behavior only when a proven use case and interaction tests justify it.
-
-## Framework and registry references
-
-These are design references, not selected dependencies: [Kobalte's Solid dialog parts](https://kobalte.dev/docs/core/components/dialog/), [Reka UI's Vue composition](https://www.reka-ui.com/docs/guides/composition), [spartan/ui's Angular dialog and directives](https://www.spartan.ng/components/dialog), and [shadcn's registry format](https://ui.shadcn.com/docs/registry/getting-started). Use separate native APIs over one runtime rather than forcing identical component syntax on every framework.
+Design references, not dependencies: [Kobalte's Solid dialog parts](https://kobalte.dev/docs/core/components/dialog/),
+[Reka UI's Vue composition](https://www.reka-ui.com/docs/guides/composition),
+[spartan/ui's Angular dialog and directives](https://www.spartan.ng/components/dialog) and
+[shadcn's registry format](https://ui.shadcn.com/docs/registry/getting-started).

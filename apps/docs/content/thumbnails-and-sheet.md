@@ -7,7 +7,7 @@ description: The two optional add-ons, the thumbnails and the sheet, with their 
 
 # Thumbnails and sheet
 
-Both are optional add-ons with their own entries, so their code loads only when you use them. Turn one on with the `thumbnails` and `sheet` options of `createFluidbox`, the `Thumbnails` and `Sheet` parts in each framework, or a `<fluidbox-thumbnails>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
+Both are optional add-ons with their own entries, so their code loads only when you use them: a gallery without them never loads it. Turn one on with the `thumbnails` and `sheet` options of `createFluidbox`, the `Thumbnails` and `Sheet` parts in each framework, or a `<fluidbox-thumbnails>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
 
 ```ts
 import { createFluidbox } from "@ogdakke/fluidbox";
@@ -16,6 +16,8 @@ import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/styles.css";
 import "@ogdakke/fluidbox/thumbnails.css";
 import "@ogdakke/fluidbox/sheet.css";
+// Optional: the thumbnails' and the sheet's look.
+import "@ogdakke/fluidbox/baseline.css";
 
 const fluidbox = createFluidbox({
   items: photos,
@@ -32,7 +34,7 @@ The fluidbox loads an add-on's entry the first time you turn it on, and an open 
 
 ## Thumbnails
 
-The thumbnails is a strip of thumbnails for a gallery of more than one item. A tap moves to that item, a drag or a wheel scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its styles are in `@ogdakke/fluidbox/thumbnails.css`.
+The thumbnails add-on is a strip of thumbnails for a gallery of more than one item. A tap moves to that item, a drag or a wheel scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its layout is in `@ogdakke/fluidbox/thumbnails.css`, and its look (corners, the selected item's mark) in the opt-in `baseline.css`.
 
 The strip is viewer content like your own. It mounts beside the viewer's layer, in `[data-fluidbox-addons]`, so a redraw of the layer, or a viewer renderer that clears its `target`, leaves it be. It reveals and dismisses with the layer, as `data-fluidbox-chrome`, and floats over the slides. `thumbnails.css` runs it along the bottom and keeps the photo above it by `--fluidbox-thumbnails-space`. Your CSS on `[data-fluidbox-thumbnails-dock]` puts it anywhere else, over the photo or beside it. Set `--fluidbox-thumbnails-space: 0px` when the photo should run under it.
 
@@ -68,7 +70,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-Each button is a `role="option"` in a listbox named by the `thumbnailsList` [label](./api.md#labels). It has `data-fluidbox-thumbnails-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name, or its place from the `position` label when it has neither. The selected thumbnail is fully opaque and has a bar along its foot, a border, so it shows in forced colours too. With a thumbnail focused, the arrow keys along the strip step through the items, Home and End go to the ends, and focus follows the selection. The strip carries `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
+Each button is a `role="option"` in a listbox named by the `thumbnailsList` [label](./api.md#labels). It has `data-fluidbox-thumbnails-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name, or its place from the `position` label when it has neither. With `baseline.css`, the selected thumbnail is fully opaque and has a bar along its foot, a border, so it shows in forced colours too. With a thumbnail focused, the arrow keys along the strip step through the items, Home and End go to the ends, and focus follows the selection. The strip carries `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
 
 `render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Thumbnails` parts render through it. Put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
 
@@ -104,20 +106,20 @@ A sheet is always tall enough for its highest pixel or percentage stop. No stop 
 
 With the sheet on, `fluidbox.sheet` is a `FluidboxSheet` that you drive and read:
 
-| Member                | What it does                                                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `stop`                | The stop the sheet rests at: `0`, then one per snap point.                                                                           |
-| `set(stop, options?)` | Move to a stop, clamped to the stops there are. `{ animate: false }` jumps. Ignored while the viewer isn't open or the sheet is off. |
+| Member                    | What it does                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `snap`                    | The stop the sheet rests at: `0`, then one per snap point.                                                                           |
+| `setSnap(snap, options?)` | Move to a stop, clamped to the stops there are. `{ animate: false }` jumps. Ignored while the viewer isn't open or the sheet is off. |
 
-Each time the sheet comes to rest at another stop, the fluidbox fires `sheetchange`, a `FluidboxSheetEvent` with `stop` and `reason`. The reason is `"pointer"` for a swipe or a tap, `"wheel"` for a wheel or trackpad, `"keyboard"` for Escape or a key on a stop button, `"api"` for `set()` and for the return to rest as the viewer opens or closes.
+Each time the sheet comes to rest at another stop, the fluidbox fires `sheetchange`, a `FluidboxSheetEvent` with `snap` and `reason`. The reason is `"pointer"` for a swipe or a tap, `"wheel"` for a wheel or trackpad, `"keyboard"` for Escape or a key on a stop button, `"api"` for `setSnap()` and for the return to rest as the viewer opens or closes.
 
 ```ts
-fluidbox.addEventListener("sheetchange", ({ stop, reason }) => {
-  console.log(`sheet at stop ${stop}, by ${reason}`);
+fluidbox.addEventListener("sheetchange", ({ snap, reason }) => {
+  console.log(`sheet at stop ${snap}, by ${reason}`);
 });
 ```
 
-In the frameworks, `useFluidboxSheet()` returns `{ stop, set }`, with `stop` in the framework's reactive form. The root takes the event as `onSheetChange`, `@sheetchange` or `(sheetChange)`, and a `SheetStop` part is a button that moves the sheet to its `stop`. On custom elements, `gallery.sheet` is the handle and the gallery fires `sheetchange`.
+In the frameworks, `useFluidboxSheet()` (React, Vue and Solid) and `injectFluidboxSheet()` (Angular) return `snap` in the framework's reactive form and `setSnap`. The `Sheet` part takes the event as `onSnapChange`, `@snap-change` or `(snapChange)`, and a `SheetSnap` part (`fluidboxSheetSnap` in Angular) is a button that moves the sheet to its stop. See the [framework pages](./react.md) for each one's form. On custom elements, `gallery.sheet` is the handle and the gallery fires `sheetchange`.
 
 ### The sheet's content
 

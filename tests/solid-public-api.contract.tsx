@@ -67,7 +67,10 @@ function Price(): JSX.Element {
     from ? null : { currentTime: 1, paused: true },
   );
   unregister();
-  if (slide.opening && !slide.active) slide.fail(new Error("no price"));
+  const model: HTMLElement | undefined = slide.origin?.model;
+  const stopClose: () => void = slide.onClose((landing) => void landing?.model?.isConnected);
+  stopClose();
+  if (!model && slide.opening && !slide.active) slide.fail(new Error("no price"));
   return <p>{`${slide.item.credit} ${slide.index}`}</p>;
 }
 

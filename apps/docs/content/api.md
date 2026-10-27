@@ -7,7 +7,7 @@ description: Every entry point of @ogdakke/fluidbox and every export of the root
 
 # API reference
 
-Complete API reference
+Every entry point, and every export of the package root, read from the package source. The guides explain when to use each; this page has the exact types.
 
 ## Entry points
 
@@ -17,7 +17,9 @@ Complete API reference
 
 ## createFluidbox(options)
 
-<!-- api: createFluidbox, FluidboxOptions, FluidboxControlName -->
+<!-- api: createFluidbox, FluidboxOptions, FluidboxControlName, FluidboxPreload, FluidboxSlideshowOptions -->
+
+`slideshow` is covered in [Slideshow](./slideshow.md), and `reachEndThreshold` in [Lists that grow](./items-and-origins.md#lists-that-grow).
 
 ## Fluidbox
 
@@ -32,23 +34,29 @@ fluidbox.update({
 
 ## FluidboxState
 
-<!-- api: FluidboxState, FluidboxStatus, FluidboxZoomState -->
+<!-- api: FluidboxState, FluidboxStatus, FluidboxValue, FluidboxZoomState -->
 
 ## Events
 
-<!-- api: FluidboxEventMap, FluidboxValueChangeEvent, FluidboxValueChangeDetails, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxMediaErrorEvent, FluidboxMediaErrorKind, FluidboxReason -->
+<!-- api: FluidboxEventMap, FluidboxValueChangeEvent, FluidboxValueChangeAction, FluidboxValueChangeDetails, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxMediaErrorEvent, FluidboxMediaErrorKind, FluidboxReachEndEvent, FluidboxReason -->
 
 ## Items
 
-<!-- api: FluidboxItem, FluidboxItemBase, FluidboxImageItem, FluidboxVideoItem, FluidboxIframeItem, FluidboxCustomItemBase, FluidboxItemTypes, FluidboxThumbnail, FluidboxPictureSource, idOf, itemLabel -->
+<!-- api: FluidboxItem, FluidboxItemBase, FluidboxImageItem, FluidboxVideoItem, FluidboxVideoSource, FluidboxVideoTrack, FluidboxIframeItem, FluidboxCustomItemBase, FluidboxItemTypes, FluidboxThumbnail, FluidboxPictureSource, idOf, itemLabel, imageItem, FluidboxImageProps -->
 
 ## Lists
 
-<!-- api: FluidboxItems, FluidboxItemList, createItemList, FluidboxItemListOptions -->
+<!-- api: FluidboxItems, FluidboxItemList, createItemList, FluidboxItemListOptions, FluidboxLazyItemList -->
 
 ## Renderers
 
-<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlides, FluidboxSlideRenderer, FluidboxSlide, FluidboxSlideOrigin, FluidboxPlayback, FluidboxPlaybackSource, FluidboxViewerRenderer, FluidboxViewerContext -->
+<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlides, FluidboxSlideRenderer, FluidboxSlide, FluidboxSlideOrigin, FluidboxPlayback, FluidboxPlaybackSource, FluidboxZoomPose, FluidboxZoomableOptions, FluidboxVideoOptions, FluidboxVideoAttachSlide, videoSlide, FluidboxViewerRenderer, FluidboxViewerContext -->
+
+### Hotspots
+
+`slide.hotspot(options)` puts a button on a point of the media. See [Hotspots](./hotspots.md).
+
+<!-- api: FluidboxHotspotOptions, FluidboxHotspotCoordinate -->
 
 ## Triggers
 

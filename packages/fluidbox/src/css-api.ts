@@ -124,7 +124,10 @@ export const parts: readonly CssName[] = [
   { names: ["data-fluidbox-close", "data-fluidbox-previous", "data-fluidbox-next"] },
   /** The zoom controls. On a button of yours in the viewer, it zooms the image on show. */
   { names: ["data-fluidbox-zoom-in", "data-fluidbox-zoom-out", "data-fluidbox-zoom-reset"] },
-  /** Full screen, Download and Share. Each hides where it can't work: no fullscreen, no file, no link. */
+  /**
+   * Full screen, Download and Share. Each hides where it can't work: no
+   * fullscreen, no file, no link. Full screen has `data-active` while the viewer is full screen.
+   */
   { names: ["data-fluidbox-fullscreen", "data-fluidbox-download", "data-fluidbox-share"] },
   /** The default counter, as "3 / 12". Hidden from assistive technology, which hears the position already. */
   { names: ["data-fluidbox-counter"] },
@@ -286,8 +289,12 @@ export const states: readonly CssName[] = [
   { names: ["data-fluidbox-phase"], on: "Trigger overlays" },
   /** The current item. */
   { names: ["aria-selected", "data-fluidbox-selected"], on: "Thumbnails items" },
-  /** The slide on show, and the thumbnail of its item. */
-  { names: ["data-active"], on: "Slides, thumbnails items" },
+  /**
+   * The slide on show, and the thumbnail of its item. On a control that
+   * switches, while it is on: Slideshow while it plays, Full screen while the
+   * viewer is full screen, yours bound to them included.
+   */
+  { names: ["data-active"], on: "Slides, thumbnails items, controls" },
   /** The viewer is full screen. */
   { names: ["data-fullscreen"], on: "Viewer" },
   /** Its media is loading, as `aria-busy="true"` says. */

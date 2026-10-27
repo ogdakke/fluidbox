@@ -34,6 +34,7 @@ declare module "@ogdakke/fluidbox" {
     lazy: FluidboxCustomItemBase<"lazy">;
     held: FluidboxCustomItemBase<"held">;
     reel: FluidboxCustomItemBase<"reel">;
+    card: FluidboxCustomItemBase<"card">;
   }
 }
 
@@ -45,6 +46,10 @@ const fixture = {
   openGate: undefined as (() => void) | undefined,
   /** Each reel slide's origin, read again whenever the test asks. */
   reels: [] as { index: number; read: () => FluidboxSlideOrigin | null }[],
+  /** Each card slide's origin model, as the item its trigger holds, read again whenever the test asks. */
+  cards: [] as { index: number; read: () => string | null }[],
+  /** Where each close from a card slide landed: the item whose model it landed on. */
+  landings: [] as (string | null)[],
   /** Each held slide's index, read again whenever the test asks. */
   held: [] as { id: string; read: () => number }[],
   /** The items of the held viewer, which the test can change. */
@@ -134,7 +139,26 @@ const Reel = defineComponent(() => {
     );
 });
 
-const custom = (type: "lazy" | "held" | "reel", id: string): FluidboxItem => ({
+/** The item whose trigger holds `model`, which is what a card reports. */
+const holder = (model: HTMLElement | undefined) =>
+  model?.closest<HTMLElement>("[data-item]")?.dataset.item ?? null;
+
+// A slide that reads the trigger's live model, and hears where each close lands.
+const Card = defineComponent(() => {
+  const slide = useFluidboxSlide<FluidboxCustomItemBase<"card">>();
+  let stop: (() => void) | undefined;
+  onMounted(() => {
+    fixture.cards.push({ index: slide.index, read: () => holder(slide.origin?.model) });
+    stop = slide.onClose((landing) => fixture.landings.push(holder(landing?.model)));
+  });
+  onBeforeUnmount(() => stop?.());
+  return () =>
+    h(Fluidbox.Media, null, () =>
+      h("div", { class: "media-probe", "data-test": "card" }, slide.item.title as string),
+    );
+});
+
+const custom = (type: "lazy" | "held" | "reel" | "card", id: string): FluidboxItem => ({
   type,
   id,
   title: `${type} ${id}`,
@@ -143,6 +167,7 @@ const custom = (type: "lazy" | "held" | "reel", id: string): FluidboxItem => ({
 });
 const reels = [custom("reel", "reel-a"), custom("reel", "reel-b")];
 const lazyItems = [custom("lazy", "lazy")];
+const cards = [custom("card", "card-a"), custom("card", "card-b")];
 
 const HeldViewer = defineComponent(() => {
   const items = shallowRef<FluidboxItem[]>([custom("held", "held-a"), custom("held", "held-b")]);
@@ -312,6 +337,19 @@ const App = defineComponent(() => {
         ),
       ]),
       h(Fluidbox.Slides, null, { reel: () => h(Reel) }),
+    ]),
+    h("h2", "A slide that reads the trigger's live model and hears each close"),
+    h(Fluidbox.Root, { items: cards }, () => [
+      h(
+        "div",
+        { class: "media-grid", id: "cards" },
+        cards.map((item) =>
+          h(Fluidbox.Trigger, { key: item.id, value: item.id!, "data-item": item.id }, () =>
+            h("model-viewer"),
+          ),
+        ),
+      ),
+      h(Fluidbox.Slides, null, { card: () => h(Card) }),
     ]),
   ];
 });
