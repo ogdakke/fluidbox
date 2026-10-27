@@ -827,12 +827,14 @@ function Slides<TItem extends FluidboxItem>(props: FluidboxSlidesProps<TItem>): 
     // Development builds only; a page without a bundler has no process.
     const twice = (() => {
       try {
-        if (process.env.NODE_ENV !== "production") return claimed.has(slides);
+        if (process.env.NODE_ENV !== "production") {
+          if (claimed.has(slides)) return "A <Fluidbox.Root> takes one <Fluidbox.Slides>.";
+          claimed.add(slides);
+        }
       } catch {}
-      return false;
+      return "";
     })();
-    if (twice) throw new Error("A <Fluidbox.Root> takes one <Fluidbox.Slides>.");
-    claimed.add(slides);
+    if (twice) throw new Error(twice);
     return () => {
       claimed.delete(slides);
       slides.set(null);

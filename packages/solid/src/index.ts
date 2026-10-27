@@ -555,11 +555,12 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
       // Development builds only; a page without a bundler has no process.
       const twice = (() => {
         try {
-          if (process.env.NODE_ENV !== "production") return untrack(slides) !== null;
+          if (process.env.NODE_ENV !== "production" && untrack(slides) !== null)
+            return "A <Fluidbox.Root> takes one <Fluidbox.Slides>.";
         } catch {}
-        return false;
+        return "";
       })();
-      if (twice) throw new Error("A <Fluidbox.Root> takes one <Fluidbox.Slides>.");
+      if (twice) throw new Error(twice);
       setSlides(() => contents);
       return () => setSlides((current) => (current === contents ? null : current));
     },

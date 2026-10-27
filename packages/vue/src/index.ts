@@ -846,12 +846,14 @@ const Slides = defineComponent({
     // Development builds only; a page without a bundler has no process.
     const twice = (() => {
       try {
-        if (process.env.NODE_ENV !== "production") return claimed.has(slides);
+        if (process.env.NODE_ENV !== "production") {
+          if (claimed.has(slides)) return "A <Fluidbox.Root> takes one <Fluidbox.Slides>.";
+          claimed.add(slides);
+        }
       } catch {}
-      return false;
+      return "";
     })();
-    if (twice) throw new Error("A <Fluidbox.Root> takes one <Fluidbox.Slides>.");
-    claimed.add(slides);
+    if (twice) throw new Error(twice);
     const entry = () => ({ slots: slots as SlidesEntry["slots"] });
     slides.value = entry();
     // The slides on show render the newest slots.
