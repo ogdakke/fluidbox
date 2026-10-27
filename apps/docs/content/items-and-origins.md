@@ -2,7 +2,7 @@
 title: Items and origins
 section: Guides
 order: 3
-description: How fluidbox takes a collection (arrays, lazy lists of any size, setItems) and finds the element each item flies from and back to (triggers, data-fluidbox-origin, the origin adapter for virtualized grids, reveal on close).
+description: How fluidbox takes a collection (arrays, lazy lists of any size, setItems, lists that grow on reachend) and finds the element each item flies from and back to (triggers, data-fluidbox-origin, the origin adapter for virtualized grids, reveal on close).
 ---
 
 # Items and origins
@@ -11,7 +11,7 @@ Fluidbox keeps two things apart. The **items** say what the viewer can show. The
 
 ## Items
 
-An item is a plain object: `{ type: "img", src, alt, width, height }`, a `video`, an `iframe`, or `custom` content. [Media types](./media.md) covers every field. Each item is known by its `id`, which defaults to its `src`. `idOf(item)` from the package root returns it. Events report ids and triggers register them, so they must be unique in a list. Commands and triggers take the item itself, its index or its id. The viewer matches an item by its id, so a fresh copy of it works too.
+An item is a plain object: `{ type: "image", src, alt, width, height }`, a `video`, an `iframe`, or a type of your own. [Media types](./media.md) covers every field. Each item is known by its `id`, which defaults to its `src`. `idOf(item)` from the package root returns it. Events report ids and triggers register them, so they must be unique in a list. Commands and triggers take the item itself, its index or its id. The viewer matches an item by its id, so a fresh copy of it works too.
 
 The viewer takes its items as an array or as a lazy list. Pass them as the `items` option of `createFluidbox`, the `items` prop of each framework root, or the `items` property of `<fluidbox-gallery>`.
 
@@ -37,7 +37,7 @@ import { createItemList } from "@ogdakke/fluidbox";
 export const library = createItemList({
   count: 1000,
   item: (index) => ({
-    type: "img",
+    type: "image",
     id: `photo-${index}`,
     src: `/photos/${index}.jpg`,
     alt: `Photo ${index + 1}`,
@@ -51,9 +51,9 @@ export const library = createItemList({
 
 - `item(index)` runs once per index. The list keeps what it returns, so `state.item` and every event get the same object for the same item, and your effects and memos keyed on it don't run again.
 - `index(id)` says where an id is, and it can be a rough guess. The list ignores an index out of range, and an index whose item has a different id, so `"photo-01"` and `"photo-x"` find nothing. Leave it out and the list scans for ids, which is fine for a few hundred items and slow for a hundred thousand.
-- The list is a snapshot. To change the items, make a new list and pass it in.
+- The list is a snapshot. To change the items, make a new list and pass it in. `list.withCount(count)` makes the same list at another length and keeps the items already made; see [Lists that grow](#lists-that-grow).
 
-`createItemList` returns a plain `FluidboxItemList`. You can also write one yourself, when you need control the factory doesn't give:
+`createItemList` returns a `FluidboxLazyItemList`: a `FluidboxItemList` with `indexOf` and `withCount`. You can also write one yourself, when you need control the factory doesn't give:
 
 ```ts
 interface FluidboxItemList<TItem> {
@@ -78,9 +78,49 @@ Pass new items with `fluidbox.setItems(items)`, a new `items` prop in a framewor
 - If it isn't, the viewer moves to the item now at the same index, or the last one.
 - If the new list is empty, the viewer closes.
 
-A move fires `itemchange` and `settle` with the reason `"items"`. A command still running when the items change resolves `false`.
+A move fires `beforevaluechange`, not cancelable, then `valuechange` and `valuechangecomplete`, with the reason `"items"`. A command still running when the items change resolves `false`.
 
 Items equal to the current ones change nothing: an array whose items match the current ones in order, field by field (`thumbnail`, `sources` and other plain objects and arrays by their contents). So a framework can pass `items={products.map(toItem)}` on every render without interrupting a move or reloading a slide; `setItems` resolves `false`. When the items do change, a slide whose item is unchanged stays, loaded, wherever its item moved to, and only the changed ones are made again. Swapping a product's variant keeps the photos the variants share. To change an item, pass a new object: one changed in place compares equal to itself.
+
+## Lists that grow
+
+A feed or a search result can load its next page as the viewer nears the end. The fluidbox fires `reachend`, a `FluidboxReachEndEvent`, once the viewer settles on an item within `reachEndThreshold` items of the last, 2 by default. The event carries `value` and `index`, the item on show, and `count`, the item count it fired for. Append the next page and pass the longer list to `setItems`:
+
+```ts
+import { createFluidbox, createItemList, type FluidboxImageItem } from "@ogdakke/fluidbox";
+
+const photo = (index: number): FluidboxImageItem => ({
+  type: "image",
+  id: `photo-${index}`,
+  src: `/photos/${index}.jpg`,
+  alt: `Photo ${index + 1}`,
+  width: 1600,
+  height: 1200,
+});
+
+let list = createItemList({ count: 24, item: photo });
+const fluidbox = createFluidbox({ items: list, reachEndThreshold: 4 });
+
+fluidbox.addEventListener("reachend", async ({ count }) => {
+  const total = await fetchTotalAfter(count);
+  list = list.withCount(total);
+  await fluidbox.setItems(list);
+});
+```
+
+`list.withCount(total)` is the same list at another length. It keeps the items already made, so the open item, its slide and the slides around it stay as they are, and only the new indices are made when the viewer reaches them. An array works too: pass the longer array, and the items it shares with the old one keep their slides.
+
+- `reachend` fires once per item count. A close and a reopen at the same count doesn't fire it again.
+- Any change of the count re-arms it. If the open item is already within the threshold of the new end, it fires at once.
+- It never fires with `loop`, since a looping gallery has no end. `loop` can change while the viewer is open; the viewer goes round, or stops at the ends, from the next move.
+- `update({ reachEndThreshold })` changes the threshold live.
+
+The bindings and the custom elements take the same event and option:
+
+- [React](./react.md) and [Solid](./solid.md): `onReachEnd` and `reachEndThreshold` on `Root`.
+- [Vue](./vue.md): `@reach-end` and `reach-end-threshold` on `Root`.
+- [Angular](./angular.md): `(reachEnd)` and `reachEndThreshold` on `fluidboxRoot`.
+- [Custom elements](./custom-elements.md): the `reachend` event, the `reach-end-threshold` attribute and the `reachEndThreshold` property of `<fluidbox-gallery>`.
 
 ## Origins
 
@@ -93,7 +133,7 @@ You never build one by hand. Every trigger (`fluidbox.bind`, the framework `Trig
 For a trigger, the viewer picks the visual in this order:
 
 1. The trigger itself or a descendant, marked `data-fluidbox-origin`.
-2. The trigger itself if it is an `<img>` or `<video>`, else its first `<img>` or `<video>`.
+2. The trigger itself if it is an `<img>`, a `<video>` or a `<model-viewer>`, else the first of them inside it.
 3. The trigger.
 
 The flight's thumbnail is the visual if it is an `<img>`, else the first `<img>` inside it. Mark the element that clips the picture. If a rounded wrapper crops a square image, mark the wrapper, or the flight lands with square corners:
@@ -161,7 +201,7 @@ const fluidbox = createFluidbox({
 });
 ```
 
-- `phase` is `"open"` after an opening and `"selection"` after a move.
+- `phase` is `"open"` before the opening flight and `"selection"` as the viewer moves between items.
 - The viewer's motion never waits for the promise. When it resolves, the viewer hides the item's thumbnail on the page, so the picture doesn't show twice.
 - `signal` aborts when the selection moves on, the viewer closes, the items change or the fluidbox is destroyed. Check it before late work.
 - The viewer ignores errors thrown here.

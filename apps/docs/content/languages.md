@@ -7,11 +7,11 @@ description: Translate the viewer's labels, use an i18n library, and run the vie
 
 # Languages and direction
 
-The viewer has fifteen strings of its own: button names, the dialog's name, what it announces as it moves, what a screen reader calls the strip and its slides, and the error on a slide that failed to load. Everything else it shows comes from your items, such as `alt` and `title`. Fluidbox ships these strings in English and no other language. You pass your own through `labels`.
+The viewer has 27 strings of its own: the controls' names, the dialog's name, what it announces as it moves, what a screen reader calls the strip, the thumbnails and the sheet, the zoom readout, and the error on a slide that failed to load. Everything else it shows comes from your items, such as `alt` and `title`. Fluidbox ships these strings in English and no other language. You pass your own through `labels`.
 
 ## Labels
 
-`labels` takes any of the strings. The ones you leave out stay English. [Labels](./api.md#labels) in the API reference lists them all.
+`labels` takes any of the strings. The ones you leave out stay English. [Labels](./api.md#labels) in the API reference lists them all. The controls show their labels as text until you give them content of your own; then the label becomes the control's `aria-label`, so translate it either way.
 
 ```ts
 createFluidbox({
@@ -42,52 +42,25 @@ New labels apply to an open viewer straight away. Each entry point takes them th
 
 - **Plain JavaScript:** `fluidbox.update({ labels })`.
 - **Custom elements:** set the gallery's `labels` property.
-- **React, Vue, Solid:** pass a new `labels` prop to `Root`. React and Vue compare labels by their strings, so an inline object on every render does nothing until a string changes.
+- **React, Vue, Solid:** pass a new `labels` prop to `Root`.
 - **Angular:** bind `[labels]` on `fluidboxRoot`.
 
-With react-i18next, build the labels from `t` and pass them to `Root`:
+Labels equal to the last ones change nothing: `update` compares them string by string, and functions such as `position` by identity. Build them from your i18n library's translate function where the language changes:
 
-```tsx
-import { useTranslation } from "react-i18next";
-import { Fluidbox } from "@ogdakke/fluidbox/react";
-
-function Gallery() {
-  const { t } = useTranslation();
-  const labels = {
-    close: t("viewer.close"),
-    previous: t("viewer.previous"),
-    next: t("viewer.next"),
-    position: (index: number, count: number) => t("viewer.position", { index: index + 1, count }),
-  };
-  return (
-    <Fluidbox.Root items={photos} labels={labels}>
-      {/* … */}
-    </Fluidbox.Root>
-  );
-}
+```ts
+i18n.on("languageChanged", () => {
+  fluidbox.update({
+    labels: {
+      close: i18n.t("viewer.close"),
+      previous: i18n.t("viewer.previous"),
+      next: i18n.t("viewer.next"),
+      position: (index, count) => i18n.t("viewer.position", { index: index + 1, count }),
+    },
+  });
+});
 ```
 
-With vue-i18n, a `computed` does the same:
-
-```vue
-<script setup lang="ts">
-import { computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { Fluidbox } from "@ogdakke/fluidbox/vue";
-
-const { t } = useI18n();
-const labels = computed(() => ({
-  close: t("viewer.close"),
-  previous: t("viewer.previous"),
-  next: t("viewer.next"),
-  position: (index: number, count: number) => t("viewer.position", { index: index + 1, count }),
-}));
-</script>
-
-<template>
-  <Fluidbox.Root :items="photos" :labels="labels"><!-- … --></Fluidbox.Root>
-</template>
-```
+In a framework, compute the same object where your component reads the language, and pass it to `Root`. The framework pages show the prop: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md) and [Custom elements](./custom-elements.md).
 
 ## Direction
 
@@ -97,8 +70,8 @@ Right to left, these flip:
 
 - ArrowLeft goes to the next item, and ArrowRight to the previous one.
 - A swipe or trackpad scroll to the left goes forward. The slides are a native scroller, so this comes from the browser.
-- Next sits on the left, Previous on the right, and their arrows point the other way. Close moves to the top-left corner.
-- The thumbnails starts on the right, and its arrow keys follow. A vertical thumbnails sits on the right.
+- With `baseline.css`, Next sits on the left, Previous on the right, and their glyphs point the other way. Close moves to the top-left corner.
+- The thumbnail strip starts on the right, and its arrow keys follow. A vertical strip sits on the right.
 
 These stay the same:
 
