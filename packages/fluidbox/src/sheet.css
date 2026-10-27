@@ -118,15 +118,27 @@
 }
 /* Holds still while the sheet rises. Sticky moves it in the same frame as the
    scroll; a scroll-driven translate that cancels the scroll lands a frame late
-   in Chrome and WebKit, so the photo rode along with a fast swipe. */
+   in Chrome and WebKit, so the photo rode along with a fast swipe. But iOS 26
+   Safari tints its bars from a sticky layer at the screen's edge, and this one
+   is the screen's height: the bar would turn the colour of the viewer as the
+   backdrop fades in a drag. So it is sticky only from the touch, wheel or key
+   that may raise the sheet until the sheet is back at rest; at rest it sits
+   where sticky would hold it. */
 :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-stage] {
-  position: sticky;
-  top: var(--fluidbox-sheet-reach, 0px);
+  position: relative;
+  /* The stacking sticky gives it, sticky or not. */
+  z-index: 0;
   /* Holds the strip's bleed under the bars in, instead of collapsing it through. */
   display: flow-root;
   /* The dialog's height, from the runtime: a percentage of the hold, whose
      height is its content's, would be the strip's. */
   height: var(--fluidbox-sheet-stage-height, 100%);
+}
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
+  [data-fluidbox-dialog][data-sheet-pinned]
+  [data-fluidbox-sheet-stage] {
+  position: sticky;
+  top: var(--fluidbox-sheet-reach, 0px);
 }
 /* The dialog's and the strip's own touch-action would keep vertical swipes
    from the scroller. */

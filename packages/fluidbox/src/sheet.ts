@@ -39,6 +39,8 @@ const WHEEL_GROWTH = 1.25;
 const TOUCH_MEMORY = 1000;
 /** Below this share of the first stop, a lowering sheet takes a pull down as the flight. */
 const LANDING = 0.6;
+/** Keys that scroll the sheet up from rest. */
+const RAISING_KEYS = new Set(["ArrowDown", "PageDown", " ", "End"]);
 /** Pixels a sheet must come down, while a field has focus, before the keyboard goes. */
 const LOWERING = 8;
 /** How long the keyboard is followed after a field gains or loses focus, as it slides. */
@@ -169,6 +171,8 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   #dismissObserver: IntersectionObserver | undefined;
   #touching = false;
   #heading = false;
+  #pinned = false;
+  #fingers = false;
   #fade: Animation | undefined;
   #keyboard = 0;
   #stripMoving = false;
@@ -294,6 +298,36 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
       capture: true,
       signal,
     });
+    // The photo's stage is sticky only while the sheet may rise; see sheet.css.
+    const pinFrom = (event: Event) => {
+      if (event.type === "touchstart") this.#fingers = true;
+      // Only what scrolls the sheet up: an arrow left or a wheel down never ends in a scrollend.
+      if (event instanceof WheelEvent && event.deltaY <= 0) return;
+      if (event instanceof KeyboardEvent && !RAISING_KEYS.has(event.key)) return;
+      if (this.#enabled && this.#scroller.scrollTop >= this.#rest - 1) this.#pin(true);
+    };
+    for (const type of ["touchstart", "wheel", "keydown"]) {
+      this.#scroller.addEventListener(type, pinFrom, { passive: true, signal });
+    }
+    for (const type of ["touchend", "touchcancel"]) {
+      this.#scroller.addEventListener(
+        type,
+        (event) => {
+          this.#fingers = (event as TouchEvent).touches.length > 0;
+          this.#unpinAtRest();
+        },
+        { passive: true, signal },
+      );
+    }
+    this.#scroller.addEventListener(
+      "scroll",
+      () => {
+        const top = this.#scroller.scrollTop;
+        if (top < this.#rest - 1) this.#pin(false);
+        else if (top > this.#rest + 1) this.#pin(true);
+      },
+      { passive: true, signal },
+    );
     // The one decision made in script: a pull down on the resting photo is the
     // viewer's flight, so the browser must not scroll it.
     if (this.#dismiss === "flight") {
@@ -885,6 +919,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     const index = Math.max(0, Math.min(stop, this.#offsets.length - 1));
     const smooth = animate && !matchMedia("(prefers-reduced-motion: reduce)").matches;
     const top = this.#offsets[index]!;
+    if (top > this.#rest + 1) this.#pin(true);
     if (Math.abs(this.#scroller.scrollTop - top) < 1) {
       this.#onScrollEnd();
       return;
@@ -931,7 +966,19 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     this.#holding = false;
   }
 
+  #pin(pinned: boolean) {
+    if (this.#pinned === pinned) return;
+    this.#pinned = pinned;
+    this.#dialog.toggleAttribute("data-sheet-pinned", pinned);
+  }
+
+  /** At rest, with no finger down, the stage sits where sticky would hold it. */
+  #unpinAtRest() {
+    if (!this.#fingers && Math.abs(this.#scroller.scrollTop - this.#rest) <= 1) this.#pin(false);
+  }
+
   #onScrollEnd = () => {
+    this.#unpinAtRest();
     if (this.#dismissed || this.#context.controller.state.status === "closed") return;
     const stop = this.#nearestStop();
     const resting = Math.abs(this.#scroller.scrollTop - this.#offsets[stop]!) <= 2;
@@ -977,6 +1024,8 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
 
   #reset() {
     this.#touch = undefined;
+    this.#fingers = false;
+    this.#pin(false);
     this.#dismissed = false;
     this.#wheelDismiss = false;
     this.#wheel = { at: -Infinity, size: 0, raised: false };
@@ -1096,6 +1145,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
     if (!touch.flight) return;
     if (event.cancelable) event.preventDefault();
     if (touch.landing) this.#land();
+    else this.#pin(false);
   };
 
   #onTouchEnd = (event: TouchEvent) => {

@@ -272,6 +272,8 @@ export const states: readonly CssName[] = [
   { names: ["data-sheet"], on: "Dialog" },
   /** The sheet is above stop `0`; at its top stop. */
   { names: ["data-sheet-raised", "data-sheet-expanded"], on: "Dialog" },
+  /** The photo's stage is sticky: from a touch, wheel or key that may raise the sheet until it rests at stop `0`. */
+  { names: ["data-sheet-pinned"], on: "Dialog" },
   /** The sheet peeks at rest; the sheet is turned off. */
   { names: ["data-sheet-peeking", "data-sheet-off"], on: "Dialog" },
   /** The sheet's `dismissMotion` option, or `none` while a drag may not close the viewer. */
