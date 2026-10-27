@@ -448,6 +448,44 @@ test.describe("turning gestures off", () => {
     expect(values).toHaveLength(1);
   });
 
+  test('wheel "navigate" takes a new gesture back while the last one\'s move still scrolls', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, "A wheel needs a mouse.");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await load(page, "?wheel=navigate");
+    await open(page, "one");
+    // Every move asked for: the wheel's two, and none of the strip's own
+    // scroll taken for a swipe, which could win over the second.
+    const moves = await page.locator("[data-fluidbox-slides]").evaluate(async (strip) => {
+      const moves: [string | null, string][] = [];
+      window.featuresFixture.fluidbox.addEventListener("beforevaluechange", (event) => {
+        const { value, reason } = event as unknown as { value: string | null; reason: string };
+        moves.push([value, reason]);
+      });
+      const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      const wheel = (deltaY: number) =>
+        strip.dispatchEvent(new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true }));
+      // A gesture and its inertia, then, past the gap that ends it while
+      // its move still scrolls, one back.
+      for (let step = 0; step < 10; step++) {
+        wheel(40);
+        await wait(30);
+      }
+      await wait(160);
+      wheel(-40);
+      await wait(1_000);
+      return moves;
+    });
+    expect(moves).toEqual([
+      ["two", "wheel"],
+      ["one", "wheel"],
+    ]);
+    await expect(page.locator(shown)).toHaveAttribute("aria-label", "Item 1 of 5");
+    expect(await page.evaluate(() => window.featuresFixture.fluidbox.state.value)).toBe("one");
+  });
+
   test('wheel "zoom" zooms with a plain wheel', async ({ page, isMobile }) => {
     test.skip(isMobile, "A wheel needs a mouse.");
     await load(page, "?wheel=zoom");
