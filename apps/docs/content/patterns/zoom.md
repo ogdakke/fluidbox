@@ -2,7 +2,7 @@
 title: Zoom
 section: Patterns
 order: 7
-description: Zoom from your code and from controls, pan by keyboard, load a sharper image as the zoom grows, and magnify product photos on hover.
+description: Zoom from your code and from controls, pan by keyboard, load a sharper image as the zoom grows, or turn zoom off.
 ---
 
 # Zoom
@@ -11,7 +11,7 @@ Images zoom with pinch (or Ctrl + wheel), a click or double-tap, the zoom contro
 
 <!-- pattern: zoom -->
 
-The first gallery zooms to 3× on a double-click and stops at 6×. Its viewer has the zoom controls, and a readout of `state.zoom` in each framework's own way: a selector hook, a signal, the root's slot, an injected signal, or `subscribe`. Its photos list two widths in `srcset` and the full-size file as `zoomSrc`, so a zoom past the 1280w candidate loads the sharper file (see [A sharper image as the zoom grows](#a-sharper-image-as-the-zoom-grows)). The second gallery turns zoom off.
+The first gallery zooms to 3× on a double-click and stops at 6×. Its viewer has the zoom controls with icons of the page's own (the package ships none; see [Zoom controls](#zoom-controls)), and a readout of `state.zoom` in each framework's own way: a selector hook, a signal, the root's slot, an injected signal, or `subscribe`. Its photos list two widths in `srcset` and the full-size file as `zoom.src`, so a zoom past the 1280w candidate loads the sharper file (see [A sharper image as the zoom grows](#a-sharper-image-as-the-zoom-grows)). The second gallery turns zoom off.
 
 - `zoom: { step, max, click, tap }` or `zoom: false` on the viewer. The custom elements also read the `zoom-step`, `zoom-max`, `zoom-click`, `zoom-tap` and `nozoom` attributes.
 - Zoom options apply live, even while the viewer is open. Call `fluidbox.update({ zoom })`, or set a new `zoom` prop or property. Turning zoom off zooms a zoomed photo back out.
@@ -46,7 +46,7 @@ The bindings have the same commands on `useFluidbox()`, `injectFluidbox()` and t
 
 ## Zoom controls
 
-The default controls leave zoom out; ask for it with `controls: ["previous", "next", "close", "zoomIn", "zoomOut", "zoomReset"]`. In a viewer of your own, `<fluidbox-controls zoom>`, `<Fluidbox.Controls zoom />` or `<div fluidboxControls zoom>` adds them, and the parts `ZoomIn`, `ZoomOut` and `ZoomReset` (`button[fluidboxZoomIn]`, `[fluidboxZoomOut]`, `[fluidboxZoomReset]` in Angular) place them one by one.
+The default controls leave zoom out. In plain JavaScript, ask for them with `controls: ["previous", "next", "close", "zoomIn", "zoomOut", "zoomReset"]`. In a viewer of your own, `ZoomControls` adds all three (`<div fluidboxZoomControls>` in Angular, `<fluidbox-zoom-controls>` in an elements template), beside a `Toolbar` for Previous, Next and Close. The parts `ZoomIn`, `ZoomOut` and `ZoomReset` (`button[fluidboxZoomIn]`, `[fluidboxZoomOut]` and `[fluidboxZoomReset]` in Angular) place them one by one, with content of your own if you like. With none, each shows its label as text, which `baseline.css` draws as a glyph. The package ships no icons: bring an SVG, or a component from an icon set, as the part's content (`icons` in plain JavaScript), and the label becomes the button's `aria-label`. Mark the icon `aria-hidden`.
 
 The three buttons sit in a `[data-fluidbox-zoom-controls]` group named by the `zoomed` label, at the bottom of the stage. Each is named by its label, `zoomIn`, `zoomOut` and `zoomReset` ("Fit to screen"), and is disabled when it can do nothing: Zoom in at `max`, Zoom out and Fit at fit, all three on a video. A button of your own is a zoom control once it has `data-fluidbox-zoom-in`, `data-fluidbox-zoom-out` or `data-fluidbox-zoom-reset`, wherever your viewer content puts it:
 
@@ -66,36 +66,23 @@ A mouse click on the image zooms in to `step` at the pointer, and the next click
 
 As the zoom shows the image larger than the pixels it loaded, the viewer loads a larger candidate from the item's `srcset` (or the `srcset` of its `sources`), decodes it off screen, and swaps it in without moving the image. It steps between the candidates you list, never past the largest, only for the image on show; a neighbour stays as it was, and an image you leave goes back to its own candidate.
 
-Give an image more pixels for zooming than for the slide with two item fields:
+Give an image more pixels for zooming than for the slide with the item's `zoom` field:
 
 ```ts
 const photo = {
-  type: "img",
+  type: "image",
   src: "/photos/fjord-1600.webp",
   srcset: "/photos/fjord-800.webp 800w, /photos/fjord-1600.webp 1600w",
-  zoomSrcset: "/photos/fjord-3200.webp 3200w",
-  zoomSrc: "/photos/fjord-master.webp",
+  alt: "Fjord from the cliff edge",
+  zoom: {
+    srcset: "/photos/fjord-3200.webp 3200w",
+    src: "/photos/fjord-master.webp",
+  },
   width: 1600,
   height: 1067,
 };
 ```
 
-`zoomSrcset` lists candidates only a zoom loads. `zoomSrc` is the largest image there is, loaded once the zoom needs more than every candidate has.
+`zoom.srcset` lists candidates only a zoom loads. `zoom.src` is the largest image there is, loaded once the zoom needs more than every candidate has.
 
-## Hover zoom
-
-On a product page, the photo on the page can magnify under a resting mouse, before anyone opens the viewer. `@ogdakke/fluidbox/hover-zoom` is an add-on of its own, about 1.5 kB:
-
-```ts
-import { hoverZoom } from "@ogdakke/fluidbox/hover-zoom";
-
-const stop = hoverZoom(card, photo, { scale: 2.5 });
-```
-
-`hoverZoom(element, item, options?)` shows `item` magnified inside the box of the first `<img>` in `element` (or `options.image`), following the pointer. It starts from the image already on the page, then swaps in the candidate of `srcset`, `zoomSrcset` or `zoomSrc` sharp at that scale once it has decoded. It sits over the page in its own `[data-fluidbox-hover-zoom]` layer (`--layer-fluidbox-hover-zoom`, default `2`), so nothing moves, and takes no pointer events, so a click still reaches the trigger and opens the viewer. `element` has `data-fluidbox-hover-zooming` while it shows.
-
-It does nothing on touch screens, for a pen, and with reduced motion, and loads nothing until the first hover, so it doesn't compete with the page's largest image. It goes as the pointer leaves or presses, or the page scrolls. Call the returned function, or abort `options.signal`, to remove it: from an effect's cleanup, `onCleanup`, `watchEffect`'s `onCleanup` or a directive's `ngOnDestroy`.
-
-Hover over the photo with a mouse, then click it. The page shows the 640w candidate. The hover zoom magnifies it 2.5× and swaps in the 1600w one, and the click opens the viewer as before.
-
-<!-- pattern: hover -->
+Hover zoom magnifies the photo on the page, before the viewer opens: see [Hover zoom](./hover.md).
