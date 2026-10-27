@@ -27,6 +27,8 @@ An error message without `--fluidbox-background` and `--fluidbox-color` set is b
 
 Properties of `styles.css` and `thumbnails.css` that you set. Each is read where the table says, and inherits there from any ancestor.
 
+`--fluidbox-motion-speed` sets the pace of every motion; [Styling](./styling.md#motion-speed) shows where to set it.
+
 <!-- css: inputs -->
 
 ### Sheet inputs
@@ -38,6 +40,8 @@ From `sheet.css`, declared on the dialog at zero specificity. Override them on `
 ## Published values
 
 Set by the runtime. Read them for your own effects; don't set them.
+
+`--fluidbox-zoom-scale` is what a [hotspot](./hotspots.md) divides by to keep its screen size under zoom.
 
 <!-- css: published -->
 
