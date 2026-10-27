@@ -23,8 +23,8 @@ export class FluidboxThumbnailsElement extends HTMLElement {
 
 /**
  * Turns on the sheet of its parent `<fluidbox-gallery>`, with `snap-points`
- * ("40% 90%", pixels or "content") and `dismiss` ("flight", "scroll" or
- * "none"). It shows each item's `<template slot="sheet">`, else its own
+ * ("40% 90%", pixels or "content") and `dismiss-motion` ("flight" or
+ * "scroll"). It shows each item's `<template slot="sheet">`, else its own
  * `<template>`, else what `render` draws.
  */
 export class FluidboxSheetElement extends HTMLElement {

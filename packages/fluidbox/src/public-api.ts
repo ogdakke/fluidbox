@@ -607,7 +607,7 @@ export interface FluidboxValueChangeDetails<TItem extends FluidboxItem = Fluidbo
 /**
  * Fired when the sheet comes to rest at another stop. A swipe or a scroll of the
  * sheet has the reason "pointer", a wheel "wheel", Escape or a key on a stop
- * button "keyboard", and `sheet.set` or the viewer opening and closing "api".
+ * button "keyboard", and `setSnap()` or the viewer opening and closing "api".
  */
 export class FluidboxSheetEvent extends Event {
   /** The snap the sheet rests at: 0 at rest, then one per snap point. */
@@ -821,7 +821,8 @@ export interface FluidboxOptions<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * The default Previous, Next and Close buttons, or a list of the controls to
    * show, the zoom controls included: `["close", "zoomIn", "zoomOut", "zoomReset"]`.
-   * @default true without a `viewer`, else false
+   * With a `viewer`, Close stays until the viewer draws its own; `false` removes it.
+   * @default true without a `viewer`, else `["close"]`
    */
   readonly controls?: boolean | readonly FluidboxControlName[];
   /**
