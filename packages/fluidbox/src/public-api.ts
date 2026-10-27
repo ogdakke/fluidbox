@@ -1,4 +1,6 @@
 import type { FluidboxReachEndEvent } from "./reach-end-event";
+import type { FluidboxMediaErrorEvent, FluidboxZoomEvent } from "./viewer-events";
+import type { FluidboxSheetEvent } from "./sheet-event";
 import type { FluidboxLabels } from "./labels";
 
 export type { FluidboxLabels } from "./labels";
@@ -605,41 +607,6 @@ export interface FluidboxValueChangeDetails<TItem extends FluidboxItem = Fluidbo
 }
 
 /**
- * Fired when the sheet comes to rest at another stop. A swipe or a scroll of the
- * sheet has the reason "pointer", a wheel "wheel", Escape or a key on a stop
- * button "keyboard", and `setSnap()` or the viewer opening and closing "api".
- */
-export class FluidboxSheetEvent extends Event {
-  /** The snap the sheet rests at: 0 at rest, then one per snap point. */
-  readonly snap: number;
-  readonly reason: FluidboxReason;
-
-  constructor(type: "sheetchange", init: EventInit & { snap: number; reason: FluidboxReason }) {
-    super(type, init);
-    this.snap = init.snap;
-    this.reason = init.reason;
-  }
-}
-
-/**
- * Fired when the image on show comes to rest at another zoom, back at 1 as
- * the viewer moves on or closes included. Never fired per frame. A pinch or a
- * double-tap has the reason "pointer", a ctrl-wheel or trackpad pinch
- * "wheel", the `+`, `-`, `0` and arrow keys "keyboard", and a command "api".
- */
-export class FluidboxZoomEvent extends Event {
-  /** The scale the image rests at. */
-  readonly scale: number;
-  readonly reason: FluidboxReason;
-
-  constructor(type: "zoomchange", init: EventInit & { scale: number; reason: FluidboxReason }) {
-    super(type, init);
-    this.scale = init.scale;
-    this.reason = init.reason;
-  }
-}
-
-/**
  * The events a fluidbox and `<fluidbox-gallery>` fire. `beforevaluechange`
  * fires synchronously for every open, move and close that would do something,
  * from a key, a gesture or your code; `preventDefault()` cancels it, and the
@@ -650,39 +617,10 @@ export class FluidboxZoomEvent extends Event {
 /** What failed: a slide's built-in media, a sharper zoom image, or a slide that called `fail`. */
 export type FluidboxMediaErrorKind = "image" | "video" | "iframe" | "zoom" | "custom";
 
-/**
- * Fired each time a slide enters its error state, neighbours too, and when a
- * zoom image fails to load (then no error shows). Not cancelable.
- */
-export class FluidboxMediaErrorEvent<TItem extends FluidboxItem = FluidboxItem> extends Event {
-  readonly value: string;
-  readonly index: number;
-  readonly item: TItem;
-  readonly kind: FluidboxMediaErrorKind;
-  /** The DOM event, the TypeError of a refused URL, or what `slide.fail` got. */
-  readonly cause: unknown;
-
-  constructor(
-    type: "mediaerror",
-    init: EventInit & {
-      value: string;
-      index: number;
-      item: TItem;
-      kind: FluidboxMediaErrorKind;
-      cause?: unknown;
-    },
-  ) {
-    super(type, init);
-    this.value = init.value;
-    this.index = init.index;
-    this.item = init.item;
-    this.kind = init.kind;
-    this.cause = init.cause;
-  }
-}
-
-// Its own module, which only the viewer imports, so it stays out of the initial chunk.
+// Modules of their own, which only the viewer and the sheet import, so they stay out of the initial chunk.
 export { FluidboxReachEndEvent } from "./reach-end-event";
+export { FluidboxMediaErrorEvent, FluidboxZoomEvent } from "./viewer-events";
+export { FluidboxSheetEvent } from "./sheet-event";
 
 export interface FluidboxEventMap<TItem extends FluidboxItem = FluidboxItem> {
   /** Before an open, a move or a close. Cancelable: the command resolves false. */

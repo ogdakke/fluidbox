@@ -27,6 +27,7 @@ import type {
   FluidboxControlName,
   FluidboxMediaErrorEvent,
   FluidboxReachEndEvent,
+  FluidboxZoomEvent,
   FluidboxRevealContext,
   FluidboxState,
   FluidboxViewerRenderer,
@@ -204,8 +205,11 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   /** Fire the before-event for a move to `target` without making it. False when it was prevented. */
   allows(target: SessionTarget, reason: SessionReason): boolean;
   subscribe(listener: (state: FluidboxState<TItem>) => void): FluidboxDispose;
-  /** The zoom came to rest at another scale, for the reason given or the last command's. */
-  zoomed?(scale: number, reason: SessionReason | undefined): void;
+  /**
+   * The zoom came to rest at another scale, for the reason given or the last command's. The
+   * viewer passes the event class, so it stays out of the initial chunk.
+   */
+  zoomed?(scale: number, reason: SessionReason | undefined, event: typeof FluidboxZoomEvent): void;
   /** The box on show may have started or stopped being zoomable. */
   zoomableChanged?(): void;
   /**

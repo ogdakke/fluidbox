@@ -8,12 +8,12 @@ import {
 import { hostOf } from "../src/host";
 import { createItemList } from "../src/items";
 import { reachEnd } from "../src/reach-end-event";
+import { FluidboxZoomEvent } from "../src/viewer-events";
 import type {
   FluidboxImageItem,
   FluidboxItem,
   FluidboxReachEndEvent,
   FluidboxValueChangeEvent,
-  FluidboxZoomEvent,
   FluidboxOptions,
 } from "../src/public-api";
 import type {
@@ -55,7 +55,9 @@ class TestDriver {
   readonly steps: Deferred[] = [];
   destroyed = false;
   registerThumbnailOverlay: (...args: unknown[]) => void | (() => void) = () => {};
-  controller: { zoomed?(scale: number, reason?: string): void } | undefined;
+  controller:
+    | { zoomed?(scale: number, reason: string | undefined, event: typeof FluidboxZoomEvent): void }
+    | undefined;
   readonly zooms: Array<{ scale: number; reason?: string; origin?: unknown }> = [];
   /** The scale a zoom under way is heading to, as the zoom engine reports it. */
   goal: number | undefined;
@@ -65,7 +67,7 @@ class TestDriver {
   zoomTo(scale: number, options: { reason?: string; origin?: unknown }) {
     this.zooms.push({ scale, reason: options.reason, origin: options.origin });
     // The zoom comes to rest at once, as with reduced motion.
-    this.controller?.zoomed?.(scale, options.reason);
+    this.controller?.zoomed?.(scale, options.reason, FluidboxZoomEvent);
     return Promise.resolve(true);
   }
   zoomGoal() {

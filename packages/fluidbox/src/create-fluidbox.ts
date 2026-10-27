@@ -28,9 +28,8 @@ import {
   type FluidboxValueChangeAction,
   type FluidboxZoomCommandOptions,
   type FluidboxZoomState,
-  FluidboxSheetEvent,
-  FluidboxZoomEvent,
 } from "./public-api";
+import type { FluidboxZoomEvent } from "./viewer-events";
 import type {
   FluidboxDispose,
   FluidboxExtension,
@@ -332,7 +331,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       previous: (options = {}) => this.#step("previous", options),
       allows: (target, reason) => this.#allowed("goTo", target, reason),
       subscribe: (listener) => this.subscribe(listener),
-      zoomed: (scale, reason) => this.#zoomed(scale, reason),
+      zoomed: (scale, reason, ZoomEvent) => this.#zoomed(scale, reason, ZoomEvent),
       zoomableChanged: () => {
         const { status, index, item, zoom } = this.#state;
         const next = this.#zoomFor(status, index, item);
@@ -372,9 +371,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     }
     this.#addonsLoading = undefined;
     this.#sheet = sheet
-      ? addon("sheet")(sheet === true ? {} : sheet, (stop, reason) => {
-          this.dispatchEvent(new FluidboxSheetEvent("sheetchange", { snap: stop, reason }));
-        })
+      ? addon("sheet")(sheet === true ? {} : sheet, (event) => this.dispatchEvent(event))
       : undefined;
     this.#thumbnails = thumbnails
       ? addon("thumbnails")(thumbnails === true ? {} : thumbnails)
@@ -525,16 +522,14 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   /** The zoom came to rest at another scale on the item on show. */
-  #zoomed(scale: number, reason: FluidboxReason | undefined) {
+  #zoomed(scale: number, reason: FluidboxReason | undefined, ZoomEvent: typeof FluidboxZoomEvent) {
     this.#zoomId = this.#state.value;
     if (scale === this.#zoomScale) return;
     this.#zoomScale = scale;
     if (this.#state.zoom && this.#state.zoom.scale !== scale) {
       this.#publish(this.#state.status, this.#state.index);
     }
-    this.dispatchEvent(
-      new FluidboxZoomEvent("zoomchange", { scale, reason: reason ?? this.#reason }),
-    );
+    this.dispatchEvent(new ZoomEvent("zoomchange", { scale, reason: reason ?? this.#reason }));
   }
 
   /** The zoom of the item on show: open on a box that zooms, with zoom on. */
