@@ -89,11 +89,6 @@ export function mountView<C>(
   });
 }
 
-/** The application, for parts that mount views of their own. */
-export function injectApp(): ApplicationRef {
-  return inject(ApplicationRef);
-}
-
 // The slots of Angular's view data a loading @defer is read from. They are the
 // same from Angular 17.3 to 22: a view's TView is at 1, and its first child
 // view or container at 12, each linking to the next at 4; a container marks
