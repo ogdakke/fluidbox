@@ -63,6 +63,7 @@ import {
   type FluidboxSlots,
   type FluidboxStaticNode,
   type FluidboxTrigger,
+  commandsOf,
 } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxApi,
@@ -553,27 +554,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): Reac
     void fluidbox.setItems(items);
   }, [items, fluidbox]);
 
-  const commands = useMemo<FluidboxCommands<TItem>>(
-    () => ({
-      open: (target, options) => fluidbox.open(target, options),
-      close: (options) => fluidbox.close(options),
-      next: (options) => fluidbox.next(options),
-      previous: (options) => fluidbox.previous(options),
-      zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
-      zoomIn: (options) => fluidbox.zoomIn(options),
-      zoomOut: (options) => fluidbox.zoomOut(options),
-      zoomReset: (options) => fluidbox.zoomReset(options),
-      setFullscreen: (on) => fluidbox.setFullscreen(on),
-      download: () => fluidbox.download(),
-      share: () => fluidbox.share(),
-      play: () => fluidbox.play(),
-      pause: () => fluidbox.pause(),
-      setItems: (next) => fluidbox.setItems(next),
-      preload: (target) => fluidbox.preload(target),
-      load: () => fluidbox.load(),
-    }),
-    [fluidbox],
-  );
+  const commands = useMemo(() => commandsOf<FluidboxCommands<TItem>>(fluidbox), [fluidbox]);
 
   const resolvedLabels = useMemo(
     () => resolveLabels(labels),

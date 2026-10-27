@@ -59,6 +59,7 @@ import {
   zoomControlNames,
   type FluidboxStaticNode,
   type FluidboxTriggerPreview,
+  commandsOf,
 } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxApi,
@@ -520,24 +521,7 @@ function Root<TItem extends FluidboxItem>(props: FluidboxRootProps<TItem>): JSX.
     });
   });
 
-  const commands: FluidboxCommands<TItem> = {
-    open: (target, options) => fluidbox.open(target, options),
-    close: (options) => fluidbox.close(options),
-    next: (options) => fluidbox.next(options),
-    previous: (options) => fluidbox.previous(options),
-    zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
-    zoomIn: (options) => fluidbox.zoomIn(options),
-    zoomOut: (options) => fluidbox.zoomOut(options),
-    zoomReset: (options) => fluidbox.zoomReset(options),
-    setFullscreen: (on) => fluidbox.setFullscreen(on),
-    download: () => fluidbox.download(),
-    share: () => fluidbox.share(),
-    play: () => fluidbox.play(),
-    pause: () => fluidbox.pause(),
-    setItems: (next) => fluidbox.setItems(next),
-    preload: (target) => fluidbox.preload(target),
-    load: () => fluidbox.load(),
-  };
+  const commands = commandsOf<FluidboxCommands<TItem>>(fluidbox);
 
   const value: FluidboxContextValue = {
     fluidbox,

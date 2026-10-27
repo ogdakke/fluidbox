@@ -52,6 +52,7 @@ import {
   takeOverFluidbox,
   unloadFluidbox,
   type FluidboxStaticNode,
+  commandsOf,
 } from "@ogdakke/fluidbox/kit";
 import { injectIsBrowser } from "./mount.js";
 
@@ -291,24 +292,8 @@ export class FluidboxRootDirective<TItem extends FluidboxItem = FluidboxItem>
 
   constructor() {
     const fluidbox = this.fluidbox;
-    const commands: FluidboxCommands<TItem> = {
-      open: (target, options) => this.open(target, options),
-      close: (options) => this.close(options),
-      next: (options) => this.next(options),
-      previous: (options) => this.previous(options),
-      zoomTo: (scale, options) => this.zoomTo(scale, options),
-      zoomIn: (options) => this.zoomIn(options),
-      zoomOut: (options) => this.zoomOut(options),
-      zoomReset: (options) => this.zoomReset(options),
-      setFullscreen: (on) => this.setFullscreen(on),
-      download: () => this.download(),
-      share: () => this.share(),
-      play: () => this.play(),
-      pause: () => this.pause(),
-      setItems: (items) => this.setItems(items),
-      preload: (target) => this.preload(target),
-      load: () => this.load(),
-    };
+    // Its own methods, which run the fluidbox outside the zone.
+    const commands = commandsOf<FluidboxCommands<TItem>>(this);
     this.api = computed(() => ({ ...this.#state(), ...commands }));
     const { signal: events } = this.#events;
     fluidbox.subscribe(() =>
