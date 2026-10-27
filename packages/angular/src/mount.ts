@@ -1,5 +1,5 @@
 import {
-  ApplicationRef,
+  type ApplicationRef,
   PLATFORM_ID,
   VERSION,
   booleanAttribute,
