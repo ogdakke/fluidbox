@@ -85,4 +85,6 @@ const photo = {
 
 `zoom.srcset` lists candidates only a zoom loads. `zoom.src` is the largest image there is, loaded once the zoom needs more than every candidate has.
 
-Hover zoom magnifies the photo on the page, before the viewer opens: see [Hover zoom](./hover.md).
+## Hover zoom
+
+`@ogdakke/fluidbox/hover-zoom` magnifies the photo on the page under a resting mouse, before the viewer opens. It has a pattern of its own: see [Hover zoom](./hover.md).
