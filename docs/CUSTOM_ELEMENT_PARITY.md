@@ -1,122 +1,87 @@
-# Custom-element behavior parity
+# Custom-element parity
 
-This ledger records where custom-element behavior lives after the declarative authoring migration.
-The runtime owns interaction rules. The custom elements compile DOM-authored content into the same
-source, origin, renderer, and controller contracts used by framework bindings.
+Every feature of the plain JS API has a form in the custom elements. `<fluidbox-gallery>` owns one
+`createFluidbox()` fluidbox and adapts markup, attributes and properties to it; it has no gallery
+engine of its own. Gestures, zoom, flights, the strip, origins and the portal stay in the
+runtime, so a new interaction lands there first and the elements get it through the same
+options. The user documentation is
+[Custom elements](../apps/docs/content/custom-elements.md); the parts the elements expand are in
+`packages/fluidbox/src/elements-parts.ts`, the gallery in `gallery.ts`, items in `item.ts`.
 
-## Gallery host
+`tests/browser/patterns.spec.ts` runs the 13 patterns on the elements as on every binding
+(`apps/examples/src/patterns/elements/`), and `elements.spec.ts`, `hotspot-parts.spec.ts`,
+`hotspots.spec.ts` and `slideshow.spec.ts` cover the parts below.
 
-| Old responsibility                                                          | Headless owner                                       | Status                                                                                                                                                                              |
-| --------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Discover DOM-authored children and adapt their media/content                | Custom-element adapter                               | `FluidboxItemElement.compile()` reads an explicit trigger and inert content template                                                                                                |
-| Read an indexed source without mounting every thumbnail                     | `FluidboxSource`, `arraySource()`, and `ViewerStrip` | Migrated                                                                                                                                                                            |
-| Validate an indexed open and select an item in an existing session          | `ViewerSession.open()` and `goTo()`                  | Migrated                                                                                                                                                                            |
-| Keep stable item identity across source changes                             | `ViewerSession.setSource()`                          | Migrated and covered by command tests                                                                                                                                               |
-| Reveal the settled thumbnail in its scroll container                        | `FluidboxOriginAdapter.revealOrigin()`               | Migrated. Thumbnails previews defer reveal until final touch/scroll settlement; reveal is abortable and never delays close.                                                         |
-| Focus the gallery when a virtualizer has removed the selected trigger       | `DomViewerDriver` focus-host fallback                | Migrated when the original trigger had a connected focusable ancestor. Originless opens have no caller-selected fallback.                                                           |
-| Redirect and warm a hidden teaser tile through `data-fluidbox-preview-more` | Host origin/overlay adapter                          | Partial. The engine does not encode a gallery layout convention, and no direct example yet recreates the old proxy source, picture hiding, alt update, warming, and reset behavior. |
+## Items, triggers and origins
 
-`FluidboxGalleryElement` is a declarative adapter over one `createFluidbox()` controller. It does not implement
-a second gallery engine.
+| Plain JS                                   | Custom elements                                                                                      |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `items` (an array or a lazy list)          | `<fluidbox-item>` children read into items, or the gallery's `items` property                        |
+| `bind(element, value)`                     | `[slot="trigger"]` in a `<fluidbox-item>`; with `items` set, `data-fluidbox-value` on any descendant |
+| a trigger closing back onto several items  | `value="a b c"` on `<fluidbox-item>`, or several ids in `data-fluidbox-value`                        |
+| `data-fluidbox-origin`                     | the same attribute, in the trigger                                                                   |
+| `findTrigger`, `revealTrigger`             | properties of the same names                                                                         |
+| `bindOverlay(element, value, { flight })`  | `data-fluidbox-trigger-overlay="none \| copy \| live \| frame"` in the trigger                       |
+| `setItems(items)`, `list.withCount(total)` | `setItems()`, or the `items` property                                                                |
+| `onPreviewChange`                          | the `fluidbox-preview-change` event on `<fluidbox-item>`                                             |
 
-## Full-image strip
+## Options
 
-| Old responsibility                                                                         | Headless owner                                                       | Status                                                                                                             |
-| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Keep a 31-slide native horizontal scroll window                                            | `ViewerStrip`                                                        | Migrated; 100,000-item browser coverage                                                                            |
-| Rebase the window around distant selections without changing the visible item              | `ViewerStrip.#renderWindow()` and instant alignment                  | Migrated                                                                                                           |
-| Let native touch scrolling choose the active item and retain momentum                      | `ViewerStrip` scroll/settle handling plus `DomViewerDriver.select()` | Migrated                                                                                                           |
-| Freeze the strip during dismiss and compensate for residual native scroll                  | `ViewerStrip.freeze()` and `resume()`                                | Migrated                                                                                                           |
-| Load only the active item and adjacent items                                               | `ViewerStrip.#loadWindow()`                                          | Migrated                                                                                                           |
-| Keep the last decoded thumbnail painted until the full image decodes                       | `decoded-preview.ts` and `prepareOpening()`                          | Migrated, including a lazy loader changing `currentSrc` before the next source decodes                             |
-| Load the full image from the press and swap it in once decoded, mid-flight too             | `ViewerStrip`                                                        | Migrated                                                                                                           |
-| Abort stale loads, show a retry action, and keep errors focusable only on the active slide | `ViewerStrip` request ownership and error UI                         | Migrated                                                                                                           |
-| Move DOM-authored custom content into a slide and restore it on eviction                   | Renderer mount/dispose contract                                      | Replaced with explicit ownership. DOM renderers may move DOM; framework renderers retain ownership of descendants. |
-| Pause outgoing video and preserve native media interaction                                 | `ViewerStrip` and `DomViewerDriver` native-interaction routing       | Migrated; physical mobile fullscreen checks remain a release gate                                                  |
+| Plain JS                                                                  | Custom elements                                                                                                                                     |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value`                                                                   | the `value` attribute and property                                                                                                                  |
+| `zoom`                                                                    | `nozoom`, `zoom-step`, `zoom-max`, `zoom-click`, `zoom-tap`, or `zoom`                                                                              |
+| `loop`, `preload`, `wheel`                                                | attributes of the same names                                                                                                                        |
+| `reachEndThreshold`                                                       | the `reach-end-threshold` attribute, or the `reachEndThreshold` property                                                                            |
+| `dismiss`, `shareUrl`, `slideshow`, `labels`, `icons`, `slides`, `viewer` | properties of the same names                                                                                                                        |
+| `thumbnails`, `sheet`                                                     | `<fluidbox-thumbnails>` and `<fluidbox-sheet>` children                                                                                             |
+| `controls`, `viewer`                                                      | `<template slot="viewer">`, with `<fluidbox-controls>` for the defaults                                                                             |
+| `icons`                                                                   | also `<template data-fluidbox-icon="name">` in the gallery                                                                                          |
+| `slides`                                                                  | also `<template data-fluidbox-slide="type">`; the add-on slides through `@ogdakke/fluidbox/elements/embed`, `/model` and `/spin`, and `defineSlide` |
 
-The direct runtime treats thumbnails selection as an immediate preview scrub. It does not animate a
-second full-image transition while the thumbnails continues under native momentum.
+Every option change applies as `update()` does, without closing the viewer.
 
-## Thumbnails
+## Commands, state and events
 
-| Old responsibility                                                               | Headless owner                                             | Status                                                                                                                            |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Render a bounded thumbnail window based on viewport width                        | `ThumbnailsRuntime` layout callback and framework renderer | Migrated for React                                                                                                                |
-| Keep native touch and trackpad momentum                                          | `ThumbnailsRuntime`                                        | Migrated. Automation covers held-touch settlement and native scrolling; physical touch and trackpad momentum remain manual gates. |
-| Distinguish commanded centering from user scrolling                              | `ThumbnailsRuntime`                                        | Migrated                                                                                                                          |
-| Select the centered item while scrolling and settle after `scrollend` or timeout | `ThumbnailsRuntime` and internal settled command           | Migrated, including a final settle when the centered index is unchanged                                                           |
-| Abort thumbnail loads when an item leaves the window                             | `thumbnails-thumbnail.ts` and React item cleanup           | Migrated                                                                                                                          |
-| Derive `/media/*-160w.webp` by filename convention                               | Source metadata                                            | Intentionally removed. Applications declare thumbnail candidates; the runtime does not rewrite arbitrary URLs.                    |
+| Plain JS                                                                                                         | Custom elements                                    |
+| ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `zoomReset`                                  | methods of the same names                          |
+| `setFullscreen`, `download`, `share`, `play`, `pause`, `preload`, `load`                                         | methods of the same names                          |
+| `state`, `subscribe`, `sheet`                                                                                    | members of the same names                          |
+| `bindControl`, and anything else on the fluidbox                                                                 | on `gallery.fluidbox`, once `whenReady()` resolves |
+| `beforevaluechange`, `valuechange`, `valuechangecomplete`, `sheetchange`, `zoomchange`, `mediaerror`, `reachend` | the same events on the gallery, not bubbling       |
 
-React and the custom-element adapter render items into the window reported by
-`ThumbnailsRuntime`; touch, wheel, commanded centering, resize, provisional selection, and settlement
-live in one runtime. `ThumbnailsSession` retains only element DOM, thumbnail loading, and selection
-painting.
+## Viewer parts
 
-## Viewer lifecycle and portal
+In `<template slot="viewer">`, and in a slide template's layer:
 
-| Old responsibility                                                                               | Headless owner                                                                      | Status                                                                                                              |
-| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Create the body-level portal and isolate the background                                          | `viewer-portal.ts`                                                                  | Migrated                                                                                                            |
-| Enforce one active viewer and hand ownership to a new viewer                                     | `viewer-ownership.ts`                                                               | Migrated; close veto is honored                                                                                     |
-| Track closed, opening, open, and closing state                                                   | `ViewerSession` and `DomViewerDriver`                                               | Migrated                                                                                                            |
-| Prepare opening geometry before the portal becomes visible                                       | `DomViewerDriver.open()`                                                            | Migrated                                                                                                            |
-| Prebuild and measure opening on primary pointerdown, then cancel on pointer cancellation         | `FluidboxController.prepare()` and trigger bindings                                 | Migrated. Preparation keeps state/background ownership unchanged, pauses the opening animations, and is disposable. |
-| Reverse an unfinished open or close from the painted pose                                        | `DomViewerDriver` plus `image-transition-motion.ts`                                 | Migrated with timestamped geometry coverage                                                                         |
-| Copy theme variables from the scoped trigger into the body portal                                | `DomViewerDriver.#applyTheme()`                                                     | Migrated for all `--fluidbox-*` inputs and legacy aliases                                                           |
-| Keep thumbnails controls hidden until the opening backdrop is ready                              | `DomViewerDriver.#waitForThumbnailsReveal()`                                        | Migrated                                                                                                            |
-| Keep video action controls hidden until their delayed reveal animation finishes                  | `ThumbnailOverlayRuntime`                                                           | Migrated for traveling overlay renderers; opening settlement waits for the application control reveal.              |
-| Publish trigger state and `aria-expanded`                                                        | `DomViewerDriver.#setActiveTrigger()`                                               | Migrated                                                                                                            |
-| Restore focus, thumbnail visibility, inert state, animations, observers, renderers, and requests | `ViewerSession.destroy()`, `DomViewerDriver.destroy()`, and `ViewerStrip.destroy()` | Migrated with teardown coverage                                                                                     |
+| Part (React, Vue, Solid)                        | Custom elements                                                                              |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `Controls`, `Previous`, `Next`, `Close`         | `<fluidbox-controls>`, or a button marked `data-fluidbox-previous` and so on                 |
+| `Toolbar`, `ZoomControls`, `Counter`, `Caption` | `<fluidbox-toolbar>`, `<fluidbox-zoom-controls>`, `<fluidbox-counter>`, `<fluidbox-caption>` |
+| `Loading`, `Error`, `Retry`                     | `<fluidbox-loading>`, `<fluidbox-error>`, a button marked `data-fluidbox-retry`              |
+| `Fullscreen`, `Download`, `Share`               | `<fluidbox-fullscreen>`, `<fluidbox-download>`, `<fluidbox-share>`                           |
+| `Slideshow`                                     | `<fluidbox-slideshow>`                                                                       |
+| `label={false}`                                 | `data-fluidbox-label="content"`                                                              |
 
-## Transition geometry
+A part without content shows its label as text and gets `data-fluidbox-default`; content of the
+page's goes inside the part. A control that switches gets `data-active` while it is on.
 
-| Old responsibility                                                                | Headless owner                                            | Status                                                                    |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Measure the marked visual rather than assuming the trigger box                    | `origin-geometry.ts` and `FluidboxOrigin.visual`          | Migrated                                                                  |
-| Preserve cover-crop continuity through open, close, and reversal                  | `transition-geometry.ts` and `image-transition-motion.ts` | Migrated                                                                  |
-| Interpolate asymmetric corner radii in screen space                               | `mapRadii()` and the radius animation channel             | Migrated; iPhone emulation coverage exists, physical iOS remains required |
-| Fall back to scale/fade when no visible origin exists                             | `DomViewerDriver` fallback poses                          | Migrated                                                                  |
-| Retarget a close flight while the document scrolls or layout changes              | `DomViewerDriver` document flight and resize observer     | Migrated                                                                  |
-| Keep image, video, iframe, or custom renderer state alive during the close flight | Image clone or live-node document flight                  | Migrated                                                                  |
-| Hide the active background thumbnail throughout the viewer session                | `OriginRegistry`                                          | Migrated, including after host reveal and recycled registration           |
-| Drive host and traveling thumbnail decorations from the same progress             | `ThumbnailOverlayRuntime`                                 | Migrated                                                                  |
+## Slide parts
 
-The old `data-fluidbox-preview-more` transition layer mixed a particular teaser layout with viewer
-motion. `FluidboxOrigin.visual` plus a host or traveling thumbnail overlay supplies the necessary
-composition points, but the gallery demo still needs a migration example proving the same teaser
-crop, radius, and decoration behavior.
+In `<template data-fluidbox-slide="type">`:
 
-## Input, zoom, and accessibility
+| Part (React, Vue, Solid) | Custom elements                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `Media`                  | `<fluidbox-media>`: its children go in the media box, its attributes on it; `zoom` or `zoom="false"`         |
+| `Image`                  | `<fluidbox-image>`, of the item or of its `field`                                                            |
+| `Hotspot`                | `<fluidbox-hotspot x y scale-with-zoom>` inside `<fluidbox-media>`; `scale-with-zoom="false"` reads as false |
 
-| Old responsibility                                                                   | Headless owner                                               | Status   |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------ | -------- |
-| Touch drag dismissal and cancellation                                                | Shared `FluidboxGestureController` used by `DomViewerDriver` | Migrated |
-| Trackpad wheel ownership, acceleration handoff, momentum suppression, and settlement | `DomViewerDriver`                                            | Migrated |
-| Pinch, pan, double-click/tap, and zoom suspension during navigation                  | Shared `fluidbox-zoom.ts` used by `DomViewerDriver`          | Migrated |
-| Release and restore overlay edges during mobile browser-chrome gestures              | `DomViewerDriver`                                            | Migrated |
-| Route keyboard navigation while excluding native form/media interaction              | `DomViewerDriver`                                            | Migrated |
-| Trap focus, restore focus, label slides, and announce item position                  | Portal, strip, and driver accessibility code                 | Migrated |
-| Honor reduced motion without changing command/event settlement                       | `DomViewerDriver` and `ViewerSession`                        | Migrated |
+Everything else in the template goes in the slide's layer. A hotspot takes the remaining
+attributes and children of its element, and becomes the `slide.hotspot()` button in its place.
 
-## Loading and media
+## Not in the elements
 
-| Old responsibility                                                        | Headless owner                               | Status                                                                                     |
-| ------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Warm a small preview before full media                                    | Explicit `thumbnail` and `preview` resources | Migrated without URL conventions                                                           |
-| Apply `srcset`, `sizes`, and picture sources after preview handoff        | `ViewerStrip`                                | Migrated                                                                                   |
-| Avoid loading full media before first open or after cancelled preparation | `ViewerStrip` mount/load lifecycle           | Migrated. A completed session currently retains its bounded active window for fast reopen. |
-| Keep declarative full media inert while closed                            | Custom-element adapter                       | `<template slot="content">` prevents eager full-media loading                              |
-| Retry failed media without losing the opening preview                     | `ViewerStrip`                                | Migrated                                                                                   |
-| Support video, iframe, and custom content through one indexed source      | Media descriptors and renderer contract      | Migrated                                                                                   |
-| Preserve live non-image state through close                               | Live-node document flight                    | Migrated                                                                                   |
-
-## Adapter boundary
-
-Custom-element files contain declarative adaptation, element registration, portal controls, and
-thumbnails DOM. Gesture, zoom, transition, source selection, origin reveal, and portal behavior stay
-in the runtime. New interaction behavior belongs in the runtime first.
-
-The dedicated `headless.html`, photo-library, and React examples use `createFluidbox()` directly.
-The vanilla playground demonstrates declarative elements. Solid, Vue, and Angular accept the
-canonical `FluidboxSource` and currently compose the same `FluidboxGalleryElement` adapter.
+The framework-only conveniences: `useFluidbox` selectors, the server copy of an open viewer, and
+`href` for URL sync. The elements read a `value` attribute a server renders, and a page keeps the
+URL in step through `valuechange`.
