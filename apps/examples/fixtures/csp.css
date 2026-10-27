@@ -1,5 +1,8 @@
 /* Strict CSP fixture. Tokens come from @ogdakke/fluidbox-design. */
+@import "@ogdakke/fluidbox-design/layers.css";
 @import "@ogdakke/fluidbox/styles.css";
+@import "@ogdakke/fluidbox/baseline.css";
+@import "./csp-glyphs.css";
 @import "@ogdakke/fluidbox-design/index.css";
 
 .csp-page {

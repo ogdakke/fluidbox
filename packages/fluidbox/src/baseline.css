@@ -1,0 +1,890 @@
+/* The default look: controls, glyphs, focus rings, fades, the thumbnails' and the sheet's look. */
+@layer fluidbox-baseline;
+
+/* Every rule is in the fluidbox-baseline layer and behind :where(), so any
+   rule of yours outside a layer, or in a layer after this one, beats it.
+   styles.css, thumbnails.css and sheet.css are in no layer, so this file never
+   sets a property they set on the same element: where both have a say, they
+   read a token this file sets. Every transition waits for
+   prefers-reduced-motion: no-preference. */
+
+@layer fluidbox-baseline {
+  :where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger])) {
+    cursor: zoom-in;
+  }
+
+  :where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible) {
+    outline: 2px solid var(--fluidbox-focus-color, currentColor);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-fluidbox-video-actions] {
+      transition: opacity 180ms linear;
+    }
+  }
+
+  /**
+   * The backdrop (through `--fluidbox-backdrop-background`), the close button,
+   * error messages.
+   * @input --fluidbox-background
+   * @default `#111`
+   * @theme
+   */
+  /** Text and icons. @input --fluidbox-color @default `white` @theme */
+  /**
+   * The Previous and Next buttons; the close button on hover.
+   * @input --fluidbox-control-background
+   * @theme
+   */
+  /**
+   * Focus rings on the controls, thumbnails items, the dialog and
+   * `<fluidbox-item>` triggers.
+   * @input --fluidbox-focus-color
+   * @theme
+   */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-container] {
+    color: var(--fluidbox-color, white);
+  }
+
+  /** The backdrop's `background`. @input --fluidbox-backdrop-background @on Backdrop */
+  /** The backdrop's `backdrop-filter`, such as `blur(24px)`. @input --fluidbox-backdrop-filter @on Backdrop */
+  /** The backdrop's resting opacity. @input --fluidbox-backdrop-opacity @on Backdrop */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-backdrop] {
+    /* styles.css paints it, after --fluidbox-backdrop-background. */
+    --fluidbox-baseline-backdrop: var(--fluidbox-background, #111);
+    opacity: var(--fluidbox-backdrop-opacity, 1);
+    -webkit-backdrop-filter: var(--fluidbox-backdrop-filter, none);
+    backdrop-filter: var(--fluidbox-backdrop-filter, none);
+    cursor: zoom-out;
+  }
+
+  /* The dialog's ring replaces the browser's. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-dialog] {
+    outline: none;
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-dialog]:focus-visible {
+    /* The dialog fills the window, so its ring goes inside. */
+    outline: 2px solid var(--fluidbox-focus-color, currentColor);
+    outline-offset: -4px;
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slides]:focus-visible {
+    outline: 2px solid var(--fluidbox-focus-color, currentColor);
+    outline-offset: calc(-4px - var(--fluidbox-slide-gap, 0px) / 2);
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-close] {
+    z-index: 6;
+    display: flex;
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--fluidbox-background, #111);
+    color: var(--fluidbox-color, white);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px oklch(0% 0 0 / 0.2);
+    opacity: var(--fluidbox-gallery-control-opacity, 1);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-close] {
+      transition:
+        transform 150ms ease-out,
+        background 150ms ease-out,
+        opacity 180ms linear;
+    }
+  }
+
+  /**
+   * Shown behind an image before anything has loaded.
+   * @input --fluidbox-image-placeholder-background
+   * @on Image frames
+   */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-image-frame] {
+    background: var(--fluidbox-image-placeholder-background, rgb(127 127 127 / 0.12));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      :is([data-fluidbox-media-cover], [data-fluidbox-video-stand-in]) {
+      transition: opacity 0.25s ease-out;
+    }
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog]:is([data-gallery], [data-fluidbox-headless])
+    [data-fluidbox-close] {
+    top: calc(var(--fluidbox-stage-top) + 16px);
+    right: calc(var(--fluidbox-stage-right) + 16px);
+  }
+  /* Right to left, Close takes the top-left corner. */
+  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-close] {
+    right: auto;
+    left: -12px;
+  }
+  :where([data-fluidbox-viewer][dir="rtl"])
+    [data-fluidbox-dialog]:is([data-gallery], [data-fluidbox-headless])
+    [data-fluidbox-close] {
+    right: auto;
+    left: calc(var(--fluidbox-stage-left) + 16px);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      [data-fluidbox-dialog][data-fluidbox-headless]:not([data-gallery])
+      [data-fluidbox-close] {
+      transition: opacity 180ms linear;
+    }
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-gallery]
+    :is([data-fluidbox-previous], [data-fluidbox-next]) {
+    position: absolute;
+    z-index: 6;
+    top: calc(
+      var(--fluidbox-stage-top) +
+        (100% - var(--fluidbox-stage-top) - var(--fluidbox-stage-bottom)) / 2
+    );
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
+    color: var(--fluidbox-color, white);
+    font: inherit;
+    cursor: pointer;
+    transform: translateY(-50%);
+    opacity: var(--fluidbox-gallery-control-opacity, 1);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      [data-fluidbox-dialog][data-gallery]
+      :is([data-fluidbox-previous], [data-fluidbox-next]) {
+      transition: opacity 180ms linear;
+    }
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-previous] {
+    left: calc(var(--fluidbox-stage-left) + 16px);
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-next] {
+    right: calc(var(--fluidbox-stage-right) + 16px);
+  }
+
+  /* Right to left, the next slide comes from the left, so Next sits there. */
+  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-previous] {
+    right: calc(var(--fluidbox-stage-right) + 16px);
+    left: auto;
+  }
+
+  :where([data-fluidbox-viewer][dir="rtl"]) [data-fluidbox-next] {
+    left: calc(var(--fluidbox-stage-left) + 16px);
+    right: auto;
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
+    /**
+     * The default controls' opacity.
+     * @default `1`; `0.35` when disabled
+     * @on Previous, Next, Close
+     */
+    --fluidbox-gallery-control-opacity: 0.35;
+    cursor: default;
+  }
+
+  /* Full screen, Download, Share, Slideshow and the counter: a row from the
+     top-left corner, the top-right right to left, in that order. A control
+     that can't work here hides, and the ones after it close up. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    :is(
+      [data-fluidbox-fullscreen],
+      [data-fluidbox-download],
+      [data-fluidbox-share],
+      [data-fluidbox-slideshow],
+      [data-fluidbox-counter]
+    ) {
+    position: absolute;
+    z-index: 6;
+    top: calc(var(--fluidbox-stage-top) + 16px);
+    left: calc(var(--fluidbox-stage-left) + 16px + var(--fluidbox-baseline-slot, 0) * 40px);
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+    background: var(--fluidbox-background, #111);
+    color: var(--fluidbox-color, white);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    text-decoration: none;
+    box-shadow: 0 2px 8px oklch(0% 0 0 / 0.2);
+    cursor: pointer;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-counter] {
+    width: auto;
+    min-width: 32px;
+    padding-inline: 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: default;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    :is(
+      [data-fluidbox-fullscreen],
+      [data-fluidbox-download],
+      [data-fluidbox-share],
+      [data-fluidbox-slideshow]
+    ):hover {
+    background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
+  }
+  /* Which of them show beside each other, read by the ones after. */
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(
+        > :is(
+          [data-fluidbox-fullscreen],
+          [data-fluidbox-download],
+          [data-fluidbox-share],
+          [data-fluidbox-slideshow],
+          [data-fluidbox-counter]
+        )
+      )
+  ) {
+    --fluidbox-baseline-fullscreen: 0;
+    --fluidbox-baseline-download: 0;
+    --fluidbox-baseline-share: 0;
+    --fluidbox-baseline-slideshow: 0;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(> [data-fluidbox-fullscreen]:not([hidden]))
+  ) {
+    --fluidbox-baseline-fullscreen: 1;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(> [data-fluidbox-download]:not([hidden]))
+  ) {
+    --fluidbox-baseline-download: 1;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight]) :has(> [data-fluidbox-share]:not([hidden]))
+  ) {
+    --fluidbox-baseline-share: 1;
+  }
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      :has(> [data-fluidbox-slideshow]:not([hidden]))
+  ) {
+    --fluidbox-baseline-slideshow: 1;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-fullscreen] {
+    --fluidbox-baseline-slot: 0;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-download] {
+    --fluidbox-baseline-slot: var(--fluidbox-baseline-fullscreen, 0);
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-share] {
+    --fluidbox-baseline-slot: calc(
+      var(--fluidbox-baseline-fullscreen, 0) + var(--fluidbox-baseline-download, 0)
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slideshow] {
+    --fluidbox-baseline-slot: calc(
+      var(--fluidbox-baseline-fullscreen, 0) + var(--fluidbox-baseline-download, 0) +
+        var(--fluidbox-baseline-share, 0)
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-counter] {
+    --fluidbox-baseline-slot: calc(
+      var(--fluidbox-baseline-fullscreen, 0) + var(--fluidbox-baseline-download, 0) +
+        var(--fluidbox-baseline-share, 0) + var(--fluidbox-baseline-slideshow, 0)
+    );
+  }
+  :where([data-fluidbox-viewer][dir="rtl"])
+    :is(
+      [data-fluidbox-fullscreen],
+      [data-fluidbox-download],
+      [data-fluidbox-share],
+      [data-fluidbox-slideshow],
+      [data-fluidbox-counter]
+    ) {
+    left: auto;
+    right: calc(var(--fluidbox-stage-right) + 16px + var(--fluidbox-baseline-slot, 0) * 40px);
+  }
+
+  /* Your portal content, and other layers marked data-fluidbox-chrome, fade
+     with the controls. */
+  @media (prefers-reduced-motion: no-preference) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      :is(
+        [data-fluidbox-chrome],
+        [data-fluidbox-portal]
+          > :not(
+            [data-fluidbox-previous],
+            [data-fluidbox-next],
+            [data-fluidbox-close],
+            [data-fluidbox-mount]
+          ),
+        [data-fluidbox-portal] > [data-fluidbox-mount] > *
+      ) {
+      transition: opacity 180ms linear;
+    }
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-zoomed]
+    [data-fluidbox-image-frame] {
+    background: transparent;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport],
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-zoom-viewport]
+    [data-fluidbox-media] {
+    cursor: grab;
+  }
+  /* A mouse zooms an image with one click; the cursor says so. Under a
+     double-click or none, a zoom cursor would promise what a click doesn't do. */
+  @media (hover: hover) and (pointer: fine) {
+    :where([data-fluidbox-viewer][data-fluidbox-zoom-click="single"])
+      [data-fluidbox-dialog][data-zoomable]
+      [data-fluidbox-slide]
+      [data-fluidbox-image-frame]
+      [data-fluidbox-media] {
+      cursor: zoom-in;
+    }
+  }
+  /* The zoom controls, when `controls` lists them, sit together under the photo. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-controls] {
+    position: absolute;
+    z-index: 6;
+    bottom: calc(var(--fluidbox-stage-bottom) + 16px);
+    left: 50%;
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 22px;
+    background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
+    transform: translateX(-50%);
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-zoom-controls]
+    > :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]) {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--fluidbox-color, white);
+    font: inherit;
+    cursor: pointer;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]):disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    :is(
+      [data-fluidbox-zoom-in],
+      [data-fluidbox-zoom-out],
+      [data-fluidbox-zoom-reset]
+    ):focus-visible {
+    outline: 1px solid var(--fluidbox-focus-color, currentColor);
+    outline-offset: 2px;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-zoom-viewport][data-grabbing],
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-zoom-viewport][data-grabbing]
+    [data-fluidbox-media] {
+    cursor: grabbing;
+  }
+  /* A slide that can't load says so along its foot. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-error] {
+    position: absolute;
+    z-index: 4;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    padding: 8px;
+    background: var(--fluidbox-background, white);
+    color: var(--fluidbox-color, black);
+  }
+
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-close]:hover {
+    transform: scale(1.1);
+    background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
+  }
+
+  /**
+   * The dark edge inside the controls' focus rings, which keeps a light ring
+   * visible over a bright photo.
+   * @input --fluidbox-focus-contrast
+   * @default `black`
+   * @theme
+   */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    :is(
+      [data-fluidbox-previous],
+      [data-fluidbox-next],
+      [data-fluidbox-close],
+      [data-fluidbox-fullscreen],
+      [data-fluidbox-download],
+      [data-fluidbox-share],
+      [data-fluidbox-slideshow],
+      [data-fluidbox-retry],
+      [data-fluidbox-error] button
+    ):focus-visible {
+    outline: 2px solid var(--fluidbox-focus-color, currentColor);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--fluidbox-focus-contrast, black);
+  }
+
+  /* Windows high contrast and other forced colours drop backgrounds and shadows,
+     so the controls get an edge, and focus and disabled states a system colour.
+     An outline, which a reset that zeroes borders leaves alone. */
+  @media (forced-colors: active) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      :is(
+        [data-fluidbox-previous],
+        [data-fluidbox-next],
+        [data-fluidbox-close],
+        [data-fluidbox-fullscreen],
+        [data-fluidbox-download],
+        [data-fluidbox-share],
+        [data-fluidbox-slideshow],
+        [data-fluidbox-counter]
+      ) {
+      outline: 1px solid ButtonText;
+      outline-offset: -1px;
+    }
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
+      outline-color: GrayText;
+      color: GrayText;
+    }
+  }
+
+  /* More contrast: disabled controls stay legible. */
+  @media (prefers-contrast: more) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
+      --fluidbox-gallery-control-opacity: 0.6;
+    }
+  }
+
+  :where([data-fluidbox-viewer][data-fluidbox-static])
+    a:is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+    color: var(--fluidbox-color, white);
+    text-decoration: none;
+  }
+
+  /* Glyphs. A control that shows its own label (data-fluidbox-default) gets a
+     glyph over its text, which stays its name. The glyph is a mask over the
+     text colour; forced colours, and data-fluidbox-glyphs="off" on an
+     ancestor, show the text instead. */
+  /**
+   * The glyphs on controls that show their own label: an SVG `url()` whose
+   * shape masks the control's text colour. A page with a strict CSP sets them
+   * to files of its own, since `img-src` governs a `data:` URL.
+   * @input --fluidbox-icon-close --fluidbox-icon-previous --fluidbox-icon-next --fluidbox-icon-zoom-in --fluidbox-icon-zoom-out --fluidbox-icon-zoom-reset --fluidbox-icon-enter-fullscreen --fluidbox-icon-exit-fullscreen --fluidbox-icon-download --fluidbox-icon-share --fluidbox-icon-play-slideshow --fluidbox-icon-pause-slideshow --fluidbox-icon-retry --fluidbox-icon-embed-play
+   * @default the package's glyph, as a `data:` URL
+   * @on Viewer
+   */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-close] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-close,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-previous] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-previous,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 5.5L8 12l6.5 6.5'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-next] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-next,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 5.5L16 12l-6.5 6.5'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-in] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-zoom-in,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M12 5v14'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-out] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-zoom-out,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-reset] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-zoom-reset,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-fullscreen] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-enter-fullscreen,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 4h6v6M20 4l-6 6M10 20H4v-6M4 20l6-6'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer][data-fullscreen]) [data-fluidbox-fullscreen] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-exit-fullscreen,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 14h6v6M4 20l6-6M20 10h-6V4M20 4l-6 6'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-download] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-download,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 10l5 5 5-5M5 20h14'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-share] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-share,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M8 8l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slideshow] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-play-slideshow,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 5.5v13l10.5-6.5z'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slideshow][data-active] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-pause-slideshow,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5v14M15 5v14'/%3E%3C/svg%3E")
+    );
+  }
+  /* Retry keeps its text. The token is there for a theme that draws it. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-retry] {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-retry,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5'/%3E%3C/svg%3E")
+    );
+  }
+  :where([data-fluidbox-embed] > [data-fluidbox-embed-play]) {
+    --fluidbox-glyph: var(
+      --fluidbox-icon-embed-play,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 5.5v13l10.5-6.5z'/%3E%3C/svg%3E")
+    );
+  }
+  @media not (forced-colors: active) {
+    /* The text stays the name: clipped, not removed. */
+    :where(
+      :is([data-fluidbox-viewer], [data-fluidbox-flight])
+        :is(
+          [data-fluidbox-close],
+          [data-fluidbox-previous],
+          [data-fluidbox-next],
+          [data-fluidbox-zoom-in],
+          [data-fluidbox-zoom-out],
+          [data-fluidbox-zoom-reset],
+          [data-fluidbox-fullscreen],
+          [data-fluidbox-download],
+          [data-fluidbox-share],
+          [data-fluidbox-slideshow],
+          [data-fluidbox-embed-play]
+        )[data-fluidbox-default]:not([data-fluidbox-glyphs="off"] *)
+    ) {
+      overflow: hidden;
+      white-space: nowrap;
+      text-indent: 100vw;
+    }
+    :where(
+      :is([data-fluidbox-viewer], [data-fluidbox-flight])
+        :is(
+          [data-fluidbox-close],
+          [data-fluidbox-previous],
+          [data-fluidbox-next],
+          [data-fluidbox-zoom-in],
+          [data-fluidbox-zoom-out],
+          [data-fluidbox-zoom-reset],
+          [data-fluidbox-fullscreen],
+          [data-fluidbox-download],
+          [data-fluidbox-share],
+          [data-fluidbox-slideshow],
+          [data-fluidbox-embed-play]
+        )[data-fluidbox-default]:not([data-fluidbox-glyphs="off"] *)
+    )::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 20px;
+      height: 20px;
+      background-color: currentColor;
+      -webkit-mask: var(--fluidbox-glyph) center / contain no-repeat;
+      mask: var(--fluidbox-glyph) center / contain no-repeat;
+    }
+    :where([data-fluidbox-embed] > [data-fluidbox-embed-play])::before {
+      width: 24px;
+      height: 24px;
+    }
+    :where([data-fluidbox-viewer][dir="rtl"])
+      :is([data-fluidbox-previous], [data-fluidbox-next])::before {
+      transform: scaleX(-1);
+    }
+  }
+  /* Text labels: as wide as their text. */
+  :where([data-fluidbox-glyphs="off"])
+    [data-fluidbox-dialog]
+    :is(
+      [data-fluidbox-close],
+      [data-fluidbox-previous],
+      [data-fluidbox-next],
+      [data-fluidbox-zoom-in],
+      [data-fluidbox-zoom-out],
+      [data-fluidbox-zoom-reset],
+      [data-fluidbox-fullscreen],
+      [data-fluidbox-download],
+      [data-fluidbox-share],
+      [data-fluidbox-slideshow],
+      [data-fluidbox-embed-play]
+    )[data-fluidbox-default] {
+    width: fit-content;
+    padding-inline: 12px;
+    border-radius: 999px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  @media (forced-colors: active) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      [data-fluidbox-dialog]
+      :is(
+        [data-fluidbox-close],
+        [data-fluidbox-previous],
+        [data-fluidbox-next],
+        [data-fluidbox-zoom-in],
+        [data-fluidbox-zoom-out],
+        [data-fluidbox-zoom-reset],
+        [data-fluidbox-fullscreen],
+        [data-fluidbox-download],
+        [data-fluidbox-share],
+        [data-fluidbox-slideshow],
+        [data-fluidbox-embed-play]
+      )[data-fluidbox-default] {
+      width: fit-content;
+      padding-inline: 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+  }
+
+  /* The thumbnails. */
+  /** How fast the strip hides and returns, as on zoom. @input --fluidbox-thumbnails-zoom-duration @on Thumbnails */
+  /** How far the strip drops as it hides. @input --fluidbox-thumbnails-zoom-travel @on Thumbnails */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
+    /* Where the strip goes as it hides: down off the bottom, or aside. */
+    --fluidbox-thumbnails-hide: translateY(var(--fluidbox-thumbnails-zoom-travel, 18px));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails] {
+      transition:
+        opacity var(--fluidbox-thumbnails-zoom-duration, 180ms) linear,
+        transform var(--fluidbox-thumbnails-zoom-duration, 180ms) ease-out;
+    }
+  }
+  /* It gives way as the photo is dismissed, fading with the rest of the
+     viewer's content, and as it is zoomed. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog]:is([data-dismissing], [data-fluidbox-status="closing"])
+    [data-fluidbox-thumbnails] {
+    transform: var(--fluidbox-thumbnails-hide);
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-zoomed]
+    [data-fluidbox-thumbnails] {
+    transform: var(--fluidbox-thumbnails-hide);
+  }
+  /* And to a sheet as it rises. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-fluidbox-sheet-host]
+    [data-fluidbox-thumbnails-dock] {
+    opacity: calc(1 - var(--fluidbox-sheet-progress) * 3 - var(--fluidbox-sheet-dismiss) * 3);
+  }
+  /** The corners of thumbnails. @input --fluidbox-thumbnails-item-radius @theme */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] {
+    border-radius: var(--fluidbox-thumbnails-item-radius, 3px);
+    opacity: 0.58;
+    cursor: pointer;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] {
+      transition: opacity 120ms linear;
+    }
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-item][aria-selected="true"] {
+    opacity: 1;
+  }
+  /* Not by opacity alone: the current thumbnail has a bar along its foot. An
+     outline, so it stays in forced colours and under a reset that zeroes
+     borders, as Tailwind's preflight does. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-item][aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 25%;
+    bottom: 3px;
+    height: 3px;
+    /* Inset 2px on each side of a 3px box, so it fills it: whole pixels, as
+       browsers round an outline's width down to them. */
+    outline: 2px solid var(--fluidbox-color, white);
+    outline-offset: -2px;
+    border-radius: 2px;
+    box-shadow: 0 0 2px oklch(0% 0 0 / 0.6);
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails-item]:focus-visible {
+    outline: 2px solid var(--fluidbox-focus-color, currentColor);
+    outline-offset: 2px;
+  }
+  @media (prefers-contrast: more) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-thumbnails-item] {
+      opacity: 0.8;
+    }
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-thumbnails]:has([aria-orientation="vertical"]) {
+    --fluidbox-thumbnails-hide: translateX(calc(-1 * var(--fluidbox-thumbnails-zoom-travel, 18px)));
+  }
+  :where([data-fluidbox-viewer][dir="rtl"])
+    [data-fluidbox-thumbnails]:has([aria-orientation="vertical"]) {
+    --fluidbox-thumbnails-hide: translateX(var(--fluidbox-thumbnails-zoom-travel, 18px));
+  }
+
+  /* The sheet. */
+  :where(
+    :is([data-fluidbox-viewer], [data-fluidbox-flight])
+      [data-fluidbox-dialog][data-fluidbox-sheet-host]
+  ) {
+    /** The sheet's top corners. */
+    --fluidbox-sheet-radius: 18px;
+    /** The sheet's widest. */
+    --fluidbox-sheet-max-width: 640px;
+    /** The sheet's background. */
+    --fluidbox-sheet-background: Canvas;
+    /** The sheet's text colour. */
+    --fluidbox-sheet-color: CanvasText;
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet] {
+    border-radius: var(--fluidbox-sheet-radius) var(--fluidbox-sheet-radius) 0 0;
+    box-shadow:
+      0 -1px 0 rgb(0 0 0 / 0.06),
+      0 -12px 40px rgb(0 0 0 / 0.18);
+    outline: none;
+  }
+  /* A grab handle; add one as the sheet's first child. */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-sheet-handle] {
+    flex: none;
+    display: block;
+    width: 36px;
+    height: 5px;
+    margin: 8px auto 4px;
+    border: 0;
+    border-radius: 3px;
+    padding: 0;
+    background: currentColor;
+    opacity: 0.25;
+  }
+  /* Choreography: the arrows go once the sheet is up, and the photo fades
+     rather than shrink to a stamp past the first stop. */
+  /**
+   * How much the photo fades between the first stop and the top one. `0` keeps it.
+   * @input --fluidbox-sheet-fade
+   */
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-fluidbox-sheet-host]
+    :is([data-fluidbox-previous], [data-fluidbox-next]) {
+    opacity: calc(1 - var(--fluidbox-sheet-progress) * 2 - var(--fluidbox-sheet-dismiss) * 3);
+  }
+  /* The arrows sit on the stage by anchor, so they move with it. Without
+     anchors, they centre in the room above the sheet. */
+  @supports (anchor-name: --fluidbox-sheet-stage) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      [data-fluidbox-dialog][data-fluidbox-sheet-host][data-gallery]
+      :is([data-fluidbox-previous], [data-fluidbox-next]) {
+      position-anchor: --fluidbox-sheet-stage;
+      top: calc(
+        anchor(top) + var(--fluidbox-stage-top) +
+          (anchor-size(height) - var(--fluidbox-stage-top) - var(--fluidbox-stage-bottom)) / 2
+      );
+    }
+  }
+  @supports not (anchor-name: --fluidbox-sheet-stage) {
+    :where([data-fluidbox-viewer], [data-fluidbox-flight])
+      [data-fluidbox-dialog][data-fluidbox-sheet-host]
+      :is([data-fluidbox-previous], [data-fluidbox-next]) {
+      translate: 0
+        calc(max(0px, var(--fluidbox-sheet-visible)) / -2 + var(--fluidbox-sheet-peek) / 2);
+    }
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-fluidbox-sheet-host]
+    [data-fluidbox-slide] {
+    opacity: calc(1 - var(--fluidbox-sheet-expand) * var(--fluidbox-sheet-fade, 1));
+  }
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
+    [data-fluidbox-dialog][data-fluidbox-sheet-host]
+    [data-fluidbox-close] {
+    opacity: calc(1 - var(--fluidbox-sheet-dismiss) * 3);
+  }
+
+  /* The media add-ons. */
+  :where([data-fluidbox-embed] > [data-fluidbox-embed-play]) {
+    display: grid;
+    place-items: center;
+    width: 68px;
+    height: 48px;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: rgb(0 0 0 / 0.7);
+    color: white;
+    cursor: pointer;
+  }
+  :where([data-fluidbox-embed] > [data-fluidbox-embed-play]:is(:hover, :focus-visible)) {
+    background: rgb(0 0 0 / 0.9);
+  }
+  :where([data-fluidbox-spin]) {
+    cursor: grab;
+  }
+  :where([data-fluidbox-spin][data-grabbing]) {
+    cursor: grabbing;
+  }
+  :where([data-fluidbox-model] > model-viewer) {
+    background: transparent;
+    --poster-color: transparent;
+  }
+}

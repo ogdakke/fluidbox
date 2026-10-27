@@ -8,18 +8,18 @@ export const mount: MountLive = async (root) => {
     `<template slot="content"><img src="${item.src}" alt="${item.alt}" width="${item.width}" height="${item.height}" /></template>`;
   root.innerHTML = `
     <fluidbox-gallery class="pattern-album">
-      <fluidbox-item item-id="${first!.id}">
+      <fluidbox-item value="${first!.id}">
         <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
           <img src="${first!.src}" alt="${coverAlt}" />
-          <span class="pattern-overlay" data-test="count" data-fluidbox-thumbnail-overlay="travel"
-            ><span class="live-layer" data-test="layer" data-fluidbox-frame-layer></span
+          <span class="pattern-overlay" data-test="count" data-fluidbox-trigger-overlay="copy"
+            ><span class="live-layer" data-test="layer" data-fluidbox-trigger-overlay="frame"></span
             >${countText}</span
           >
         </button>
         ${content(first!)}
       </fluidbox-item>
-      ${rest.map((item) => `<fluidbox-item item-id="${item.id}">${content(item)}</fluidbox-item>`).join("")}
-      <fluidbox-filmstrip></fluidbox-filmstrip>
+      ${rest.map((item) => `<fluidbox-item value="${item.id}">${content(item)}</fluidbox-item>`).join("")}
+      <fluidbox-thumbnails></fluidbox-thumbnails>
     </fluidbox-gallery>`;
   const gallery = root.querySelector("fluidbox-gallery")!;
   await gallery.whenReady();

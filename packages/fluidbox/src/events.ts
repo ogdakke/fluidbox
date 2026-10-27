@@ -1,35 +1,24 @@
-import {
-  FluidboxItemChangeEvent,
-  FluidboxSheetEvent,
-  FluidboxToggleEvent,
-  FluidboxZoomEvent,
-  type FluidboxEventMap,
-} from "./public-api";
+import type { FluidboxEventMap } from "./public-api";
 
 /** The seven event names, for bindings that forward them as props, emits or outputs. */
 export const fluidboxEventTypes = [
-  "beforetoggle",
-  "toggle",
-  "beforeitemchange",
-  "itemchange",
-  "settle",
+  "beforevaluechange",
+  "valuechange",
+  "valuechangecomplete",
   "sheetchange",
   "zoomchange",
+  "mediaerror",
+  "reachend",
 ] as const satisfies readonly (keyof FluidboxEventMap)[];
 
-const eventClasses: (new (type: any, init: any) => Event)[] = [
-  FluidboxToggleEvent,
-  FluidboxItemChangeEvent,
-  FluidboxSheetEvent,
-  FluidboxZoomEvent,
-];
-
-/** A copy of a fluidbox event, to fire on another target. */
-function copyOf(event: Event): Event | null {
-  const EventClass = eventClasses.find((each) => event instanceof each);
+/**
+ * A copy of a fluidbox event, to fire on another target: made by the event's
+ * own class, so no class is imported here.
+ */
+function copyOf(event: Event): Event {
   // The event's own fields are its init; `cancelable` is a getter on Event.
   const init = Object.assign({}, event, { cancelable: event.cancelable });
-  return EventClass ? new EventClass(event.type, init) : null;
+  return new (event.constructor as new (type: string, init: object) => Event)(event.type, init);
 }
 
 /**
@@ -38,8 +27,7 @@ function copyOf(event: Event): Event | null {
  */
 export function forwardEvents(from: EventTarget, to: EventTarget, signal: AbortSignal) {
   const forward = (event: Event) => {
-    const copy = copyOf(event);
-    if (copy && !to.dispatchEvent(copy)) event.preventDefault();
+    if (!to.dispatchEvent(copyOf(event))) event.preventDefault();
   };
   for (const type of fluidboxEventTypes) from.addEventListener(type, forward, { signal });
 }

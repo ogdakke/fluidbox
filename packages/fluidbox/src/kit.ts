@@ -2,19 +2,24 @@
  * The binding kit: what the framework bindings build their parts from. Each
  * binding uses only this and the plain API, never the custom elements.
  */
-import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS } from "./control-icons";
 import { hostOf } from "./host";
 import { idOf, indexIn, itemLabel, targetKey, targetKeys } from "./items";
 import { defaultLabels, resolveLabels } from "./labels";
 import { fluidboxEventTypes } from "./events";
-import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "./public-api";
+import { crossOrigin, downloadName, fileOf } from "./item-file";
+import type {
+  Fluidbox,
+  FluidboxHotspotOptions,
+  FluidboxItem,
+  FluidboxRenderer,
+  FluidboxSlide,
+} from "./public-api";
 
 export { controlNames, fluidboxControls, zoomControlNames, type FluidboxControl } from "./controls";
 export { defaultLabels, resolveLabels };
 export {
   bindTrigger,
   createTrigger,
-  frameLayerOf,
   resolveOrigin,
   type FluidboxTrigger,
   type FluidboxTriggerOptions,
@@ -23,16 +28,68 @@ export {
 } from "./trigger";
 export { idOf, itemLabel, targetKey, targetKeys };
 
-/** The default control icons, as attributes and a path, for frameworks that build their own SVG. */
-export const fluidboxControlIcon = {
-  attributes: CONTROL_ICON_ATTRIBUTES,
-  paths: CONTROL_ICON_PATHS,
-} as const;
-
 /** The fluidbox events, for bindings that forward them as props, emits or outputs. */
 export { fluidboxEventTypes };
 
-export { latestOrigins } from "./origins";
+export { latestFindTrigger } from "./origins";
+
+/** A Download link's `href` and `download` for an item, or null when it has no file. */
+export function downloadLink(item: FluidboxItem | null) {
+  const file = item && fileOf(item);
+  return file ? { href: file.src, download: downloadName(item, file) } : null;
+}
+
+/** Whether a browser ignores `download` on a link to `href` and navigates, so Download fetches it. */
+export { crossOrigin };
+
+/**
+ * Hold a slide's commit while a framework renders it: call it in the slide's
+ * renderer, and call what it returns once the content is in the box. An open
+ * waits for the commit before it reads the box (at most its three seconds).
+ * Outside the renderer's body it holds nothing.
+ */
+export function holdSlideCommit(slide: FluidboxSlide<any>): () => void {
+  const hold = (slide as unknown as { [key: symbol]: (() => () => void) | undefined })[
+    Symbol.for("fluidbox.holdCommit")
+  ];
+  return hold ? hold() : () => {};
+}
+
+/**
+ * Keep `button`, which you render in the slide's media box, on its point of
+ * the painted media, hidden with the controls. Call it again as the options
+ * change. Nothing outside a slide's renderer, as on the server.
+ */
+export function placeHotspot(
+  slide: FluidboxSlide<any>,
+  button: HTMLElement,
+  options: FluidboxHotspotOptions,
+): void {
+  (
+    slide as unknown as {
+      [key: symbol]: ((button: HTMLElement, options: FluidboxHotspotOptions) => void) | undefined;
+    }
+  )[Symbol.for("fluidbox.hotspots")]?.(button, options);
+}
+
+/**
+ * Each command of `target`, a fluidbox or a binding's own root, as a function of
+ * its own, so a binding can hand them out. `arg` maps each argument on the way,
+ * as Vue unwraps its proxies.
+ */
+export function commandsOf<TCommands>(
+  target: object,
+  arg: (value: unknown) => unknown = (value) => value,
+): TCommands {
+  const commands: Record<string, (...args: unknown[]) => unknown> = {};
+  for (const name of "open close next previous zoomTo zoomIn zoomOut zoomReset setFullscreen download share play pause setItems preload load".split(
+    " ",
+  )) {
+    commands[name] = (...args) =>
+      (target as Record<string, (...args: unknown[]) => unknown>)[name]!(...args.map(arg));
+  }
+  return commands as TCommands;
+}
 
 /**
  * Drop a fluidbox's viewer and close it at once, keeping its bindings, as a
@@ -45,7 +102,7 @@ export function unloadFluidbox(fluidbox: Fluidbox<any>) {
 
 export { indexIn };
 
-export { createFluidboxSync, watchFluidbox, type FluidboxChangeDetails } from "./controlled";
+export { createFluidboxSync, valueChangeDetails, watchFluidbox } from "./controlled";
 export {
   fluidboxStaticViewer,
   fluidboxStaticViewerNodes,
@@ -57,8 +114,8 @@ export {
 const takeovers = new WeakMap<Fluidbox<any>, object>();
 
 /**
- * Take over the open viewer the server rendered inside `element`: open at
- * `index` with no motion, and hide the server's copy in the frame the viewer
+ * Take over the open viewer the server rendered inside `element`: open on
+ * `value`, an id, with no motion, and hide the server's copy in the frame the viewer
  * first paints. Resolves whether the viewer opened. A takeover that fails
  * hides the copy too, unless a newer one is under way, as after StrictMode's
  * remount.
@@ -66,7 +123,7 @@ const takeovers = new WeakMap<Fluidbox<any>, object>();
 export function takeOverFluidbox(
   fluidbox: Fluidbox<any>,
   element: HTMLElement,
-  index: number,
+  value: string,
 ): Promise<boolean> {
   const copy = element.matches("[data-fluidbox-static]")
     ? element
@@ -81,7 +138,7 @@ export function takeOverFluidbox(
     if (copy && takeovers.get(fluidbox) === token) copy.hidden = true;
   };
   return hostOf(fluidbox)
-    .takeOver(index)
+    .takeOver(value)
     .then(
       (opened) => {
         hide();
@@ -103,11 +160,11 @@ export interface FluidboxSlot<TItem extends FluidboxItem = FluidboxItem> {
    * so the viewer emptying the container never pulls nodes from under it.
    */
   readonly target: HTMLElement;
-  /** The element the viewer gave the renderer: a sheet's section, a filmstrip button. */
+  /** The element the viewer gave the renderer: a sheet's section, a thumbnail button. */
   readonly container: HTMLElement;
 }
 
-/** A renderer for the sheet or the filmstrip that lists its targets for a framework to fill. */
+/** A renderer for the sheet or the thumbnails that lists its targets for a framework to fill. */
 export interface FluidboxSlots<TItem extends FluidboxItem = FluidboxItem> {
   readonly render: FluidboxRenderer<TItem>;
   /** The targets on show, in index order. */

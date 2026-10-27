@@ -30,7 +30,7 @@ const REDUCED = "(prefers-reduced-motion: reduce)";
 /**
  * Magnify `item` inside the box of the image in `element` while a mouse rests
  * on it, as Amazon's and Shopify's product photos do. The magnified image is
- * the item's `zoomSrc`, or the candidate of `zoomSrcset` or `srcset` sharp at
+ * the item's `zoom.src`, or the candidate of `zoom.srcset` or `srcset` sharp at
  * the zoom; until it has decoded, the image on the page stands in. It sits
  * over the image, takes no pointer events, so a click still opens the viewer,
  * and goes as the pointer leaves or presses, or the page scrolls. It does
@@ -127,8 +127,8 @@ export function hoverZoom(
     const needed = width * view.devicePixelRatio;
     const candidates = [
       ...srcsetCandidates(item.srcset),
-      ...srcsetCandidates(item.zoomSrcset),
-      ...(item.zoomSrc ? [{ src: item.zoomSrc, width: Infinity }] : []),
+      ...srcsetCandidates(item.zoom?.srcset),
+      ...(item.zoom?.src ? [{ src: item.zoom.src, width: Infinity }] : []),
     ];
     const src = sharperCandidate(candidates, 0, needed)?.src ?? item.src;
     if (picture?.src && new URL(src, element.baseURI).href === picture.src) return;

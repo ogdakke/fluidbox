@@ -37,6 +37,7 @@
     "@angular/compiler": "^22.2.3",
     "@angular/core": "^22.2.3",
     "@angular/platform-browser": "^22.2.3",
+    "@angular/platform-server": "^22.2.3",
     "@arethetypeswrong/cli": "^0.18.2",
     "@axe-core/playwright": "^4.14.0",
     "@ogdakke/fluidbox": "workspace:*",

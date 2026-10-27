@@ -2,7 +2,12 @@ import { defineConfig } from "tsdown";
 
 // Built on its own, then copied into @ogdakke/fluidbox's dist by scripts/build.ts.
 export default defineConfig({
-  entry: { index: "src/index.ts" },
+  entry: {
+    index: "src/index.ts",
+    embed: "src/embed.ts",
+    model: "src/model.ts",
+    spin: "src/spin.ts",
+  },
   format: "esm",
   platform: "browser",
   target: "es2022",
@@ -10,5 +15,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   report: false,
+  // Left for the app's bundler, so development-only checks drop out of its production build.
+  define: { "process.env.NODE_ENV": "process.env.NODE_ENV" },
   deps: { neverBundle: [/^@ogdakke\/fluidbox(?:\/.*)?$/] },
 });

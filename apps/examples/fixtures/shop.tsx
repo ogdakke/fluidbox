@@ -1,28 +1,21 @@
 import { mountSite } from "../src/site";
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type {
-  FluidboxImageItem,
-  FluidboxItem,
-  FluidboxOriginAdapter,
-  FluidboxSlideRenderer,
-} from "@ogdakke/fluidbox";
-import { renderEmbed, youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer, modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
-import { createSpinRenderer, spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
-import {
-  Fluidbox,
-  useFluidbox,
-  type FluidboxReactRenderContext,
-  type FluidboxReactRenderer,
-} from "@ogdakke/fluidbox/react";
+import type { FluidboxImageItem } from "@ogdakke/fluidbox";
+import { youtubeItem, type FluidboxEmbedItem } from "@ogdakke/fluidbox/embed";
+import { modelItem, type FluidboxModelItem } from "@ogdakke/fluidbox/model";
+import { spinItem, type FluidboxSpinItem } from "@ogdakke/fluidbox/spin";
+import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
+import { Embed } from "@ogdakke/fluidbox/react/embed";
+import { Model } from "@ogdakke/fluidbox/react/model";
+import { Spin } from "@ogdakke/fluidbox/react/spin";
 import { thumbHashToDataURL } from "thumbhash";
 import hashes from "./shop-photos.json";
 import { Avatar, compact, type Person } from "./social-ui";
 import "./safari-chrome.css";
 import "./shop.css";
 
-mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a filmstrip column" });
+mountSite("fixtures", { fixture: "Shop product page · carousel, dots and a thumbnails column" });
 
 // The product: one print in seven photos. Frame options jump to their photo, as in Shop.
 
@@ -41,7 +34,7 @@ const delayed = (src: string, ms: number) => (ms ? `${src}?delay=${Math.round(ms
 
 const shot = (name: keyof typeof hashes, alt: string, frame?: FrameId): Shot => ({
   id: `fjord-${name}`,
-  type: "img",
+  type: "image",
   src: delayed(`/products/fjord-${name}.webp`, delay),
   alt,
   width: 1600,
@@ -105,11 +98,11 @@ type ShopItem = Shot | FluidboxEmbedItem | FluidboxSpinItem | FluidboxModelItem;
 const media: readonly ShopItem[] = [...shots, video, spin, model];
 
 /** The item's name for a card's label. */
-const named = (item: ShopItem) => (item.type === "img" ? item.alt : item.title);
+const named = (item: ShopItem) => (item.type === "image" ? item.alt : item.title);
 
 /** The picture a card shows: the photo, the video's poster, the spin's first frame or the model's poster. */
 const cover = (item: ShopItem) =>
-  item.type === "img"
+  item.type === "image"
     ? item.src
     : "frames" in item
       ? item.frames[0]!
@@ -118,52 +111,10 @@ const cover = (item: ShopItem) =>
 /** What a card says it holds besides a photo. */
 const badges: Record<string, string> = { embed: "Video", spin: "360°", model: "3D" };
 
-/**
- * The add-ons' renderers draw into an element. A React slide gets a span of
- * its own to draw them into, with the slide's signal and activity.
- */
-function addon(render: FluidboxSlideRenderer<FluidboxItem>): FluidboxReactRenderer<ShopItem> {
-  return (context) => <AddonSlide render={render} context={context} />;
-}
-
-function AddonSlide({
-  render,
-  context,
-}: {
-  render: FluidboxSlideRenderer<FluidboxItem>;
-  context: FluidboxReactRenderContext<ShopItem>;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const target = ref.current!;
-    const controller = new AbortController();
-    const dispose = render({
-      item: context.item,
-      index: context.index,
-      target,
-      signal: AbortSignal.any([context.signal, controller.signal]),
-      get active() {
-        return context.active;
-      },
-      onActiveChange: context.onActiveChange,
-    });
-    return () => {
-      controller.abort();
-      dispose?.();
-      target.replaceChildren();
-    };
-  }, [render, context]);
-  return <span ref={ref} style={{ display: "contents" }} />;
-}
-
 // The model's element loads from a CDN only when a model slide is first on show.
 const MODEL_VIEWER = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
 
-const renderers = {
-  embed: addon(renderEmbed),
-  spin: addon(createSpinRenderer()),
-  model: addon(createModelRenderer({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) })),
-};
+const loadModelViewer = () => import(/* @vite-ignore */ MODEL_VIEWER);
 
 const sizes = [
   { id: "9x12", label: "9″ × 12″", price: 32.95 },
@@ -339,18 +290,24 @@ function Gallery({ carousel }: { carousel: Carousel }) {
       <div className="shop-stage">
         <div className="shop-carousel" ref={ref} onScroll={onScroll}>
           {media.map((item, at) => (
-            <Fluidbox.Trigger key={item.id} item={item} asChild>
+            <Fluidbox.Trigger key={item.id} value={item} asChild>
               <button
                 type="button"
                 className="shop-slide"
                 aria-label={`Open ${at + 1} of ${media.length}: ${named(item)}`}
               >
-                {/* The card scales as it scrolls; the button, the snap target, doesn't. */}
+                {/* The card moves as it scrolls; the button, the snap target, doesn't. */}
                 <span className="shop-card">
-                  <Photo item={item} src={cover(item)} size={item.width} origin eager={at < 2} />
-                  {item.type === "custom" && (
+                  <Photo
+                    item={item}
+                    src={cover(item)}
+                    size={item.width ?? 800}
+                    origin
+                    eager={at < 2}
+                  />
+                  {item.type !== "image" && (
                     <span className="shop-kind" aria-hidden="true">
-                      {badges[item.render]}
+                      {badges[item.type]}
                     </span>
                   )}
                 </span>
@@ -419,7 +376,7 @@ function Dots() {
   );
 }
 
-/** True while the window is wide: the viewer has a filmstrip down the left instead of dots. */
+/** True while the window is wide: the viewer has thumbnails down the left instead of dots. */
 function useWide() {
   const [wide, setWide] = useState(() => matchMedia(WIDE).matches);
   useEffect(() => {
@@ -483,9 +440,9 @@ function ShopViewer() {
         <Fluidbox.Previous />
         <Fluidbox.Next />
       </Fluidbox.Viewer>
-      {/* The package's filmstrip, docked down the left by --fluidbox-filmstrip-position.
+      {/* The package's thumbnails, docked down the left by --fluidbox-thumbnails-position.
         A phone has the dots instead, so the strip is only there on a wide screen. */}
-      {wide && <Fluidbox.Filmstrip />}
+      {wide && <Fluidbox.Thumbnails />}
     </>
   );
 }
@@ -794,20 +751,17 @@ function ProductPage() {
   const [cart, setCart] = useState(0);
   // The viewer scrolls the carousel to the photo on show, so the close lands
   // on that card and the page is left where the viewer was.
-  const origins = useMemo<FluidboxOriginAdapter<ShopItem>>(
-    () => ({
-      getOrigin: () => null,
-      revealOrigin: (_id, index) => carousel.scrollTo(index, "instant"),
-    }),
+  const revealTrigger = useCallback(
+    (_item: ShopItem, index: number) => carousel.scrollTo(index, "instant"),
     [carousel.scrollTo],
   );
   return (
-    <Fluidbox.Root
-      items={media}
-      origins={origins}
-      renderers={renderers}
-      zoom={{ step: 2.5, max: 4 }}
-    >
+    <Fluidbox.Root items={media} revealTrigger={revealTrigger} zoom={{ step: 2.5, max: 4 }}>
+      <Fluidbox.Slides
+        embed={() => <Embed />}
+        spin={() => <Spin />}
+        model={() => <Model load={loadModelViewer} />}
+      />
       <article className="shop-page">
         <div className="shop-seller-row">
           <Seller />
@@ -843,8 +797,8 @@ function Findings() {
           Instagram and Shop.
         </li>
         <li>
-          <strong>Thumbnail column: CSS.</strong> The filmstrip is viewer content that the page's
-          CSS places. --fluidbox-filmstrip-axis: y runs it as a column down the left, over slides
+          <strong>Thumbnail column: CSS.</strong> The thumbnails is viewer content that the page's
+          CSS places. --fluidbox-thumbnails-axis: y runs it as a column down the left, over slides
           that cross the whole window; a vertical wheel scrolls it, and up and down step through it.
         </li>
         <li>

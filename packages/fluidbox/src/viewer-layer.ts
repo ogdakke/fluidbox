@@ -1,22 +1,50 @@
-import { controlIcon, type ControlIconPart } from "./control-icons";
-import { allControlNames, controlNames, fluidboxControls, zoomControlNames } from "./controls";
+import { allControlNames, fluidboxControls, zoomControlNames } from "./controls";
+import {
+  boundControls,
+  namingOf,
+  paintControl,
+  runControl,
+  type ControlNaming,
+} from "./control-wiring";
 import type { FluidboxLabels } from "./labels";
 import type { Fluidbox, FluidboxControlName, FluidboxState } from "./public-api";
 import type { FluidboxDispose, FluidboxViewerLayer } from "./runtime-types";
 
-/** A default control button, with its icon, label and attribute. */
+/** How each control in the layer is named as the state changes. */
+const drawn = new WeakMap<Element, ControlNaming>();
+
+/**
+ * A default control: a button, a link for Download, so "Save link as" works,
+ * and text for the counter. With no icon of yours it shows its label as text,
+ * marked `data-fluidbox-default`; with one, the label names it.
+ */
 export function controlButton(
   ownerDocument: Document,
   name: FluidboxControlName,
   labels: FluidboxLabels,
-): HTMLButtonElement {
+  icons: FluidboxViewerLayer["icons"],
+): HTMLElement {
   const control = fluidboxControls[name];
-  const button = ownerDocument.createElement("button");
-  button.type = "button";
-  button.setAttribute(control.attribute, "");
-  button.setAttribute("aria-label", control.label(labels));
-  button.append(controlIcon(ownerDocument, name as ControlIconPart));
-  return button;
+  const element =
+    name === "counter"
+      ? ownerDocument.createElement("span")
+      : name === "download"
+        ? ownerDocument.createElement("a")
+        : Object.assign(ownerDocument.createElement("button"), { type: "button" });
+  element.setAttribute(control.attribute, "");
+  const icon = name === "counter" ? undefined : icons?.[name]?.();
+  if (icon) {
+    element.append(icon);
+    element.setAttribute("aria-label", control.label(labels));
+    drawn.set(element, "label");
+  } else {
+    element.dataset.fluidboxDefault = "";
+    element.textContent = control.label(labels);
+    // The dialog's name and the announcer already say where you are.
+    if (name === "counter") element.setAttribute("aria-hidden", "true");
+    drawn.set(element, "text");
+  }
+  return element;
 }
 
 /** The buttons of `names`, with the zoom controls together in a group named like the zoomed image. */
@@ -24,10 +52,13 @@ function controlNodes(
   ownerDocument: Document,
   names: readonly FluidboxControlName[],
   labels: FluidboxLabels,
+  icons: FluidboxViewerLayer["icons"],
 ): HTMLElement[] {
-  const button = (name: FluidboxControlName) => controlButton(ownerDocument, name, labels);
-  const nodes: HTMLElement[] = names.filter((name) => !zoomControlNames.includes(name)).map(button);
-  const zooms = names.filter((name) => zoomControlNames.includes(name));
+  const button = (name: FluidboxControlName) => controlButton(ownerDocument, name, labels, icons);
+  const zoom = (name: FluidboxControlName) =>
+    (zoomControlNames as readonly string[]).includes(name);
+  const nodes: HTMLElement[] = names.filter((name) => !zoom(name)).map(button);
+  const zooms = names.filter(zoom);
   if (zooms.length) {
     const group = ownerDocument.createElement("div");
     group.dataset.fluidboxZoomControls = "";
@@ -41,7 +72,7 @@ function controlNodes(
 
 /** Draw the viewer's layer into `target`: the default buttons, then the viewer content. */
 export function drawViewerLayer(
-  { fluidbox, controls, viewer, labels }: FluidboxViewerLayer,
+  { fluidbox, controls, viewer, labels, icons }: FluidboxViewerLayer,
   target: HTMLElement,
   lifetime: AbortSignal,
 ): FluidboxDispose {
@@ -49,7 +80,7 @@ export function drawViewerLayer(
   const scope = new AbortController();
   const { signal } = scope;
   lifetime.addEventListener("abort", () => scope.abort(), { once: true, signal });
-  const buttons = controlNodes(target.ownerDocument, controls, labels);
+  const buttons = controlNodes(target.ownerDocument, controls, labels, icons);
   target.append(...buttons);
   const disposeViewer = viewer?.({ target, fluidbox, signal }) ?? undefined;
   const close = buttons.find((button) => button.hasAttribute(fluidboxControls.close.attribute));
@@ -68,18 +99,8 @@ export function drawViewerLayer(
     signal.addEventListener("abort", () => observer.disconnect(), { once: true });
     place();
   }
-  // A <fluidbox-controls> the content left, as a gallery's template does, stands
-  // for the defaults, and with `zoom` for the zoom controls too.
-  for (const placeholder of target.querySelectorAll("fluidbox-controls")) {
-    const names = placeholder.hasAttribute("zoom")
-      ? [...controlNames, ...zoomControlNames]
-      : controlNames;
-    const expanded = controlNodes(target.ownerDocument, names, labels);
-    placeholder.replaceWith(...expanded);
-    buttons.push(...expanded);
-  }
   // Buttons marked as controls work wherever the viewer content puts them.
-  wireControls(target, fluidbox, signal);
+  wireControls(target, fluidbox, labels, signal);
   return () => {
     disposeViewer?.();
     scope.abort();
@@ -93,42 +114,38 @@ export const controlSelector = allControlNames
   .join();
 
 /**
- * Make the control buttons in `target` work: a click on a button marked
- * `data-fluidbox-previous`, `-next`, `-close`, `-zoom-in`, `-zoom-out` or
- * `-zoom-reset` runs it, unless the click was prevented, and each one is
- * disabled while it can do nothing.
+ * Make the controls in `target` work: a click on an element marked
+ * `data-fluidbox-close`, `-next`, `-download` and the rest runs it, unless the
+ * click was prevented, and each one is disabled or hidden while it can do
+ * nothing. Elements made controls with `bindControl` look after themselves.
  */
 export function wireControls(
   target: HTMLElement,
   fluidbox: Fluidbox<any>,
+  labels: FluidboxLabels,
   signal: AbortSignal,
 ): void {
+  const nameOf = (element: Element) =>
+    allControlNames.find((each) => element.hasAttribute(fluidboxControls[each].attribute))!;
   target.addEventListener(
     "click",
     (event) => {
-      const button = (event.target as Element | null)?.closest?.(controlSelector);
-      if (!button || !target.contains(button)) return;
-      const name = allControlNames.find((each) =>
-        button.hasAttribute(fluidboxControls[each].attribute),
-      )!;
-      // Frameworks that delegate events handle the click after this listener,
-      // so look once the whole dispatch is over.
-      setTimeout(() => {
-        if (!event.defaultPrevented && !signal.aborted) {
-          void fluidboxControls[name].run(fluidbox, event);
-        }
-      });
+      const element = (event.target as Element | null)?.closest?.(controlSelector);
+      if (!element || !target.contains(element) || boundControls.has(element)) return;
+      runControl(event, element, nameOf(element), fluidbox, signal);
     },
     { signal },
   );
   const paint = (state: FluidboxState<any>) => {
-    for (const name of allControlNames) {
-      const control = fluidboxControls[name];
-      // A framework part keeps its own disabled state, which may be overridden.
-      const selector = `[${control.attribute}]:not([data-fluidbox-managed])`;
-      for (const button of target.querySelectorAll<HTMLButtonElement>(selector)) {
-        button.disabled = control.disabled(state);
-      }
+    // A framework part keeps its own state, which may be overridden.
+    for (const element of target.querySelectorAll<HTMLElement>(
+      `:is(${controlSelector}):not([data-fluidbox-managed])`,
+    )) {
+      if (boundControls.has(element)) continue;
+      const name = nameOf(element);
+      // Markup's controls are named once, before a label of ours could look like their own.
+      if (!drawn.has(element)) drawn.set(element, namingOf(element, name));
+      paintControl(element, name, fluidbox, state, labels, drawn.get(element)!);
     }
   };
   paint(fluidbox.state);

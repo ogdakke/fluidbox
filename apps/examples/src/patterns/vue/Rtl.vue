@@ -2,7 +2,8 @@
 <script setup lang="ts">
 import { itemLabel } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/vue";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { arabic, photos } from "../shared";
 </script>
 
@@ -14,14 +15,14 @@ import { arabic, photos } from "../shared";
         <Fluidbox.Trigger
           v-for="photo in photos"
           :key="photo.id"
-          :item="photo"
+          :value="photo.id"
           class="pattern-thumb"
           data-test="trigger"
         >
           <img :src="photo.src" :alt="itemLabel(photo)" />
         </Fluidbox.Trigger>
       </div>
-      <Fluidbox.Filmstrip />
+      <Fluidbox.Thumbnails />
     </Fluidbox.Root>
   </div>
 </template>

@@ -1,11 +1,12 @@
 // #region example
 import { createFluidbox, itemLabel } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { arabic, photos } from "../shared";
 
 export function mountRtl(root: HTMLElement) {
-  const fluidbox = createFluidbox({ items: photos, labels: arabic, filmstrip: true });
+  const fluidbox = createFluidbox({ items: photos, labels: arabic, thumbnails: true });
   // The viewer takes dir and lang from the trigger's surroundings.
   const section = Object.assign(document.createElement("div"), { dir: "rtl", lang: "ar" });
   const grid = document.createElement("div");

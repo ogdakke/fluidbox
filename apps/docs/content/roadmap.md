@@ -63,12 +63,18 @@ The opening animation and swipes should hold 60 fps on a mid-range Android phone
 
 1.0 won't support any of these. They come later, probably as add-ons.
 
-- **Sharper images while zooming.** The viewer swaps in a higher resolution once the zoom passes what the current image can show.
 - **Tiled images.** Zoom into images too large to download whole, using Deep Zoom (DZI) or IIIF tiles.
 - **A Svelte binding.**
-- **Panoramas and streaming video** as built-in renderers. You can already write your own renderer for either.
+- **Panoramas and streaming video** as built-in slides. You can already draw either with a [slide of your own](./media.md).
 
-YouTube and Vimeo videos, 360° spins and 3D models, once listed here, are add-ons now. See [Product media](./product-media.md).
+Some features once listed here ship now:
+
+- A sharper image as you zoom, from an image item's `zoom` field. See [Media types](./media.md).
+- YouTube and Vimeo videos, 360° spins and 3D models, as add-ons. See [Product media](./product-media.md).
+- A slideshow. See [Slideshow](./slideshow.md).
+- Hotspots on an image or video. See [Hotspots](./hotspots.md).
+- A list that grows as the viewer nears its end. See [Items and origins](./items-and-origins.md#lists-that-grow).
+- A speed for every motion, `--fluidbox-motion-speed`. See [Styling](./styling.md#motion-speed).
 
 ## Helping
 

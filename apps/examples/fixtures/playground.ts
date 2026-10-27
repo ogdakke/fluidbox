@@ -17,7 +17,7 @@ const items: FluidboxItemList = {
     const src = index % 2 ? "/second.svg" : "/first.svg";
     return {
       id: String(index),
-      type: "img",
+      type: "image",
       src,
       alt: `Gallery item ${index + 1}`,
       width: 600,
@@ -31,14 +31,7 @@ const items: FluidboxItemList = {
   },
 };
 gallery.items = items;
-gallery.origins = {
-  getOrigin(id) {
-    const trigger = origins.get(id);
-    if (!trigger) return null;
-    const thumbnail = trigger.querySelector("img");
-    return { trigger, visual: thumbnail ?? trigger, thumbnail: thumbnail ?? undefined };
-  },
-};
+gallery.findTrigger = (item) => origins.get(item.id!) ?? null;
 
 function renderWindow(start: number) {
   for (const button of origins.values()) button.remove();
@@ -57,7 +50,7 @@ function renderWindow(start: number) {
     caption.textContent = `Item ${index + 1}`;
     button.append(image, caption);
     button.addEventListener("click", () => gallery.open(index));
-    gallery.insertBefore(button, gallery.querySelector("fluidbox-filmstrip"));
+    gallery.insertBefore(button, gallery.querySelector("fluidbox-thumbnails"));
     origins.set(String(index), button);
   }
 }

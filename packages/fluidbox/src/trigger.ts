@@ -3,25 +3,27 @@ import { idOf, idsIn, indexIn, targetKeys } from "./items";
 import type {
   Fluidbox,
   FluidboxItem,
-  FluidboxOrigin,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
+  FluidboxTriggerValue,
 } from "./public-api";
 import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
+import { triggerHooks } from "./trigger-hooks";
 
 /**
  * Find the parts of a trigger the flight uses: the box marked with
- * `data-fluidbox-origin`, else its image or video, else the trigger itself.
+ * `data-fluidbox-origin`, else its image, video or live `<model-viewer>`, else
+ * the trigger itself.
  */
-export function resolveOrigin(trigger: HTMLElement): FluidboxOrigin {
+export function resolveOrigin(trigger: HTMLElement): RuntimeOrigin {
   const visual =
     (trigger.matches("[data-fluidbox-origin]")
       ? trigger
       : trigger.querySelector<HTMLElement>("[data-fluidbox-origin]")) ??
-    (trigger.matches("img, video")
+    (trigger.matches("img, video, model-viewer")
       ? trigger
-      : (trigger.querySelector<HTMLElement>("img, video") ?? trigger));
+      : (trigger.querySelector<HTMLElement>("img, video, model-viewer") ?? trigger));
   const thumbnail = visual.matches("img")
     ? (visual as HTMLImageElement)
     : (visual.querySelector("img") ?? undefined);
@@ -30,10 +32,8 @@ export function resolveOrigin(trigger: HTMLElement): FluidboxOrigin {
 
 /** What a trigger opens and returns to. */
 export interface FluidboxTriggerOptions<TItem extends FluidboxItem = FluidboxItem> {
-  /** The item the trigger opens. */
-  readonly target: FluidboxTarget<TItem>;
-  /** More items that close back onto the trigger. */
-  readonly returns?: readonly FluidboxTarget<TItem>[];
+  /** One target, or a list: the first opens, and every one closes back onto the trigger. */
+  readonly value: FluidboxTriggerValue<TItem>;
   /** Called before the closing flight measures the trigger, with the item it lands on. */
   readonly onPreviewChange?: (item: TItem, index: number) => void;
 }
@@ -94,14 +94,28 @@ export interface FluidboxTrigger<TItem extends FluidboxItem = FluidboxItem> {
 /** Elements a keyboard and a screen reader can use as a trigger. */
 const INTERACTIVE = "a[href],button,input,select,textarea,summary,[role],[tabindex]";
 
-/** Whether a bundler built for development. Without one, it says no. */
-const development = () => {
+/**
+ * Warn in development about a trigger a keyboard can't reach. A production
+ * build drops it, and a page without a bundler skips it.
+ */
+function checkReach(element: HTMLElement) {
   try {
-    return process.env.NODE_ENV !== "production";
+    if (process.env.NODE_ENV === "production") return;
   } catch {
-    return false;
+    return;
   }
-};
+  if (!element.matches(INTERACTIVE)) {
+    console.warn(
+      "A fluidbox trigger needs to be a <button> or <a href>, or to have a role and tabindex:",
+      element,
+    );
+  }
+}
+
+/** Content in a trigger that a drag works, rather than the trigger. */
+const OWNS_INPUT = "model-viewer, [data-fluidbox-owns-input]";
+/** How far a press on such content moves before it is a drag, not a click, in CSS pixels. */
+const DRAG_SLOP = 6;
 
 /** How long a preload waits for a click after the pointer lifts. */
 const PRELOAD_GRACE = 250;
@@ -114,7 +128,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   options: FluidboxTriggerOptions<TItem>,
 ): FluidboxTrigger<TItem> {
   const host = hostOf(fluidbox);
-  let targets = targetKeys(options.target, options.returns);
+  let targets = targetKeys(options.value);
   let onPreviewChange = options.onPreviewChange;
   let element: HTMLElement | null = null;
   let registered = "";
@@ -125,6 +139,9 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   let intents: AbortController | undefined;
   let lastPreviewId: string | null = null;
   let following = false;
+  // A press on content that owns its input, and whether it became a drag.
+  let press: { readonly x: number; readonly y: number } | undefined;
+  let dragged = false;
 
   const ids = () => idsIn(fluidbox.items, targets);
   const register = () => {
@@ -135,8 +152,16 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     dispose = undefined;
     registered = key;
     if (!element || !key) return;
+    const trigger = element;
+    // Read as the viewer measures, so content rendered into the trigger since bind counts.
     const origin: RuntimeOrigin = {
-      ...resolveOrigin(element),
+      trigger,
+      get visual() {
+        return resolveOrigin(trigger).visual;
+      },
+      get thumbnail() {
+        return resolveOrigin(trigger).thumbnail;
+      },
       onPreviewChange: (item, index) => {
         lastPreviewId = idOf(item);
         onPreviewChange?.(item as TItem, index);
@@ -160,7 +185,53 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
       options,
     );
     target.addEventListener("pointerleave", leave, options);
+    // A drag on a live model turns it; the click that ends it doesn't open.
+    target.addEventListener(
+      "pointerdown",
+      (event) => {
+        dragged = false;
+        const owner = event.isPrimary && (event.target as Element).closest?.(OWNS_INPUT);
+        press =
+          owner && target.contains(owner) ? { x: event.clientX, y: event.clientY } : undefined;
+      },
+      options,
+    );
+    target.addEventListener(
+      "pointermove",
+      (event) => {
+        if (!press || dragged || !event.isPrimary || !event.buttons) return;
+        if (Math.hypot(event.clientX - press.x, event.clientY - press.y) <= DRAG_SLOP) return;
+        dragged = true;
+        discardPreload();
+      },
+      options,
+    );
+    // The press ends as the pointer lifts; a hover after it is no drag. A drag
+    // swallows only the click that ends it, which comes in the same task.
+    const release = () => {
+      press = undefined;
+      if (dragged) setTimeout(() => (dragged = false));
+    };
+    target.addEventListener("pointerup", release, options);
+    target.addEventListener("pointercancel", release, options);
+    target.addEventListener("keydown", () => (dragged = false), options);
     target.addEventListener("focusin", () => host.intend(), options);
+    // Add-ons see the trigger now, and again as a framework renders into it.
+    if (triggerHooks.size) {
+      const undo = new Map<unknown, () => void>();
+      const run = () =>
+        triggerHooks.forEach((hook) => {
+          const done = hook(target);
+          if (done) undo.set(hook, done);
+        });
+      run();
+      const content = new MutationObserver(run);
+      content.observe(target, { childList: true, subtree: true });
+      signal.addEventListener("abort", () => {
+        content.disconnect();
+        undo.forEach((done) => done());
+      });
+    }
     signal.addEventListener("abort", leave);
   };
   const discardPreload = () => {
@@ -171,7 +242,7 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
   };
   const preview = (state: FluidboxState<TItem>): FluidboxTriggerPreview<TItem> => {
     const known = ids();
-    const activeId = state.id && known.includes(state.id) ? state.id : null;
+    const activeId = state.value && known.includes(state.value) ? state.value : null;
     const list = fluidbox.items;
     const first = known[0];
     const shown = activeId ?? lastPreviewId ?? first;
@@ -201,18 +272,13 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
         listenForIntent(next);
         next.dataset.fluidboxTrigger = "";
         if (!next.hasAttribute("aria-haspopup")) next.setAttribute("aria-haspopup", "dialog");
-        if (development() && !next.matches(INTERACTIVE)) {
-          console.warn(
-            "A fluidbox trigger needs to be a <button> or <a href>, or to have a role and tabindex:",
-            next,
-          );
-        }
+        checkReach(next);
       }
       register();
     },
     update(next) {
       onPreviewChange = next.onPreviewChange;
-      const nextTargets = targetKeys(next.target, next.returns);
+      const nextTargets = targetKeys(next.value);
       if (nextTargets.join("\u0000") === targets.join("\u0000")) return;
       targets = nextTargets;
       register();
@@ -237,6 +303,11 @@ export function createTrigger<TItem extends FluidboxItem = FluidboxItem>(
     },
     pointerCancel: discardPreload,
     click(event) {
+      if (dragged) {
+        dragged = false;
+        event.preventDefault?.();
+        return;
+      }
       const target = openTarget();
       const modified = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
       if (following || event.defaultPrevented || modified || (event.button ?? 0) !== 0) return;
@@ -295,18 +366,4 @@ export function bindTrigger<TItem extends FluidboxItem = FluidboxItem>(
       destroy();
     },
   });
-}
-
-/**
- * The element of a thumbnail overlay marked `data-fluidbox-frame-layer`, the
- * overlay itself or one inside it: it moves into the flying frame for the
- * flight and scales with it, as a scrim does.
- */
-export function frameLayerOf(overlay: HTMLElement): HTMLElement | undefined {
-  return overlay.matches("[data-fluidbox-frame-layer]")
-    ? overlay
-    : // The still copy a flight leaves on the card is never the layer itself.
-      (overlay.querySelector<HTMLElement>(
-        "[data-fluidbox-frame-layer]:not([data-fluidbox-ghost])",
-      ) ?? undefined);
 }

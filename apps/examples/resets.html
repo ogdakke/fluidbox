@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fluidbox under site resets</title>
+    <script type="module" src="/fixtures/resets.ts"></script>
+  </head>
+  <body>
+    <main class="resets-page">
+      <h1>The viewer under unlayered site resets</h1>
+      <p>
+        With <code>?resets</code>, modern-normalize, Tailwind v3 preflight and a responsive-media
+        rule load before the package CSS. Without it, the same gallery has none.
+      </p>
+      <div class="resets-grid" id="resets" aria-label="Resets gallery"></div>
+    </main>
+  </body>
+</html>

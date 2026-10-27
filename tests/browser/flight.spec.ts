@@ -102,7 +102,7 @@ async function armHold(page: Page, at: "start" | "middle" | "end") {
     const timer = setInterval(() => {
       const moving = Array.from(
         document.querySelectorAll(
-          "[data-fluidbox-overlay] [data-fluidbox-frame], [data-fluidbox-flight] [data-fluidbox-frame]",
+          "[data-fluidbox-viewer] [data-fluidbox-frame], [data-fluidbox-flight] [data-fluidbox-frame]",
         ),
       ).some((frame) =>
         frame
@@ -377,7 +377,7 @@ test("the card stays painted until the opening has been on screen for a frame", 
         const image = document.querySelector<HTMLElement>('[data-flight-case="cover"] img')!;
         const seen: string[] = [];
         const tick = () => {
-          const overlay = document.querySelector("[data-fluidbox-overlay]");
+          const overlay = document.querySelector("[data-fluidbox-viewer]");
           const shown = !!overlay && !overlay.hasAttribute("data-fluidbox-prepared");
           if (shown) seen.push(getComputedStyle(image).visibility);
           if (seen.length < 4) requestAnimationFrame(tick);

@@ -1,7 +1,7 @@
 import type {
-  FluidboxFilmstripOptions,
-  FluidboxReason,
+  FluidboxThumbnailsOptions,
   FluidboxSheet,
+  FluidboxSheetEvent,
   FluidboxSheetOptions,
 } from "./public-api";
 import type { FluidboxExtension, FluidboxItem as RuntimeItem } from "./runtime-types";
@@ -14,9 +14,9 @@ export interface Addon<THandle> {
 interface Addons {
   sheet?: (
     options: FluidboxSheetOptions<any>,
-    onChange: (stop: number, reason: FluidboxReason) => void,
+    onChange: (event: FluidboxSheetEvent) => void,
   ) => Addon<FluidboxSheet>;
-  filmstrip?: (options: FluidboxFilmstripOptions<any>) => Addon<null>;
+  thumbnails?: (options: FluidboxThumbnailsOptions<any>) => Addon<null>;
 }
 
 // One registry per page, however many copies of the entries a bundler makes.
@@ -32,7 +32,15 @@ export function registerAddon<K extends keyof Addons>(name: K, create: NonNullab
 export function addon<K extends keyof Addons>(name: K): NonNullable<Addons[K]> {
   const create = registry()[name];
   if (!create) {
-    throw new Error(`The ${name} needs its entry: import "@ogdakke/fluidbox/${name}" once.`);
+    throw new Error(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `The ${name} needs its entry: import "@ogdakke/fluidbox/${name}" once.`;
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   }
   return create;
 }
@@ -43,7 +51,7 @@ export function hasAddon(name: keyof Addons): boolean {
 }
 
 /** The add-ons that load from their own entry. */
-export type FluidboxAddonName = "sheet" | "filmstrip";
+export type FluidboxAddonName = "sheet" | "thumbnails";
 
 /**
  * Load the entries of the add-ons a binding's parts turn on, so a binding
@@ -55,7 +63,7 @@ export function loadAddons(names: readonly FluidboxAddonName[]): Promise<void> |
   if (!missing.length) return null;
   return Promise.all(
     missing.map((name) =>
-      name === "sheet" ? import("./sheet-entry") : import("./filmstrip-entry"),
+      name === "sheet" ? import("./sheet-entry") : import("./thumbnails-entry"),
     ),
   ).then(() => {});
 }

@@ -23,7 +23,7 @@ test("React trigger prepares on pointerdown and discards a cancelled open", asyn
   await trigger.hover();
   await page.waitForLoadState("networkidle");
   await trigger.dispatchEvent("pointerdown", { button: 0, isPrimary: true, pointerId: 1 });
-  const prepared = page.locator("[data-fluidbox-overlay][data-fluidbox-prepared]");
+  const prepared = page.locator("[data-fluidbox-viewer][data-fluidbox-prepared]");
   await expect(prepared).toHaveCount(1);
   await expect(prepared).toHaveCSS("visibility", "hidden");
   await expect(trigger).not.toHaveAttribute("data-open", "");
@@ -111,7 +111,7 @@ for (const count of [10_000, 100_000]) {
         element.click();
         for (let frames = 0; frames < 120; frames += 1) {
           await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-          const overlay = document.querySelector("[data-fluidbox-overlay]");
+          const overlay = document.querySelector("[data-fluidbox-viewer]");
           if (overlay && !overlay.hasAttribute("data-fluidbox-prepared") && held.length) break;
         }
       } finally {
@@ -142,12 +142,12 @@ for (const count of [10_000, 100_000]) {
       "aria-label",
       `Item ${index + 1} of ${count}`,
     );
-    await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
+    await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCount(1);
     await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
       "data-fluidbox-status",
       "open",
     );
-    await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCSS("pointer-events", "auto");
+    await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCSS("pointer-events", "auto");
     await expect(image).toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
     await expect(image).toHaveCSS("visibility", "hidden");
 
@@ -157,14 +157,14 @@ for (const count of [10_000, 100_000]) {
     await expect(page.locator(`[data-photo-index="${index}"]`)).toHaveCount(0);
     const farIndex = count - 200;
     await page
-      .locator("[data-fluidbox-filmstrip-scroll]")
+      .locator("[data-fluidbox-thumbnails-scroll]")
       .evaluate(async (element, selectedIndex) => {
         const start = new Event("touchstart", { bubbles: true });
         Object.defineProperty(start, "touches", { value: [{}] });
         element.dispatchEvent(start);
         const size = parseFloat(
           getComputedStyle(element.parentElement!).getPropertyValue(
-            "--fluidbox-filmstrip-item-size",
+            "--fluidbox-thumbnails-item-size",
           ),
         );
         const gap = parseFloat(getComputedStyle(element).columnGap);
@@ -183,8 +183,8 @@ for (const count of [10_000, 100_000]) {
         Object.defineProperty(end, "touches", { value: [] });
         element.dispatchEvent(end);
       }, farIndex);
-    const filmstripGeometry = await page
-      .locator("[data-fluidbox-filmstrip-scroll]")
+    const thumbnailsGeometry = await page
+      .locator("[data-fluidbox-thumbnails-scroll]")
       .evaluate((element) => ({
         scrollLeft: element.scrollLeft,
         scrollWidth: element.scrollWidth,
@@ -195,19 +195,19 @@ for (const count of [10_000, 100_000]) {
           (item) => item.dataset.index,
         ),
       }));
-    await testInfo.attach("far-filmstrip-geometry", {
-      body: JSON.stringify(filmstripGeometry, null, 2),
+    await testInfo.attach("far-thumbnails-geometry", {
+      body: JSON.stringify(thumbnailsGeometry, null, 2),
       contentType: "application/json",
     });
-    const filmstripTarget = page.locator(
-      `[data-fluidbox-filmstrip-item][data-index="${farIndex}"]`,
+    const thumbnailsTarget = page.locator(
+      `[data-fluidbox-thumbnails-item][data-index="${farIndex}"]`,
     );
-    await expect(filmstripTarget).toBeVisible();
+    await expect(thumbnailsTarget).toBeVisible();
     await expect
       .poll(() =>
-        filmstripTarget.evaluate((element) => {
+        thumbnailsTarget.evaluate((element) => {
           const scroller = element
-            .closest("[data-fluidbox-filmstrip-scroll]")!
+            .closest("[data-fluidbox-thumbnails-scroll]")!
             .getBoundingClientRect();
           const bounds = element.getBoundingClientRect();
           return bounds.left >= scroller.left && bounds.right <= scroller.right;
@@ -240,12 +240,14 @@ for (const count of [10_000, 100_000]) {
     );
     await expect(farThumbnail).not.toHaveAttribute("data-fluidbox-thumbnail-hidden", "");
     const selectedIndex = count - 250;
-    await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate(async (element, index) => {
+    await page.locator("[data-fluidbox-thumbnails-scroll]").evaluate(async (element, index) => {
       const start = new Event("touchstart", { bubbles: true });
       Object.defineProperty(start, "touches", { value: [{}] });
       element.dispatchEvent(start);
       const size = parseFloat(
-        getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+        getComputedStyle(element.parentElement!).getPropertyValue(
+          "--fluidbox-thumbnails-item-size",
+        ),
       );
       const gap = parseFloat(getComputedStyle(element).columnGap);
       const padding = parseFloat(getComputedStyle(element).paddingLeft);
@@ -360,45 +362,45 @@ for (const count of [10_000, 100_000]) {
   });
 }
 
-test("filmstrip preference applies to the next open", async ({ page }) => {
+test("thumbnails preference applies to the next open", async ({ page }) => {
   await page.goto("/photo-library.html");
   await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
   const initialRange = await page
     .locator("[data-photo-index]")
     .first()
     .getAttribute("data-photo-index");
-  await page.getByRole("checkbox", { name: "Show filmstrip on next open" }).uncheck();
+  await page.getByRole("checkbox", { name: "Show thumbnails on next open" }).uncheck();
   await page.locator("[data-photo-index]").first().click();
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveCount(0);
-  await page.getByRole("checkbox", { name: "Show filmstrip on next open" }).check();
+  await page.getByRole("checkbox", { name: "Show thumbnails on next open" }).check();
   await page.locator(`[data-photo-index="${initialRange}"]`).click();
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCount(1);
   await expect(page.locator("[data-library-count]")).toHaveAttribute("data-library-count", "10000");
   expect(await page.locator("[data-photo-index]").count()).toBeLessThan(100);
 });
 
-test("opening centers the filmstrip once without changing gallery selection", async ({ page }) => {
+test("opening centers the thumbnails once without changing gallery selection", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
+  const thumbnails = page.locator("[data-fluidbox-thumbnails-scroll]");
   await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
   await expect(
-    page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
+    page.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]'),
   ).toHaveAttribute("data-index", "5000");
-  const initial = await filmstrip.evaluate((element) => element.scrollLeft);
+  const initial = await thumbnails.evaluate((element) => element.scrollLeft);
   await page.waitForTimeout(400);
-  expect(await filmstrip.evaluate((element) => element.scrollLeft)).toBeCloseTo(initial, 0);
+  expect(await thumbnails.evaluate((element) => element.scrollLeft)).toBeCloseTo(initial, 0);
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     "Item 5001 of 10000",
   );
 });
 
-test("opening scrolled virtual origins fills and centers the filmstrip", async ({ page }) => {
+test("opening scrolled virtual origins fills and centers the thumbnails", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   const host = page.locator(".library-scroll");
 
@@ -419,7 +421,7 @@ test("opening scrolled virtual origins fills and centers the filmstrip", async (
       "open",
     );
 
-    const geometry = await page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((element) => {
+    const geometry = await page.locator("[data-fluidbox-thumbnails-scroll]").evaluate((element) => {
       const scroller = element.getBoundingClientRect();
       const rendered = [...element.querySelectorAll<HTMLElement>("[data-index]")];
       const selected = element.querySelector<HTMLElement>('[aria-selected="true"]')!;
@@ -444,7 +446,7 @@ test("opening scrolled virtual origins fills and centers the filmstrip", async (
     expect(geometry.rendered).toContain(expected + 1);
     await expect
       .poll(() =>
-        page.locator("[data-fluidbox-filmstrip-scroll]").evaluate((element) => {
+        page.locator("[data-fluidbox-thumbnails-scroll]").evaluate((element) => {
           const viewport = element.getBoundingClientRect();
           return [...element.querySelectorAll<HTMLImageElement>("img")]
             .filter((image) => {
@@ -520,14 +522,14 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
 
     if (random() > 0.35) {
       expected = Math.max(0, Math.min(9_999, expected + Math.floor(random() * 17) - 8));
-      const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
-      await filmstrip.evaluate(async (element, index) => {
+      const thumbnails = page.locator("[data-fluidbox-thumbnails-scroll]");
+      await thumbnails.evaluate(async (element, index) => {
         const touch = new Event("touchstart", { bubbles: true });
         Object.defineProperty(touch, "touches", { value: [{}] });
         element.dispatchEvent(touch);
         const size = parseFloat(
           getComputedStyle(element.parentElement!).getPropertyValue(
-            "--fluidbox-filmstrip-item-size",
+            "--fluidbox-thumbnails-item-size",
           ),
         );
         const gap = parseFloat(getComputedStyle(element).columnGap);
@@ -552,7 +554,7 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
             .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
             ?.getAttribute("aria-label");
           const selected = document
-            .querySelector('[data-fluidbox-filmstrip-item][aria-selected="true"]')
+            .querySelector('[data-fluidbox-thumbnails-item][aria-selected="true"]')
             ?.getAttribute("data-index");
           const hidden = document
             .querySelector("[data-fluidbox-thumbnail-hidden]")
@@ -572,7 +574,7 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
         .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
         ?.getAttribute("aria-label");
       const selected = document
-        .querySelector('[data-fluidbox-filmstrip-item][aria-selected="true"]')
+        .querySelector('[data-fluidbox-thumbnails-item][aria-selected="true"]')
         ?.getAttribute("data-index");
       const hidden = document
         .querySelector("[data-fluidbox-thumbnail-hidden]")
@@ -596,7 +598,7 @@ test("stateful virtual-gallery interactions preserve one selected item", async (
   }
 });
 
-test("filmstrip scrubbing reveals the host only after touch settlement", async ({ page }) => {
+test("thumbnails scrubbing reveals the host only after touch settlement", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.locator('[data-photo-index="0"]').click();
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
@@ -604,13 +606,13 @@ test("filmstrip scrubbing reveals the host only after touch settlement", async (
     "open",
   );
   const selectedIndex = 5_000;
-  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
-  const provisional = await filmstrip.evaluate(async (element, index) => {
+  const thumbnails = page.locator("[data-fluidbox-thumbnails-scroll]");
+  const provisional = await thumbnails.evaluate(async (element, index) => {
     const start = new Event("touchstart", { bubbles: true });
     Object.defineProperty(start, "touches", { value: [] });
     element.dispatchEvent(start);
     const size = parseFloat(
-      getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+      getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-thumbnails-item-size"),
     );
     const gap = parseFloat(getComputedStyle(element).columnGap);
     const padding = parseFloat(getComputedStyle(element).paddingLeft);
@@ -633,7 +635,7 @@ test("filmstrip scrubbing reveals the host only after touch settlement", async (
     activeLabel: `Item ${selectedIndex + 1} of 10000`,
     hostMounted: false,
   });
-  await filmstrip.evaluate((element) => {
+  await thumbnails.evaluate((element) => {
     const event = new Event("touchend", { bubbles: true });
     Object.defineProperty(event, "touches", { value: [] });
     element.dispatchEvent(event);
@@ -641,7 +643,7 @@ test("filmstrip scrubbing reveals the host only after touch settlement", async (
   await expect(page.locator(`[data-photo-index="${selectedIndex}"]`)).toHaveCount(1);
 });
 
-test("delayed programmatic filmstrip scrolling cannot take navigation ownership", async ({
+test("delayed programmatic thumbnails scrolling cannot take navigation ownership", async ({
   page,
 }) => {
   await page.goto("/photo-library.html?count=10000");
@@ -649,10 +651,10 @@ test("delayed programmatic filmstrip scrolling cannot take navigation ownership"
   const dialog = page.locator("[data-fluidbox-dialog]");
   await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 
-  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
-  await filmstrip.evaluate(async (element) => {
+  const thumbnails = page.locator("[data-fluidbox-thumbnails-scroll]");
+  await thumbnails.evaluate(async (element) => {
     const size = parseFloat(
-      getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-filmstrip-item-size"),
+      getComputedStyle(element.parentElement!).getPropertyValue("--fluidbox-thumbnails-item-size"),
     );
     const gap = parseFloat(getComputedStyle(element).columnGap);
     const padding = parseFloat(getComputedStyle(element).paddingLeft);
@@ -669,7 +671,7 @@ test("delayed programmatic filmstrip scrolling cannot take navigation ownership"
   await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 });
 
-test("a pointer gesture without scrolling releases filmstrip ownership", async ({ page }) => {
+test("a pointer gesture without scrolling releases thumbnails ownership", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
@@ -678,8 +680,8 @@ test("a pointer gesture without scrolling releases filmstrip ownership", async (
     "open",
   );
 
-  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
-  await filmstrip.evaluate(async (element) => {
+  const thumbnails = page.locator("[data-fluidbox-thumbnails-scroll]");
+  await thumbnails.evaluate(async (element) => {
     element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 1 }));
     element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1 }));
     element.scrollLeft += 40 * 57;
@@ -695,11 +697,11 @@ test("a pointer gesture without scrolling releases filmstrip ownership", async (
   );
   await page.waitForTimeout(300);
   await expect(
-    page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
+    page.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]'),
   ).toHaveAttribute("data-index", "5000");
 });
 
-test("filmstrip input and programmatic sync settle without an event storm", async ({ page }) => {
+test("thumbnails input and programmatic sync settle without an event storm", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
@@ -708,8 +710,8 @@ test("filmstrip input and programmatic sync settle without an event storm", asyn
     "open",
   );
 
-  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
-  const selectedIndex = await filmstrip.evaluate(async (element) => {
+  const thumbnails = page.locator("[data-fluidbox-thumbnails-scroll]");
+  const selectedIndex = await thumbnails.evaluate(async (element) => {
     let scrollEvents = 0;
     element.addEventListener("scroll", () => (scrollEvents += 1));
     for (let step = 0; step < 24; step += 1) {
@@ -730,7 +732,7 @@ test("filmstrip input and programmatic sync settle without an event storm", asyn
         .querySelector('[data-fluidbox-slide][aria-hidden="false"]')
         ?.getAttribute("aria-label"),
       selected: document
-        .querySelector('[data-fluidbox-filmstrip-item][aria-selected="true"]')
+        .querySelector('[data-fluidbox-thumbnails-item][aria-selected="true"]')
         ?.getAttribute("data-index"),
       extraEvents: scrollEvents - settledEvents,
     };
@@ -739,7 +741,7 @@ test("filmstrip input and programmatic sync settle without an event storm", asyn
   expect(selectedIndex.active).toBe(`Item ${Number(selectedIndex.selected) + 1} of 10000`);
 });
 
-test("a vertical wheel burst scrolls and settles the filmstrip once", async ({ page }) => {
+test("a vertical wheel burst scrolls and settles the thumbnails once", async ({ page }) => {
   await page.goto("/photo-library.html?count=10000");
   await page.getByLabel("Photo number").fill("5001");
   await page.getByRole("button", { name: "Open number" }).click();
@@ -748,8 +750,8 @@ test("a vertical wheel burst scrolls and settles the filmstrip once", async ({ p
     "open",
   );
 
-  const filmstrip = page.locator("[data-fluidbox-filmstrip-scroll]");
-  await filmstrip.evaluate((element) => {
+  const thumbnails = page.locator("[data-fluidbox-thumbnails-scroll]");
+  await thumbnails.evaluate((element) => {
     for (const deltaY of [90, 120, 0]) {
       element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY }));
     }
@@ -757,13 +759,13 @@ test("a vertical wheel burst scrolls and settles the filmstrip once", async ({ p
   await expect
     .poll(() =>
       page
-        .locator('[data-fluidbox-filmstrip-item][aria-selected="true"]')
+        .locator('[data-fluidbox-thumbnails-item][aria-selected="true"]')
         .getAttribute("data-index"),
     )
     .not.toBe("5000");
   const selected = Number(
     await page
-      .locator('[data-fluidbox-filmstrip-item][aria-selected="true"]')
+      .locator('[data-fluidbox-thumbnails-item][aria-selected="true"]')
       .getAttribute("data-index"),
   );
   await expect(page.locator(`[data-photo-index="${selected}"]`)).toHaveCount(1);
@@ -856,7 +858,7 @@ test("opening remains active until the delayed chrome reveal settles", async ({ 
   await page.goto("/photo-library.html");
   await page.locator("[data-photo-index]").first().click();
   const dialog = page.locator("[data-fluidbox-dialog]");
-  // The filmstrip is viewer content, so it reveals with the rest of the chrome.
+  // The thumbnails is viewer content, so it reveals with the rest of the chrome.
   const paused = await page.evaluate(async () => {
     for (let frame = 0; frame < 60; frame += 1) {
       const animations = document
@@ -865,7 +867,7 @@ test("opening remains active until the delayed chrome reveal settles", async ({ 
           (candidate) =>
             (candidate as CSSAnimation).animationName === "fluidbox-gallery-controls-appear",
         );
-      const dock = document.querySelector("[data-fluidbox-filmstrip-dock]");
+      const dock = document.querySelector("[data-fluidbox-thumbnails-dock]");
       if (
         dock &&
         animations.some((animation) => (animation.effect as KeyframeEffect | null)?.target === dock)
@@ -890,17 +892,17 @@ test("opening remains active until the delayed chrome reveal settles", async ({ 
   await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
 });
 
-test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
+test("thumbnails reveal runs one monotonic fade", async ({ page }) => {
   await page.goto("/photo-library.html");
   await page.evaluate(() => {
     const measurements = { starts: 0 };
-    Object.assign(window, { __filmstripRevealMeasurements: measurements });
+    Object.assign(window, { __thumbnailsRevealMeasurements: measurements });
     document.addEventListener(
       "animationstart",
       (event) => {
         if (
           (event as AnimationEvent).animationName === "fluidbox-gallery-controls-appear" &&
-          (event.target as Element).matches("[data-fluidbox-filmstrip-dock]")
+          (event.target as Element).matches("[data-fluidbox-thumbnails-dock]")
         ) {
           measurements.starts += 1;
         }
@@ -921,8 +923,8 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
   await page.locator("[data-photo-index]").first().click();
   const measurements = await page.evaluate(async () => {
     const end = await window.__motion.ready();
-    const filmstrip = document.querySelector<HTMLElement>("[data-fluidbox-filmstrip-dock]")!;
-    const fade = filmstrip
+    const thumbnails = document.querySelector<HTMLElement>("[data-fluidbox-thumbnails-dock]")!;
+    const fade = thumbnails
       .getAnimations()
       .find(
         (candidate) =>
@@ -932,8 +934,8 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
     const opacity: number[] = [];
     for (let time = 0; time <= Math.max(end, fadeEnd); time += 8) {
       window.__motion.seek(time);
-      if (getComputedStyle(filmstrip).visibility === "visible") {
-        opacity.push(Number(getComputedStyle(filmstrip).opacity));
+      if (getComputedStyle(thumbnails).visibility === "visible") {
+        opacity.push(Number(getComputedStyle(thumbnails).opacity));
       }
     }
     window.__motion.release();
@@ -945,8 +947,8 @@ test("filmstrip reveal runs one monotonic fade", async ({ page }) => {
   );
   const { starts } = await page.evaluate(
     () =>
-      (window as unknown as { __filmstripRevealMeasurements: { starts: number } })
-        .__filmstripRevealMeasurements,
+      (window as unknown as { __thumbnailsRevealMeasurements: { starts: number } })
+        .__thumbnailsRevealMeasurements,
   );
   expect(starts).toBe(1);
   expect(measurements.some((opacity) => opacity > 0 && opacity < 1)).toBe(true);

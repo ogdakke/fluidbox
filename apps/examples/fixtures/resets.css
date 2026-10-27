@@ -1,0 +1,57 @@
+/* The resets fixture. Every box the flight starts from is sized here, so the
+   page looks the same with the resets and without them. */
+
+.resets-page {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  padding: 40px var(--fb-gutter) 56px;
+}
+
+/* Out of the flow, so the resets' type and margins above can't move it. */
+.resets-grid {
+  position: absolute;
+  top: 360px;
+  left: 40px;
+  display: grid;
+  grid-template-columns: repeat(4, 160px);
+  gap: 8px;
+}
+
+.resets-grid button {
+  display: block;
+  width: 160px;
+  height: 160px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: var(--fb-surface-2);
+  cursor: zoom-in;
+}
+
+.resets-grid img {
+  display: block;
+  width: 160px;
+  height: 160px;
+  max-width: none;
+  object-fit: cover;
+}
+
+.resets-map {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #234, #9bd);
+}
+
+/* Stage insets and a slide gap, so the strip's and the slides' margins and
+   padding are in play: a `* { margin: 0; padding: 0 }` reset would zero them. */
+:root {
+  --fluidbox-slide-gap: 24px;
+}
+
+[data-fluidbox-dialog] {
+  --fluidbox-stage-top: 48px;
+  --fluidbox-stage-right: 32px;
+  --fluidbox-stage-bottom: 24px;
+  --fluidbox-stage-left: 32px;
+}

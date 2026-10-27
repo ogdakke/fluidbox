@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { MountPattern } from "../page";
 import type { PatternName } from "../shared";
 import { Basic } from "./basic";
-import { Filmstrip } from "./filmstrip";
+import { Thumbnails } from "./thumbnails";
 import { Headless } from "./headless";
 import { Hover } from "./hover";
 import { Media } from "./media";
@@ -35,7 +35,7 @@ export const patterns: Record<PatternName, MountPattern> = {
   renderers: mount(Renderers),
   programmatic: mount(Programmatic),
   zoom: mount(Zoom),
-  filmstrip: mount(Filmstrip),
+  thumbnails: mount(Thumbnails),
   sheet: mount(Sheet),
   headless: mount(Headless),
   rtl: mount(Rtl),

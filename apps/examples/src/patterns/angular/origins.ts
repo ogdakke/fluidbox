@@ -11,7 +11,7 @@ import { product, strip } from "../shared";
   template: `
     <!-- The photo flies from the element marked data-fluidbox-origin, not the whole card. -->
     <div fluidboxRoot [items]="[product]">
-      <button [fluidboxTrigger]="product" class="pattern-card" data-test="product">
+      <button [fluidboxTrigger]="product.id" class="pattern-card" data-test="product">
         <span data-fluidbox-origin>
           <img [src]="product.src" [alt]="label(product)" />
         </span>
@@ -21,7 +21,7 @@ import { product, strip } from "../shared";
     <!-- Moving through the viewer scrolls each trigger into view, so the close lands on it. -->
     <div fluidboxRoot [items]="strip" class="pattern-scroller" data-test="scroller">
       @for (item of strip; track item.id) {
-        <button [fluidboxTrigger]="item" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="item.id" class="pattern-thumb" data-test="trigger">
           <img [src]="item.src" [alt]="label(item)" />
         </button>
       }

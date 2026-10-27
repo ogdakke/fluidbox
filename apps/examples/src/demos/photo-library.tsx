@@ -3,9 +3,9 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Fluidbox, useFluidbox } from "@ogdakke/fluidbox/react";
 import {
   createItemList,
-  type FluidboxItemChangeEvent,
+  type FluidboxValue,
+  type FluidboxValueChangeDetails,
   type FluidboxImageItem,
-  type FluidboxOriginAdapter,
   type FluidboxRevealContext,
 } from "@ogdakke/fluidbox";
 import "./photo-library.css";
@@ -35,12 +35,15 @@ function photoId(index: number): string {
   return `synthetic-photo-${index}`;
 }
 
-type PhotoItem = FluidboxImageItem & { readonly id: string; readonly thumbnail: { src: string } };
+type PhotoItem = FluidboxImageItem & {
+  readonly id: string;
+  readonly thumbnail: { src: string };
+};
 
 function photoAt(index: number, images: readonly LibraryImage[] = fixtureImages): PhotoItem {
   const fixture = images[(index * 17 + Math.floor(index / sectionSize)) % images.length]!;
   return {
-    type: "img",
+    type: "image",
     id: photoId(index),
     src: fixture.src,
     alt: `Synthetic ${fixture.shape} illustration, photo ${index + 1}`,
@@ -109,7 +112,7 @@ export function PhotoLibrary({
   >(null);
   const [columns, setColumns] = useState(() => columnsFor(window.innerWidth));
   const [requestedNumber, setRequestedNumber] = useState("1");
-  const [showFilmstrip, setShowFilmstrip] = useState(true);
+  const [showThumbnails, setShowThumbnails] = useState(true);
   const [lastViewed, setLastViewed] = useState<number | null>(null);
   const pendingResizeAnchor = useRef<number | null>(null);
   const { rows, photoToRow } = useMemo(() => makeRows(count, columns), [count, columns]);
@@ -122,21 +125,14 @@ export function PhotoLibrary({
       }),
     [count, images],
   );
-  const originAdapter = useMemo<FluidboxOriginAdapter<PhotoItem>>(
-    () => ({
-      getOrigin(id) {
-        const element = origins.current.get(id);
-        if (!element?.isConnected || element.dataset.photoId !== id) return null;
-        return {
-          trigger: element,
-          visual: element,
-          thumbnail: element.querySelector("img") ?? undefined,
-        };
-      },
-      revealOrigin(id, index, context) {
-        return revealOrigin.current?.(id, index, context);
-      },
-    }),
+  // The tile is its own origin (data-fluidbox-origin), with its image as the thumbnail.
+  const findTrigger = useCallback((photo: PhotoItem) => {
+    const element = origins.current.get(photo.id);
+    return element?.isConnected && element.dataset.photoId === photo.id ? element : null;
+  }, []);
+  const revealTrigger = useCallback(
+    (photo: PhotoItem, index: number, context: FluidboxRevealContext) =>
+      revealOrigin.current?.(photo.id, index, context),
     [],
   );
   const getScrollElement = useCallback(() => scrollElement.current, []);
@@ -197,8 +193,8 @@ export function PhotoLibrary({
   };
 
   const onSettle = useCallback(
-    (event: FluidboxItemChangeEvent<PhotoItem>) => {
-      if (event.index >= 0 && event.index < count) setLastViewed(event.index);
+    (_: FluidboxValue, { index }: FluidboxValueChangeDetails<PhotoItem>) => {
+      if (index !== null && index >= 0 && index < count) setLastViewed(index);
     },
     [count],
   );
@@ -246,9 +242,14 @@ export function PhotoLibrary({
   const visibleEnd = lastRow?.kind === "photos" ? lastRow.firstPhoto + lastRow.count : visibleStart;
 
   return (
-    <Fluidbox.Root items={items} origins={originAdapter} onSettle={onSettle}>
+    <Fluidbox.Root
+      items={items}
+      findTrigger={findTrigger}
+      revealTrigger={revealTrigger}
+      onValueChangeComplete={onSettle}
+    >
       <OpenBridge openRef={openRef} />
-      {showFilmstrip && <Fluidbox.Filmstrip />}
+      {showThumbnails && <Fluidbox.Thumbnails />}
       <main
         className={embedded ? "library-page library-page--embedded" : "library-page"}
         data-library-count={count}
@@ -298,10 +299,10 @@ export function PhotoLibrary({
             <label className="library-checkbox">
               <input
                 type="checkbox"
-                checked={showFilmstrip}
-                onChange={(event) => setShowFilmstrip(event.target.checked)}
+                checked={showThumbnails}
+                onChange={(event) => setShowThumbnails(event.target.checked)}
               />
-              Show filmstrip on next open
+              Show thumbnails on next open
             </label>
             <a
               className="fb-button fb-button--small"
@@ -365,7 +366,7 @@ export function PhotoLibrary({
                         const index = row.firstPhoto + offset;
                         const photo = photoAt(index, images);
                         return (
-                          <Fluidbox.Trigger key={photo.id} item={photo.id} asChild>
+                          <Fluidbox.Trigger key={photo.id} value={photo.id} asChild>
                             <button
                               type="button"
                               className="library-photo"

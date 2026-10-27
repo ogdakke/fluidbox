@@ -4,7 +4,7 @@ import { holdMotion } from "./support/hold-motion";
 /**
  * What every binding does live: a travelling overlay's frame layer flies as
  * itself, labels, loop and the viewer part change an open viewer in place, and a
- * filmstrip stays through each of those redraws.
+ * thumbnails stays through each of those redraws.
  * The fixture is binding-live.html; see fixtures/binding-live/shared.ts.
  */
 const frameworks = ["react", "vue", "solid", "angular", "elements", "javascript"] as const;
@@ -137,18 +137,18 @@ for (const framework of frameworks) {
       await load(page, framework);
       const dialog = await openViewer(page);
       const close = page.locator("[data-fluidbox-close]");
-      await expect(close).toHaveAttribute("aria-label", "Close");
+      await expect(close).toHaveAccessibleName("Close");
 
       await page.evaluate(() =>
         window.__live.setLabels({ close: "Sulje", previous: "Edellinen", next: "Seuraava" }),
       );
-      await expect(close).toHaveAttribute("aria-label", "Sulje");
-      await expect(page.locator("[data-fluidbox-next]")).toHaveAttribute("aria-label", "Seuraava");
+      await expect(close).toHaveAccessibleName("Sulje");
+      await expect(page.locator("[data-fluidbox-next]")).toHaveAccessibleName("Seuraava");
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
       expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);
 
       await page.evaluate(() => window.__live.setLabels(undefined));
-      await expect(close).toHaveAttribute("aria-label", "Close");
+      await expect(close).toHaveAccessibleName("Close");
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
       expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);
 
@@ -220,23 +220,23 @@ for (const framework of frameworks) {
       expect(errors).toEqual([]);
     });
 
-    test("the filmstrip stays through every redraw of the viewer's layer", async ({ page }) => {
+    test("the thumbnails stays through every redraw of the viewer's layer", async ({ page }) => {
       const errors = watchErrors(page);
       await load(page, framework);
       const dialog = await openViewer(page);
       // Add-ons live beside the layer the viewer content is drawn into.
-      const strip = dialog.locator("[data-fluidbox-addons] > [data-fluidbox-filmstrip-dock]");
+      const strip = dialog.locator("[data-fluidbox-addons] > [data-fluidbox-thumbnails-dock]");
       const expectStrip = async () => {
         await expect(strip).toHaveCount(1);
         await expect(strip).toBeVisible();
-        await expect(dialog.locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
+        await expect(dialog.locator("[data-fluidbox-thumbnails]")).toHaveCount(1);
       };
       await expectStrip();
 
       // New labels redraw the layer, and name the strip anew.
-      await page.evaluate(() => window.__live.setLabels({ close: "Sulje", filmstrip: "Kuvat" }));
-      await expect(dialog.locator("[data-fluidbox-close]")).toHaveAttribute("aria-label", "Sulje");
-      await expect(dialog.locator("[data-fluidbox-filmstrip]")).toHaveAttribute(
+      await page.evaluate(() => window.__live.setLabels({ close: "Sulje", thumbnails: "Kuvat" }));
+      await expect(dialog.locator("[data-fluidbox-close]")).toHaveAccessibleName("Sulje");
+      await expect(dialog.locator("[data-fluidbox-thumbnails]")).toHaveAttribute(
         "aria-label",
         "Kuvat",
       );
@@ -253,9 +253,9 @@ for (const framework of frameworks) {
       await expectStrip();
 
       // And it still moves the viewer.
-      await dialog.locator("[data-fluidbox-filmstrip-item]").nth(1).click();
+      await dialog.locator("[data-fluidbox-thumbnails-item]").nth(1).click();
       await expect(
-        dialog.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
+        dialog.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]'),
       ).toHaveAttribute("aria-posinset", "2");
       await expect(dialog).toHaveAttribute("data-fluidbox-status", "open");
       expect(await dialog.evaluate((element) => element.__liveOriginal)).toBe(true);

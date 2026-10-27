@@ -17,7 +17,7 @@ const ladder = [540, 1080, 2160, 4320]
 const items: readonly FluidboxItem[] = [
   {
     id: "ladder",
-    type: "img",
+    type: "image",
     src: "/photos/1015.webp?w=1080",
     srcset: ladder,
     // Twice the fitted width at 1280 × 720, so a zoom past 2 needs more.
@@ -29,12 +29,12 @@ const items: readonly FluidboxItem[] = [
   },
   {
     id: "master",
-    type: "img",
+    type: "image",
     src: "/photos/1016.webp?w=1080",
     alt: "A red rock canyon",
     width: 1920,
     height: 1080,
-    zoomSrc: "/photos/1016.webp?master",
+    zoom: { src: "/photos/1016.webp?master" },
   },
   {
     id: "clip",

@@ -18,9 +18,19 @@
     <main class="fb-shell fb-pad csp-page">
       <h1>Strict Content Security Policy</h1>
       <p class="fb-muted">
-        No inline scripts or styles, and Trusted Types on. <code>?ssr</code> renders the open viewer
-        on the server for the plain runtime to take over; <code>?react</code> opens a React Root on
-        its first render.
+        This page runs under <code>default-src 'self'</code> with no inline scripts or styles and
+        Trusted Types required. On it, the plain runtime opens, moves, zooms and closes, the custom
+        elements open and close, and React, Vue and Solid Roots render open and hand their server
+        copy to the viewer, all without a policy violation. The stylesheets are linked, not
+        injected, and <code>baseline.css</code>'s glyphs point at files on this origin, since the
+        policy's <code>img-src</code> blocks its <code>data:</code> URLs.
+      </p>
+      <p class="fb-muted">
+        <code>?ssr</code> renders the open viewer on the server for the plain runtime to take over;
+        <code>?react</code> opens a React Root on its first render, and <code>?vue</code> and
+        <code>?solid</code> hydrate a Vue or Solid Root the server rendered open. Angular isn't
+        here: hydrating it under this policy needs an AOT build of the examples, which isn't part of
+        this repo yet. The examples compile Angular in the browser, which the policy forbids.
       </p>
       <h2>Plain JavaScript</h2>
       <div class="csp-grid" data-csp-plain>
@@ -36,7 +46,7 @@
       </div>
       <h2>Custom elements</h2>
       <fluidbox-gallery class="csp-grid" data-csp-elements>
-        <fluidbox-item item-id="fjord">
+        <fluidbox-item value="fjord">
           <a slot="trigger" href="/art/fjord.svg">
             <img src="/art/fjord.svg" alt="Fjord" width="320" height="240" />
           </a>
@@ -44,7 +54,7 @@
             <img src="/art/fjord.svg" alt="Fjord" width="1400" height="1400" />
           </template>
         </fluidbox-item>
-        <fluidbox-item item-id="lagoon">
+        <fluidbox-item value="lagoon">
           <button slot="trigger" type="button">
             <img src="/art/lagoon.svg" alt="Lagoon" width="320" height="240" />
           </button>
@@ -54,6 +64,8 @@
         </fluidbox-item>
       </fluidbox-gallery>
       <div data-csp-react></div>
+      <div data-csp-solid></div>
+      <div data-csp-vue></div>
     </main>
     <!--fluidbox-static-viewer-->
   </body>

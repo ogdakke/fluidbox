@@ -1,0 +1,173 @@
+---
+title: Thumbnails and sheet
+section: Guides
+order: 6
+description: The two optional add-ons, the thumbnails and the sheet, with their imports, every option, sheet stops, the sheetchange event, data-fluidbox-sheet-snap buttons, and sheet.css.
+---
+
+# Thumbnails and sheet
+
+Both are optional add-ons with their own entries, so their code loads only when you use them: a gallery without them never loads it. Turn one on with the `thumbnails` and `sheet` options of `createFluidbox`, the `Thumbnails` and `Sheet` parts in each framework, or a `<fluidbox-thumbnails>` or `<fluidbox-sheet>` child of `<fluidbox-gallery>`.
+
+```ts
+import { createFluidbox } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/sheet";
+import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/sheet.css";
+// Optional: the thumbnails' and the sheet's look.
+import "@ogdakke/fluidbox/baseline.css";
+
+const fluidbox = createFluidbox({
+  items: photos,
+  thumbnails: true,
+  sheet: {
+    render({ item, target }) {
+      target.textContent = item.id ?? "";
+    },
+  },
+});
+```
+
+The fluidbox loads an add-on's entry the first time you turn it on, and an open waits for it. Import the entry yourself, as above, to have it in the page's bundle from the start instead. The entries are safe to import on the server.
+
+## Thumbnails
+
+The thumbnails add-on is a strip of thumbnails for a gallery of more than one item. A tap moves to that item, a drag or a wheel scrubs through them, and the strip follows swipes, arrow keys and `open(target)`. It renders only the thumbnails in view, so it works for lazy lists of any size. Its layout is in `@ogdakke/fluidbox/thumbnails.css`, and its look (corners, the selected item's mark) in the opt-in `baseline.css`.
+
+The strip is viewer content like your own. It mounts beside the viewer's layer, in `[data-fluidbox-addons]`, so a redraw of the layer, or a viewer renderer that clears its `target`, leaves it be. It reveals and dismisses with the layer, as `data-fluidbox-chrome`, and floats over the slides. `thumbnails.css` runs it along the bottom and keeps the photo above it by `--fluidbox-thumbnails-space`. Your CSS on `[data-fluidbox-thumbnails-dock]` puts it anywhere else, over the photo or beside it. Set `--fluidbox-thumbnails-space: 0px` when the photo should run under it.
+
+`--fluidbox-thumbnails-axis: y` on the dialog runs it as a column, down the left unless you move it. The add-on reads the axis from CSS, so a media query can turn a phone's row into a wide screen's column. Its listbox carries `aria-orientation`, and a wheel turned either way scrolls it along.
+
+```css
+@media (min-width: 900px) {
+  [data-fluidbox-dialog] {
+    --fluidbox-thumbnails-axis: y;
+  }
+}
+```
+
+`thumbnails: true` draws each item's thumbnail. An object, `FluidboxThumbnailsOptions`, changes that:
+
+| Option   | Type                      | What it does                                                      |
+| -------- | ------------------------- | ----------------------------------------------------------------- |
+| `render` | `FluidboxRenderer<TItem>` | Fill each thumbnail button yourself instead of the default image. |
+
+`render` gets `{ item, index, target, signal }`. `target` is the thumbnail `<button>`. When the button scrolls out of the rendered window, `signal` aborts and the function you return runs. By default each button holds the item's `thumbnail`, else the full image or the video's poster.
+
+```ts
+import { createFluidbox } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/thumbnails";
+
+const fluidbox = createFluidbox({
+  items: photos,
+  thumbnails: {
+    render({ index, target }) {
+      target.textContent = String(index + 1);
+    },
+  },
+});
+```
+
+Each button is a `role="option"` in a listbox named by the `thumbnailsList` [label](./api.md#labels). It has `data-fluidbox-thumbnails-item`, `data-index`, `aria-selected` and `data-fluidbox-selected` on the current item, and the item's alt text or title as its name, or its place from the `position` label when it has neither. With `baseline.css`, the selected thumbnail is fully opaque and has a bar along its foot, a border, so it shows in forced colours too. With a thumbnail focused, the arrow keys along the strip step through the items, Home and End go to the ends, and focus follows the selection. The strip carries `data-fluidbox-owns-input`, so its touches, wheel and keys scrub the strip rather than move or close the viewer. A move from the strip has the reason of its input, `"pointer"`, `"wheel"` or `"keyboard"`, and a scrub through it is a [`scrub`](./javascript.md#commands) move.
+
+`render` runs for each button as it enters the strip's rendered window, and its `signal` aborts as the button leaves. The framework `Thumbnails` parts render through it. Put the part in the root, with a child that draws one thumbnail. See the framework pages for each one's form.
+
+<!-- pattern: thumbnails -->
+
+On custom elements, a `<fluidbox-thumbnails>` child adds the strip. Set its `render` property to fill the buttons yourself.
+
+## Sheet
+
+The sheet is a panel that rises from the bottom over the photo, for details, comments or a form. The photo and the sheet share one native scroller with a snap point per stop, so swipes, momentum and rubber-banding are the browser's own. When the sheet reaches the photo, it pushes the photo up with a gap between them. The push is layout, with no animation, so the photo keeps up with the fastest swipe. Import `@ogdakke/fluidbox/sheet.css` with it.
+
+`sheet: true` turns it on with the defaults. An object, `FluidboxSheetOptions`, sets them:
+
+| Option          | Type                       | Default              | What it does                                             |
+| --------------- | -------------------------- | -------------------- | -------------------------------------------------------- |
+| `snapPoints`    | `FluidboxSheetSnapPoint[]` | `["60%", "content"]` | The stops above the resting one, lowest first.           |
+| `dismissMotion` | `"flight" \| "scroll"`     | `"flight"`           | How a swipe down on the photo closes the viewer at rest. |
+| `render`        | `FluidboxRenderer<TItem>`  |                      | Fill the sheet for the item on show.                     |
+
+### Stops
+
+Stop `0` is the sheet at rest, either out of sight or showing `--fluidbox-sheet-peek` of itself. Each snap point, a `FluidboxSheetSnapPoint`, adds a stop above it:
+
+- A number is pixels of sheet showing.
+- `"40%"` is a percentage of the viewer's height.
+- `"content"` is the sheet's own height, so it sits lower when there is little content.
+
+A sheet is always tall enough for its highest pixel or percentage stop. No stop goes above `--fluidbox-sheet-top` from the top of the screen. Stops closer than 24 pixels count as one.
+
+`dismissMotion` sets how a swipe down on the photo closes the viewer while the sheet is at rest. `"flight"` closes the viewer with the usual flight home. A second flick down while the sheet is still lowering goes straight into it. `"scroll"` scrolls the photo off the bottom of the screen and closes, and the backdrop fades as it goes. To keep the viewer open, as for a caption that always peeks, set the viewer's `dismiss: { drag: false }`; a swipe up still raises the sheet.
+
+### The sheet handle
+
+With the sheet on, `fluidbox.sheet` is a `FluidboxSheet` that you drive and read:
+
+| Member                    | What it does                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `snap`                    | The stop the sheet rests at: `0`, then one per snap point.                                                                           |
+| `setSnap(snap, options?)` | Move to a stop, clamped to the stops there are. `{ animate: false }` jumps. Ignored while the viewer isn't open or the sheet is off. |
+
+Each time the sheet comes to rest at another stop, the fluidbox fires `sheetchange`, a `FluidboxSheetEvent` with `snap` and `reason`. The reason is `"pointer"` for a swipe or a tap, `"wheel"` for a wheel or trackpad, `"keyboard"` for Escape or a key on a stop button, `"api"` for `setSnap()` and for the return to rest as the viewer opens or closes.
+
+```ts
+fluidbox.addEventListener("sheetchange", ({ snap, reason }) => {
+  console.log(`sheet at stop ${snap}, by ${reason}`);
+});
+```
+
+In the frameworks, `useFluidboxSheet()` (React, Vue and Solid) and `injectFluidboxSheet()` (Angular) return `snap` in the framework's reactive form and `setSnap`. The `Sheet` part takes the event as `onSnapChange`, `@snap-change` or `(snapChange)`, and a `SheetSnap` part (`fluidboxSheetSnap` in Angular) is a button that moves the sheet to its stop. See the [framework pages](./react.md) for each one's form. On custom elements, `gallery.sheet` is the handle and the gallery fires `sheetchange`.
+
+### The sheet's content
+
+The sheet is a `<section data-fluidbox-sheet data-fluidbox-chrome>` that the runtime makes, named by the `sheet` [label](./api.md#labels). `render({ item, index, target, signal })` fills it for the item on show. When the viewer moves to another item, `signal` aborts, the returned function runs, and the runtime empties the section before the next item's render. The framework `Sheet` parts render through it, so their children re-render with the app's state, and they put their own attributes on the section.
+
+`<fluidbox-sheet>` shows the active item's `<template slot="sheet">`, else its own `<template>`. Set its `render` property to draw the sheet yourself. Its `snap-points` and `dismiss-motion` attributes are the options: `<fluidbox-sheet snap-points="40% 90%" dismiss-motion="scroll">`.
+
+Put these inside the sheet element:
+
+<!-- css: sheet-parts data-fluidbox-sheet-handle data-fluidbox-sheet-scroll -->
+
+Below the top stop, a swipe anywhere on the sheet moves the sheet. At the top stop its content scrolls, and a pull down from the top of the content carries on into the sheet. Put padding on an inner element, not on `[data-fluidbox-sheet]`.
+
+<!-- pattern: sheet -->
+
+### Stop buttons
+
+Any element in the viewer with `data-fluidbox-sheet-snap="N"` moves the sheet to stop `N` when clicked, such as a "Details" button in the viewer's layer or a reply count. Clicked again at that stop, it lowers the sheet to `0`. This works in every entry point, as plain markup. The runtime keeps `aria-expanded` on every stop button, and moves focus into the sheet once it settles at a raised stop. When the sheet goes out of sight, it becomes `inert`, and focus inside it goes back to the button or the dialog.
+
+```html
+<button type="button" data-fluidbox-sheet-snap="1">Details</button>
+```
+
+With the sheet raised, Escape and a tap above the sheet lower it instead of closing the viewer. Keys typed in the sheet's fields stay there, so the arrow keys don't change the slide. A tap in a field focuses it without the page panning, and the sheet makes room for the software keyboard. Zoom works only with the sheet at rest.
+
+### sheet.css
+
+`@ogdakke/fluidbox/sheet.css` holds the sheet's layout and its variables. Set them on `[data-fluidbox-dialog]`. The defaults have no weight, so any selector wins. The runtime reads the ones that say so as they change, so a media query can set them too.
+
+<!-- css: sheet -->
+
+As the sheet moves, these variables on the overlay follow its scroll. Use them for your own effects:
+
+<!-- css: published --fluidbox-sheet-visible --fluidbox-sheet-progress --fluidbox-sheet-expand --fluidbox-sheet-dismiss -->
+
+The dialog gets `data-sheet` with the stop number, `data-sheet-raised` above stop `0`, `data-sheet-expanded` at the top stop, `data-sheet-peeking` while the peek is above zero and `data-sheet-off` while the sheet is turned off. The overlay gets `data-sheet-dismiss` with the `dismissMotion` option, or `none` while a drag may not close the viewer.
+
+```css
+[data-fluidbox-dialog] .caption {
+  opacity: clamp(0, 1 - var(--fluidbox-sheet-progress) * 2.5, 1);
+}
+
+@media (min-width: 900px) {
+  [data-fluidbox-dialog]:has(.replies) {
+    --fluidbox-sheet-enabled: 0;
+    --fluidbox-stage-right: 360px;
+  }
+}
+```
+
+In a browser without scroll-driven animations, the sheet still scrolls, snaps and pushes the photo. With `fit`, the photo keeps its size behind it.

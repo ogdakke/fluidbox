@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./index.css": "./index.css",
+    "./layers.css": "./layers.css",
     "./chrome": "./chrome.ts",
     "./art-scenes": "./art-scenes.ts",
     "./highlight": "./highlight.ts",

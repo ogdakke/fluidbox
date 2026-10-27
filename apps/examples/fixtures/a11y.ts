@@ -1,21 +1,33 @@
 import { mountSite } from "../src/site";
 import { createFluidbox } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
-import "@ogdakke/fluidbox/filmstrip.css";
-import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/thumbnails.css";
+import "@ogdakke/fluidbox/baseline.css";
+import type {
+  Fluidbox,
+  FluidboxCustomItemBase,
+  FluidboxItem,
+  FluidboxSlides,
+} from "@ogdakke/fluidbox";
 import "./site.css";
 
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    shop: FluidboxCustomItemBase<"shop">;
+  }
+}
+
 mountSite("fixtures", {
-  fixture: "Accessibility · query flags: filmstrip, unnamed, viewer, broken",
+  fixture: "Accessibility · query flags: thumbnails, unnamed, viewer, broken",
 });
 
 const params = new URLSearchParams(location.search);
 
 const items: FluidboxItem[] = [
-  { id: "first", type: "img", src: "/first.svg", alt: "Red study", width: 600, height: 400 },
+  { id: "first", type: "image", src: "/first.svg", alt: "Red study", width: 600, height: 400 },
   {
     id: "second",
-    type: "img",
+    type: "image",
     src: params.has("broken") ? "/missing.svg?delay=300" : "/second.svg",
     alt: params.has("unnamed") ? "" : "Blue study",
     width: 600,
@@ -33,7 +45,7 @@ const items: FluidboxItem[] = [
       { src: "/captions.vtt", kind: "captions", srclang: "en", label: "English", default: true },
     ],
   },
-  { id: "shop", type: "custom", render: "shop", title: "Product form", width: 600, height: 400 },
+  { id: "shop", type: "shop", title: "Product form", width: 600, height: 400 },
 ];
 
 /** A web component with its own focusable control, as a 3D viewer has. */
@@ -46,8 +58,8 @@ class ShadowControl extends HTMLElement {
 if (!customElements.get("a11y-shadow-control"))
   customElements.define("a11y-shadow-control", ShadowControl);
 
-const renderers: Record<string, FluidboxRenderer> = {
-  shop({ target }) {
+const slides: FluidboxSlides = {
+  shop({ media: target }) {
     target.innerHTML = `
       <form class="a11y-shop" onsubmit="return false">
         <input type="hidden" name="id" value="1" />
@@ -106,9 +118,9 @@ const viewer = params.has("viewer")
 
 const fluidbox: Fluidbox = createFluidbox({
   items,
-  renderers,
-  loading: "eager",
-  filmstrip: params.has("filmstrip"),
+  slides,
+  preload: "eager",
+  thumbnails: params.has("thumbnails"),
   ...(params.has("zoom")
     ? { controls: ["previous", "next", "close", "zoomIn", "zoomOut", "zoomReset"] as const }
     : {}),

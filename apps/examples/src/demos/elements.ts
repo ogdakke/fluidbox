@@ -1,4 +1,5 @@
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import { photoSrc, photoThumb, photos, type Photo } from "../photos";
 
 const image = (photo: Photo, src: string) => {
@@ -37,7 +38,7 @@ function sheetTemplate(photo: Photo): HTMLTemplateElement {
 export function mountElements(gallery: HTMLElement): void {
   for (const photo of photos) {
     const item = document.createElement("fluidbox-item");
-    item.setAttribute("item-id", photo.id);
+    item.setAttribute("value", photo.id);
     item.style.setProperty("--ratio", String(photo.width / photo.height));
 
     const trigger = document.createElement("button");
@@ -56,7 +57,7 @@ export function mountElements(gallery: HTMLElement): void {
   }
 }
 
-const persisted = ["sheet", "dismiss", "photo", "backdrop", "zoom", "filmstrip", "radius"];
+const persisted = ["sheet", "dismiss", "photo", "backdrop", "zoom", "thumbnails", "radius"];
 
 /** A form field's value as the URL keeps it: a checkbox is "on" or "off". */
 function read(form: HTMLFormElement, name: string) {
@@ -113,13 +114,13 @@ export function mountControls(gallery: HTMLElement, form: HTMLFormElement): void
   const photo = field<HTMLSelectElement>("photo");
   const radiusValue = field<HTMLOutputElement>("radiusValue");
 
-  const filmstrip = document.createElement("fluidbox-filmstrip");
+  const thumbnails = document.createElement("fluidbox-thumbnails");
   const sheet = document.createElement("fluidbox-sheet");
   sheet.setAttribute("snap-points", "content");
   const viewer = document.createElement("template");
   viewer.setAttribute("slot", "viewer");
-  viewer.innerHTML = `<fluidbox-controls></fluidbox-controls>
-    <button type="button" class="info-toggle" data-fluidbox-sheet-stop="1">Info</button>`;
+  viewer.innerHTML = `<fluidbox-toolbar></fluidbox-toolbar>
+    <button type="button" class="info-toggle" data-fluidbox-sheet-snap="1">Info</button>`;
 
   // Adding or removing an add-on rebuilds the viewer, so only touch the ones that changed.
   const toggle = (child: Element, on: boolean) => {
@@ -132,11 +133,11 @@ export function mountControls(gallery: HTMLElement, form: HTMLFormElement): void
     dismiss.disabled = !sheetOn;
     photo.disabled = !sheetOn;
     root.dataset.sheetPhoto = photo.value;
-    if (sheet.getAttribute("dismiss") !== dismiss.value)
-      sheet.setAttribute("dismiss", dismiss.value);
+    if (sheet.getAttribute("dismiss-motion") !== dismiss.value)
+      sheet.setAttribute("dismiss-motion", dismiss.value);
     toggle(sheet, sheetOn);
     toggle(viewer, sheetOn);
-    toggle(filmstrip, field<HTMLInputElement>("filmstrip").checked);
+    toggle(thumbnails, field<HTMLInputElement>("thumbnails").checked);
 
     const zoom = value("zoom");
     gallery.toggleAttribute("nozoom", zoom === "off");

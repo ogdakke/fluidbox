@@ -16,16 +16,20 @@ export const mount: MountLive = (root) => {
           default: () => [
             h(
               Fluidbox.Trigger,
-              { item: album[0]!, class: "pattern-thumb pattern-album", "data-test": "trigger" },
+              { value: album[0]!, class: "pattern-thumb pattern-album", "data-test": "trigger" },
               {
                 default: () => [
                   h("img", { src: album[0]!.src, alt: coverAlt }),
                   h(
-                    Fluidbox.ThumbnailOverlay,
-                    { travel: true, class: "pattern-overlay", "data-test": "count" },
+                    Fluidbox.Overlay,
+                    { flight: "live", class: "pattern-overlay", "data-test": "count" },
                     {
                       default: () => [
-                        h(Fluidbox.FrameLayer, { class: "live-layer", "data-test": "layer" }),
+                        h(Fluidbox.Overlay, {
+                          flight: "frame",
+                          class: "live-layer",
+                          "data-test": "layer",
+                        }),
                         countText,
                       ],
                     },
@@ -33,7 +37,7 @@ export const mount: MountLive = (root) => {
                 ],
               },
             ),
-            h(Fluidbox.Filmstrip),
+            h(Fluidbox.Thumbnails),
             viewer.value
               ? h(Fluidbox.Viewer, null, {
                   default: () =>

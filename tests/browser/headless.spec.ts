@@ -15,7 +15,7 @@ test("plain runtime opens, navigates, composes controls, and closes without cust
   });
   await first.click();
 
-  const overlay = page.locator("[data-fluidbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-viewer]");
   const activeMedia = page.locator(
     '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]',
   );
@@ -95,7 +95,7 @@ test("plain runtime contains focus, leaves Tab to the browser and keeps page key
 }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-fluidbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-viewer]");
   await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
   // A viewer of your own keeps the default Close, which takes focus.
   const close = page.locator("[data-fluidbox-dialog] [data-fluidbox-close]");
@@ -134,7 +134,7 @@ test("plain runtime returns focus to a virtualized origin host", async ({ page }
   await page.locator('[data-photo-id="one"]').evaluate((element) => element.remove());
   await page.evaluate(() => void window.headlessViewer.close());
 
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
   await expect(gallery).toBeFocused();
 });
 
@@ -147,7 +147,7 @@ test("plain controllers hand body-level ownership to the newest viewer", async (
   );
 
   await page.evaluate(() => void window.headlessSecondaryViewer.open("two"));
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(1);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-status",
     "open",
@@ -161,7 +161,7 @@ test("plain controllers hand body-level ownership to the newest viewer", async (
   }));
   expect(states).toEqual({ first: "closed", second: "open" });
   await page.evaluate(() => void window.headlessSecondaryViewer.close());
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
 });
 
 test("active viewer ownership honors a prevented close", async ({ page }) => {
@@ -175,7 +175,7 @@ test("active viewer ownership honors a prevented close", async ({ page }) => {
   const result = await page.evaluate(() => window.headlessSecondaryViewer.open("two"));
 
   expect(result).toBe(false);
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(1);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(1);
   await expect(page.locator("[data-fluidbox-dialog]")).toHaveAttribute(
     "data-fluidbox-status",
     "open",
@@ -189,7 +189,7 @@ test("active viewer ownership honors a prevented close", async ({ page }) => {
   }));
   expect(states).toEqual({ protected: "open", secondary: "closed" });
   await page.evaluate(() => window.headlessProtectedViewer.destroy());
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
 });
 
 test("plain runtime owns video and iframe media while custom renderers own descendants", async ({
@@ -200,8 +200,7 @@ test("plain runtime owns video and iframe media while custom renderers own desce
     await window.headlessViewer.setItems([
       {
         id: "custom",
-        type: "custom",
-        render: "demo",
+        type: "demo",
         title: "Custom study",
         width: 800,
         height: 600,
@@ -243,20 +242,20 @@ test("plain runtime owns video and iframe media while custom renderers own desce
   await expect(page.locator("body")).toHaveAttribute("data-custom-disposals", "1");
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
 });
 
 test("destroy unloads mounted custom media before removing the viewer", async ({ page }) => {
   await page.goto("/headless.html");
   await page.evaluate(async () => {
     await window.headlessViewer.setItems([
-      { id: "one", type: "custom", render: "demo", title: "Custom study", width: 800, height: 600 },
+      { id: "one", type: "demo", title: "Custom study", width: 800, height: 600 },
     ]);
     await window.headlessViewer.open("one");
     window.headlessViewer.destroy();
   });
 
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
   await expect(page.locator("body")).toHaveAttribute("data-custom-mounts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-aborts", "1");
   await expect(page.locator("body")).toHaveAttribute("data-custom-disposals", "1");
@@ -268,7 +267,7 @@ test("custom media uses the document close flight and returns to its retained sl
   await page.goto("/headless.html");
   await page.evaluate(async () => {
     await window.headlessViewer.setItems([
-      { id: "one", type: "custom", render: "demo", title: "Custom study", width: 800, height: 600 },
+      { id: "one", type: "demo", title: "Custom study", width: 800, height: 600 },
     ]);
     await window.headlessViewer.open("one");
     void window.headlessViewer.close();
@@ -278,7 +277,7 @@ test("custom media uses the document close flight and returns to its retained sl
     "Custom one",
   );
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
 
   await page.evaluate(() => void window.headlessViewer.open("one"));
   await expect(
@@ -291,7 +290,7 @@ test("custom media uses the document close flight and returns to its retained sl
 test("plain runtime does not take native horizontal swipe ownership", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
     "data-fluidbox-status",
     "open",
   );
@@ -363,7 +362,7 @@ test("plain runtime keeps the preview painted until the full image can replace i
     await window.headlessViewer.setItems([
       {
         id: "preview-test",
-        type: "img",
+        type: "image",
         src: "/photo-square.svg?full",
         alt: "Preview handoff",
         width: 800,
@@ -402,7 +401,7 @@ test("adjacent slides paint their placeholder while responsive images are pendin
     await window.headlessViewer.setItems(
       [0, 1].map((index) => ({
         id: `pending-${index}`,
-        type: "img" as const,
+        type: "image" as const,
         src: `/pending-slide-full-${index}.svg`,
         alt: `Pending image ${index}`,
         width: 800,
@@ -457,7 +456,7 @@ test("plain runtime retains the last decoded origin when its next source is pend
     await window.headlessViewer.setItems([
       {
         id: "one",
-        type: "img",
+        type: "image",
         src: "/deferred-full.svg",
         alt: "Deferred full image",
         width: 800,
@@ -501,7 +500,7 @@ test("plain runtime keeps the preview available while a failed full image is ret
     await window.headlessViewer.setItems([
       {
         id: "retry-test",
-        type: "img",
+        type: "image",
         src: "/retry-full.svg",
         alt: "Retry handoff",
         width: 800,
@@ -536,7 +535,7 @@ test("plain runtime keeps focus that moved into the dialog during the opening", 
     await window.headlessViewer.setItems([
       {
         id: "focus-test",
-        type: "img",
+        type: "image",
         src: "/focus-full.svg",
         alt: "Focus",
         width: 800,
@@ -560,7 +559,7 @@ test("plain runtime keeps focus that moved into the dialog during the opening", 
         '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-error]:not([hidden]) button',
       );
     const painting = () =>
-      document.querySelector("[data-fluidbox-overlay]:not([data-fluidbox-prepared])") && retry();
+      document.querySelector("[data-fluidbox-viewer]:not([data-fluidbox-prepared])") && retry();
     for (let frames = 0; frames < 240 && !painting(); frames += 1) {
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     }
@@ -608,7 +607,7 @@ test("plain runtime settles immediately when reduced motion is requested", async
   await expect(page.locator("[data-demo-caption]")).toHaveText("two");
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
   await expect(page.locator('[data-photo-id="two"]')).toBeFocused();
 });
 
@@ -618,7 +617,7 @@ test("plain runtime keeps session height stable through mobile browser chrome ch
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-fluidbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-viewer]");
   await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
   await expect(overlay).toHaveCSS("--fluidbox-height", "700px");
 
@@ -695,7 +694,7 @@ test("plain runtime preserves the painted frame when open and close reverse", as
       expect(Math.abs(before[property] - after[property])).toBeLessThan(4);
     }
   }
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
     "data-fluidbox-status",
     "open",
   );
@@ -704,7 +703,7 @@ test("plain runtime preserves the painted frame when open and close reverse", as
 test("plain runtime publishes drag state and dismisses from a touch pointer", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-fluidbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-viewer]");
   await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
 
   const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
@@ -750,7 +749,7 @@ test("plain runtime publishes drag state and dismisses from a touch pointer", as
 test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ page }) => {
   await page.goto("/headless.html");
   await page.locator('[data-photo-id="one"]').click();
-  const overlay = page.locator("[data-fluidbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-viewer]");
   await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
 
   const frame = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-frame]');
@@ -761,7 +760,7 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
         new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: 40 }),
       );
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      const overlay = document.querySelector<HTMLElement>("[data-fluidbox-overlay]")!;
+      const overlay = document.querySelector<HTMLElement>("[data-fluidbox-viewer]")!;
       maximum = Math.max(
         maximum,
         Number(overlay.style.getPropertyValue("--fluidbox-dismiss-progress")),
@@ -776,7 +775,7 @@ test("plain runtime dismisses from a vertical trackpad wheel gesture", async ({ 
   const closing = await frame.evaluate(
     (element) =>
       new Promise<{ state: string | undefined; tailPrevented: boolean }>((resolve) => {
-        const overlay = document.querySelector<HTMLElement>("[data-fluidbox-overlay]")!;
+        const overlay = document.querySelector<HTMLElement>("[data-fluidbox-viewer]")!;
         const observer = new MutationObserver(() => {
           if (overlay.dataset.fluidboxStatus !== "closing") return;
           observer.disconnect();
@@ -919,21 +918,23 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
     const host = document.createElement("span");
     host.dataset.testThumbnailOverlay = "";
     document.querySelector('[data-photo-id="one"]')!.append(host);
+    window.headlessViewer.bindOverlay(host, "one", { flight: "frame" });
     window.headlessViewer.bindOverlay(host, "one", {
-      frameLayer: host,
-      travel({ target, item, signal }) {
-        const badge = document.createElement("strong");
-        badge.dataset.testTravelingOverlay = "";
-        badge.textContent = `Traveling ${item.id}`;
-        const actions = document.createElement("span");
-        actions.dataset.fluidboxVideoActions = "";
-        target.append(badge, actions);
-        signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
-          once: true,
-        });
-        return () => {
-          host.dataset.rendererDisposed = "";
-        };
+      flight: {
+        live({ target, item, signal }) {
+          const badge = document.createElement("strong");
+          badge.dataset.testTravelingOverlay = "";
+          badge.textContent = `Traveling ${item.id}`;
+          const actions = document.createElement("span");
+          actions.dataset.fluidboxVideoActions = "";
+          target.append(badge, actions);
+          signal.addEventListener("abort", () => (host.dataset.rendererAborted = ""), {
+            once: true,
+          });
+          return () => {
+            host.dataset.rendererDisposed = "";
+          };
+        },
       },
     });
   });
@@ -1063,7 +1064,7 @@ test("plain runtime drives host and traveling thumbnail overlays through the pai
   expect(closing.travelRect.width).toBeCloseTo(closing.frameRect.width, 0);
   expect(closing.travelRect.height).toBeCloseTo(closing.frameRect.height, 0);
   await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
   await expect(page.locator("[data-fluidbox-transition-content]")).toHaveCount(0);
   const host = page.locator("[data-test-thumbnail-overlay]");
   await expect(host).toHaveAttribute("data-fluidbox-phase", "idle");
@@ -1079,12 +1080,13 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
     const host = document.createElement("span");
     host.dataset.testParkedLayer = "";
     document.querySelector('[data-photo-id="one"]')!.append(host);
-    window.headlessViewer.bindOverlay(host, "one", {
-      returns: ["two"],
-      frameLayer: host,
-      travel({ target }) {
-        host.dataset.mounts = String(Number(host.dataset.mounts ?? 0) + 1);
-        target.textContent = "Overlay";
+    window.headlessViewer.bindOverlay(host, ["one", "two"], { flight: "frame" });
+    window.headlessViewer.bindOverlay(host, ["one", "two"], {
+      flight: {
+        live({ target }) {
+          host.dataset.mounts = String(Number(host.dataset.mounts ?? 0) + 1);
+          target.textContent = "Overlay";
+        },
       },
     });
     await window.headlessViewer.open("one");
@@ -1097,7 +1099,7 @@ test("an open overlay stays parked while another slide is selected", async ({ pa
         layer.closest("[data-fluidbox-slide]")!,
       ),
       mounts: layer.dataset.mounts,
-      selected: window.headlessViewer.state.id,
+      selected: window.headlessViewer.state.value,
     };
   });
   expect(parked).toEqual({ slide: 0, mounts: "1", selected: "two" });
@@ -1111,7 +1113,7 @@ test("native gallery scrolling is never corrected by the runtime", async ({ page
     await window.headlessViewer.setItems(
       Array.from({ length: 6 }, (_, index) => ({
         id: `slide-${index}`,
-        type: "img" as const,
+        type: "image" as const,
         src: "/photo-square.svg",
         alt: `Slide ${index}`,
         width: 800,
@@ -1147,7 +1149,7 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
       count,
       get: (index) => ({
         id: `large-${index}`,
-        type: "img",
+        type: "image",
         src: "/photo-square.svg",
         alt: `Large item ${index + 1}`,
         width: 800,
@@ -1176,37 +1178,37 @@ test("plain runtime keeps a 100k source bounded without custom elements", async 
   expect(await page.locator("[data-fluidbox-media][src]").count()).toBeLessThanOrEqual(3);
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
 });
 
-test("the filmstrip option docks thumbnails that navigate the viewer", async ({ page }) => {
+test("the thumbnails option docks thumbnails that navigate the viewer", async ({ page }) => {
   await page.goto("/headless.html");
-  await page.evaluate(() => void window.headlessFilmstripViewer.open("one"));
+  await page.evaluate(() => void window.headlessThumbnailsViewer.open("one"));
 
   const dialog = page.locator("[data-fluidbox-dialog]");
   // The strip is viewer content: it mounts in the viewer's layer.
   await expect(
-    dialog.locator("[data-fluidbox-addons] > [data-fluidbox-filmstrip-dock]"),
+    dialog.locator("[data-fluidbox-addons] > [data-fluidbox-thumbnails-dock]"),
   ).toHaveCount(1);
-  const items = page.locator("[data-fluidbox-filmstrip-item]");
+  const items = page.locator("[data-fluidbox-thumbnails-item]");
   await expect(items.first()).toBeVisible();
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveAttribute(
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveAttribute(
     "aria-label",
-    "Gallery filmstrip",
+    "Gallery thumbnails",
   );
 
-  await page.locator('[data-fluidbox-filmstrip-item][data-index="1"]').click();
-  await expect.poll(() => page.evaluate(() => window.headlessFilmstripViewer.state.index)).toBe(1);
+  await page.locator('[data-fluidbox-thumbnails-item][data-index="1"]').click();
+  await expect.poll(() => page.evaluate(() => window.headlessThumbnailsViewer.state.index)).toBe(1);
 
-  await page.evaluate(() => void window.headlessFilmstripViewer.close());
-  await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+  await page.evaluate(() => void window.headlessThumbnailsViewer.close());
+  await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
 });
 
 test("bindings follow setItems, by index and by an id that arrives later", async ({ page }) => {
   await page.goto("/headless.html");
   const errors = await page.evaluate(async () => {
     const item = (name: string) => ({
-      type: "img" as const,
+      type: "image" as const,
       src: `/art/${name}.svg`,
       alt: name,
       width: 1200,
@@ -1231,12 +1233,12 @@ test("bindings follow setItems, by index and by an id that arrives later", async
   expect(errors).toEqual({ thrown: [], count: 3, items: 3 });
 });
 
-test("an aborted open toggles back to closed", async ({ page }) => {
+test("an aborted open changes the value back to null", async ({ page }) => {
   await page.goto("/headless.html");
   const events = await page.evaluate(async () => {
     const viewer = window.headlessViewer;
     const seen: string[] = [];
-    viewer.addEventListener("toggle", (event) => seen.push(event.newState));
+    viewer.addEventListener("valuechange", (event) => seen.push(event.action));
     const controller = new AbortController();
     const opening = viewer.open(0, { signal: controller.signal });
     await new Promise((resolve) => setTimeout(resolve, 30));
@@ -1244,25 +1246,25 @@ test("an aborted open toggles back to closed", async ({ page }) => {
     const result = await opening;
     return { seen, result, status: viewer.state.status };
   });
-  expect(events).toEqual({ seen: ["open", "closed"], result: false, status: "closed" });
+  expect(events).toEqual({ seen: ["open", "close"], result: false, status: "closed" });
 });
 
-test("update changes labels, controls, zoom and the filmstrip while the viewer stays open", async ({
+test("update changes labels, controls, zoom and the thumbnails while the viewer stays open", async ({
   page,
 }) => {
   await page.goto("/headless.html");
   await page.evaluate(() => window.headlessSecondaryViewer.open("one"));
-  const overlay = page.locator("[data-fluidbox-overlay]");
+  const overlay = page.locator("[data-fluidbox-viewer]");
   const close = page.locator("[data-fluidbox-portal] [data-fluidbox-close]");
   await expect(overlay).toHaveAttribute("data-fluidbox-status", "open");
-  await expect(close).toHaveAttribute("aria-label", "Close");
+  await expect(close).toHaveAccessibleName("Close");
 
   await page.evaluate(() =>
     window.headlessSecondaryViewer.update({
       labels: { close: "Sulje", position: (index, count) => `Kuva ${index + 1}/${count}` },
     }),
   );
-  await expect(close).toHaveAttribute("aria-label", "Sulje");
+  await expect(close).toHaveAccessibleName("Sulje");
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     /^Kuva 1\//,
@@ -1272,15 +1274,15 @@ test("update changes labels, controls, zoom and the filmstrip while the viewer s
   await expect(page.locator("[data-fluidbox-portal] [data-fluidbox-next]")).toHaveCount(0);
   await expect(close).toHaveCount(1);
 
-  await page.evaluate(() => window.headlessSecondaryViewer.update({ filmstrip: true }));
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(1);
-  await page.locator("[data-fluidbox-filmstrip-item]").nth(1).click();
+  await page.evaluate(() => window.headlessSecondaryViewer.update({ thumbnails: true }));
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCount(1);
+  await page.locator("[data-fluidbox-thumbnails-item]").nth(1).click();
   await expect(page.locator('[data-fluidbox-slide][aria-hidden="false"]')).toHaveAttribute(
     "aria-label",
     /^Kuva 2\//,
   );
-  await page.evaluate(() => window.headlessSecondaryViewer.update({ filmstrip: undefined }));
-  await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(0);
+  await page.evaluate(() => window.headlessSecondaryViewer.update({ thumbnails: undefined }));
+  await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCount(0);
 
   // Turning zoom off zooms the photo back out, and the next double-click doesn't zoom.
   const media = page.locator('[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-media]');
@@ -1304,7 +1306,7 @@ test("update adds a sheet to the open viewer, and takes it away again", async ({
     await window.loadSheet();
     const viewer = window.headlessSecondaryViewer;
     const events: string[] = [];
-    viewer.addEventListener("sheetchange", (event) => events.push(`${event.stop}:${event.reason}`));
+    viewer.addEventListener("sheetchange", (event) => events.push(`${event.snap}:${event.reason}`));
     Object.assign(window, { sheetEvents: events });
     await viewer.open("one");
     viewer.update({
@@ -1324,7 +1326,7 @@ test("update adds a sheet to the open viewer, and takes it away again", async ({
   // Rendered for the item on show, with no item change to wait for.
   await expect(sheet.locator(".sheet-text")).toHaveText("one");
 
-  await page.evaluate(() => window.headlessSecondaryViewer.sheet!.set(1));
+  await page.evaluate(() => window.headlessSecondaryViewer.sheet!.setSnap(1));
   await expect(dialog).toHaveAttribute("data-sheet", "1");
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveAttribute("data-sheet", "0");
@@ -1333,7 +1335,7 @@ test("update adds a sheet to the open viewer, and takes it away again", async ({
   expect(await events()).toEqual(["1:api", "0:keyboard"]);
 
   // A raised sheet that goes announces its return to rest once.
-  await page.evaluate(() => window.headlessSecondaryViewer.sheet!.set(1));
+  await page.evaluate(() => window.headlessSecondaryViewer.sheet!.setSnap(1));
   await expect(dialog).toHaveAttribute("data-sheet", "1");
   await page.evaluate(() => window.headlessSecondaryViewer.update({ sheet: undefined }));
   await expect(sheet).toHaveCount(0);
@@ -1389,4 +1391,43 @@ test("a pinch that lands on a drag starts from where the finger took the photo",
   await expect(slide).toHaveAttribute("aria-label", "Item 3 of 4");
   await touch("touchEnd", []);
   await expect(slide).toHaveAttribute("aria-label", "Item 3 of 4");
+});
+
+test("a frame overlay and a live overlay sit side by side on one trigger", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/headless.html");
+  const during = await page.evaluate(async () => {
+    const trigger = document.querySelector<HTMLElement>('[data-photo-id="one"]')!;
+    const scrim = document.createElement("span");
+    scrim.dataset.testScrim = "";
+    const count = document.createElement("span");
+    count.dataset.testCount = "";
+    trigger.append(scrim, count);
+    const viewer = window.headlessViewer;
+    viewer.bindOverlay(scrim, "one", { flight: "frame" });
+    viewer.bindOverlay(count, ["one", "two"], {
+      flight: { live: ({ target }) => void (target.textContent = "+1") },
+    });
+    const opened = viewer.open("one");
+    // Look while the flight is under way.
+    const seen = await new Promise<{ scrimInFrame: boolean; live: string; phase: string | null }>(
+      (resolve) => {
+        const look = () => {
+          const live = document.querySelector("[data-fluidbox-transition-content]");
+          if (viewer.state.status === "opening" && live) {
+            resolve({
+              scrimInFrame: !!scrim.parentElement?.matches("[data-fluidbox-frame]"),
+              live: live.textContent ?? "",
+              phase: count.getAttribute("data-fluidbox-phase"),
+            });
+          } else requestAnimationFrame(look);
+        };
+        look();
+      },
+    );
+    await opened;
+    await viewer.close();
+    return { ...seen, scrimBack: scrim.parentElement === trigger };
+  });
+  expect(during).toEqual({ scrimInFrame: true, live: "+1", phase: "opening", scrimBack: true });
 });

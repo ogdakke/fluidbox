@@ -194,6 +194,49 @@ export interface OriginPoseOptions {
   /** The viewport position of the media box when it is not transformed. */
   readonly left: number;
   readonly top: number;
+  /**
+   * The part of the box that paints the item, in the box's own pixels: a fill
+   * box's poster. It lands on the origin's picture, and the rest of the box
+   * starts cropped away. Without it, the whole box does.
+   */
+  readonly content?: Rect;
+}
+
+export interface Rect {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * The poster's rectangle in a fill box (`data-fluidbox-fill`): its aspect,
+ * from the item or else the visual's own, fitted with `contain` and centred.
+ */
+export function fillContent(
+  media: HTMLElement,
+  width: number,
+  height: number,
+  visual: HTMLElement | null,
+): Rect | undefined {
+  const fill = media.dataset.fluidboxFill;
+  if (fill === undefined || !width || !height) return undefined;
+  let aspect = Number(fill);
+  if (!aspect && visual) {
+    const [naturalWidth, naturalHeight] = naturalSize(visual);
+    const rect = visual.getBoundingClientRect();
+    aspect =
+      naturalWidth && naturalHeight ? naturalWidth / naturalHeight : rect.width / rect.height;
+  }
+  if (!Number.isFinite(aspect) || aspect <= 0) return undefined;
+  const contentWidth = Math.min(width, height * aspect);
+  const contentHeight = contentWidth / aspect;
+  return {
+    left: (width - contentWidth) / 2,
+    top: (height - contentHeight) / 2,
+    width: contentWidth,
+    height: contentHeight,
+  };
 }
 
 /**
@@ -208,9 +251,10 @@ export function originPose({
   height,
   left,
   top,
+  content = { left: 0, top: 0, width, height },
 }: OriginPoseOptions): OriginPose | null {
-  if (!width || !height) return null;
-  const aspect = width / height;
+  if (!width || !height || !content.width || !content.height) return null;
+  const aspect = content.width / content.height;
   const originRect = origin.getBoundingClientRect();
   if (!originRect.width || !originRect.height) return null;
   const originStyle = getComputedStyle(origin);
@@ -235,9 +279,9 @@ export function originPose({
     }
   } else {
     // Cover the origin's box from its centre.
-    const scale = Math.max(originRect.width / width, originRect.height / height);
-    const paintedWidth = width * scale;
-    const paintedHeight = height * scale;
+    const scale = Math.max(originRect.width / content.width, originRect.height / content.height);
+    const paintedWidth = content.width * scale;
+    const paintedHeight = content.height * scale;
     const x = originRect.left + (originRect.width - paintedWidth) / 2;
     const y = originRect.top + (originRect.height - paintedHeight) / 2;
     painted = { left: x, top: y, right: x + paintedWidth, bottom: y + paintedHeight };
@@ -248,15 +292,21 @@ export function originPose({
     boxes.push(clip);
   }
   if (visible.right - visible.left < 0.5 || visible.bottom - visible.top < 0.5) return null;
-  const scaleX = (painted.right - painted.left) / width;
-  const scaleY = (painted.bottom - painted.top) / height;
+  // `painted` is where the content paints; the box extends past it by the
+  // content's offset, and that part starts cropped away.
+  const scaleX = (painted.right - painted.left) / content.width;
+  const scaleY = (painted.bottom - painted.top) / content.height;
+  const boxLeft = painted.left - content.left * scaleX;
+  const boxTop = painted.top - content.top * scaleY;
+  const boxRight = boxLeft + width * scaleX;
+  const boxBottom = boxTop + height * scaleY;
   return {
-    transform: new DOMMatrix([scaleX, 0, 0, scaleY, painted.left - left, painted.top - top]),
+    transform: new DOMMatrix([scaleX, 0, 0, scaleY, boxLeft - left, boxTop - top]),
     clip: {
-      top: Math.max(0, (visible.top - painted.top) / scaleY),
-      right: Math.max(0, (painted.right - visible.right) / scaleX),
-      bottom: Math.max(0, (painted.bottom - visible.bottom) / scaleY),
-      left: Math.max(0, (visible.left - painted.left) / scaleX),
+      top: Math.max(0, (visible.top - boxTop) / scaleY),
+      right: Math.max(0, (boxRight - visible.right) / scaleX),
+      bottom: Math.max(0, (boxBottom - visible.bottom) / scaleY),
+      left: Math.max(0, (visible.left - boxLeft) / scaleX),
       radii: visibleRadii(visible, boxes),
     },
   };

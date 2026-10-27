@@ -23,7 +23,7 @@ function Live({ ready }: { ready: (controls: LiveControls) => void }) {
     Fluidbox.Root,
     { items: album, labels, loop },
     h(Fluidbox.Trigger, {
-      item: album[0]!,
+      value: album[0]!,
       className: "pattern-thumb pattern-album",
       ...test("trigger"),
       children: h(
@@ -31,14 +31,14 @@ function Live({ ready }: { ready: (controls: LiveControls) => void }) {
         null,
         h("img", { src: album[0]!.src, alt: coverAlt }),
         h(
-          Fluidbox.ThumbnailOverlay,
-          { travel: true, className: "pattern-overlay", ...test("count") },
-          h(Fluidbox.FrameLayer, { className: "live-layer", ...test("layer") }),
+          Fluidbox.Overlay,
+          { flight: "live", className: "pattern-overlay", ...test("count") },
+          h(Fluidbox.Overlay, { flight: "frame", className: "live-layer", ...test("layer") }),
           countText,
         ),
       ),
     }),
-    h(Fluidbox.Filmstrip),
+    h(Fluidbox.Thumbnails),
     viewer &&
       h(
         Fluidbox.Viewer,

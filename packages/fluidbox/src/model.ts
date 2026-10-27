@@ -4,17 +4,16 @@
  * server.
  */
 import { addStyles, paintPoster, posterStyles } from "./addon-styles";
+import { triggerHooks } from "./trigger-hooks";
 import type {
-  FluidboxCustomItem,
-  FluidboxItem,
+  FluidboxCustomItemBase,
   FluidboxSlideRenderer,
   FluidboxThumbnail,
 } from "./public-api";
 
 /** A glTF or GLB model. Its fields are `<model-viewer>`'s, by property name. */
-export interface FluidboxModelItem extends FluidboxCustomItem {
-  /** The marker `modelItem` sets, so the renderer knows its items. */
-  readonly model: true;
+export interface FluidboxModelItem extends FluidboxCustomItemBase<"model"> {
+  readonly id: string;
   /** The `.glb` or `.gltf` file. */
   readonly src: string;
   /** An image of the model, shown over the thumbnail until the model is ready. */
@@ -29,43 +28,41 @@ export interface FluidboxModelItem extends FluidboxCustomItem {
   readonly attributes?: Readonly<Record<string, string>>;
 }
 
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    model: FluidboxModelItem;
+  }
+}
+
 /** What `modelItem` takes. */
 export interface FluidboxModelItemOptions extends Omit<
   FluidboxModelItem,
-  "type" | "id" | "render" | "model" | "thumbnail"
+  "type" | "id" | "thumbnail"
 > {
   /** Defaults to `src`. */
   readonly id?: string;
   readonly thumbnail?: FluidboxThumbnail;
-  /**
-   * The key of the renderer in `renderers`.
-   * @default "model"
-   */
-  readonly render?: string;
 }
 
-/** A model item for the model renderer. */
+/**
+ * A model item for the model slide. Its box fills the stage unless you
+ * pass `fit: "contain"`; `width` and `height` then only shape the poster.
+ */
 export function modelItem(options: FluidboxModelItemOptions): FluidboxModelItem {
   return {
+    fit: "fill",
     ...options,
-    type: "custom",
+    type: "model",
     id: options.id ?? options.src,
-    render: options.render ?? "model",
-    model: true,
   };
 }
 
-/** Whether an item is a model made by `modelItem`. */
-export function isModelItem(item: FluidboxItem): item is FluidboxModelItem {
-  return item.type === "custom" && (item as Partial<FluidboxModelItem>).model === true;
-}
-
-/** What `createModelRenderer` takes. */
-export interface FluidboxModelRendererOptions {
+/** What `createModelSlide` takes. */
+export interface FluidboxModelSlideOptions {
   /**
    * Load `<model-viewer>`, as `() => import("@google/model-viewer")`. The
-   * renderer calls it when a model slide first comes on show, then waits for
-   * the element to be defined. Without it, load the element yourself.
+   * slide calls it when a model is first opened or comes on show, then waits
+   * for the element to be defined. Without it, load the element yourself.
    */
   readonly load?: () => Promise<unknown>;
 }
@@ -73,6 +70,242 @@ export interface FluidboxModelRendererOptions {
 /** The model element's API the renderer uses; `<model-viewer>` has more. */
 interface ModelViewerElement extends HTMLElement {
   pause?(): void;
+  readonly loaded?: boolean;
+  cameraOrbit?: string;
+  cameraTarget?: string;
+  fieldOfView?: string;
+  getCameraOrbit?(): { toString(): string };
+  getCameraTarget?(): { toString(): string };
+  getFieldOfView?(): number;
+  getMaximumFieldOfView?(): number;
+  getIdealAspect?(): number;
+  jumpCameraToGoal?(): void;
+  toDataURL?(type?: string, quality?: number): string;
+}
+
+/** The live models each trigger has quieted, with what gives each its own accessibility back. */
+const quieted = new WeakMap<HTMLElement, Map<HTMLElement, () => void>>();
+/** Whether the development warning about a `<model-viewer>` without its focus target ran. */
+let warnedModel = false;
+
+/**
+ * A live `<model-viewer>` in a trigger is its picture. The trigger is the one
+ * control a keyboard and a screen reader reach, so the model leaves the
+ * accessibility tree, and its focus target, `.userInput` in its shadow root,
+ * the tab order; its poster's and AR buttons go inert. A drag still turns it.
+ * A model that leaves the trigger, or a trigger that is unbound, gets all of
+ * that back. Checked against `<model-viewer>` 4.0.0: a version without
+ * `.userInput` keeps its focus, and loses the `aria-hidden`, which would hide
+ * a focusable element.
+ */
+function quietModels(trigger: HTMLElement) {
+  let own = quieted.get(trigger);
+  if (!own) quieted.set(trigger, (own = new Map()));
+  for (const [model, restore] of own) {
+    if (trigger.contains(model)) continue;
+    restore();
+    own.delete(model);
+  }
+  for (const model of trigger.querySelectorAll<HTMLElement>("model-viewer")) {
+    if (!own.has(model)) own.set(model, quiet(model));
+  }
+  const models = own;
+  return () => {
+    models.forEach((restore) => restore());
+    quieted.delete(trigger);
+  };
+}
+
+/** Quiet one live model, and return what undoes it. */
+function quiet(model: HTMLElement) {
+  const undo: (() => void)[] = [];
+  let quiet = true;
+  if (!model.hasAttribute("aria-hidden")) {
+    model.setAttribute("aria-hidden", "true");
+    undo.push(() => model.removeAttribute("aria-hidden"));
+  }
+  model.ownerDocument.defaultView?.customElements
+    .whenDefined("model-viewer")
+    .then(() => (model as { updateComplete?: Promise<unknown> }).updateComplete)
+    .then(() => {
+      if (!quiet) return;
+      const root = model.shadowRoot;
+      const input = root?.querySelector<HTMLElement>(".userInput");
+      if (!root || !input) {
+        undo.splice(0).forEach((done) => done());
+        // Development builds only; a page without a bundler has no process.
+        try {
+          if (process.env.NODE_ENV !== "production" && !warnedModel) {
+            warnedModel = true;
+            console.warn(
+              "Fluidbox found no .userInput in this <model-viewer>'s shadow root, so the live model in a trigger stays a second tab stop. Fluidbox is checked against <model-viewer> 4.0.0:",
+              model,
+            );
+          }
+        } catch {}
+        return;
+      }
+      for (const target of root.querySelectorAll<HTMLElement>("[tabindex]")) {
+        if (target.tabIndex < 0) continue;
+        const was = target.getAttribute("tabindex")!;
+        target.tabIndex = -1;
+        undo.push(() => target.setAttribute("tabindex", was));
+      }
+      // Its own buttons go inert, so a press on the poster opens the viewer too.
+      for (const control of root.querySelectorAll<HTMLElement>("button, a")) {
+        if (control.inert) continue;
+        control.inert = true;
+        undo.push(() => (control.inert = false));
+      }
+    })
+    .catch(() => {});
+  return () => {
+    quiet = false;
+    undo.splice(0).forEach((done) => done());
+  };
+}
+
+// Imported, the add-on quiets the live models in every trigger.
+triggerHooks.add(quietModels);
+
+/** Whether the development warning about a `<model-viewer>` without its canvas ran. */
+let warnedCanvas = false;
+
+/**
+ * The canvas a loaded `<model-viewer>` 4.0.0 shows, marked `show` in its
+ * shadow root: the renderer's shared WebGL canvas while it is the one model in
+ * view, which the renderer moves into it, else its own 2D canvas, which the
+ * renderer copies each frame into. Both are sized for the largest model in
+ * view, and this one's pixels are their top-left corner. The WebGL canvas
+ * keeps its drawing buffer, so it holds the last frame between frames. Null
+ * before it has drawn, and for a version laid out otherwise, which the
+ * development build warns of once.
+ */
+function shownCanvas(model: ModelViewerElement) {
+  const root = model.shadowRoot;
+  const canvas = root?.querySelector<HTMLCanvasElement>("canvas.show");
+  if (canvas) return canvas;
+  // Development builds only; a page without a bundler has no process. A
+  // canvas not yet marked has drawn nothing, and warns of nothing.
+  try {
+    if (process.env.NODE_ENV !== "production" && !warnedCanvas && !root?.querySelector("canvas")) {
+      warnedCanvas = true;
+      console.warn(
+        "Fluidbox can't reach the canvas this <model-viewer> draws to, so its snapshots encode a PNG, which is slower. Fluidbox is checked against <model-viewer> 4.0.0:",
+        model,
+      );
+    }
+  } catch {}
+  return null;
+}
+
+/** Where a model's camera is: `<model-viewer>`'s camera properties. */
+interface ModelView {
+  readonly orbit: string;
+  readonly target: string;
+  /** Null while the camera isn't zoomed, so the element keeps its own field of view. */
+  readonly fieldOfView: string | null;
+}
+
+const RADIANS = Math.PI / 180;
+
+/** A loaded model's camera, or null. */
+function readView(model: ModelViewerElement): ModelView | null {
+  if (!model.loaded || !model.getCameraOrbit || !model.getCameraTarget || !model.getFieldOfView) {
+    return null;
+  }
+  const shown = model.getFieldOfView();
+  // A zoom narrows the field of view below the widest the element allows.
+  const widest = model.getMaximumFieldOfView?.() ?? shown;
+  const zoomed = Math.abs(widest - shown) > 0.01;
+  // <model-viewer> widens the vertical field of view of a box narrower than
+  // the model; the property takes it unwidened, so another box widens it for
+  // its own shape.
+  const aspect = model.clientWidth / model.clientHeight;
+  const widen = Math.max(1, (model.getIdealAspect?.() ?? 0) / (aspect || 1));
+  const fieldOfView = (2 * Math.atan(Math.tan((shown * RADIANS) / 2) / widen)) / RADIANS;
+  return {
+    orbit: model.getCameraOrbit().toString(),
+    target: model.getCameraTarget().toString(),
+    fieldOfView: zoomed ? `${fieldOfView}deg` : null,
+  };
+}
+
+/** The field of view a page gave each live model, before a close set one. */
+const ownFieldOfView = new WeakMap<ModelViewerElement, string>();
+
+/** Turn a model's camera to `view` at once, without its eased move. */
+function applyView(model: ModelViewerElement, view: ModelView) {
+  model.cameraOrbit = view.orbit;
+  model.cameraTarget = view.target;
+  if (!ownFieldOfView.has(model)) ownFieldOfView.set(model, model.fieldOfView ?? "auto");
+  // Unzoomed, the element goes back to its own field of view, "auto" unless
+  // the page set one, so it keeps fitting the model to its box.
+  model.fieldOfView = view.fieldOfView ?? ownFieldOfView.get(model)!;
+  model.jumpCameraToGoal?.();
+}
+
+/**
+ * A picture of what a loaded model draws now, or null: a copy of the pixels
+ * it shows, made at once, so it holds the frame on screen as a close starts;
+ * else, without that canvas, the PNG of its `toDataURL`. WebGL takes no
+ * texture from another origin without CORS, so 4.0.0's canvases don't taint,
+ * and the guard on `toDataURL` is defensive; a copy of a tainted canvas would
+ * still draw, and only reading it back would fail.
+ */
+function snapshot(
+  model: ModelViewerElement,
+  ownerDocument: Document,
+): HTMLCanvasElement | HTMLImageElement | null {
+  if (!model.loaded) return null;
+  const source = shownCanvas(model);
+  if (source) {
+    // The renderer draws at the device's pixel ratio, lower while it throttles,
+    // when it shows its canvas larger than its pixels; its scene is the
+    // content box, whose size, fractions and all, its .container takes.
+    const ratio = model.ownerDocument.defaultView?.devicePixelRatio ?? 1;
+    const scale =
+      Math.abs(source.width / ratio - source.clientWidth) < 1
+        ? ratio
+        : source.width / (source.clientWidth || 1);
+    const content = source.closest<HTMLElement>(".container")?.style;
+    const copy = ownerDocument.createElement("canvas");
+    copy.width = Math.min(
+      source.width,
+      Math.ceil((Number.parseFloat(content?.width ?? "") || model.clientWidth) * scale),
+    );
+    copy.height = Math.min(
+      source.height,
+      Math.ceil((Number.parseFloat(content?.height ?? "") || model.clientHeight) * scale),
+    );
+    const context = copy.getContext("2d");
+    if (!context || !copy.width || !copy.height) return null;
+    context.drawImage(source, 0, 0, copy.width, copy.height, 0, 0, copy.width, copy.height);
+    return copy;
+  }
+  if (!model.toDataURL) return null;
+  try {
+    // PNG: the canvas is clear around the model, which JPEG loses.
+    const image = ownerDocument.createElement("img");
+    image.alt = "";
+    image.draggable = false;
+    image.decoding = "sync";
+    image.src = model.toDataURL();
+    return image;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether `model` shows `src`. */
+function showsSrc(model: Element, src: string) {
+  const own = model.getAttribute("src");
+  if (!own) return false;
+  try {
+    return new URL(own, model.baseURI).href === new URL(src, model.baseURI).href;
+  } catch {
+    return own === src;
+  }
 }
 
 const modelStyles = `
@@ -82,8 +315,6 @@ const modelStyles = `
   width: 100%;
   height: 100%;
   touch-action: none;
-  background: transparent;
-  --poster-color: transparent;
 }
 :where([data-fluidbox-model]:not([data-fluidbox-model-ready]) > model-viewer) {
   opacity: 0;
@@ -91,33 +322,48 @@ const modelStyles = `
 :where([data-fluidbox-model][data-fluidbox-model-ready] > [data-fluidbox-media-poster]) {
   visibility: hidden;
 }
-/* A closing flight carries the poster home, as a photo, and leaves the live model behind. */
-:where([data-fluidbox-flight] [data-fluidbox-model]) > [data-fluidbox-media-poster] {
+/* A close carries the poster, or a snapshot of the model's view, home as a photo, and leaves the live model behind:
+   in a flight, or in the slide's own frame, where a box holding the element closes. */
+:where([data-fluidbox-flight], [data-fluidbox-status="closing"])
+  :where([data-fluidbox-model])
+  > [data-fluidbox-media-poster] {
   visibility: visible;
 }
-:where([data-fluidbox-flight] [data-fluidbox-model]) > model-viewer {
+:where([data-fluidbox-flight], [data-fluidbox-status="closing"])
+  :where([data-fluidbox-model])
+  > model-viewer {
+  visibility: hidden;
+}
+/* A snapshot shows the view whole, with no poster through its clear background. */
+:where([data-fluidbox-model]:has(> [data-fluidbox-media-poster="snapshot"]))
+  > [data-fluidbox-media-poster]:not([data-fluidbox-media-poster="snapshot"]) {
   visibility: hidden;
 }
 `;
 
 /**
- * Make a renderer for `modelItem` models. The slide shows the thumbnail, then
- * the poster, through the opening flight. Each time the slide comes on show
- * it makes a `<model-viewer>`, loading the element the first time, and shows
- * the model once it has loaded. When the slide leaves the show the element
- * goes and the poster returns: `<model-viewer>` draws nothing, or a clipped
- * frame, once it has left the page and come back, as a closed viewer's slides
- * do. The model owns its input: a drag on it turns it, a pinch zooms it, and
- * the arrow keys turn it while it has focus, rather than moving the viewer.
+ * Make the slide for model items. The slide shows the thumbnail, then the
+ * poster. Each time the slide comes on show it makes a `<model-viewer>`,
+ * loading the element the first time, and shows the model once it has loaded;
+ * an opening waits for its first frame. When the slide leaves the show the
+ * element goes and the poster returns: `<model-viewer>` draws nothing, or a
+ * clipped frame, once it has left the page and come back, as a closed
+ * viewer's slides do. The model owns its input: a drag on it turns it, a pinch
+ * zooms it, and the arrow keys turn it while it has focus, rather than moving
+ * the viewer.
+ *
+ * A trigger can hold a live `<model-viewer>` of the item as its picture. The
+ * opening then starts on its view: the flight shows a snapshot of it until the
+ * slide's model has drawn with the trigger's camera (orbit, target and zoom).
+ * A close turns the live model it lands on to the slide's view, and flies a
+ * snapshot of that view.
  */
-export function createModelRenderer(
-  options: FluidboxModelRendererOptions = {},
-): FluidboxSlideRenderer<FluidboxItem> {
+export function createModelSlide(
+  options: FluidboxModelSlideOptions = {},
+): FluidboxSlideRenderer<FluidboxModelItem> {
   let loading: Promise<unknown> | undefined;
-  return ({ item, target, signal, active, onActiveChange }) => {
-    if (!isModelItem(item)) {
-      throw new TypeError(`The model renderer draws modelItem models: ${item.id}`);
-    }
+  return (slide) => {
+    const { item, media: target, signal, onActiveChange, waitUntil } = slide;
     const ownerDocument = target.ownerDocument;
     addStyles(ownerDocument, "model", posterStyles + modelStyles);
     const box = ownerDocument.createElement("div");
@@ -125,10 +371,26 @@ export function createModelRenderer(
     box.dataset.fluidboxModel = "";
     paintPoster(box, item.thumbnail, item.poster, signal);
     target.append(box);
+    // A picture of a live model's view, over the posters: the trigger's as an
+    // opening flies, before the slide's own model has drawn; the slide's as a
+    // close carries it home.
+    const paintSnapshot = (picture: HTMLCanvasElement | HTMLImageElement | null) => {
+      if (!picture) return;
+      picture.setAttribute("aria-hidden", "true");
+      picture.dataset.fluidboxMediaPoster = "snapshot";
+      box.querySelector('[data-fluidbox-media-poster="snapshot"]')?.remove();
+      box.insertBefore(picture, model?.parentNode === box ? model : null);
+    };
+    // The trigger's live model showing this item, whose view an opening starts from.
+    const card = () => {
+      const origin = slide.origin?.model as ModelViewerElement | undefined;
+      return origin && showsSrc(origin, item.src) ? origin : undefined;
+    };
     let model: ModelViewerElement | undefined;
-    let onShow = active;
-    const show = async () => {
-      if (model) return;
+    let shown: Promise<void> | undefined;
+    // Each show counts, so one the slide has left stops making its element.
+    let shows = 0;
+    const show = async (run: number, synced: boolean) => {
       const registry = ownerDocument.defaultView?.customElements;
       if (!registry) return;
       if (options.load && !registry.get("model-viewer")) {
@@ -140,7 +402,7 @@ export function createModelRenderer(
         await loading;
       }
       await registry.whenDefined("model-viewer");
-      if (signal.aborted || model || !onShow) return;
+      if (signal.aborted || run !== shows) return;
       const element = ownerDocument.createElement("model-viewer") as ModelViewerElement;
       model = element;
       // Content that owns its input: the viewer neither swipes, dismisses,
@@ -155,14 +417,32 @@ export function createModelRenderer(
       for (const [name, value] of Object.entries(item.attributes ?? {})) {
         model.setAttribute(name, value);
       }
-      model.addEventListener(
-        "load",
-        () => {
-          if (model === element) box.dataset.fluidboxModelReady = "";
-        },
-        { once: true, signal },
-      );
-      model.addEventListener(
+      // An opening from a live model starts on its view: the first frame
+      // draws with the trigger's camera.
+      const sync = () => {
+        const view = synced && card() && readView(card()!);
+        if (view) applyView(element, view);
+      };
+      sync();
+      // Its first frame: the load event, then a frame painted with it.
+      const loaded = new Promise<void>((resolve, reject) => {
+        element.addEventListener(
+          "load",
+          () => {
+            if (model !== element) return resolve();
+            // The trigger may have turned while the model loaded.
+            sync();
+            box.dataset.fluidboxModelReady = "";
+            ownerDocument.defaultView!.requestAnimationFrame(() => resolve());
+          },
+          { once: true, signal },
+        );
+        element.addEventListener("error", () => reject(new Error(`${item.src} didn't load`)), {
+          once: true,
+          signal,
+        });
+      });
+      element.addEventListener(
         "error",
         () => {
           if (model === element) box.dataset.fluidboxModelError = "";
@@ -171,21 +451,50 @@ export function createModelRenderer(
       );
       model.setAttribute("src", item.src);
       box.append(model);
+      await loaded;
     };
-    const start = () => void show().catch(() => (box.dataset.fluidboxModelError = ""));
+    const start = () => {
+      if (shown) return shown;
+      const run = ++shows;
+      const synced = slide.opening;
+      // Until the model draws, the opening flies on the trigger's view.
+      if (synced && card()) paintSnapshot(snapshot(card()!, ownerDocument));
+      return (shown = show(run, synced).catch(() => {
+        if (run !== shows) return;
+        // A failed load of the element tries again when the slide next comes on show.
+        if (!model) shown = undefined;
+        box.dataset.fluidboxModelError = "";
+      }));
+    };
     const hide = () => {
+      shows += 1;
+      shown = undefined;
       model?.pause?.();
       model?.remove();
       model = undefined;
+      // A snapshot is of one view; the slide's next show starts from its own.
+      box.querySelector('[data-fluidbox-media-poster="snapshot"]')?.remove();
       delete box.dataset.fluidboxModelReady;
       delete box.dataset.fluidboxModelError;
     };
-    // Neighbouring slides keep their posters: a model loads once its slide is on show.
-    if (active) start();
+    // A close carries the model's view home, and turns the live model it
+    // lands on, if it shows this item, to that view.
+    slide.onClose((landing) => {
+      if (!model) return;
+      paintSnapshot(snapshot(model, ownerDocument));
+      const view = readView(model);
+      const home = landing?.model as ModelViewerElement | undefined;
+      if (view && home && showsSrc(home, item.src)) applyView(home, view);
+    });
+    // The model being opened, or opened again, starts now and holds the flight
+    // for its first frame; neighbouring slides keep their posters until they
+    // come on show.
+    if (slide.opening) waitUntil(start());
+    else if (slide.active) void start();
     return onActiveChange((now) => {
-      onShow = now;
-      if (now) start();
-      else hide();
+      if (!now) hide();
+      else if (slide.opening) waitUntil(start());
+      else void start();
     });
   };
 }

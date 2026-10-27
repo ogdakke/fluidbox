@@ -1,5 +1,8 @@
 import { controlSelector, drawViewerLayer } from "./viewer-layer";
-import { idOf } from "./items";
+import { idOf, itemLabel } from "./items";
+import type { FluidboxOptions } from "./public-api";
+import { FluidboxMediaErrorEvent, FluidboxZoomEvent } from "./viewer-events";
+import { reachEnd } from "./reach-end-event";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
 import { originMatchesItem, originShowsItem } from "./origin-match";
@@ -32,6 +35,7 @@ import type {
   FluidboxOrigin,
   FluidboxViewerLayer,
   FluidboxSlideRenderer,
+  FluidboxSlides,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
   FluidboxZoomOptions,
@@ -40,6 +44,7 @@ import type { FluidboxZoom, ZoomReason } from "./fluidbox-zoom";
 import type {
   ViewerSessionCloseContext,
   ViewerSessionDriver,
+  ViewerGestures,
   ViewerSessionMotionContext,
 } from "./runtime-types";
 import {
@@ -51,12 +56,19 @@ import {
 } from "./viewer-portal";
 import type { FluidboxLabels } from "./labels";
 import { ViewerStrip } from "./viewer-strip";
+import { ViewerSlideshow } from "./viewer-slideshow";
+import type * as ViewerActions from "./viewer-actions";
+import { canGoFullscreen, crossOrigin, downloadName, fileOf } from "./item-file";
 import { activeViewer } from "./viewer-ownership";
 import { mapRadii, mixInsets, type ImageClip } from "./transition-geometry";
-import { originPose, originPicture } from "./origin-pose";
+import { fillContent, originPose, originPicture } from "./origin-pose";
 import type { ThumbnailOverlayRuntime } from "./thumbnail-overlay-runtime";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 
+/** The controls whose actions load on demand. */
+const ACTION_CONTROLS = "[data-fluidbox-fullscreen],[data-fluidbox-download],[data-fluidbox-share]";
+/** The longest an open waits for its slide to be ready, as the instant open waits for its image. */
+const SLIDE_READY_CAP = 3000;
 const OPEN_DURATION = 300;
 const TOUCH_DISMISS_DISTANCE = 60;
 const OPENING_SPRING_RESPONSE = 210;
@@ -66,6 +78,8 @@ const WHEEL_HANDOFF_QUIET_GAP = 120;
 const WHEEL_HANDOFF_ACCELERATION = 1.25;
 const WHEEL_HANDOFF_MIN_DELTA = 4;
 const WHEEL_HANDOFF_TIMEOUT = 1200;
+/** Content that owns its input: a hotspot, a live model. */
+const OWNS_INPUT = "[data-fluidbox-owns-input]";
 /** Content whose keys are its own: widgets that move with arrow keys, and content that owns its input. */
 const KEY_OWNERS =
   "[data-fluidbox-owns-input], [role=radiogroup], [role=slider], [role=tablist], [role=listbox], [role=menu], [role=menubar], [role=grid], [role=treegrid], [role=tree], [role=toolbar], [role=combobox], [role=spinbutton]";
@@ -127,6 +141,24 @@ function finitePose(pose: PaintedPose) {
   ].every(Number.isFinite);
 }
 
+/** A wheel gesture in `"navigate"` mode ends after this long without wheel input. */
+const NAVIGATE_WHEEL_GAP = 150;
+
+/** How far a drag that may not close moves the media: a short way, slowing as it goes. */
+const rubberBand = (distance: number) =>
+  Math.sign(distance) * 48 * (1 - Math.exp(-Math.abs(distance) / 160));
+
+/** The trigger's live `<model-viewer>`, which a model slide syncs its camera with. */
+function originModel(origin: FluidboxOrigin | null | undefined) {
+  const visual = origin?.visual;
+  if (!visual) return null;
+  const model =
+    visual.localName === "model-viewer"
+      ? visual
+      : visual.querySelector<HTMLElement>("model-viewer");
+  return model?.isConnected ? model : null;
+}
+
 /** Plain DOM image driver. It has no dependency on custom elements or a framework. */
 /** Zoom options with their defaults, or undefined when zoom is off. */
 function zoomConfig(
@@ -138,7 +170,7 @@ function zoomConfig(
   if (!Number.isFinite(max) || max <= 1 || !Number.isFinite(step) || step <= 1 || step > max) {
     throw new RangeError("Fluidbox zoom step must be greater than 1 and no greater than max.");
   }
-  return { max, step };
+  return { max, step, click: options?.click ?? "single", tap: options?.tap ?? "double" };
 }
 
 export class DomViewerDriver<
@@ -149,7 +181,7 @@ export class DomViewerDriver<
   /** Loaded with the first overlay, so a viewer without overlays never loads it. */
   #thumbnailOverlays: ThumbnailOverlayRuntime<TItem> | undefined;
   #overlaysLoad: Promise<unknown> | undefined;
-  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
+  readonly #slides: FluidboxSlides<TItem>;
   readonly #viewerOwner = {
     closeImmediately: () => {
       const controller = this.#controller;
@@ -166,6 +198,8 @@ export class DomViewerDriver<
   #loop = false;
   #portalDispose: FluidboxDispose | undefined;
   #source: FluidboxSource<TItem> | undefined;
+  /** Whether `reachend` fired for this item count. */
+  #reachedEnd = false;
   #extensions: FluidboxExtensionInstance<TItem>[] = [];
   /** Aborted when the mounted extensions are replaced. */
   #extensionLifetime: AbortController | undefined;
@@ -197,6 +231,8 @@ export class DomViewerDriver<
   #closeRetargetFrame = 0;
   #closeRetargetSettleFrame = 0;
   #suppressClick = false;
+  /** Whether the last press began on content that owns its input. */
+  #pressOwned = false;
   #suppressClickTimer: ReturnType<typeof setTimeout> | undefined;
   #wheelHandoff:
     | {
@@ -233,18 +269,39 @@ export class DomViewerDriver<
   #operation = 0;
 
   readonly #labels: FluidboxLabels;
+  #gestures: ViewerGestures = {
+    dismiss: { drag: true, backdrop: true },
+    wheel: "dismiss",
+  };
+  /** When the last wheel event of a `"navigate"` gesture came. */
+  #lastNavigateWheel = -Infinity;
+  /** Fullscreen, download and share, once a press or a control for one has loaded them. */
+  #actions: typeof ViewerActions | undefined;
+  /** A cross-origin download's fetch, which a move or a close aborts. */
+  #fileFetch: AbortController | undefined;
+  #copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  readonly #slideshow: ViewerSlideshow;
 
   constructor(
     ownerDocument: Document,
     zoomOptions: false | FluidboxZoomOptions | undefined,
-    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>> | undefined,
+    slides: FluidboxSlides<TItem> | undefined,
     labels: FluidboxLabels,
   ) {
     this.#labels = labels;
     this.#portal = createViewerPortal(ownerDocument, labels.viewer);
     this.#isolation = new ViewerModalIsolation(this.#portal.overlay);
-    this.#renderers = renderers ?? {};
+    this.#slides = slides ?? {};
     this.#portal.dialog.dataset.fluidboxHeadless = "";
+    this.#slideshow = new ViewerSlideshow({
+      controller: () => this.#controller,
+      loops: () => this.#loop,
+      ready: (index, cap, signal) => this.#strip?.ready(index, cap, signal),
+      slide: () => this.#strip?.current?.element,
+      dialog: this.#portal.dialog,
+      status: this.#portal.status,
+    });
+    this.onUserInteraction((event) => this.#slideshow.interaction(event));
     this.#portal.container.addEventListener(
       "click",
       (event) => {
@@ -253,11 +310,23 @@ export class DomViewerDriver<
           clearTimeout(this.#suppressClickTimer);
           return;
         }
+        // A press that began on a hotspot or a model and let go beside it is
+        // theirs: its click lands on what holds both, and neither zooms nor closes.
+        if (
+          (event as MouseEvent).detail &&
+          this.#pressOwned &&
+          !(event.target as Element).closest(OWNS_INPUT)
+        ) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         if (event instanceof MouseEvent && this.#zoom?.handleClick(event)) {
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
         }
+        if (!this.#gestures.dismiss.backdrop) return;
         if (
           event.target === this.#portal.dialog ||
           event.target === this.#portal.backdrop ||
@@ -271,6 +340,19 @@ export class DomViewerDriver<
       },
       { signal: this.#lifetime.signal },
     );
+    this.#portal.container.addEventListener(
+      "pointerdown",
+      ({ target }) => (this.#pressOwned = !!(target as Element).closest(OWNS_INPUT)),
+      { capture: true, passive: true, signal: this.#lifetime.signal },
+    );
+    // Ahead of every other listener, the zoom's included: each input a person makes.
+    for (const type of ["pointerdown", "touchstart", "wheel"] as const) {
+      this.#portal.container.addEventListener(type, (event) => this.#userInteraction(event), {
+        capture: true,
+        passive: true,
+        signal: this.#lifetime.signal,
+      });
+    }
     for (const [type, listener, passive] of [
       ["pointerdown", this.#onPointerDown, true],
       ["pointermove", this.#onPointerMove, false],
@@ -280,6 +362,11 @@ export class DomViewerDriver<
     ] as const) {
       this.#portal.container.addEventListener(type, listener as EventListener, {
         passive,
+        signal: this.#lifetime.signal,
+      });
+    }
+    for (const type of ["fullscreenchange", "webkitfullscreenchange"]) {
+      ownerDocument.addEventListener(type, this.#onFullscreenChange, {
         signal: this.#lifetime.signal,
       });
     }
@@ -312,9 +399,108 @@ export class DomViewerDriver<
     });
     this.#zoomOptions = zoomConfig(zoomOptions);
     this.#portal.dialog.toggleAttribute("data-zoomable", !!this.#zoomOptions);
+    this.#markZoomClick();
   }
 
-  /** Change the zoom options. Turning zoom off zooms the photo back out. */
+  /** What may close the viewer, and what a vertical wheel does, with their defaults. */
+  setGestures({ dismiss, wheel }: Pick<FluidboxOptions, "dismiss" | "wheel">) {
+    this.#gestures = {
+      dismiss: { drag: dismiss?.drag ?? true, backdrop: dismiss?.backdrop ?? true },
+      wheel: wheel ?? "dismiss",
+    };
+  }
+
+  /** The document's fullscreen element, by the WebKit name too, as older iPad Safari has it. */
+  #fullscreenElement() {
+    const ownerDocument = this.#portal.overlay.ownerDocument as Document & {
+      webkitFullscreenElement?: Element | null;
+    };
+    return ownerDocument.fullscreenElement ?? ownerDocument.webkitFullscreenElement ?? null;
+  }
+
+  #isFullscreen() {
+    return this.#fullscreenElement() === this.#portal.overlay;
+  }
+
+  #loadActions() {
+    return import("./viewer-actions").then((actions) => (this.#actions = actions));
+  }
+
+  /** Load the actions once the viewer holds a control for one, so its press finds them ready. */
+  #preloadActions() {
+    if (!this.#actions && this.#portal.dialog.querySelector(ACTION_CONTROLS)) {
+      void this.#loadActions();
+    }
+  }
+
+  /**
+   * Make the viewer fill the screen, or stop. Resolves whether the viewer is as
+   * asked. Loaded, the actions run in the press itself, as fullscreen needs.
+   */
+  async setFullscreen(on: boolean): Promise<boolean> {
+    if (on === this.#isFullscreen()) return true;
+    const actions = this.#actions ?? (await this.#loadActions());
+    if (!on) {
+      await actions.exitFullscreen(this.#portal.overlay);
+      return !this.#isFullscreen();
+    }
+    return (
+      canGoFullscreen() &&
+      this.#controller?.state.status === "open" &&
+      actions.enterFullscreen(this.#portal.overlay)
+    );
+  }
+
+  #onFullscreenChange = () => {
+    const on = this.#isFullscreen();
+    if (!on) this.#actions?.raiseAgain(this.#portal.overlay);
+    this.#portal.overlay.toggleAttribute("data-fullscreen", on);
+    this.#controller?.changed?.();
+  };
+
+  /** The controls marked `name` in the viewer, default or your own. */
+  #controlsNamed(name: string) {
+    return this.#portal.dialog.querySelectorAll<HTMLElement>(`[data-fluidbox-${name}]`);
+  }
+
+  /** Load the slide on show again if it failed. False when it hadn't. */
+  retry() {
+    return this.#strip?.retry() ?? false;
+  }
+
+  /** Save the item's file; a move or a close stops a fetch under way. */
+  async download(item: TItem) {
+    this.#fileFetch?.abort();
+    const fetching = (this.#fileFetch = new AbortController());
+    const file = fileOf(item);
+    if (!file) return false;
+    const href = new URL(file.src, location.href).href;
+    const { saveFile } = this.#actions ?? (await this.#loadActions());
+    if (fetching.signal.aborted) return false;
+    const { ownerDocument } = this.#portal.overlay;
+    const name = downloadName(item, file);
+    return saveFile(ownerDocument, href, name, crossOrigin(href), fetching.signal, (busy) => {
+      for (const control of this.#controlsNamed("download")) {
+        if (busy) control.setAttribute("aria-busy", "true");
+        else control.removeAttribute("aria-busy");
+      }
+    });
+  }
+
+  /** Share a link to the item, or copy it and say so. */
+  async share(item: TItem, url: string) {
+    const { shareLink } = this.#actions ?? (await this.#loadActions());
+    return shareLink(itemLabel(item), url, () => {
+      this.#announce(this.#labels.linkCopied);
+      const controls = this.#controlsNamed("share");
+      for (const control of controls) control.toggleAttribute("data-copied", true);
+      clearTimeout(this.#copiedTimer);
+      this.#copiedTimer = setTimeout(() => {
+        for (const control of controls) control.removeAttribute("data-copied");
+      }, 2000);
+    });
+  }
+
   /** Go round the gallery, or stop at its ends. */
   setLoop(loop: boolean) {
     if (loop === this.#loop) return;
@@ -324,14 +510,27 @@ export class DomViewerDriver<
 
   setZoom(options: false | FluidboxZoomOptions | undefined) {
     const next = zoomConfig(options);
-    if (next?.max === this.#zoomOptions?.max && next?.step === this.#zoomOptions?.step) return;
+    const current = this.#zoomOptions;
+    if (
+      next?.max === current?.max &&
+      next?.step === current?.step &&
+      next?.click === current?.click &&
+      next?.tap === current?.tap
+    )
+      return;
     this.#zoomOptions = next;
     this.#portal.dialog.toggleAttribute("data-zoomable", !!next);
+    this.#markZoomClick();
     if (next) return;
     this.#zoom?.reset("api");
     this.#zoom?.destroy();
     this.#zoom = undefined;
     this.#zoomLoad = undefined;
+  }
+
+  /** Say on the viewer what a click on the media does, for the cursor. */
+  #markZoomClick() {
+    this.#portal.overlay.dataset.fluidboxZoomClick = this.#zoomOptions?.click || "off";
   }
 
   /** Show the labels again after they changed in place. */
@@ -349,13 +548,14 @@ export class DomViewerDriver<
 
   /** Draw the portal layer again, as after its controls or content changed. */
   setPortal(layer: FluidboxViewerLayer | undefined) {
+    this.#slideshow.options = layer?.slideshow;
     this.#portalDispose?.();
     this.#portalDispose = layer
       ? drawViewerLayer(layer, this.#portal.portalTarget, this.#lifetime.signal)
       : undefined;
   }
 
-  /** Replace the extensions, as when the filmstrip or the sheet is turned on, off or changed. */
+  /** Replace the extensions, as when the thumbnails or the sheet is turned on, off or changed. */
   setExtensions(extensions: readonly (FluidboxExtension<TItem> | undefined)[]) {
     this.#extensionLifetime?.abort();
     for (const extension of this.#extensions) extension.destroy();
@@ -375,6 +575,7 @@ export class DomViewerDriver<
           controller,
           source: this.#source,
           labels: this.#labels,
+          gestures: this.#gestures,
           signal,
         }),
       );
@@ -394,7 +595,12 @@ export class DomViewerDriver<
       return (this.#zoom = new FluidboxZoom(this.#portal.container, {
         prepare: () => this.#prepareZoom(),
         // Read on every gesture, so a change of options applies to the next one.
-        config: () => this.#zoomOptions ?? { max: 1, step: 1 },
+        config: () => {
+          const options = this.#zoomOptions ?? { max: 1, step: 1, click: false, tap: false };
+          // A box of your own can zoom further, or less far, than the rest.
+          const max = this.#strip?.zoomable()?.max;
+          return max ? { ...options, max } : options;
+        },
         get label() {
           return labels.zoomed;
         },
@@ -416,16 +622,82 @@ export class DomViewerDriver<
         settled: (scale, reason) => {
           // The slide's image gets sharper as the zoom shows more of its pixels.
           if (this.#strip?.shows(this.#strip.index)) this.#strip.sharpen(scale);
-          this.#controller?.zoomed?.(scale, reason);
+          this.#controller?.zoomed?.(scale, reason, FluidboxZoomEvent);
           // The open viewer says how far it is zoomed, through its live status.
           if (this.#controller?.state.status === "open") {
             this.#announce(labels.zoomLevel(scale));
           }
         },
         reducedMotion: () => this.#prefersReducedMotion(),
+        duration: (ms) => this.#duration(ms),
+        watched: () => this.#strip?.watchesZoom() ?? false,
+        pose: (image, pose) => this.#strip?.zoomPose(image, pose),
+        interact: () => this.#userInteraction(),
+        wheelZooms: () => this.#gestures.wheel === "zoom",
       }));
     });
     return this.#zoomLoad;
+  }
+
+  /**
+   * Every duration and spring response the viewer plays, in milliseconds, as
+   * its motion plays it. One place, so a motion speed changes them all.
+   */
+  #duration(ms: number, speed = this.#motionSpeed()) {
+    return ms / speed;
+  }
+
+  /** `--fluidbox-motion-speed` on the viewer: 2 plays every motion twice as fast. */
+  #motionSpeed() {
+    const speed = Number.parseFloat(
+      getComputedStyle(this.#portal.dialog).getPropertyValue("--fluidbox-motion-speed"),
+    );
+    return Number.isFinite(speed) ? Math.min(4, Math.max(0.25, speed)) : 1;
+  }
+
+  /** Listeners for a person's input to the open viewer. */
+  readonly #interactions = new Set<(event?: Event) => void>();
+
+  /**
+   * Follow every gesture, key and zoom a person makes in the viewer, with the
+   * event behind it when there is one. Returns a function that stops.
+   */
+  onUserInteraction(listener: (event?: Event) => void) {
+    this.#interactions.add(listener);
+    return () => void this.#interactions.delete(listener);
+  }
+
+  /** A person's input: a pointer, a touch, a wheel, a key or a zoom. Every one passes here. */
+  #userInteraction(event?: Event) {
+    for (const listener of this.#interactions) listener(event);
+  }
+
+  /** Whether the viewer is the document's fullscreen element. */
+  get fullscreen() {
+    return this.#isFullscreen();
+  }
+
+  /** Whether the slideshow plays, held or not. */
+  get playing() {
+    return this.#slideshow.playing;
+  }
+
+  /** Start the slideshow on the open viewer. */
+  play() {
+    this.#slideshow.play();
+  }
+
+  pause() {
+    this.#slideshow.pause();
+  }
+
+  /**
+   * Whether the box of the item at `index` zooms, with its own largest scale if
+   * it has one: null when it doesn't, undefined when the strip isn't on it.
+   */
+  zoomable(index: number): { readonly max?: number } | null | undefined {
+    // Until the strip is on the item, the item's type answers, as an image zooms.
+    return this.#strip?.index === index ? this.#strip.zoomable() : undefined;
   }
 
   /**
@@ -448,6 +720,8 @@ export class DomViewerDriver<
       readonly reason?: ZoomReason;
     },
   ): Promise<boolean> {
+    // A zoom pauses the slideshow, whether a control, a key or your code asked.
+    this.#slideshow.pause();
     // Its scale is the goal from now, before the zoom has loaded and started to move.
     const command = { scale };
     this.#zoomCommand = command;
@@ -474,6 +748,8 @@ export class DomViewerDriver<
   }
 
   setSource(source: FluidboxSource<TItem>) {
+    // A new count re-arms reachend.
+    if (source.count !== this.#source?.count) this.#reachedEnd = false;
     this.#source = source;
     for (const extension of this.#extensions) extension.setSource?.(source);
     this.#discardPreparation();
@@ -496,12 +772,34 @@ export class DomViewerDriver<
         const controller = this.#controller;
         return controller?.state.status !== "open" || controller.allows({ index }, "pointer");
       },
-      this.#renderers,
+      this.#slides as Readonly<Record<string, FluidboxSlideRenderer<any> | undefined>>,
       this.#labels,
       this.#loop,
     );
+    // A box the zoom holds goes back before its slide unloads, as new items can do.
+    this.#strip.onUnload = (media) => {
+      if (this.#zoom?.target !== media) return;
+      this.#zoom.suspend();
+      this.#zoom.release();
+    };
+    this.#strip.onZoomableChange = () => this.#controller?.zoomableChanged?.();
+    this.#strip.onMediaError = (index, kind, cause) => {
+      const item = this.#source!.getItem(index);
+      this.#controller?.mediaError?.(
+        new FluidboxMediaErrorEvent("mediaerror", { value: idOf(item), index, item, kind, cause }),
+      );
+    };
     this.#portal.frame.replaceWith(this.#strip.element);
     this.#portal.dialog.toggleAttribute("data-gallery", source.count > 1);
+  }
+
+  /** Fire `reachend` once per item count, when an open or a move settles near the end. */
+  reachEnd() {
+    if (this.#controller && !this.#reachedEnd && !this.#loop) {
+      // Set first: a handler that changes the count re-arms it as it dispatches.
+      this.#reachedEnd = true;
+      if (!reachEnd(this.#controller)) this.#reachedEnd = false;
+    }
   }
 
   revealed() {
@@ -547,6 +845,13 @@ export class DomViewerDriver<
       return () => {};
     }
     this.#stage(context.origin?.trigger ?? null);
+    // The slide mounts knowing an open may wait for it, and what it opens from.
+    this.#strip?.setOpening(context.index);
+    this.#strip?.setOriginMedia(
+      context.index,
+      this.#originVideo(context),
+      originModel(context.origin),
+    );
     void this.#strip?.select(context.index, false);
     this.#strip?.prepareOpening(context.index, this.#matchingThumbnail(context));
     this.#render(context.item, context.index, false);
@@ -573,6 +878,7 @@ export class DomViewerDriver<
 
   async open(context: ViewerSessionMotionContext<TItem>) {
     const operation = ++this.#operation;
+    this.#preloadActions();
     // Every wait below can end with the open called off: by a close, a destroy,
     // new items or the caller's signal. It then stops before touching the page.
     const abandoned = () => {
@@ -608,6 +914,12 @@ export class DomViewerDriver<
         : undefined;
     if (!prepared) this.#discardPreparation();
     else this.#preparedOpen = undefined;
+    this.#strip?.setOpening(context.index);
+    this.#strip?.setOriginMedia(
+      context.index,
+      this.#originVideo(context),
+      originModel(context.origin),
+    );
     const focused = this.#portal.overlay.ownerDocument.activeElement;
     this.#stage(context.origin?.trigger ?? (focused instanceof HTMLElement ? focused : null));
     if (!prepared) {
@@ -643,7 +955,7 @@ export class DomViewerDriver<
     if (context.instant) {
       // Hidden until the image can paint, so it replaces the server's copy in one frame.
       this.#keepThumbnailVisible(undefined);
-      await this.#mediaReady();
+      await Promise.all([this.#mediaReady(), this.#slideReady(context)]);
       if (abandoned()) return;
       this.#clearMotionStyles();
       this.#thumbnailOverlays?.prepare(context.item, context.index, this.#frame, "open", 0);
@@ -656,6 +968,11 @@ export class DomViewerDriver<
     }
     if (!prepared) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (abandoned()) return;
+    // The card keeps its picture while the slide gets ready, so the flight
+    // doesn't land on an empty box.
+    await this.#slideReady(context);
+    if (abandoned()) return;
+    this.#strip?.setOpening(context.index, true);
     if (this.#prefersReducedMotion()) {
       this.#keepThumbnailVisible(undefined);
       for (const animation of prepared?.animations ?? []) animation.cancel();
@@ -731,6 +1048,7 @@ export class DomViewerDriver<
   }
 
   async select(context: ViewerSessionMotionContext<TItem>) {
+    this.#fileFetch?.abort();
     this.#preparedFlight = undefined;
     this.#cancelAnimations(true);
     this.#zoom?.suspend();
@@ -750,12 +1068,13 @@ export class DomViewerDriver<
     if (!selected) {
       const smooth =
         !this.#prefersReducedMotion() && context.reason !== "source-update" && !context.scrub;
-      await this.#strip?.select(context.index, smooth, context.step);
+      await this.#strip?.select(context.index, smooth && this.#motionSpeed(), context.step);
       if (context.signal.aborted || this.#destroyed) return;
     }
     // The item left behind scrolled away zoomed; coming back, it shows at fit.
     this.#zoom?.release();
     this.#render(context.item, context.index, true);
+    this.#slideshow.moved(context.item);
     // The overlay is invisible while open. Moving it between slide frames
     // during native scrolling can invalidate the browser's painted snap.
     // A scrub is a direct preview. The full-size image swaps immediately
@@ -763,7 +1082,14 @@ export class DomViewerDriver<
   }
 
   async close(context: ViewerSessionCloseContext) {
-    ++this.#operation;
+    const operation = ++this.#operation;
+    const immediate = this.#forceImmediateClose;
+    this.#fileFetch?.abort();
+    // A close planned while the viewer covers the screen would fly to stale geometry.
+    if (this.#isFullscreen()) {
+      await this.setFullscreen(false);
+      if (context.signal.aborted || this.#destroyed || operation !== this.#operation) return;
+    }
     const settling = this.#extensions
       .map((extension) => extension.beforeClose?.())
       .filter((result): result is Promise<void> => result instanceof Promise);
@@ -780,7 +1106,12 @@ export class DomViewerDriver<
       this.#returnFocus = context.origin.trigger;
       this.#returnFocusFallback = focusableHostFor(context.origin.trigger);
     }
+    // A move still under way ends on its slide, which the close then leaves from.
+    this.#strip?.land();
+    // Every close, flown or not, tells the slide on show where it lands.
+    this.#strip?.closing(this.#originVideo(context), originModel(context.origin));
     if (
+      immediate ||
       this.#forceImmediateClose ||
       this.#prefersReducedMotion() ||
       // An open called off before the viewer showed has nothing painted to fly
@@ -796,11 +1127,13 @@ export class DomViewerDriver<
       this.#finishClose();
       return;
     }
-    const from = visibleOrigin(context.origin?.visual);
-    const closing = this.#strip?.activeItem;
+    // A renderer's box with nothing in it has no picture to fly: it fades in place.
+    const from = this.#strip?.empty ? null : visibleOrigin(context.origin?.visual);
+    const closing = this.#strip?.shownItem;
     const crossfade = !!from && !!closing && !originMatchesItem(context.origin, closing);
     const picture = this.#originPicture(from, context.origin, crossfade);
-    if (picture instanceof HTMLVideoElement) this.#handBackVideo(picture);
+    const video = this.#originVideo(context);
+    if (video) this.#handBackVideo(video);
     this.#keepThumbnailVisible(crossfade ? context.origin?.thumbnail : undefined);
     const start = interruptedPose ?? {
       ...readImageTransitionPose(this.#frame, this.#media),
@@ -820,10 +1153,14 @@ export class DomViewerDriver<
     let frame = this.#frame;
     let media = this.#media;
     // Moving an iframe or video into the body-level flight would reload it or
-    // reset playback, so embedded media close inside their own frame instead,
-    // as does custom content that holds them, such as a playing YouTube embed.
+    // reset playback, and a custom element such as <model-viewer> can lose what
+    // it drew, so embedded media close inside their own frame instead, as does
+    // custom content that holds them, such as a playing YouTube embed.
     const playable = "iframe, video, audio";
-    const embedded = media.matches(playable) || !!media.querySelector(playable);
+    const embedded =
+      media.matches(playable) ||
+      !!media.querySelector(playable) ||
+      [media, ...media.querySelectorAll("*")].some((element) => element.localName.includes("-"));
     if (from && originTarget && !embedded) {
       const source = media;
       const prepared =
@@ -861,6 +1198,8 @@ export class DomViewerDriver<
     } else {
       this.#preparedFlight = undefined;
     }
+    // Read once for the close, and the retargets that replan it.
+    const speed = this.#motionSpeed();
     const closeMotion = (to: ImageTransitionPose, width: number, height: number) =>
       createImageTransitionMotion({
         opening: false,
@@ -869,8 +1208,8 @@ export class DomViewerDriver<
         width,
         height,
         backdropFrom: Number(start.backdropOpacity),
-        duration,
-        response: duration * 0.9,
+        duration: this.#duration(duration, speed),
+        response: this.#duration(duration * 0.9, speed),
         samples: 60,
         fadeFrame: !originTarget,
         crossfade,
@@ -937,6 +1276,11 @@ export class DomViewerDriver<
     this.#dragGesture.cancel();
     this.#preparedFlight = undefined;
     this.#endWheelHandoff();
+    this.#fileFetch?.abort();
+    clearTimeout(this.#copiedTimer);
+    this.#slideshow.destroy();
+    if (this.#isFullscreen()) void this.setFullscreen(false);
+    this.#actions?.raiseAgain(this.#portal.overlay);
     this.#zoom?.destroy();
     this.#mediaObserver?.disconnect();
     this.#mediaObserver = undefined;
@@ -951,6 +1295,22 @@ export class DomViewerDriver<
     this.#strip?.destroy();
     this.#strip = undefined;
     this.#finishClose();
+  }
+
+  /**
+   * Wait until the opened slide is ready, for at most three seconds, with the
+   * keys of a wait. The open's signal ends it: a close, a newer open, new
+   * items or a destroy.
+   */
+  #slideReady(context: { readonly index: number; readonly signal: AbortSignal }) {
+    const ready = this.#strip?.ready(context.index, SLIDE_READY_CAP);
+    if (!ready) return Promise.resolve();
+    const { signal } = context;
+    const called = new Promise<void>((resolve) => {
+      if (signal.aborted) resolve();
+      signal.addEventListener("abort", () => resolve(), { once: true });
+    });
+    return this.#whileWaiting(Promise.race([ready, called]), signal);
   }
 
   /** Wait until the active image has decoded and the strip shows it, for at most three seconds. */
@@ -1026,12 +1386,12 @@ export class DomViewerDriver<
   }
 
   get #media() {
-    return this.#strip?.current?.image ?? this.#portal.media;
+    return this.#strip?.current?.media ?? this.#portal.media;
   }
 
   /** Name the dialog for an item, and announce it: by `name`, by its own name, or not. */
   #render(item: TItem, index: number, announce: string | boolean) {
-    const label = item.type === "img" ? item.alt : item.title;
+    const label = item.type === "image" ? item.alt : item.title;
     this.#portal.dialog.setAttribute("aria-label", label || this.#labels.viewer);
     const count = this.#controller?.state.count ?? 1;
     if (announce !== false && count > 1) {
@@ -1105,15 +1465,32 @@ export class DomViewerDriver<
     return thumbnail && originShowsItem(thumbnail, context.item) ? thumbnail : undefined;
   }
 
-  /** The card's own video picks up where the player is, so it lands on the same frame. */
+  /**
+   * The card's own video picks up where the closing slide's player is, so it
+   * lands on the same frame: the built-in video's, or what a custom slide
+   * registered with `returnPlayback`.
+   */
   #handBackVideo(origin: HTMLVideoElement) {
-    const player = this.#media;
-    if (!(player instanceof HTMLVideoElement) || player.readyState < HTMLMediaElement.HAVE_METADATA)
-      return;
-    if (Math.abs(origin.currentTime - player.currentTime) > 0.01) {
-      origin.currentTime = player.currentTime;
+    const playback = this.#strip?.returnedPlayback();
+    if (!playback) return;
+    if (Math.abs(origin.currentTime - playback.currentTime) > 0.01) {
+      origin.currentTime = playback.currentTime;
     }
-    if (!player.paused && !player.ended) void origin.play().catch(() => undefined);
+    if (!playback.paused) void origin.play().catch(() => undefined);
+  }
+
+  /**
+   * The trigger's video: what an opening slide gets as `origin`, and what a
+   * close hands the playback back to. Whether the flight crossfades doesn't
+   * matter, as a custom player's item never matches the clip the trigger plays.
+   */
+  #originVideo(context: { origin?: FluidboxOrigin | null }) {
+    const picture = this.#originPicture(
+      visibleOrigin(context.origin?.visual),
+      context.origin,
+      false,
+    );
+    return picture instanceof HTMLVideoElement ? picture : null;
   }
 
   /** The element that paints the item in the origin, unless the flight crossfades over it. */
@@ -1137,8 +1514,13 @@ export class DomViewerDriver<
     interrupted?: PaintedPose,
     prepared?: PreparedOpen<TItem>,
   ) {
-    const origin = prepared?.origin ?? visibleOrigin(context.origin?.visual);
-    const crossfade = !!origin && !originMatchesItem(context.origin, context.item);
+    // A renderer's box with nothing in it opens as if without an origin.
+    const origin = this.#strip?.empty
+      ? null
+      : (prepared?.origin ?? visibleOrigin(context.origin?.visual));
+    const shown = this.#strip?.shows(context.index) ? this.#strip.shownItem : undefined;
+    const crossfade =
+      !!origin && !originMatchesItem(context.origin, (shown as TItem | undefined) ?? context.item);
     const picture = prepared
       ? prepared.picture
       : this.#originPicture(origin, context.origin, crossfade);
@@ -1192,6 +1574,7 @@ export class DomViewerDriver<
     const response = matchMedia("(hover: none) and (pointer: coarse)").matches
       ? TOUCH_OPENING_SPRING_RESPONSE
       : OPENING_SPRING_RESPONSE;
+    const speed = this.#motionSpeed();
     return createImageTransitionMotion({
       opening: true,
       from: start,
@@ -1199,8 +1582,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: Number(start.backdropOpacity),
-      duration: OPEN_DURATION,
-      response,
+      duration: this.#duration(OPEN_DURATION, speed),
+      response: this.#duration(response, speed),
       samples: 24,
       fadeFrame: !start.fromOrigin,
       crossfade,
@@ -1264,6 +1647,7 @@ export class DomViewerDriver<
     const prepared = this.#preparedOpen;
     if (!prepared) return;
     this.#preparedOpen = undefined;
+    this.#strip?.setOpening(undefined);
     for (const animation of prepared.animations) animation.cancel();
     this.#strip?.unmount();
     this.#clearMotionStyles();
@@ -1477,7 +1861,7 @@ export class DomViewerDriver<
       this.#extensions.some((extension) => extension.allowsZoom?.() === false) ||
       this.#flight ||
       !this.#strip ||
-      !(this.#media instanceof HTMLImageElement)
+      !this.#strip.zoomable()
     )
       return null;
     // A pinch can land mid-dismiss. Drop the drag whole, or the strip stays
@@ -1572,13 +1956,16 @@ export class DomViewerDriver<
     const view = this.#portal.overlay.ownerDocument.defaultView!;
     // The flight lives in document coordinates, so the pose is relative to its
     // origin wherever the page has scrolled to now.
+    const width = media.offsetWidth;
+    const height = media.offsetHeight;
     return originPose({
       origin,
       picture,
-      width: media.offsetWidth,
-      height: media.offsetHeight,
+      width,
+      height,
       left: this.#flightOrigin.x - view.scrollX,
       top: this.#flightOrigin.y - view.scrollY,
+      content: fillContent(media, width, height, picture ?? origin),
     });
   }
 
@@ -1897,6 +2284,7 @@ export class DomViewerDriver<
     const { state, inputDistance, inputSpeed, velocityX, velocityY } = release;
     const commit =
       !cancel &&
+      this.#gestures.dismiss.drag &&
       (inputDistance > TOUCH_DISMISS_DISTANCE ||
         (inputDistance > 30 &&
           inputSpeed > 0.6 &&
@@ -1912,6 +2300,7 @@ export class DomViewerDriver<
     const settleX = boundDismissVelocity(state.x, velocityX, "x");
     const settleY = boundDismissVelocity(state.y, velocityY, "y");
     const duration = Math.max(140, 220 - Math.min(80, Math.hypot(settleX, settleY) * 50));
+    const speed = this.#motionSpeed();
     const motion = createImageTransitionMotion({
       opening: true,
       from: current,
@@ -1919,8 +2308,8 @@ export class DomViewerDriver<
       width: this.#media.offsetWidth,
       height: this.#media.offsetHeight,
       backdropFrom: opacity,
-      duration,
-      response: duration * 0.8,
+      duration: this.#duration(duration, speed),
+      response: this.#duration(duration * 0.8, speed),
       samples: 24,
     });
     const animations = this.#fly(
@@ -1959,6 +2348,7 @@ export class DomViewerDriver<
   }
 
   #setState(state: "closed" | "opening" | "open" | "closing") {
+    if (state !== "opening") this.#strip?.setOpening(undefined);
     for (const target of [this.#portal.overlay, this.#portal.dialog]) {
       target.dataset.fluidboxStatus = state;
       target.toggleAttribute("data-open", state !== "closed");
@@ -1970,6 +2360,11 @@ export class DomViewerDriver<
       target.toggleAttribute("data-dismissing", state === "closing" || this.#dragGesture.active);
     }
     if (state === "closed") this.#endReveal();
+    this.#slideshow.statusChanged(state);
+    // Once open, the actions load out of the flight's way, so a press on a
+    // button of the app's own that calls setFullscreen, download or share
+    // finds them ready, and keeps its user activation.
+    if (state === "open" && !this.#actions) void this.#loadActions();
   }
 
   /**
@@ -1999,6 +2394,7 @@ export class DomViewerDriver<
     ) {
       return;
     }
+    this.#userInteraction(event);
     if (event.key === "Escape") {
       const owner = target?.closest(ESCAPE_OWNERS);
       if (owner && dialog.contains(owner) && owner !== dialog) return;
@@ -2057,6 +2453,7 @@ export class DomViewerDriver<
 
   #onDialogChange = () => {
     this.#describe();
+    this.#preloadActions();
     const { dialog } = this.#portal;
     const last = this.#lastFocus;
     const active = dialog.ownerDocument.activeElement;
@@ -2162,7 +2559,9 @@ export class DomViewerDriver<
       return;
     }
     this.#beginDrag();
-    this.#dragGesture.moveTouch(x, y);
+    // A drag that may not close follows the finger a little way, and springs back.
+    if (this.#gestures.dismiss.drag) this.#dragGesture.moveTouch(x, y);
+    else this.#dragGesture.moveTouch(rubberBand(x), rubberBand(y));
   };
 
   #onPointerEnd = (event: PointerEvent) => {
@@ -2209,6 +2608,22 @@ export class DomViewerDriver<
       }
     }
     event.preventDefault();
+    const mode = this.#gestures.wheel;
+    // "zoom" is the zoom's, which takes the wheel before this does; "none" keeps the page still.
+    if (mode === "zoom" || mode === "none") return;
+    if (mode === "navigate") {
+      // One gesture, one move: trackpad inertia keeps the gesture going.
+      const now = performance.now();
+      const fresh = now - this.#lastNavigateWheel > NAVIGATE_WHEEL_GAP;
+      this.#lastNavigateWheel = now;
+      if (fresh && this.#controller?.state.status === "open") {
+        const options = { reason: "wheel" as const };
+        void (event.deltaY > 0
+          ? this.#controller.next(options)
+          : this.#controller.previous(options));
+      }
+      return;
+    }
     const direction = Math.sign(-event.deltaY);
     this.#beginDrag(direction);
     this.#dragGesture.moveWheel(event.deltaY * unit);

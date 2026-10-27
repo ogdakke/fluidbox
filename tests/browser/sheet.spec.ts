@@ -10,13 +10,13 @@ test.describe("sheet on a phone", () => {
   }) => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
-    await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
       "data-fluidbox-status",
       "open",
     );
     await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
 
-    const trigger = page.locator(".x-phone [data-fluidbox-sheet-stop]");
+    const trigger = page.locator(".x-phone [data-fluidbox-sheet-snap]");
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
     await trigger.click();
     await expect(dialog(page)).toHaveAttribute("data-sheet", "1");
@@ -33,7 +33,7 @@ test.describe("sheet on a phone", () => {
               .getBoundingClientRect();
             return Math.round(
               media.bottom -
-                document.querySelector("[data-fluidbox-overlay] .x-sheet")!.getBoundingClientRect()
+                document.querySelector("[data-fluidbox-viewer] .x-sheet")!.getBoundingClientRect()
                   .top,
             );
           }),
@@ -42,7 +42,7 @@ test.describe("sheet on a phone", () => {
 
     await page.keyboard.press("Escape");
     await expect(dialog(page)).toHaveAttribute("data-sheet", "0");
-    await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
       "data-fluidbox-status",
       "open",
     );
@@ -50,7 +50,7 @@ test.describe("sheet on a phone", () => {
     await trigger.click();
     await expect(dialog(page)).toHaveAttribute("data-sheet", "1");
     await page.locator("[data-fluidbox-close]").click();
-    await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
   });
 
   test("the top stop is reachable however few the replies", async ({ page }) => {
@@ -67,7 +67,7 @@ test.describe("sheet on a phone", () => {
       .poll(() =>
         page.evaluate(() =>
           Math.round(
-            document.querySelector("[data-fluidbox-overlay] .x-sheet")!.getBoundingClientRect().top,
+            document.querySelector("[data-fluidbox-viewer] .x-sheet")!.getBoundingClientRect().top,
           ),
         ),
       )
@@ -91,13 +91,13 @@ test.describe("sheet on a phone", () => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
     await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
-    const sheet = page.locator("[data-fluidbox-overlay] [data-fluidbox-sheet]");
+    const sheet = page.locator("[data-fluidbox-viewer] [data-fluidbox-sheet]");
     await expect(sheet).toHaveAttribute("inert");
     // A screen reader that moves into a sheet still on its way loses its place,
     // as React Aria's sheet notes, so focus and inert wait for the scroll end.
     const moving = await page.evaluate(() => {
-      document.querySelector<HTMLElement>(".x-phone [data-fluidbox-sheet-stop]")!.click();
-      const sheet = document.querySelector("[data-fluidbox-overlay] [data-fluidbox-sheet]")!;
+      document.querySelector<HTMLElement>(".x-phone [data-fluidbox-sheet-snap]")!.click();
+      const sheet = document.querySelector("[data-fluidbox-viewer] [data-fluidbox-sheet]")!;
       return {
         inert: sheet.hasAttribute("inert"),
         focused: sheet.contains(document.activeElement),
@@ -125,7 +125,7 @@ test.describe("sheet on a phone", () => {
       await expect(thumbnail).toHaveCount(1);
       await expect(thumbnail).toHaveCSS("visibility", visibility);
       await page.keyboard.press("Escape");
-      await expect(page.locator("[data-fluidbox-overlay]")).toHaveCount(0);
+      await expect(page.locator("[data-fluidbox-viewer]")).toHaveCount(0);
       await expect(trigger.locator("img")).toHaveCSS("visibility", "visible");
     }
   });
@@ -148,7 +148,7 @@ test.describe("sheet on a phone", () => {
       Object.assign(window, { stopMomentum: () => clearInterval(momentum) });
     });
     // The flick scrolls the photo off.
-    const overlay = page.locator("[data-fluidbox-overlay]");
+    const overlay = page.locator("[data-fluidbox-viewer]");
     await expect(async () => {
       for (let event = 0; event < 8; event++) await page.mouse.wheel(0, -300);
       expect(await overlay.evaluate((node) => getComputedStyle(node).opacity)).toBe("0");
@@ -169,12 +169,12 @@ test.describe("sheet on a wide screen", () => {
   test("the X viewer keeps its sidebar and hides the sheet", async ({ page }) => {
     await page.goto("/social.html");
     await page.locator(".x-grid button").first().click();
-    await expect(page.locator("[data-fluidbox-overlay]")).toHaveAttribute(
+    await expect(page.locator("[data-fluidbox-viewer]")).toHaveAttribute(
       "data-fluidbox-status",
       "open",
     );
     await expect(page.locator(".x-aside")).toBeVisible();
-    await expect(page.locator("[data-fluidbox-overlay] .x-sheet")).toBeHidden();
+    await expect(page.locator("[data-fluidbox-viewer] .x-sheet")).toBeHidden();
   });
 });
 

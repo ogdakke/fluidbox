@@ -4,7 +4,7 @@ export function overlay(root: HTMLElement) {
   const preview = cover.querySelector<HTMLImageElement>("img")!;
   // Before the close flight lands, show the item it lands on.
   cover.addEventListener("fluidbox-preview-change", ({ detail: { item } }) => {
-    if (item.type !== "img") return;
+    if (item.type !== "image") return;
     preview.src = item.src;
     preview.alt = item.alt;
   });

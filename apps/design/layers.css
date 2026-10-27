@@ -1,0 +1,6 @@
+/* The cascade layers, in order: load this before any other stylesheet. The
+   design system's focus ring sits under baseline.css's layer, so the viewer's
+   controls keep the baseline's ring, as they did when the package was
+   unlayered. The rest of the design system, like the package's functional
+   CSS, is unlayered and competes by specificity. */
+@layer fb-base, fluidbox-baseline;

@@ -3,7 +3,7 @@ import { createItemList, idOf, toList, toSource } from "../src/items";
 import type { FluidboxImageItem } from "../src/public-api";
 
 const photo = (index: number): FluidboxImageItem => ({
-  type: "img",
+  type: "image",
   id: `photo-${index}`,
   src: `/photos/${index}.jpg`,
   alt: `Photo ${index + 1}`,
@@ -50,6 +50,28 @@ describe("createItemList", () => {
     expect(item).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the items it made in a list withCount makes", () => {
+    const item = vi.fn(photo);
+    const index = vi.fn((id: string) => Number(id.slice(6)));
+    const list = createItemList({ count: 5, item, index });
+    const third = list.get(2);
+    const longer = list.withCount(20);
+    expect(longer.count).toBe(20);
+    expect(list.count).toBe(5);
+    expect(longer.get(2)).toBe(third);
+    expect(longer.indexOf("photo-2")).toBe(2);
+    expect(index).not.toHaveBeenCalled();
+    expect(longer.indexOf("photo-12")).toBe(12);
+    expect(longer.get(12)).toBe(longer.withCount(30).get(12));
+    expect(item).toHaveBeenCalledTimes(2);
+    // A shorter list keeps the items, but not the ones past its end.
+    const shorter = longer.withCount(3);
+    expect(shorter.get(2)).toBe(third);
+    expect(shorter.indexOf("photo-12")).toBe(-1);
+    expect(() => shorter.get(12)).toThrow(RangeError);
+    expect(() => list.withCount(-1)).toThrow(RangeError);
+  });
+
   it("finds an item it already made without asking", () => {
     const index = vi.fn(() => -1);
     const list = createItemList({ count: 5, item: photo, index });
@@ -68,7 +90,7 @@ describe("createItemList", () => {
 
 describe("an array of items", () => {
   const media = (src: string, id?: string): FluidboxImageItem => ({
-    type: "img",
+    type: "image",
     ...(id === undefined ? {} : { id }),
     src,
     alt: src,
@@ -114,5 +136,55 @@ describe("an array of items", () => {
   it("still throws for a duplicate id of an item's own", () => {
     expect(() => toList([media("/a.jpg", "x"), media("/b.jpg", "x")])).toThrow(TypeError);
     expect(() => toList([media("/a.jpg", "")])).toThrow(TypeError);
+  });
+});
+
+describe("an item's size", () => {
+  const map = (fields: object) => ({ type: "map", id: "map", title: "Map", ...fields }) as never;
+
+  it("is required, so the box has a shape, unless the item fills the stage", () => {
+    expect(() => toList([map({})])).toThrow(
+      'Fluidbox item map needs a positive width and height, or fit: "fill".',
+    );
+    expect(() => toList([map({ width: 4, height: 0 })])).toThrow(TypeError);
+    expect(toList([map({ fit: "fill" })]).count).toBe(1);
+    expect(toList([map({ fit: "fill", width: 4, height: 3 })]).count).toBe(1);
+  });
+
+  it("is checked as a lazy list makes each item", () => {
+    const list = createItemList({ count: 2, item: (at) => (at ? map({}) : photo(0)) });
+    expect(list.get(0).id).toBe("photo-0");
+    expect(() => list.get(1)).toThrow(TypeError);
+  });
+
+  it("is always required of an image, which ignores fit", () => {
+    const { width: _width, height: _height, ...unsized } = photo(0);
+    expect(() => toList([{ ...unsized, fit: "fill" } as never])).toThrow(TypeError);
+  });
+});
+
+describe("an item's data", () => {
+  const tagged = (data: Record<string, unknown>) => ({ ...photo(0), data }) as never;
+
+  it("takes lower-case names with digits and single dashes", () => {
+    expect(toList([tagged({ tone: "light", "kind-2": "product", a1: "" })]).count).toBe(1);
+  });
+
+  it("throws a TypeError that names the item and the key for any other name", () => {
+    expect(() => toList([tagged({ Tone: "light" })])).toThrow(
+      /Fluidbox item photo-0 has data "Tone"/,
+    );
+    for (const name of ["2tone", "tone-", "to--ne", "to_ne", "-tone", "fluidbox-status", ""]) {
+      expect(() => toList([tagged({ [name]: "x" })]), name).toThrow(TypeError);
+    }
+  });
+
+  it("takes string values only", () => {
+    expect(() => toList([tagged({ tone: 1 })])).toThrow(TypeError);
+  });
+
+  it("is checked as a lazy list makes each item", () => {
+    const list = createItemList({ count: 1, item: () => tagged({ Bad: "x" }) });
+    expect(() => list.get(0)).toThrow(TypeError);
   });
 });

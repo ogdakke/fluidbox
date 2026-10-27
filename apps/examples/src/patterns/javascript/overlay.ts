@@ -19,15 +19,14 @@ export function mountOverlay(root: HTMLElement) {
   root.append(button);
 
   // The cover opens the first photo; every one of them closes back onto it.
-  fluidbox.bind(button, album[0]!, {
-    returns: album,
+  fluidbox.bind(button, album, {
     onPreviewChange(item) {
       preview.src = item.src;
       preview.alt = itemLabel(item);
     },
   });
   // The count flies with the photo.
-  fluidbox.bindOverlay(count, album[0]!, { returns: album, travel: true });
+  fluidbox.bindOverlay(count, album, { flight: "copy" });
 
   return () => {
     fluidbox.destroy();

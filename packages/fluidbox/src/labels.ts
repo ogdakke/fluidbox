@@ -5,7 +5,7 @@ export interface FluidboxLabels {
   readonly close: string;
   readonly previous: string;
   readonly next: string;
-  /** A slide's name, and a filmstrip thumbnail's when its item has no name. */
+  /** A slide's name, and a thumbnail's when its item has no name. */
   readonly position: (index: number, count: number) => string;
   /**
    * What the viewer announces as it moves to an item, with the item's alt text
@@ -18,9 +18,11 @@ export interface FluidboxLabels {
   readonly carousel: string;
   /** What each slide is, to a screen reader. */
   readonly slide: string;
-  readonly filmstrip: string;
-  /** The filmstrip's list of thumbnails. */
-  readonly filmstripList: string;
+  readonly thumbnails: string;
+  /** The thumbnails' list of thumbnails. */
+  readonly thumbnailsList: string;
+  /** The counter's text. It is hidden from screen readers, which hear `position`. */
+  readonly counter: (index: number, count: number) => string;
   /** The scroller of a zoomed image. */
   readonly zoomed: string;
   /** The zoom-in control. */
@@ -37,6 +39,24 @@ export interface FluidboxLabels {
   readonly error: string;
   /** The button that loads failed media again. */
   readonly retry: string;
+  /** The fullscreen control, while the viewer isn't fullscreen. */
+  readonly enterFullscreen: string;
+  /** The fullscreen control, while the viewer is fullscreen. */
+  readonly exitFullscreen: string;
+  readonly download: string;
+  readonly share: string;
+  /** Announced once Share copied the link. */
+  readonly linkCopied: string;
+  /**
+   * The slideshow control, while the slideshow is paused. Its default lives with the control.
+   * @default "Play slideshow"
+   */
+  readonly playSlideshow?: string;
+  /**
+   * The slideshow control, while the slideshow plays.
+   * @default "Pause slideshow"
+   */
+  readonly pauseSlideshow?: string;
 }
 
 /** The labels the viewer uses for any you don't pass. */
@@ -51,8 +71,9 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   slides: "Gallery items",
   carousel: "carousel",
   slide: "slide",
-  filmstrip: "Gallery filmstrip",
-  filmstripList: "Choose a gallery item",
+  thumbnails: "Gallery thumbnails",
+  thumbnailsList: "Choose a gallery item",
+  counter: (index: number, count: number) => `${index + 1} / ${count}`,
   zoomed: "Zoomed image",
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",
@@ -61,6 +82,11 @@ export const defaultLabels: FluidboxLabels = Object.freeze({
   sheet: "Details",
   error: "Unable to load media.",
   retry: "Retry",
+  enterFullscreen: "Enter full screen",
+  exitFullscreen: "Exit full screen",
+  download: "Download",
+  share: "Share",
+  linkCopied: "Link copied",
 });
 
 /** Your labels over the defaults. */

@@ -25,17 +25,11 @@ function followInUrl(photo: number | null) {
 
 export function url(root: HTMLElement) {
   const gallery = root.querySelector("fluidbox-gallery")!;
-  // The gallery opens on its open and index attributes as they change.
+  // The gallery opens, moves and closes as its value changes.
   const show = (photo: number | null) => {
-    if (photo !== null) gallery.setAttribute("index", String(photo));
-    gallery.toggleAttribute("open", photo !== null);
+    gallery.value = photo === null ? null : photos[photo]!.id;
   };
-  gallery.addEventListener("toggle", ({ newState }) => {
-    if (newState !== "closed") return;
-    followInUrl(null);
-    show(null);
-  });
-  gallery.addEventListener("itemchange", ({ index }) => {
+  gallery.addEventListener("valuechange", ({ index }) => {
     followInUrl(index);
     show(index);
   });

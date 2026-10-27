@@ -1,16 +1,18 @@
-import { CONTROL_ICON_ATTRIBUTES, CONTROL_ICON_PATHS } from "./control-icons";
 import { defaultLabels, type FluidboxLabels } from "./labels";
-import type { FluidboxItem } from "./public-api";
+import { idOf, indexIn, toList } from "./items";
+import { dataAttributes } from "./item-data";
+import type { FluidboxItem, FluidboxItems } from "./public-api";
 
 /** What the server needs to draw the open viewer. */
 export interface FluidboxStaticViewerOptions<TItem extends FluidboxItem = FluidboxItem> {
-  readonly items: readonly TItem[];
-  /** The item on show. */
-  readonly index: number;
+  /** An array, or a lazy list that finds an id with `indexOf`. */
+  readonly items: FluidboxItems<TItem>;
+  /** The item on show, by id. */
+  readonly value: string;
   readonly labels?: FluidboxLabels;
   readonly loop?: boolean;
-  /** Leave room for the filmstrip, which appears once the viewer takes over. */
-  readonly filmstrip?: boolean;
+  /** Leave room for the thumbnails, which appears once the viewer takes over. */
+  readonly thumbnails?: boolean;
   /** Leave room for a sheet's peek, as the viewer does once it takes over. */
   readonly sheet?: boolean;
   /** Draw Previous, Next and Close. Off when you draw your own viewer, as the viewer does. */
@@ -19,20 +21,20 @@ export interface FluidboxStaticViewerOptions<TItem extends FluidboxItem = Fluidb
   readonly dir?: "ltr" | "rtl";
   /**
    * The address each control leads to before JavaScript runs: `null` for
-   * Close, an index for Previous and Next. A control without one is drawn but
-   * inert until the viewer takes over.
+   * Close, the previous or next item's id for Previous and Next. A control
+   * without one is drawn but inert until the viewer takes over.
    */
-  readonly href?: (index: number | null) => string | undefined;
+  readonly href?: (value: string | null) => string | undefined;
 }
 
 /**
- * An element of the server's copy, by HTML attribute names. A boolean
- * attribute that is on has the value `""`.
+ * An element of the server's copy, by HTML attribute names, or a text. A
+ * boolean attribute that is on has the value `""`.
  */
 export interface FluidboxStaticNode {
   readonly tag: string;
   readonly attributes: Readonly<Record<string, string>>;
-  readonly children: readonly FluidboxStaticNode[];
+  readonly children: readonly (FluidboxStaticNode | string)[];
 }
 
 type Attributes = Record<string, string | number | boolean | undefined>;
@@ -40,7 +42,7 @@ type Attributes = Record<string, string | number | boolean | undefined>;
 const node = (
   tag: string,
   values: Attributes,
-  ...children: (FluidboxStaticNode | null)[]
+  ...children: (FluidboxStaticNode | string | null)[]
 ): FluidboxStaticNode => {
   const attributes: Record<string, string> = {};
   for (const [name, value] of Object.entries(values)) {
@@ -49,13 +51,6 @@ const node = (
   }
   return { tag, attributes, children: children.filter((child) => child !== null) };
 };
-
-const icon = (name: keyof typeof CONTROL_ICON_PATHS) =>
-  node(
-    "svg",
-    { ...CONTROL_ICON_ATTRIBUTES, "data-fluidbox-icon": "" },
-    node("path", { d: CONTROL_ICON_PATHS[name] }),
-  );
 
 /**
  * The image's `width` and `height` in its own ratio, scaled past any screen.
@@ -77,19 +72,21 @@ const staticSize = (width: number, height: number) => {
  * items have one; for any other item this returns `null`.
  */
 export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
-  items,
-  index,
+  items: given,
+  value,
   labels = defaultLabels,
   loop = false,
-  filmstrip = false,
+  thumbnails = false,
   sheet = false,
   controls: showControls = true,
   dir,
   href,
 }: FluidboxStaticViewerOptions<TItem>): FluidboxStaticNode | null {
-  const item = items[index];
-  if (!item || item.type !== "img") return null;
-  const count = items.length;
+  const items = toList(given);
+  const index = indexIn(items, value);
+  const item = index === null ? undefined : items.get(index);
+  if (index === null || !item || item.type !== "image") return null;
+  const count = items.count;
   const position = labels.position(index, count);
 
   const placeholder = item.placeholder
@@ -131,14 +128,20 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   // to go to, and otherwise drawn but inert, so it never offers what it can't do.
   const control = (name: "previous" | "next" | "close", target: number | null) => {
     const label = labels[name];
-    const link = target === null && name !== "close" ? undefined : href?.(target);
-    const common = { [`data-fluidbox-${name}`]: "", "aria-label": label };
+    const link =
+      target === null
+        ? name === "close"
+          ? href?.(null)
+          : undefined
+        : href?.(idOf(items.get(target)));
+    // Its label as text, as the viewer draws it.
+    const common = { [`data-fluidbox-${name}`]: "", "data-fluidbox-default": "" };
     return link
-      ? node("a", { ...common, href: link }, icon(name))
+      ? node("a", { ...common, href: link }, label)
       : node(
           "button",
           { ...common, type: "button", disabled: name !== "close" && target === null, inert: true },
-          icon(name),
+          label,
         );
   };
   const step = (by: number) => {
@@ -150,16 +153,16 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   const controls = showControls
     ? [control("previous", step(-1)), control("next", step(1)), control("close", null)]
     : [];
-  // An empty stand-in that keeps the filmstrip's room. Its orientation is what
+  // An empty stand-in that keeps the thumbnails' room. Its orientation is what
   // the stylesheet keys the room on; it is hidden, having nothing to offer yet.
-  const strip = filmstrip
+  const strip = thumbnails
     ? node(
         "div",
-        { "data-fluidbox-filmstrip-dock": "", "data-fluidbox-chrome": "", "aria-hidden": "true" },
+        { "data-fluidbox-thumbnails-dock": "", "data-fluidbox-chrome": "", "aria-hidden": "true" },
         node(
           "div",
-          { "data-fluidbox-filmstrip": "" },
-          node("div", { "data-fluidbox-filmstrip-scroll": "", "aria-orientation": "horizontal" }),
+          { "data-fluidbox-thumbnails": "" },
+          node("div", { "data-fluidbox-thumbnails-scroll": "", "aria-orientation": "horizontal" }),
         ),
       )
     : null;
@@ -168,7 +171,7 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
   // takes over, so the copy is a labelled region of the page.
   return node(
     "div",
-    { "data-fluidbox-overlay": "", "data-fluidbox-static": "", dir },
+    { "data-fluidbox-viewer": "", "data-fluidbox-static": "", dir },
     node("div", { "data-fluidbox-backdrop": "" }),
     node(
       "div",
@@ -195,6 +198,8 @@ export function fluidboxStaticViewerNodes<TItem extends FluidboxItem>({
               role: "group",
               "aria-label": position,
               "aria-hidden": "false",
+              "data-active": "",
+              ...dataAttributes(item.data),
             },
             node(
               "div",
@@ -217,7 +222,9 @@ const escape = (value: string) =>
 
 const VOID = new Set(["img", "source"]);
 
-const html = ({ tag, attributes, children }: FluidboxStaticNode): string => {
+const html = (each: FluidboxStaticNode | string): string => {
+  if (typeof each === "string") return escape(each);
+  const { tag, attributes, children } = each;
   const open = `<${tag}${Object.entries(attributes)
     .map(([name, value]) => (value === "" ? ` ${name}` : ` ${name}="${escape(value)}"`))
     .join("")}>`;

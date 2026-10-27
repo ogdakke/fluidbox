@@ -17,13 +17,14 @@ The framework bindings are in the same package. React, Vue, Solid and Angular ar
 
 ## Import the styles
 
-The viewer's layout and default look are in one stylesheet. Import it once, in a client entry, before your own CSS:
+`styles.css` holds what the viewer needs to work: its layers, layout and motion. `baseline.css` is an opt-in look: control positions and glyphs, focus rings, fades and the error message. Import them once, in a client entry, before your own CSS:
 
 ```ts
 import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/baseline.css"; // optional: the default look
 ```
 
-The filmstrip and sheet add-ons have their own stylesheets, `@ogdakke/fluidbox/filmstrip.css` and `@ogdakke/fluidbox/sheet.css`. Import each only if you use that add-on.
+Without `baseline.css`, the controls are plain buttons that show their labels as text, ready for your own styles. The thumbnails and sheet add-ons have their own stylesheets, `@ogdakke/fluidbox/thumbnails.css` and `@ogdakke/fluidbox/sheet.css`; `baseline.css` covers their look too. Import each only if you use that add-on. [Styling](./styling.md) has the details.
 
 ## Describe your items
 
@@ -34,7 +35,7 @@ import type { FluidboxItem } from "@ogdakke/fluidbox";
 
 export const photos: FluidboxItem[] = [
   {
-    type: "img",
+    type: "image",
     src: "/photos/aurora.jpg",
     alt: "Aurora over the tundra",
     width: 2200,
@@ -52,7 +53,7 @@ One viewer for the whole list, and a trigger for each thumbnail. Pick your frame
 
 <!-- pattern: basic -->
 
-The examples import `photos` from a local `./data` module, described in [the example data](./patterns/index.md#the-example-data). They import `itemLabel` from `@ogdakke/fluidbox`, which returns an item's `alt` or `title`. Every API shows the default Previous, Next and Close buttons until you give the viewer content of your own. After that, the `controls` option, the `Controls` part or `<fluidbox-controls>` keeps them.
+The examples import `photos` from a local `./data` module, described in [the example data](./patterns/index.md#the-example-data). They import `itemLabel` from `@ogdakke/fluidbox`, which returns an item's `alt` or `title`. The viewer shows the default Previous, Next and Close buttons until you give it content of your own. Then the `Toolbar` part (`[fluidboxToolbar]` in Angular, `<fluidbox-toolbar>` for the custom elements) or the `controls` option puts them back. The package ships no icons: each control shows its label as text, and holds your content when you give it some.
 
 ## Framework setup
 
@@ -61,11 +62,11 @@ The examples import `photos` from a local `./data` module, described in [the exa
 | React            | `@ogdakke/fluidbox/react`    | `react` and `react-dom` 18 or later |
 | Vue              | `@ogdakke/fluidbox/vue`      | `vue` 3.3 or later                  |
 | Solid            | `@ogdakke/fluidbox/solid`    | `solid-js` 1.8 or later             |
-| Angular          | `@ogdakke/fluidbox/angular`  | `@angular/core` 17 or later         |
+| Angular          | `@ogdakke/fluidbox/angular`  | `@angular/core` 17.3 or later       |
 | Custom elements  | `@ogdakke/fluidbox/elements` | none                                |
 | Plain JavaScript | `@ogdakke/fluidbox`          | none                                |
 
-Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, and `Filmstrip` and `Sheet` turn those add-ons on by being there. `useFluidbox()` (`injectFluidbox()` in Angular) reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md). [Next.js](./nextjs.md) covers the React binding with server components and `next/image`.
+Every binding has the same parts with the same names: `Root` holds the items and owns the viewer, `Trigger` opens an item, `Viewer` renders into the viewer's layer, `Slides` draws item types of your own, and `Thumbnails` and `Sheet` turn those add-ons on by being there. `useFluidbox()` (`injectFluidbox()` in Angular) reads the state and returns the commands. Each framework page shows them in its own idiom: [React](./react.md), [Vue](./vue.md), [Solid](./solid.md), [Angular](./angular.md). [Next.js](./nextjs.md) covers the React binding with server components and `next/image`.
 
 - **Custom elements.** `<fluidbox-gallery>` with `<fluidbox-item>` children. See [Custom elements](./custom-elements.md).
 - **Plain JavaScript.** `createFluidbox()`, and `fluidbox.bind()` for each trigger. See [JavaScript](./javascript.md).
@@ -74,13 +75,13 @@ Every binding has the same parts with the same names: `Root` holds the items and
 
 The page loads the triggers, the items and the viewer's state. The viewer itself, with its gestures, transitions and slides, is a chunk of its own. By default it loads when a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus, so it has usually arrived by the time the click does. An open loads it if it hasn't.
 
-The `loading` option picks the moment:
+The `preload` option picks the moment:
 
-| `loading`           | The viewer's code loads                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| `"hover"` (default) | When a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus. |
-| `"press"`           | When a trigger is pressed. Nothing loads for a pointer that only passes over.                |
-| `"eager"`           | Once the page is idle, whether or not anyone opens a viewer.                                 |
+| `preload`            | The viewer's code loads                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| `"intent"` (default) | When a mouse rests on a trigger for 100 ms, a finger or pen touches one, or one takes focus. |
+| `"press"`            | When a trigger is pressed. Nothing loads for a pointer that only passes over.                |
+| `"eager"`            | Once the page is idle, whether or not anyone opens a viewer.                                 |
 
 For a signal of your own, call `load()`. A route that's about to show the gallery, or a menu that leads to it, can start the download early:
 
@@ -88,20 +89,20 @@ For a signal of your own, call `load()`. A route that's about to show the galler
 menu.addEventListener("toggle", () => void fluidbox.load(), { once: true });
 ```
 
-`load()` resolves `true` once the code has loaded and `false` if it failed, as when offline. A failed load tries again on the next call or open. The bindings take `loading` on Root and put `load` next to the commands, and `<fluidbox-gallery>` has a `loading` attribute and a `load()` method.
+`load()` resolves `true` once the code has loaded and `false` if it failed, as when offline. A failed load tries again on the next call or open. The bindings take `preload` on Root and put `load` next to the commands, and `<fluidbox-gallery>` has a `preload` attribute and a `load()` method.
 
 ## Add-ons
 
-The filmstrip and the sheet are add-ons with their own entries, so their code loads only when you use them. Turn one on, with an option, a framework part or a `<fluidbox-filmstrip>` or `<fluidbox-sheet>` child, and the fluidbox loads its entry. An open waits for it. To bundle an entry up front, import it once in the browser bundle:
+The thumbnails and the sheet are add-ons with their own entries, so their code loads only when you use them. Turn one on, with an option, a framework part or a `<fluidbox-thumbnails>` or `<fluidbox-sheet>` child, and the fluidbox loads its entry. An open waits for it. To bundle an entry up front, import it once in the browser bundle:
 
 ```ts
-import "@ogdakke/fluidbox/filmstrip";
-import "@ogdakke/fluidbox/filmstrip.css";
+import "@ogdakke/fluidbox/thumbnails";
+import "@ogdakke/fluidbox/thumbnails.css";
 import "@ogdakke/fluidbox/sheet";
 import "@ogdakke/fluidbox/sheet.css";
 ```
 
-Each needs its stylesheet, `filmstrip.css` or `sheet.css`, whichever way you turn it on. See [Filmstrip and sheet](./filmstrip-and-sheet.md).
+Each needs its stylesheet, `thumbnails.css` or `sheet.css`, whichever way you turn it on. See [Thumbnails and sheet](./thumbnails-and-sheet.md).
 
 ## A link as the trigger
 
@@ -131,10 +132,10 @@ if (typeof customElements !== "undefined") await import("@ogdakke/fluidbox/eleme
 
 The viewer runs under a strict policy such as `default-src 'self'; style-src 'self'; script-src 'self'; require-trusted-types-for 'script'`. It builds its DOM node by node, never from HTML strings, so Trusted Types has nothing to refuse, and it sets styles through the CSSOM, which `style-src` allows. Serve the stylesheets as files, with `<link>`.
 
-A React `Root` that renders open draws the open viewer on the server, for the viewer to take over once it loads. That copy has no inline styles either: the stylesheet places it, and its image's `width` and `height` carry the photo's shape. Until the viewer takes over, the copy is a labelled region rather than a dialog, since nothing holds focus in it yet. Its controls are links where `href` gives them an address, and inert where it doesn't.
+A framework `Root` that renders open, with a `value` on the server, draws the open viewer on the server, for the viewer to take over once it loads. That copy has no inline styles either: the stylesheet places it, and its image's `width` and `height` carry the photo's shape. Until the viewer takes over, the copy is a labelled region rather than a dialog, since nothing holds focus in it yet. Its controls are links where `href` gives them an address, and inert where it doesn't.
 
 ## Next
 
-- The [patterns](./patterns/index.md) show nine common setups in every framework.
+- The [patterns](./patterns/index.md) show thirteen common setups in every framework.
 - [Items and origins](./items-and-origins.md) covers large or virtualized lists, and where the flight lands.
 - [Styling](./styling.md) shows how to theme the viewer and add your own controls.

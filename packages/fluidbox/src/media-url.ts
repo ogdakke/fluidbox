@@ -21,6 +21,9 @@ export function checkItemUrls(item: FluidboxItem): void {
   const urls: [string, unknown][] = [
     ["src", item.src],
     ["poster", (item as { poster?: unknown }).poster],
+    ...(item.type === "video" ? (item.sources ?? []) : []).map(
+      (source) => ["source src", source.src] as [string, unknown],
+    ),
     // A video's caption tracks load from where the video may.
     ...(item.type === "video" ? (item.tracks ?? []) : []).map(
       (track) => ["track src", track.src] as [string, unknown],
@@ -29,7 +32,13 @@ export function checkItemUrls(item: FluidboxItem): void {
   for (const [name, url] of urls) {
     if (typeof url === "string" && !isSafeMediaUrl(url, item.type)) {
       throw new TypeError(
-        `The ${name} of fluidbox ${item.type} item ${item.id ?? ""} is not http(s) or relative: ${url}`,
+        (() => {
+          try {
+            if (process.env.NODE_ENV !== "production")
+              return `The ${name} of fluidbox ${item.type} item ${item.id ?? ""} is not http(s) or relative: ${url}`;
+          } catch {}
+          return "fluidbox";
+        })(),
       );
     }
   }

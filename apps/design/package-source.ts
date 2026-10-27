@@ -17,15 +17,43 @@ export function packageSource(command: "build" | "serve"): Alias[] {
   return [
     { find: "@ogdakke/fluidbox/styles.css", replacement: core("styles.css") },
     { find: "@ogdakke/fluidbox/sheet.css", replacement: core("sheet.css") },
-    { find: "@ogdakke/fluidbox/filmstrip.css", replacement: core("filmstrip.css") },
-    { find: "@ogdakke/fluidbox/filmstrip", replacement: core("filmstrip-entry.ts") },
+    { find: "@ogdakke/fluidbox/thumbnails.css", replacement: core("thumbnails.css") },
+    { find: "@ogdakke/fluidbox/baseline.css", replacement: core("baseline.css") },
+    { find: "@ogdakke/fluidbox/thumbnails", replacement: core("thumbnails-entry.ts") },
     { find: "@ogdakke/fluidbox/sheet", replacement: core("sheet-entry.ts") },
     { find: "@ogdakke/fluidbox/kit", replacement: core("kit.ts") },
     { find: "@ogdakke/fluidbox/hover-zoom", replacement: core("hover-zoom.ts") },
-    { find: "@ogdakke/fluidbox/embeds", replacement: core("embeds.ts") },
+    { find: "@ogdakke/fluidbox/embed", replacement: core("embed.ts") },
     { find: "@ogdakke/fluidbox/model", replacement: core("model.ts") },
     { find: "@ogdakke/fluidbox/spin", replacement: core("spin.ts") },
+    // The elements' add-on entries, before the elements they sit under.
+    ...["embed", "model", "spin"].map((name) => ({
+      find: `@ogdakke/fluidbox/elements/${name}`,
+      replacement: core(`elements-${name}.ts`),
+    })),
     { find: "@ogdakke/fluidbox/elements", replacement: core("elements.ts") },
+    // The React add-on parts, before the binding they sit under.
+    ...["embed", "model", "spin"].map((name) => ({
+      find: `@ogdakke/fluidbox/react/${name}`,
+      replacement: resolve(packages, "react/src", `${name}.ts`),
+    })),
+    // The Solid add-on parts, likewise.
+    ...["embed", "model", "spin"].map((name) => ({
+      find: `@ogdakke/fluidbox/solid/${name}`,
+      replacement: resolve(packages, "solid/src", `${name}.ts`),
+    })),
+    // The Vue add-on parts, before the binding they sit under.
+    ...["embed", "model", "spin"].map((name) => ({
+      find: `@ogdakke/fluidbox/vue/${name}`,
+      replacement: resolve(packages, "vue/src", `${name}.ts`),
+    })),
+    // Angular's signal inputs, models and outputs need its AOT compiler, so the
+    // Angular binding is served from its partial build, which the page's
+    // @angular/compiler links. `bun run build` makes it.
+    ...["embed", "model", "spin", "index"].map((name) => ({
+      find: name === "index" ? "@ogdakke/fluidbox/angular" : `@ogdakke/fluidbox/angular/${name}`,
+      replacement: resolve(packages, "angular/dist", `${name}.js`),
+    })),
     ...bindings.map((name) => ({
       find: `@ogdakke/fluidbox/${name}`,
       replacement: resolve(packages, name, "src/index.ts"),

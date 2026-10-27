@@ -1,6 +1,18 @@
 <!-- #region example -->
 <fluidbox-gallery class="pattern-grid">
-  <fluidbox-item item-id="photo-aurora">
+  <!-- Your own controls and caption replace the default ones. -->
+  <template slot="viewer">
+    <div class="pattern-caption">
+      <button type="button" data-fluidbox-previous data-test="prev">Previous</button>
+      <span>
+        <strong data-fluidbox-text="alt" data-test="title"></strong>
+        <small data-test="counter"><fluidbox-counter></fluidbox-counter></small>
+      </span>
+      <button type="button" data-fluidbox-next data-test="next">Next</button>
+      <button type="button" data-fluidbox-close data-test="close">Close</button>
+    </div>
+  </template>
+  <fluidbox-item value="photo-aurora">
     <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
       <img src="/art/aurora.svg" alt="Aurora over the tundra" />
     </button>
@@ -8,7 +20,7 @@
       <img src="/art/aurora.svg" alt="Aurora over the tundra" width="1100" height="1650" />
     </template>
   </fluidbox-item>
-  <fluidbox-item item-id="photo-ridge">
+  <fluidbox-item value="photo-ridge">
     <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
       <img src="/art/ridge.svg" alt="Night ridge" />
     </button>
@@ -16,7 +28,7 @@
       <img src="/art/ridge.svg" alt="Night ridge" width="1200" height="1500" />
     </template>
   </fluidbox-item>
-  <fluidbox-item item-id="photo-fjord">
+  <fluidbox-item value="photo-fjord">
     <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
       <img src="/art/fjord.svg" alt="Fjord in the blue hour" />
     </button>
@@ -24,7 +36,7 @@
       <img src="/art/fjord.svg" alt="Fjord in the blue hour" width="1200" height="1600" />
     </template>
   </fluidbox-item>
-  <fluidbox-item item-id="photo-lagoon">
+  <fluidbox-item value="photo-lagoon">
     <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
       <img src="/art/lagoon.svg" alt="Lagoon after sunset" />
     </button>
@@ -33,15 +45,4 @@
     </template>
   </fluidbox-item>
 </fluidbox-gallery>
-<template>
-  <div class="pattern-caption">
-    <span>
-      <strong data-test="title"></strong>
-      <small data-test="counter"></small>
-    </span>
-    <button type="button" data-action="previous" data-test="prev">Previous</button>
-    <button type="button" data-action="next" data-test="next">Next</button>
-    <button type="button" data-action="close" data-test="close">Close</button>
-  </div>
-</template>
 <!-- #endregion example -->

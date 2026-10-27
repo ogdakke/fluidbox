@@ -7,7 +7,7 @@ description: Every entry point of @ogdakke/fluidbox and every export of the root
 
 # API reference
 
-Complete API reference
+Every entry point, and every export of the package root, read from the package source. The guides explain when to use each; this page has the exact types.
 
 ## Entry points
 
@@ -17,7 +17,9 @@ Complete API reference
 
 ## createFluidbox(options)
 
-<!-- api: createFluidbox, FluidboxOptions, FluidboxControlName -->
+<!-- api: createFluidbox, FluidboxOptions, FluidboxControlName, FluidboxPreload, FluidboxSlideshowOptions -->
+
+`slideshow` is covered in [Slideshow](./slideshow.md), and `reachEndThreshold` in [Lists that grow](./items-and-origins.md#lists-that-grow).
 
 ## Fluidbox
 
@@ -32,27 +34,33 @@ fluidbox.update({
 
 ## FluidboxState
 
-<!-- api: FluidboxState, FluidboxStatus, FluidboxZoomState -->
+<!-- api: FluidboxState, FluidboxStatus, FluidboxValue, FluidboxZoomState -->
 
 ## Events
 
-<!-- api: FluidboxEventMap, FluidboxToggleEvent, FluidboxItemChangeEvent, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxReason, FluidboxToggleState -->
+<!-- api: FluidboxEventMap, FluidboxValueChangeEvent, FluidboxValueChangeAction, FluidboxValueChangeDetails, FluidboxSheetEvent, FluidboxZoomEvent, FluidboxMediaErrorEvent, FluidboxMediaErrorKind, FluidboxReachEndEvent, FluidboxReason -->
 
 ## Items
 
-<!-- api: FluidboxItem, FluidboxItemBase, FluidboxImageItem, FluidboxVideoItem, FluidboxIframeItem, FluidboxCustomItem, FluidboxThumbnail, FluidboxPictureSource, idOf, itemLabel -->
+<!-- api: FluidboxItem, FluidboxItemBase, FluidboxImageItem, FluidboxVideoItem, FluidboxVideoSource, FluidboxVideoTrack, FluidboxIframeItem, FluidboxCustomItemBase, FluidboxItemTypes, FluidboxThumbnail, FluidboxPictureSource, idOf, itemLabel, imageItem, FluidboxImageProps -->
 
 ## Lists
 
-<!-- api: FluidboxItems, FluidboxItemList, createItemList, FluidboxItemListOptions -->
+<!-- api: FluidboxItems, FluidboxItemList, createItemList, FluidboxItemListOptions, FluidboxLazyItemList -->
 
 ## Renderers
 
-<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlideRenderer, FluidboxSlideRenderContext, FluidboxViewerRenderer, FluidboxViewerContext -->
+<!-- api: FluidboxRenderer, FluidboxRenderContext, FluidboxSlides, FluidboxSlideRenderer, FluidboxSlide, FluidboxSlideOrigin, FluidboxPlayback, FluidboxPlaybackSource, FluidboxZoomPose, FluidboxZoomableOptions, FluidboxVideoOptions, FluidboxVideoAttachSlide, videoSlide, FluidboxViewerRenderer, FluidboxViewerContext -->
 
-## Origins
+### Hotspots
 
-<!-- api: FluidboxOrigin, FluidboxOriginAdapter, FluidboxRevealContext -->
+`slide.hotspot(options)` puts a button on a point of the media. See [Hotspots](./hotspots.md).
+
+<!-- api: FluidboxHotspotOptions, FluidboxHotspotCoordinate -->
+
+## Triggers
+
+<!-- api: FluidboxTriggerValue, FluidboxBindOptions, FluidboxOverlayOptions, FluidboxRevealContext -->
 
 ## Labels
 
@@ -74,11 +82,11 @@ createFluidbox({
 
 ## Add-ons
 
-<!-- api: FluidboxFilmstripOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->
+<!-- api: FluidboxThumbnailsOptions, FluidboxSheetOptions, FluidboxSheetSnapPoint, FluidboxSheet -->
 
 ### Hover zoom
 
-`@ogdakke/fluidbox/hover-zoom` magnifies a photo on the page under a resting mouse. See [Zoom](./patterns/zoom.md#hover-zoom).
+`@ogdakke/fluidbox/hover-zoom` magnifies a photo on the page under a resting mouse. See [Hover zoom](./patterns/hover.md).
 
 <!-- api: hoverZoom, FluidboxHoverZoomOptions -->
 
@@ -86,7 +94,7 @@ createFluidbox({
 
 YouTube and Vimeo, 360° spins and 3D models. See [Product media](./product-media.md).
 
-<!-- api-summary: embeds -->
+<!-- api-summary: embed -->
 
 <!-- api-summary: spin -->
 

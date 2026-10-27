@@ -39,7 +39,9 @@ The viewer uses these where the browser has them, and works without them:
 | Scroll-driven animations (`animation-timeline: scroll()`) | The sheet still scrolls and snaps between its stops, but the photo keeps its size behind it and the backdrop doesn't fade with a scroll dismiss. |
 | The `scrollend` event                                     | The viewer waits for a short pause in scroll events instead.                                                                                     |
 | `visualViewport`                                          | The sheet doesn't make room for the software keyboard.                                                                                           |
+| The Fullscreen API, which iPhone Safari lacks             | The Full screen control hides.                                                                                                                   |
+| `navigator.share` and `navigator.clipboard`               | Share copies the link when it can't open the share sheet, and hides when it can do neither.                                                      |
 
 ## Motion preferences
 
-With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights and moves between slides, zoom levels and sheet stops without animation. See [Styling](./styling.md#reduced-motion).
+With `prefers-reduced-motion: reduce`, the viewer opens and closes without flights and moves between slides, zoom levels and sheet stops without animation, a slideshow's moves included. `--fluidbox-motion-speed` changes how fast the other motions run, not this. See [Styling](./styling.md#reduced-motion).

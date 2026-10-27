@@ -358,7 +358,7 @@ test.describe("semantics", () => {
       return (window as any).a11yFluidbox.setItems([
         {
           id: "green",
-          type: "img",
+          type: "image",
           src: "/first.svg",
           alt: "Green study",
           width: 600,
@@ -438,18 +438,18 @@ test.describe("semantics", () => {
     await expect(dialog(page).locator("[data-fluidbox-close]")).toBeVisible();
   });
 
-  test("a filmstrip thumbnail without alt text is named by its place, and the selected one is marked by shape", async ({
+  test("a thumbnail without alt text is named by its place, and the selected one is marked by shape", async ({
     page,
   }) => {
-    await load(page, "?filmstrip&unnamed");
+    await load(page, "?thumbnails&unnamed");
     await page.evaluate(() => (window as any).a11yFluidbox.open(1));
-    const thumbnails = page.locator("[data-fluidbox-filmstrip-item]");
+    const thumbnails = page.locator("[data-fluidbox-thumbnails-item]");
     await expect(thumbnails.nth(1)).toHaveAttribute("aria-label", "Item 2 of 4");
     await expect(thumbnails.nth(0)).toHaveAttribute("aria-label", "Red study");
     const bar = (index: number) =>
       thumbnails
         .nth(index)
-        .evaluate((element) => getComputedStyle(element, "::after").borderTopStyle);
+        .evaluate((element) => getComputedStyle(element, "::after").outlineStyle);
     expect(await bar(1)).toBe("solid");
     expect(await bar(0)).toBe("none");
   });
@@ -485,7 +485,7 @@ test.describe("semantics", () => {
     await load(page);
     await page.evaluate(() => (window as any).a11yFluidbox.open(1));
     const close = dialog(page).locator("[data-fluidbox-close]");
-    await expect(close).toHaveCSS("border-top-style", "solid");
+    await expect(close).toHaveCSS("outline-style", "solid");
   });
 
   test("the controls' focus ring has a dark edge", async ({ page, isMobile }) => {

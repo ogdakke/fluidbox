@@ -1,35 +1,152 @@
 import type {
   FluidboxDispose,
   FluidboxItem,
+  FluidboxSlide,
   FluidboxSlideRenderer,
   FluidboxSource,
 } from "./runtime-types";
 import { observeDecodedPreview } from "./decoded-preview";
-import { fitSize } from "./fit-size";
-import { idOf, sameItem } from "./items";
+import { fitSize, posterAspect } from "./fit-size";
+import { fillsStage, idOf, itemLabel, sameItem } from "./items";
 import type { FluidboxLabels } from "./labels";
 import { IFRAME_SANDBOX_DEFAULT } from "./iframe-sandbox";
+import { paintItemData } from "./item-data";
 import { checkItemUrls } from "./media-url";
-import type { FluidboxThumbnail } from "./public-api";
+import type {
+  FluidboxIframeItem,
+  FluidboxImageItem,
+  FluidboxThumbnail,
+  FluidboxVideoItem,
+  FluidboxVideoAttachSlide,
+  FluidboxMediaErrorKind,
+  FluidboxVideoOptions,
+  FluidboxZoomableOptions,
+  FluidboxZoomPose,
+  FluidboxPlayback,
+  FluidboxPlaybackSource,
+  FluidboxSlideOrigin,
+} from "./public-api";
+
+/** A zoom pose as the zoom engine has it, with the box's size before the zoom. */
+export interface ViewerZoomPose {
+  readonly scale: number;
+  readonly x: number;
+  readonly y: number;
+  readonly moving: boolean;
+  /** The box's layout rectangle at fit, in client pixels. */
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+  /** The zoom viewport the box is seen through, in client pixels. */
+  readonly viewport: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  };
+}
 import { sharperCandidate, srcsetCandidates } from "./srcset";
+import type * as ZoomPosing from "./zoom-pose";
+import type { FluidboxHotspotOptions } from "./public-api";
+
+/** A `<video>` as a playback source: nothing until it knows its duration. */
+const videoPlayback = (video: HTMLVideoElement) => () =>
+  video.readyState < HTMLMediaElement.HAVE_METADATA
+    ? null
+    : { currentTime: video.currentTime, paused: video.paused || video.ended };
+
+/** A live view of a video's playback: each read is the video's state now. */
+const livePlayback = (video: HTMLVideoElement): FluidboxPlayback => ({
+  get currentTime() {
+    return video.currentTime;
+  },
+  get paused() {
+    return video.paused || video.ended;
+  },
+  get muted() {
+    return video.muted;
+  },
+});
+
+/** What a trigger shows, as a slide reads it: its video's playback, and its live model. */
+const slideOrigin = (video: HTMLVideoElement | null, model: HTMLElement | null) => ({
+  ...(video && { video: livePlayback(video) }),
+  ...(model && { model }),
+});
 
 const WINDOW_SIZE = 31;
 const LOAD_RADIUS = 1;
+
+/** The media the runtime draws itself: by a built-in slide, or a slide's draw call. */
+type DrawnItem = FluidboxImageItem | FluidboxVideoItem | FluidboxIframeItem;
+
+/** Item types without a slide, warned about once. */
+const unknownTypes = new Set<string>();
+
+/** Image files whose shape differs from their item's width and height, warned about once. */
+const misshapen = new Set<string>();
+
+const builtIn = (type: string): type is DrawnItem["type"] =>
+  type === "image" || type === "video" || type === "iframe";
+
+/** The elements of drawn media. */
+interface DrawnParts {
+  readonly picture?: HTMLPictureElement;
+  readonly placeholder?: HTMLImageElement;
+  readonly preview?: HTMLImageElement;
+  readonly cover?: HTMLImageElement;
+  readonly image: HTMLElement;
+}
 
 interface ViewerSlide {
   /** Where the slide sits in the strip; new items can move it. */
   position: number;
   readonly element: HTMLDivElement;
   readonly frame: HTMLDivElement;
-  readonly picture?: HTMLPictureElement;
-  readonly placeholder?: HTMLImageElement;
-  readonly preview?: HTMLImageElement;
+  /**
+   * The media box: what flies, follows a drag and zooms. A built-in slide's
+   * box is its `<img>`, `<video>` or `<iframe>`; any other slide's is a div
+   * its renderer draws into.
+   */
+  readonly media: HTMLElement;
+  /** Whether a renderer draws the slide, rather than the built-in media alone. */
+  readonly custom: boolean;
+  /** The item of the built-in media drawn in the slide, if any. */
+  drawn?: DrawnItem;
+  /** The draw call that drew it, so a stale undraw does nothing. */
+  drawing?: AbortController;
+  picture?: HTMLPictureElement;
+  placeholder?: HTMLImageElement;
+  preview?: HTMLImageElement;
   /** Snapshot shown over embedded media until it has loaded, and while closing. */
-  readonly cover?: HTMLImageElement;
-  readonly image: HTMLElement;
+  cover?: HTMLImageElement;
+  /** The drawn `<img>`, `<video>` or `<iframe>`: the box itself in a built-in slide. */
+  image?: HTMLElement;
   readonly error: HTMLDivElement;
   readonly retry: HTMLButtonElement;
+  /** The drawn media has started loading. */
   loaded: boolean;
+  /** The renderer of a custom slide has run, and not been disposed. */
+  rendered: boolean;
+  /** The renderer called `slide.fail`, so Retry renders it again. */
+  failed?: boolean;
+  /** Aborts the renderer's signal. */
+  content?: AbortController;
+  /** The origin an open prepared before the renderer drew, for the image it draws. */
+  origin?: HTMLImageElement | null;
+  /** What the trigger showed, on the slide an open started from it. */
+  originPlayback?: FluidboxSlideOrigin;
+  /** What the slide hands back to the trigger's video as a close starts from it. */
+  playback?: FluidboxPlaybackSource;
+  /** The renderer's listeners for a close starting from the slide. */
+  closeListeners?: Set<(landing: FluidboxSlideOrigin | null) => void>;
+  /** The slide's layer beside the box, made when a renderer first asks for it. */
+  layer?: HTMLDivElement;
+  /** What the renderer said of zoom, if it did: off, or on with these options. */
+  zoom?: false | FluidboxZoomableOptions;
+  /** The renderer's listeners for the box's zoom pose. */
+  zoomListeners?: Set<(pose: FluidboxZoomPose) => void>;
   decoded: boolean;
   fullApplied: boolean;
   imageVersion: number;
@@ -37,6 +154,8 @@ interface ViewerSlide {
   controller?: AbortController;
   /** A playing origin's picture, shown until the slide's player catches up with it. */
   videoHandoff?: AbortController;
+  /** How a custom slide's drawn video loads: `attach` from `drawVideo`, and the slide it tells. */
+  videoOptions?: FluidboxVideoOptions & { readonly slide: FluidboxVideoAttachSlide };
   /** The load of a sharper candidate for the zoom, until it swaps in. */
   sharpening?: AbortController;
   /** The URL of the sharper candidate the image shows for the zoom, if any. */
@@ -44,6 +163,38 @@ interface ViewerSlide {
   dispose?: FluidboxDispose;
   /** Custom content's view of whether its slide is on show, and who follows it. */
   activity?: { active: boolean; readonly listeners: Set<(active: boolean) => void> };
+  /**
+   * Settles once the renderer's content has committed: as the renderer
+   * returns, or when the binding holding the commit reports it.
+   */
+  commit?: Promise<void>;
+  /** Settles the commit, for a slide that unloads before it commits. */
+  release?: () => void;
+  /** The renderer's `waitUntil` promises, each until it settles. */
+  waits?: Set<Promise<void>>;
+}
+
+/** Where a binding finds the hold on a slide's commit: shared across chunks by its key. */
+const holdCommit = Symbol.for("fluidbox.holdCommit");
+/** Where a binding finds how to place the hotspots it renders in a slide's box. */
+const hotspotsKey = Symbol.for("fluidbox.hotspots");
+
+/** Settles once a video can show a frame, or its poster has decoded. */
+function videoFrame(video: HTMLVideoElement) {
+  return new Promise<void>((resolve) => {
+    const settled = new AbortController();
+    const done = () => {
+      settled.abort();
+      resolve();
+    };
+    video.addEventListener("loadeddata", done, { signal: settled.signal });
+    video.addEventListener("error", done, { signal: settled.signal });
+    if (video.poster) {
+      const poster = new Image();
+      poster.src = video.poster;
+      poster.decode().then(done, () => {});
+    }
+  });
 }
 
 /** Point an image at a thumbnail, its srcset and sizes included. */
@@ -73,7 +224,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   readonly #controller = new AbortController();
   readonly #onSelect: (index: number, settled: boolean) => void;
   readonly #allows: (index: number) => boolean;
-  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>;
+  readonly #renderers: Readonly<Record<string, FluidboxSlideRenderer<any> | undefined>>;
   readonly #labels: FluidboxLabels;
   #source: FluidboxSource<TItem>;
   #loop: boolean;
@@ -97,6 +248,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #frozenLeft = 0;
   #userOwned = false;
   #userScrolled = false;
+  /** A gesture stopped a glide between slides: its settle brings the strip onto one. */
+  #stopped = false;
   #touching = false;
   #fingers = false;
   #lastWheel = 0;
@@ -107,17 +260,33 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #fence: -1 | 0 | 1 = 0;
   #settleTimer: ReturnType<typeof setTimeout> | undefined;
   #selection:
-    | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> }
+    | { index: number; resolve: () => void; timeout: ReturnType<typeof setTimeout> | undefined }
     | undefined;
+  /**
+   * A smooth selection the strip scrolls itself, at a motion speed other than
+   * 1. An empty animation keeps its time, so it plays on the document's
+   * timeline as the flights do.
+   */
+  #glide: { frame: number; readonly timing: Animation } | undefined;
   /** While new items are laid out: the old slides whose item is unchanged, by id. */
-  #recycled: Map<string, { item: TItem; slide: ViewerSlide }[]> | undefined;
+  /** The item an open waits for, and whether its flight has started. */
+  #opening: { readonly index: number; readonly flying: boolean } | undefined;
+  /** The trigger's video the open under way starts from, and the item it opens. */
+  #originMedia:
+    | {
+        readonly index: number;
+        readonly video: HTMLVideoElement | null;
+        readonly model: HTMLElement | null;
+      }
+    | undefined;
+  #recycled: Map<string, { item: TItem; slide: ViewerSlide; offset: number }[]> | undefined;
 
   constructor(
     ownerDocument: Document,
     source: FluidboxSource<TItem>,
     onSelect: (index: number, settled: boolean) => void,
     allows: (index: number) => boolean,
-    renderers: Readonly<Record<string, FluidboxSlideRenderer<TItem>>>,
+    renderers: Readonly<Record<string, FluidboxSlideRenderer<any> | undefined>>,
     labels: FluidboxLabels,
     loop = false,
   ) {
@@ -157,6 +326,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     });
   }
 
+  /** Called before a slide's media unloads, with its box: the zoom lets go of it. */
+  onUnload: ((media: HTMLElement) => void) | undefined;
+  /** Called when the slide on show may have started or stopped being zoomable. */
+  onZoomableChange: (() => void) | undefined;
+  /** What turns a zoom pose into a slide's, loaded once a slide follows its zoom. */
+  #posing: typeof ZoomPosing | undefined;
+  /** The pose that came while it loaded. */
+  #lastPose: [HTMLElement, ViewerZoomPose] | undefined;
+  /** Called as a slide shows its error, and when a sharper image for the zoom fails. */
+  onMediaError: ((index: number, kind: FluidboxMediaErrorKind, cause: unknown) => void) | undefined;
+
   /** The item on show. */
   get index() {
     return this.#item(this.#index);
@@ -183,6 +363,61 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   get activeItem() {
     return this.#source.getItem(this.index);
+  }
+
+  /**
+   * The item the slide on show pictures, for matching it to its trigger: the
+   * built-in media it draws, else its own item.
+   */
+  get shownItem(): FluidboxItem | undefined {
+    return this.current?.drawn ?? this.activeItem;
+  }
+
+  /** Whether the slide on show is a renderer's box with nothing in it, which doesn't fly. */
+  get empty() {
+    const slide = this.current;
+    return !!slide?.custom && !slide.media.hasChildNodes();
+  }
+
+  /**
+   * Whether the box on show zooms, and how: a drawn image does unless its
+   * renderer said otherwise, and a renderer's own box does once it says so.
+   * Null when it doesn't.
+   */
+  zoomable(): { readonly max?: number; readonly sharpen: boolean } | null {
+    const slide = this.current;
+    if (!slide || slide.zoom === false) return null;
+    const image = slide.drawn?.type === "image" && slide.image instanceof HTMLImageElement;
+    if (slide.zoom) return { max: slide.zoom.max, sharpen: slide.zoom.sharpen ?? image };
+    return image ? { sharpen: true } : null;
+  }
+
+  /** Whether a slide follows its box's zoom pose, so the zoom reports every frame. */
+  watchesZoom() {
+    return !!this.current?.zoomListeners?.size;
+  }
+
+  /** Tell the slide whose box this is where its zoom is, once its pose code is in. */
+  zoomPose(media: HTMLElement, pose: ViewerZoomPose) {
+    const slide = this.current?.media === media ? this.current : undefined;
+    const listeners = slide?.zoomListeners;
+    if (!slide || !listeners?.size) return;
+    if (!this.#posing) {
+      this.#lastPose = [media, pose];
+      return;
+    }
+    const shown = this.#posing.shownPose(this.#source.getItem(this.#item(this.#index)), pose);
+    for (const listener of listeners) listener(shown);
+  }
+
+  /** Load what turns a zoom pose into a slide's, and tell it the pose it missed. */
+  #loadPosing() {
+    void import("./zoom-pose").then((posing) => {
+      this.#posing = posing;
+      const last = this.#lastPose;
+      this.#lastPose = undefined;
+      if (last) this.zoomPose(...last);
+    });
   }
 
   /** Whether the strip goes round: a single item has nowhere to go. */
@@ -225,22 +460,30 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    * Show new items. A slide whose item is unchanged stays, loaded, wherever its
    * item moved to, so swapping a product's variant keeps the photos it shares.
    */
-  setSource(source: FluidboxSource<TItem>) {
+  setSource(source: FluidboxSource<TItem>, loop = this.#loop) {
+    // A selection under way ends on its slide.
+    const moving = this.#selection;
+    if (moving) this.#sync(moving.index, false);
     this.#resolveSelection();
     this.#focusable(source.count);
     this.#unfence();
     const previous = this.#source;
     const index = this.index;
     const shown = previous.count ? idOf(previous.getItem(index)) : null;
-    const recycled = new Map<string, { item: TItem; slide: ViewerSlide }[]>();
-    for (const [position, slide] of this.#slides) {
+    const recycled = new Map<string, { item: TItem; slide: ViewerSlide; offset: number }[]>();
+    // Nearest first, so an item a loop repeats keeps the slide on show, and the ones beside it.
+    const slides = [...this.#slides].sort(
+      ([a], [b]) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
+    );
+    for (const [position, slide] of slides) {
       const at = this.#item(position);
       const item = previous.getItem(at);
       const id = idOf(item);
       // Most items stay where they were; a lazy list without indexOf finds an id by scanning.
       const next = at < source.count && idOf(source.getItem(at)) === id ? at : source.getIndex(id);
       if (next !== null && sameItem(item, source.getItem(next))) {
-        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide }]);
+        const offset = position - this.#index;
+        recycled.set(id, [...(recycled.get(id) ?? []), { item, slide, offset }]);
       } else {
         this.#unload(slide);
         slide.element.remove();
@@ -248,6 +491,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     this.#slides.clear();
     this.#source = source;
+    this.#loop = loop;
     // The strip stays on the item it shows, wherever that went.
     this.#index =
       (shown === null ? null : source.getIndex(shown)) ??
@@ -260,35 +504,39 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       this.#unload(slide);
       slide.element.remove();
     }
-    this.#align(this.#index);
+    // A smooth scroll under way can carry on past an instant one, as Chrome's
+    // on Android does: hold the slide in place until the strip is still.
+    if (moving) this.#jump(this.#index);
+    else this.#align(this.#index);
   }
 
-  /** An unchanged old slide for the item at a position, moved there. */
-  #recycle(position: number) {
+  /**
+   * An unchanged old slide for the item at a position, moved there; with
+   * `same`, only one that was as far from the slide on show.
+   */
+  #recycle(position: number, same?: boolean) {
     const item = this.#source.getItem(this.#item(position));
     const kept = this.#recycled?.get(idOf(item));
-    const found = kept?.findIndex((each) => sameItem(each.item, item)) ?? -1;
+    const found =
+      kept?.findIndex(
+        (each) => sameItem(each.item, item) && (!same || each.offset === position - this.#index),
+      ) ?? -1;
     if (!kept || found < 0) return undefined;
     const { slide } = kept.splice(found, 1)[0]!;
     slide.position = position;
     this.#labelSlide(slide.element, position);
+    // The same item, but its data may have changed.
+    paintItemData(slide.element, item.data);
     this.#present(slide, position === this.#index);
     return slide;
   }
 
-  /** Go round, or stop at the ends. The slides are made again around the item on show. */
+  /**
+   * Go round, or stop at the ends. Every slide stays, loaded, with its item;
+   * only the slides past the ends come or go.
+   */
   setLoop(loop: boolean) {
-    if (loop === this.#loop) return;
-    const index = this.index;
-    // Positions mean something else now, so no slide carries over.
-    for (const slide of this.#slides.values()) {
-      this.#unload(slide);
-      slide.element.remove();
-    }
-    this.#slides.clear();
-    this.#loop = loop;
-    this.#index = index;
-    this.setSource(this.#source);
+    if (loop !== this.#loop) this.setSource(this.#source, loop);
   }
 
   mount() {
@@ -308,6 +556,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
 
   /** The viewer has closed: no slide is on show until the strip mounts again. */
   hide() {
+    // Nothing aligns a strip out of the page: it would wait on it forever.
+    this.#resolveSelection();
+    this.#endInstant();
     this.#hidden = true;
     this.#activate();
   }
@@ -318,10 +569,12 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#activate();
     this.#observer.disconnect();
     this.#resolveSelection();
+    this.#endInstant();
     for (const slide of this.#slides.values()) this.#unload(slide);
   }
 
-  select(item: number, smooth: boolean, step?: 1 | -1): Promise<void> {
+  /** Go to an item: at once, or smoothly at a motion speed (1 is the browser's own smooth scroll). */
+  select(item: number, smooth: false | number, step?: 1 | -1): Promise<void> {
     if (!Number.isInteger(item) || item < 0 || item >= this.#source.count) {
       throw new RangeError(`Viewer strip index ${item} is out of range.`);
     }
@@ -330,32 +583,79 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     // fallback before rebasing its virtual window, otherwise that stale timer
     // can jump to a slide which has already been recycled.
     this.#resolveSelection();
+    // So does it over a gesture that has let go: that gesture's settle would
+    // otherwise send the viewer back to the slide it stopped on.
+    if (!this.#touching && !this.#fingers) this.#userOwned = this.#userScrolled = false;
+    // An instant align still under way would put snapping back mid-glide.
+    this.#endInstant();
     this.#unfence();
     if (!this.#slides.has(index)) this.#renderWindow(index, smooth ? this.#index : index);
     if (!this.#mounted || !smooth || index === this.#index) {
       this.#jump(index);
       return Promise.resolve();
     }
-    this.#scrollTo((index - this.#base) * this.#width, "smooth");
-    return new Promise<void>((resolve) => {
-      // The fallback lands the slide only once the smooth scroll has stalled.
-      // Safari takes well over half a second to cross a wide viewport, and
-      // jumping while it still glides snaps the last stretch into place.
-      const started = performance.now();
-      let last = this.#left;
-      const check = () => {
-        const left = this.#left;
-        const moving = Math.abs(left - last) > 1;
-        last = left;
-        if (moving && performance.now() - started < 2000 && this.#selection) {
-          this.#selection.timeout = setTimeout(check, 120);
+    if (smooth !== 1) {
+      const from = this.#left;
+      const timing = this.element.animate(null, { duration: 300 / smooth, easing: "ease-in-out" });
+      // Snapping would pull every step back to a slide.
+      this.element.style.scrollSnapType = "none";
+      // A far slide loads on the way, so it has its picture as it lands.
+      for (const [at, slide] of this.#slides) {
+        if (Math.abs(at - index) <= LOAD_RADIUS) this.#load(at, slide);
+      }
+      const step = () => {
+        const progress = timing.effect!.getComputedTiming().progress;
+        const left = (index - this.#base) * this.#width;
+        this.#scrollTo(progress == null ? left : from + (left - from) * progress, "instant");
+        if (progress != null) {
+          this.#glide!.frame = requestAnimationFrame(step);
           return;
         }
-        this.#jump(index);
         this.#resolveSelection();
+        this.#jump(index);
       };
-      this.#selection = { index, resolve, timeout: setTimeout(check, 600) };
+      return new Promise<void>((resolve) => {
+        this.#selection = { index, resolve, timeout: undefined };
+        this.#glide = { frame: requestAnimationFrame(step), timing };
+      });
+    }
+    this.#scrollTo((index - this.#base) * this.#width, "smooth");
+    return new Promise<void>((resolve) => {
+      this.#selection = { index, resolve, timeout: undefined };
+      this.#awaitLanding();
     });
+  }
+
+  /**
+   * Land the pending selection once the scroll stalls, if it hasn't by then.
+   * Safari takes well over half a second to cross a wide viewport, and
+   * jumping while it still glides snaps the last stretch into place.
+   */
+  #awaitLanding() {
+    const started = performance.now();
+    let last = this.#left;
+    const check = () => {
+      const selection = this.#selection;
+      if (!selection) return;
+      const left = this.#left;
+      const moving = Math.abs(left - last) > 1;
+      last = left;
+      if (moving && performance.now() - started < 2000) {
+        selection.timeout = setTimeout(check, 120);
+        return;
+      }
+      this.#jump(selection.index);
+      this.#resolveSelection();
+    };
+    this.#selection!.timeout = setTimeout(check, 600);
+  }
+
+  /** End a selection under way on its slide at once, as a close does. */
+  land() {
+    const selection = this.#selection;
+    if (!selection) return;
+    this.#resolveSelection();
+    this.#jump(selection.index);
   }
 
   destroy() {
@@ -423,6 +723,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #present(slide: ViewerSlide | undefined, shown: boolean) {
     if (!slide) return;
     slide.element.setAttribute("aria-hidden", String(!shown));
+    slide.element.toggleAttribute("data-active", shown);
     slide.element.inert = !shown;
   }
 
@@ -432,6 +733,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     element.dataset.fluidboxSlide = "";
     element.setAttribute("role", "group");
     this.#labelSlide(element, index);
+    paintItemData(element, item.data);
     const frame = this.#ownerDocument.createElement("div");
     frame.dataset.fluidboxFrame = "";
     const size = fitSize(item);
@@ -443,9 +745,62 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     error.setAttribute("role", "alert");
     const retry = this.#ownerDocument.createElement("button");
     retry.type = "button";
+    retry.dataset.fluidboxRetry = "";
     retry.textContent = this.#labels.retry;
     retry.addEventListener("click", () => this.#retry(slide.position));
     error.append(`${this.#labels.error} `, retry);
+    // A slide of your own for the type comes first, then the built-in one.
+    const custom = !!this.#renderers[item.type] || !builtIn(item.type);
+    let drawn: DrawnParts | undefined;
+    let media: HTMLElement;
+    if (custom) {
+      const content = this.#ownerDocument.createElement("div");
+      content.dataset.fluidboxItemContent = "";
+      content.setAttribute("role", "group");
+      content.setAttribute("aria-label", itemLabel(item));
+      frame.append(content);
+      media = content;
+    } else {
+      drawn = this.#build(item as DrawnItem, frame, frame);
+      media = drawn.image;
+    }
+    media.dataset.fluidboxMedia = "";
+    if (fillsStage(item)) {
+      // The box is the stage. The flight starts from the poster inside it: the
+      // item's aspect when it has one, else the trigger's own.
+      media.dataset.fluidboxFill = String(posterAspect(item) ?? "");
+    } else {
+      media.style.setProperty("--fluidbox-media-aspect", `${item.width} / ${item.height}`);
+    }
+    frame.append(error);
+    element.append(frame);
+    const slide: ViewerSlide = {
+      position: index,
+      element,
+      frame,
+      media,
+      custom,
+      drawn: drawn && (item as DrawnItem),
+      ...drawn,
+      error,
+      retry,
+      loaded: false,
+      rendered: false,
+      decoded: false,
+      fullApplied: false,
+      imageVersion: 0,
+      playback: drawn?.image instanceof HTMLVideoElement ? videoPlayback(drawn.image) : undefined,
+    };
+    this.#wire(slide, this.#controller.signal);
+    this.#present(slide, index === this.#index);
+    return slide;
+  }
+
+  /**
+   * Make the built-in media for an item into `host`: the frame of a built-in
+   * slide, where the media element is the box, or the box of a custom one.
+   */
+  #build(item: DrawnItem, frame: HTMLDivElement, host: HTMLElement): DrawnParts {
     let picture: HTMLPictureElement | undefined;
     let placeholder: HTMLImageElement | undefined;
     let preview: HTMLImageElement | undefined;
@@ -459,18 +814,18 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       image.decoding = "sync";
       return image;
     };
-    if (item.type === "img") {
+    if (item.type === "image") {
       frame.dataset.fluidboxImageFrame = "";
       if (item.placeholder) {
         placeholder = decorative("fluidboxSlidePlaceholder");
         placeholder.src = item.placeholder;
-        frame.append(placeholder);
+        host.append(placeholder);
       }
       if (item.thumbnail?.src) {
         // A preview is small and usually already decoded for the page; paint it
         // on the first frame it appears in.
         preview = decorative("fluidboxSlidePreview");
-        frame.append(preview);
+        host.append(preview);
       }
       picture = this.#ownerDocument.createElement("picture");
       picture.dataset.fluidboxPicture = "";
@@ -482,18 +837,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       image.decoding = "async";
       image.draggable = false;
       image.dataset.fluidboxImagePending = "";
-      image.addEventListener(
-        "load",
-        () => {
-          void this.#revealImage(slide, slide.imageVersion);
-        },
-        { signal: this.#controller.signal },
-      );
-      image.addEventListener("error", () => this.#fail(slide), {
-        signal: this.#controller.signal,
-      });
       picture.append(image);
-      frame.append(picture);
+      host.append(picture);
       media = image;
     } else if (item.type === "video") {
       const video = this.#ownerDocument.createElement("video");
@@ -512,65 +857,199 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         element.default = !!track.default;
         video.append(element);
       }
-      frame.append(video);
+      host.append(video);
       media = video;
-    } else if (item.type === "iframe") {
+    } else {
       const iframe = this.#ownerDocument.createElement("iframe");
       iframe.title = item.title;
       iframe.loading = "lazy";
       iframe.setAttribute("allowfullscreen", "");
-      frame.append(iframe);
+      host.append(iframe);
       media = iframe;
       cover = decorative("fluidboxMediaCover");
       if (item.thumbnail) paintThumbnail(cover, item.thumbnail);
-      frame.append(cover);
-    } else {
-      const content = this.#ownerDocument.createElement("div");
-      content.dataset.fluidboxItemContent = "";
-      content.setAttribute("role", "group");
-      content.setAttribute("aria-label", item.title);
-      frame.append(content);
-      media = content;
+      host.append(cover);
     }
-    media.dataset.fluidboxMedia = "";
-    media.style.setProperty("--fluidbox-media-aspect", `${item.width} / ${item.height}`);
-    frame.append(error);
-    element.append(frame);
-    const slide = {
-      position: index,
-      element,
-      frame,
-      picture,
-      placeholder,
-      preview,
-      cover,
-      image: media,
-      error,
-      retry,
-      loaded: false,
-      decoded: false,
-      fullApplied: false,
-      imageVersion: 0,
-    } satisfies ViewerSlide;
-    this.#present(slide, index === this.#index);
-    return slide;
+    // Inside a box, the box is the media; the drawn element fills it.
+    if (host !== frame) media.dataset.fluidboxDrawn = "";
+    return { picture, placeholder, preview, cover, image: media };
+  }
+
+  /** Follow the drawn image's loads and failures until `signal` aborts. */
+  #wire(slide: ViewerSlide, signal: AbortSignal) {
+    const image = slide.image;
+    if (slide.drawn?.type !== "image" || !(image instanceof HTMLImageElement)) return;
+    image.addEventListener(
+      "load",
+      () => {
+        void this.#revealImage(slide, slide.imageVersion);
+      },
+      { signal },
+    );
+    image.addEventListener("error", (event) => this.#fail(slide, "image", event), { signal });
+  }
+
+  /** Where a slide's drawn media sits: its frame, or a custom slide's box. */
+  #host(slide: ViewerSlide) {
+    return slide.custom ? slide.media : slide.frame;
+  }
+
+  /**
+   * Mark the item an open waits for, so its slide mounts with `opening` set,
+   * then the start of its flight, after which `waitUntil` comes too late.
+   */
+  setOpening(index: number | undefined, flying = false) {
+    this.#opening = index === undefined ? undefined : { index, flying };
+    if (index === undefined) this.#originMedia = undefined;
+  }
+
+  /**
+   * The trigger's video and live model an open of the item at `index` starts
+   * from, or null. The slide for it, mounted or yet to mount, gets them as its
+   * `origin`.
+   */
+  setOriginMedia(index: number, video: HTMLVideoElement | null, model: HTMLElement | null) {
+    this.#originMedia = video || model ? { index, video, model } : undefined;
+    const slide = this.#slides.get(this.#near(index));
+    if (this.#originMedia && slide?.rendered) slide.originPlayback = slideOrigin(video, model);
+  }
+
+  /**
+   * Tell the slide on show that a close starts from it, with what the trigger
+   * it lands on shows. Each listener runs once per close.
+   */
+  closing(video: HTMLVideoElement | null, model: HTMLElement | null) {
+    const listeners = this.current?.closeListeners;
+    if (!listeners?.size) return;
+    const landing = video || model ? slideOrigin(video, model) : null;
+    for (const listener of listeners) {
+      try {
+        listener(landing);
+      } catch (error) {
+        // A slide's error doesn't stop the close.
+        if (typeof reportError === "function") reportError(error);
+      }
+    }
+  }
+
+  /** The playback the slide on show hands back as the viewer closes from it, or null. */
+  returnedPlayback() {
+    const source = this.current?.playback;
+    return (typeof source === "function" ? source() : source) ?? null;
+  }
+
+  /** Register what a slide hands back on close, until the function it returns runs. */
+  #returnPlayback(slide: ViewerSlide, source: FluidboxPlaybackSource) {
+    slide.playback = source;
+    return () => {
+      if (slide.playback === source) slide.playback = undefined;
+    };
+  }
+
+  /**
+   * Settles once the slide for an item is ready to show, after `cap` ms, or as `signal` aborts:
+   * its content has committed, the images and videos in its box can paint and
+   * its `waitUntil` promises have settled. The built-in media a slide draws
+   * adds no wait, and a built-in slide is ready at once. Callable outside an
+   * open, for whatever waits on the next slide.
+   */
+  async ready(index: number, cap: number, signal?: AbortSignal) {
+    if (signal?.aborted) return;
+    const slide = this.#slides.get(this.#near(index));
+    if (!slide?.custom || !slide.rendered) return;
+    const content = slide.content;
+    // What is still pending, for the warning at the cap.
+    const pending = new Map<Promise<void>, string>();
+    let committed = false;
+    const ready = (async () => {
+      await slide.commit;
+      committed = true;
+      if (slide.content !== content) return;
+      const track = (promise: Promise<void>, what: string) => {
+        pending.set(promise, what);
+        void promise.then(() => pending.delete(promise));
+      };
+      for (const [promise, what] of this.#boxWaits(slide)) track(promise, what);
+      // A waitUntil before the flight starts still counts, so read them until none is new.
+      const seen = new Set<Promise<void>>();
+      for (;;) {
+        const fresh = [...(slide.waits ?? [])].filter((promise) => !seen.has(promise));
+        for (const promise of fresh) {
+          seen.add(promise);
+          track(promise, "a waitUntil promise");
+        }
+        if (!pending.size && !fresh.length) return;
+        await Promise.all(pending.keys());
+        if (slide.content !== content) return;
+        if (![...(slide.waits ?? [])].some((promise) => !seen.has(promise))) return;
+      }
+    })();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capped = new Promise<false>((resolve) => {
+      timer = setTimeout(resolve, cap, false);
+      signal?.addEventListener("abort", () => resolve(false), { once: true });
+    });
+    const done = await Promise.race([ready.then(() => true), capped]);
+    clearTimeout(timer);
+    if (signal?.aborted) return;
+    // Development builds only; a page without a bundler has no process.
+    try {
+      if (process.env.NODE_ENV !== "production" && !done && slide.content === content) {
+        const waiting = committed ? [...pending.values()] : ["the slide's content to commit"];
+        console.warn(
+          `Fluidbox showed ${itemLabel(this.#source.getItem(index))} after ${cap} ms without its slide ready, still waiting for ${waiting.join(", ")}.`,
+        );
+      }
+    } catch {}
+  }
+
+  /** The images and videos in a slide's box that must paint, but not the built-in media it drew. */
+  *#boxWaits(slide: ViewerSlide): Generator<[Promise<void>, string]> {
+    const drawn = [slide.picture, slide.placeholder, slide.preview, slide.cover, slide.image];
+    const own = (element: Element) => !drawn.some((part) => part?.contains(element));
+    for (const image of slide.media.querySelectorAll("img")) {
+      if (!own(image)) continue;
+      const decoded = image.decode().catch(() => {});
+      yield [decoded, `<img src="${image.currentSrc || image.src}">`];
+    }
+    for (const video of slide.media.querySelectorAll("video")) {
+      if (!own(video) || video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) continue;
+      yield [videoFrame(video), `<video src="${video.currentSrc || video.src}">`];
+    }
   }
 
   prepareOpening(index: number, origin?: HTMLImageElement) {
     const position = this.#near(index);
     const slide = this.#slides.get(position);
-    const item = this.#source.getItem(index);
-    if (slide?.cover) {
+    if (!slide) return;
+    // The renderer hasn't drawn yet: the image it draws paints the origin.
+    if (slide.custom && !slide.rendered) {
+      slide.origin = origin ?? null;
+      return;
+    }
+    if (!this.#paintOpening(slide, origin)) return;
+    this.#reset(slide);
+    slide.fullApplied = false;
+    this.#loadMedia(position, slide);
+  }
+
+  /**
+   * Paint the trigger's picture into a slide's drawn media, for the opening's
+   * first frame. Returns whether the image must load again behind it.
+   */
+  #paintOpening(slide: ViewerSlide, origin?: HTMLImageElement | null) {
+    const item = slide.drawn;
+    if (slide.cover) {
       // Embedded pages paint long after the opening motion starts. The origin's
       // snapshot covers the frame until the embed reports that it has loaded.
-      if (item.thumbnail) paintThumbnail(slide.cover, item.thumbnail);
+      if (item?.thumbnail) paintThumbnail(slide.cover, item.thumbnail);
       else {
         const src = origin?.currentSrc || origin?.src;
         if (src) slide.cover.src = src;
       }
-      return;
+      return false;
     }
-    if (!slide || item.type !== "img" || !(slide.image instanceof HTMLImageElement)) return;
+    if (item?.type !== "image" || !(slide.image instanceof HTMLImageElement)) return false;
     const decodedPreview = origin ? observeDecodedPreview(origin) : null;
     const preview = decodedPreview || item.thumbnail?.src || origin?.currentSrc || origin?.src;
     if (preview) {
@@ -587,9 +1066,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.removeAttribute("srcset");
       slide.image.removeAttribute("sizes");
     }
-    this.#reset(slide);
-    slide.fullApplied = false;
-    this.#load(position, slide);
+    return true;
   }
 
   /**
@@ -599,9 +1076,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
    */
   continueVideo(index: number, origin: HTMLVideoElement) {
     const slide = this.#slides.get(this.#near(index));
-    const item = this.#source.getItem(index);
     const video = slide?.image;
-    if (!slide || item.type !== "video" || !(video instanceof HTMLVideoElement)) return;
+    if (!slide || slide.drawn?.type !== "video" || !(video instanceof HTMLVideoElement)) return;
     slide.videoHandoff?.abort();
     if (origin.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !origin.videoWidth) return;
     const handoff = new AbortController();
@@ -682,17 +1158,37 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.element.remove();
       this.#slides.delete(index);
     }
-    let insertionPoint = this.element.firstChild;
-    for (let index = base; index < base + size; index++) {
-      let slide = this.#slides.get(index);
-      if (!slide) {
-        slide = this.#recycle(index) ?? this.#makeSlide(index);
+    const elements: HTMLElement[] = [];
+    // Nearest the slide on show first, so it and the ones beside it keep their
+    // slides where a loop repeats an item.
+    const positions = Array.from({ length: size }, (_, at) => base + at).sort(
+      (a, b) => Math.abs(a - this.#index) - Math.abs(b - this.#index),
+    );
+    // An old slide keeps its place beside the one on show if it can, as when
+    // a loop starts or stops: only then any old slide for the item, or a new one.
+    for (const same of [true, false]) {
+      for (const index of positions) {
+        const slide =
+          this.#slides.get(index) ??
+          this.#recycle(index, same) ??
+          (same ? undefined : this.#makeSlide(index));
+        if (!slide) continue;
         this.#slides.set(index, slide);
+        elements[index - base] = slide.element;
       }
-      // Only a slide out of place moves: moving an embed reloads it.
-      if (slide.element !== insertionPoint)
-        this.element.insertBefore(slide.element, insertionPoint);
-      insertionPoint = slide.element.nextSibling;
+    }
+    // Only a slide out of place moves, as moving an embed reloads it, and
+    // the one on show never does: the others take their places around it.
+    const fixed = Math.max(0, Math.min(size - 1, this.#index - base));
+    if (elements[fixed]!.parentNode !== this.element) this.element.append(elements[fixed]!);
+    for (let at = fixed - 1; at >= 0; at--) {
+      if (elements[at]!.nextSibling !== elements[at + 1]) {
+        this.element.insertBefore(elements[at]!, elements[at + 1]!);
+      }
+    }
+    for (let at = fixed + 1; at < size; at++) {
+      if (elements[at]!.previousSibling !== elements[at - 1])
+        elements[at - 1]!.after(elements[at]!);
     }
     this.#rebasing = true;
     this.#base = base;
@@ -706,6 +1202,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #jump(index: number) {
+    // A settle while a smooth selection glided can have moved the window off it.
+    if (!this.#slides.has(index)) this.#renderWindow(index, index);
     this.#instantTarget = index;
     this.element.style.scrollSnapType = "none";
     this.#align(index);
@@ -799,13 +1297,14 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     if (previous?.image instanceof HTMLVideoElement) previous.image.pause();
     this.#index = index;
     this.#present(this.active, true);
+    this.onZoomableChange?.();
     // An error a hidden slide raised was not heard; say it as the slide arrives.
     if (!this.active.error.hidden) this.#alert(this.active);
     this.#loadWindow();
-    const media = this.#source.getItem(this.#item(index));
+    const media = this.active.drawn;
     const player = this.active.image;
     if (
-      media.type === "video" &&
+      media?.type === "video" &&
       media.autoplay &&
       player instanceof HTMLVideoElement &&
       player.paused
@@ -831,19 +1330,20 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   /**
    * Show the image on show sharper for a zoom resting at `scale`: once its
    * pixels on screen outnumber its candidate's, decode the smallest larger
-   * candidate of the same source, or of `zoomSrcset` and `zoomSrc`, off screen,
+   * candidate of the same source, or of the item's `zoom`, off screen,
    * then swap it in at the same size. The largest one caps it.
    */
   sharpen(scale: number) {
     const index = this.#index;
+    if (this.zoomable()?.sharpen === false) return;
     // An image still loading sharpens once it shows; see #revealImage.
     this.#zoomed = { index, scale };
     const slide = this.#slides.get(index);
-    const item = this.#source.getItem(this.#item(index));
+    const item = slide?.drawn;
     const image = slide?.image;
     if (
       !slide ||
-      item.type !== "img" ||
+      item?.type !== "image" ||
       !(image instanceof HTMLImageElement) ||
       !slide.fullApplied ||
       !this.#painted(image)
@@ -864,8 +1364,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     const next = sharperCandidate(
       [
         ...chosen,
-        ...srcsetCandidates(item.zoomSrcset),
-        ...(item.zoomSrc ? [{ src: item.zoomSrc, width: Infinity }] : []),
+        ...srcsetCandidates(item.zoom?.srcset),
+        ...(item.zoom?.src ? [{ src: item.zoom.src, width: Infinity }] : []),
       ],
       current,
       needed,
@@ -890,7 +1390,11 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         image.srcset = `${next.src} ${loader.naturalWidth}w`;
         slide.sharpened = next.src;
       })
-      .catch(() => {})
+      .catch((error) => {
+        // The slide keeps the image it has.
+        if (controller.signal.aborted || slide.imageVersion !== version) return;
+        this.onMediaError?.(this.#item(slide.position), "zoom", error);
+      })
       .finally(() => {
         if (slide.sharpening === controller) slide.sharpening = undefined;
       });
@@ -905,17 +1409,24 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #load(index: number, slide: ViewerSlide) {
-    const item = this.#source.getItem(this.#item(index));
+    if (slide.custom && !slide.rendered) this.#render(index, slide);
+    else this.#loadMedia(index, slide);
+  }
+
+  /** Start loading the slide's drawn media, or only reprioritise it once it is loading. */
+  #loadMedia(index: number, slide: ViewerSlide) {
+    const item = slide.drawn;
+    if (!item) return;
     this.#loadPreview(item, slide);
     if (slide.loaded) {
       if (slide.image instanceof HTMLImageElement)
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
       return;
     }
-    slide.error.hidden = true;
-    if (item.type === "img" && slide.image instanceof HTMLImageElement && slide.picture) {
+    this.#showError(slide, false);
+    if (item.type === "image" && slide.image instanceof HTMLImageElement && slide.picture) {
       // Busy until the full image shows, or fails.
-      slide.element.setAttribute("aria-busy", "true");
+      this.#busy(slide, true);
       const current = slide.image.getAttribute("src");
       if (!current) {
         // Nothing paints yet, so the full image can stream straight in.
@@ -933,7 +1444,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
         slide.fullApplied = true;
         slide.image.loading = "eager";
         slide.image.fetchPriority = index === this.#index ? "high" : "low";
-        if (this.#painted(slide.image)) slide.element.removeAttribute("aria-busy");
+        if (this.#painted(slide.image)) this.#busy(slide, false);
         else void this.#revealImage(slide, slide.imageVersion);
       } else {
         const controller = new AbortController();
@@ -955,8 +1466,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
             // New items may have moved the slide while it decoded.
             this.#applyImage(slide.position, slide);
           })
-          .catch(() => {
-            if (!controller.signal.aborted) this.#fail(slide);
+          .catch((error) => {
+            if (!controller.signal.aborted) this.#fail(slide, "image", error);
           })
           .finally(() => {
             controller.signal.removeEventListener("abort", abort);
@@ -965,14 +1476,17 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       }
     } else if (!safeUrls(item)) {
       // Item lists reject these already; a list of your own still stops here.
-      this.#fail(slide);
+      this.#fail(
+        slide,
+        item.type,
+        new TypeError(`Fluidbox item ${idOf(item)} has a URL it doesn't load.`),
+      );
     } else if (item.type === "video" && slide.image instanceof HTMLVideoElement) {
-      slide.image.src = item.src;
-      if (item.poster) slide.image.poster = item.poster;
+      this.#loadVideo(slide, item, slide.image);
       // Autoplay only on the slide in view: its neighbours load too.
       if (item.autoplay && index === this.#index) void slide.image.play().catch(() => {});
     } else if (item.type === "iframe" && slide.image instanceof HTMLIFrameElement) {
-      const frame = slide.frame;
+      const frame = this.#host(slide);
       const controller = new AbortController();
       slide.controller = controller;
       delete frame.dataset.fluidboxMediaReady;
@@ -991,58 +1505,363 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       if (item.referrerPolicy) slide.image.referrerPolicy = item.referrerPolicy;
       slide.image.setAttribute("sandbox", item.sandbox ?? IFRAME_SANDBOX_DEFAULT);
       slide.image.src = item.src;
-    } else if (item.type === "custom") {
-      const renderer = this.#renderers[item.render];
-      if (!renderer) throw new TypeError(`Unknown fluidbox renderer: ${item.render}`);
-      const controller = new AbortController();
-      // Unloading drops the activity, so its listeners are never called again.
-      const activity = (slide.activity = {
-        active: this.#mounted && !this.#hidden && index === this.#index,
-        listeners: new Set<(active: boolean) => void>(),
-      });
-      slide.controller = controller;
-      slide.dispose =
-        renderer({
-          item,
-          index: this.#item(index),
-          target: slide.image,
-          signal: controller.signal,
-          get active() {
-            return activity.active;
-          },
-          onActiveChange(listener) {
-            activity.listeners.add(listener);
-            return () => activity.listeners.delete(listener);
-          },
-        }) ?? undefined;
     }
     slide.loaded = true;
   }
 
-  #unload(slide: ViewerSlide) {
+  /**
+   * Load a video: through `attach`, else from a `<source>` per entry of
+   * `sources` and a last one for `src`, else from `src`. A `src` attribute
+   * would make the browser ignore every `<source>`, so it gets none with them.
+   */
+  #loadVideo(slide: ViewerSlide, item: FluidboxVideoItem, video: HTMLVideoElement) {
+    for (const source of video.querySelectorAll(":scope > source")) source.remove();
+    if (item.poster) video.poster = item.poster;
+    const { attach, slide: shown } = slide.videoOptions ?? {};
+    if (!attach && !item.sources?.length) {
+      video.src = item.src;
+      return;
+    }
+    const controller = new AbortController();
+    slide.controller = controller;
+    if (attach) {
+      try {
+        attach(video, controller.signal, item, shown!);
+      } catch (error) {
+        console.error(error);
+        this.#fail(slide, "video", error);
+      }
+      return;
+    }
+    // Sources go before the tracks, as the content model wants them.
+    const tracks = video.querySelector(":scope > track");
+    let last: HTMLSourceElement | undefined;
+    for (const { src, type, media } of [...item.sources!, { src: item.src }] as const) {
+      last = this.#ownerDocument.createElement("source");
+      last.src = src;
+      if (type) last.type = type;
+      if (media) last.media = media;
+      video.insertBefore(last, tracks);
+    }
+    // When every source fails, the error fires on the last one, not the video.
+    last!.addEventListener("error", (event) => this.#fail(slide, "video", event), {
+      signal: controller.signal,
+    });
+    // A fresh video picks its source as the first one goes in; one that failed
+    // before, as on Retry, waits for load().
+    if (video.networkState !== HTMLMediaElement.NETWORK_EMPTY) video.load();
+  }
+
+  /**
+   * Run a custom slide's renderer: the slide of its type, else the default.
+   * A type with neither shows the slide's error.
+   */
+  #render(index: number, slide: ViewerSlide) {
+    const item = this.#source.getItem(this.#item(index));
+    const renderer =
+      this.#renderers[item.type] ?? (builtIn(item.type) ? undefined : this.#renderers.default);
+    slide.rendered = true;
+    if (!renderer) {
+      // Development builds only; a page without a bundler has no process.
+      try {
+        if (process.env.NODE_ENV !== "production" && !unknownTypes.has(item.type)) {
+          unknownTypes.add(item.type);
+          console.warn(
+            `Fluidbox has no slide for items of type "${item.type}". Add one to the slides option.`,
+          );
+        }
+      } catch {}
+      this.#fail(slide, "custom", new TypeError(`Fluidbox has no slide for "${item.type}" items.`));
+      return;
+    }
+    const controller = new AbortController();
+    // Unloading drops the activity, so its listeners are never called again.
+    const activity = (slide.activity = {
+      active: this.#mounted && !this.#hidden && index === this.#index,
+      listeners: new Set<(active: boolean) => void>(),
+    });
+    slide.content = controller;
+    const { signal } = controller;
+    const zoomListeners = (slide.zoomListeners = new Set<(pose: FluidboxZoomPose) => void>());
+    const layer = () => this.#layer(slide);
+    // The item's index now: new items keep a slide whose item moved.
+    const itemIndex = () => this.#item(slide.position);
+    const waits = (slide.waits = new Set<Promise<void>>());
+    let release!: () => void;
+    slide.commit = new Promise<void>((resolve) => (release = resolve));
+    slide.release = release;
+    let holds = 0;
+    let rendering = true;
+    const opening = () => (this.#opening?.index === itemIndex() ? this.#opening : undefined);
+    const origin = this.#originMedia?.index === itemIndex() ? this.#originMedia : undefined;
+    if (origin) slide.originPlayback = slideOrigin(origin.video, origin.model);
+    const closeListeners = (slide.closeListeners = new Set());
+    // A hotspot in the box: hidden with the controls, and placed once the
+    // hotspots' code, loaded the first time this render adds one, is in.
+    let placing: Promise<(button: HTMLElement, options: FluidboxHotspotOptions) => void>;
+    const place = (button: HTMLElement, options: FluidboxHotspotOptions) => {
+      if (!button.hasAttribute("type")) button.setAttribute("type", "button");
+      // Hidden until the hotspots' code puts it on its point.
+      if (!button.style.left) button.style.visibility = "hidden";
+      for (const name of ["hotspot", "chrome", "owns-input", "managed"]) {
+        button.setAttribute(`data-fluidbox-${name}`, "");
+      }
+      void (placing ??= import("./hotspots").then(
+        ({ hotspotLayer }) => hotspotLayer(slide.media, () => item, signal),
+        // Code that fails to load leaves them where they are, once.
+        () => () => {},
+      )).then((placed) => placed(button, options));
+    };
+    const context: FluidboxSlide<any> & {
+      [holdCommit]?: () => () => void;
+      [hotspotsKey]?: typeof place;
+    } = {
+      item,
+      get index() {
+        return itemIndex();
+      },
+      media: slide.media,
+      get layer() {
+        return layer();
+      },
+      signal,
+      get active() {
+        return activity.active;
+      },
+      get opening() {
+        return opening()?.flying === false;
+      },
+      onActiveChange(listener: (active: boolean) => void) {
+        activity.listeners.add(listener);
+        return () => activity.listeners.delete(listener);
+      },
+      get origin() {
+        return slide.originPlayback ?? null;
+      },
+      returnPlayback: (source: FluidboxPlaybackSource) =>
+        signal.aborted ? () => {} : this.#returnPlayback(slide, source),
+      onClose(listener: (landing: FluidboxSlideOrigin | null) => void) {
+        if (signal.aborted) return () => {};
+        closeListeners.add(listener);
+        return () => closeListeners.delete(listener);
+      },
+      zoomable: (on) => {
+        if (signal.aborted) return;
+        slide.zoom = on === true ? {} : on;
+        this.#zoomableChanged(slide);
+      },
+      onZoom: (listener: (pose: FluidboxZoomPose) => void) => {
+        zoomListeners.add(listener);
+        if (!this.#posing) this.#loadPosing();
+        return () => zoomListeners.delete(listener);
+      },
+      waitUntil: (promise: Promise<unknown>) => {
+        if (signal.aborted) return;
+        // Development builds only; a page without a bundler has no process.
+        try {
+          if (process.env.NODE_ENV !== "production" && opening()?.flying) {
+            console.warn(
+              "Fluidbox got slide.waitUntil() after the opening flight started, so it doesn't delay it. Call it before the slide commits.",
+            );
+          }
+        } catch {}
+        const settled = Promise.resolve(promise).then(
+          () => {},
+          () => {},
+        );
+        waits.add(settled);
+        void settled.then(() => waits.delete(settled));
+      },
+      // A binding holds the commit while its framework renders the slide, and
+      // reports it once the content is in the box.
+      [holdCommit]: () => {
+        if (!rendering || signal.aborted) return () => {};
+        holds += 1;
+        let reported = false;
+        return () => {
+          if (reported) return;
+          reported = true;
+          if (--holds === 0) release();
+        };
+      },
+      fail: (error?: unknown) => {
+        if (signal.aborted) return;
+        slide.failed = true;
+        this.#fail(slide, "custom", error);
+      },
+      drawImage: (image?: FluidboxItem) => this.#draw(slide, signal, "image", image ?? item),
+      drawVideo: (video?: FluidboxItem, options?: FluidboxVideoOptions) =>
+        this.#draw(
+          slide,
+          signal,
+          "video",
+          video ?? item,
+          options && { ...options, slide: context },
+        ),
+      drawIframe: (iframe?: FluidboxItem) => this.#draw(slide, signal, "iframe", iframe ?? item),
+      hotspot: (options) => {
+        const button = slide.media.appendChild(this.#ownerDocument.createElement("button"));
+        place(button, options);
+        return button;
+      },
+      [hotspotsKey]: place,
+    };
+    try {
+      slide.dispose = renderer(context) ?? undefined;
+    } finally {
+      rendering = false;
+      if (!holds) release();
+    }
+  }
+
+  /**
+   * Draw built-in media into a custom slide's box, in place of what it drew
+   * before. Returns a function that takes it out again.
+   */
+  #draw(
+    slide: ViewerSlide,
+    signal: AbortSignal,
+    type: DrawnItem["type"],
+    item: FluidboxItem,
+    videoOptions?: ViewerSlide["videoOptions"],
+  ) {
+    if (item.type !== type) {
+      throw new TypeError(`Fluidbox draws ${type} items here, not "${item.type}" ones.`);
+    }
+    if (signal.aborted) return () => {};
+    this.#undraw(slide);
+    const drawing = new AbortController();
+    Object.assign(slide, this.#build(item, slide.frame, slide.media), {
+      drawn: item,
+      drawing,
+      videoOptions,
+    });
+    this.#wire(slide, drawing.signal);
+    // The built-in video hands its time back as your own player would.
+    if (slide.image instanceof HTMLVideoElement) {
+      const unregister = this.#returnPlayback(slide, videoPlayback(slide.image));
+      drawing.signal.addEventListener("abort", unregister, { once: true });
+    }
+    const origin = slide.origin;
+    slide.origin = undefined;
+    if (origin !== undefined) this.#paintOpening(slide, origin);
+    this.#loadMedia(slide.position, slide);
+    this.#zoomableChanged(slide);
+    return () => {
+      if (slide.drawing === drawing) this.#undraw(slide);
+    };
+  }
+
+  /** Take a custom slide's drawn media out of its box. */
+  #undraw(slide: ViewerSlide) {
+    const drawing = slide.drawing;
+    if (!drawing) return;
+    this.#stopMedia(slide);
+    this.#unloadMedia(slide);
+    drawing.abort();
+    for (const node of [
+      slide.placeholder,
+      slide.preview,
+      slide.picture ?? slide.image,
+      slide.cover,
+    ])
+      node?.remove();
+    if (slide.drawn?.type === "image") delete slide.frame.dataset.fluidboxImageFrame;
+    delete slide.media.dataset.fluidboxMediaReady;
+    Object.assign(slide, {
+      drawn: undefined,
+      drawing: undefined,
+      picture: undefined,
+      placeholder: undefined,
+      preview: undefined,
+      cover: undefined,
+      image: undefined,
+      videoOptions: undefined,
+    });
+    this.#zoomableChanged(slide);
+  }
+
+  /**
+   * The slide's layer: over the whole slide, beside its frame, so it doesn't
+   * fly or zoom. It reveals and hides with the viewer's controls.
+   */
+  #layer(slide: ViewerSlide) {
+    if (!slide.layer) {
+      const layer = this.#ownerDocument.createElement("div");
+      layer.dataset.fluidboxSlideLayer = "";
+      layer.dataset.fluidboxChrome = "";
+      slide.layer = layer;
+    }
+    if (!slide.layer.isConnected) slide.element.append(slide.layer);
+    return slide.layer;
+  }
+
+  /** A slide's zoom may have changed: tell the viewer, if it is the slide on show. */
+  #zoomableChanged(slide: ViewerSlide) {
+    if (slide === this.current) this.onZoomableChange?.();
+  }
+
+  /** Stop the drawn media's work that outlives a load: a hand-off, a sharper image, a preview. */
+  #stopMedia(slide: ViewerSlide) {
     slide.videoHandoff?.abort();
     slide.sharpening?.abort();
     slide.sharpening = undefined;
     slide.sharpened = undefined;
     slide.previewController?.abort();
     slide.previewController = undefined;
+  }
+
+  #unload(slide: ViewerSlide) {
+    if (slide.loaded || slide.rendered) this.onUnload?.(slide.media);
+    this.#stopMedia(slide);
+    slide.origin = undefined;
+    if (slide.rendered) {
+      slide.content?.abort();
+      slide.content = undefined;
+      slide.dispose?.();
+      slide.dispose = undefined;
+      slide.activity = undefined;
+      slide.zoomListeners = undefined;
+      slide.closeListeners = undefined;
+      // An open waiting for the slide goes on without it.
+      slide.release?.();
+      slide.release = undefined;
+      slide.commit = undefined;
+      slide.waits = undefined;
+      slide.rendered = false;
+      slide.failed = false;
+      this.#undraw(slide);
+      this.#showError(slide, false);
+      this.#busy(slide, false);
+      slide.media.replaceChildren();
+      slide.layer?.replaceChildren();
+      slide.layer?.remove();
+      if (slide.zoom !== undefined) {
+        slide.zoom = undefined;
+        this.#zoomableChanged(slide);
+      }
+      return;
+    }
+    this.#unloadMedia(slide);
+  }
+
+  #unloadMedia(slide: ViewerSlide) {
     if (!slide.loaded) return;
     slide.controller?.abort();
     slide.controller = undefined;
-    slide.dispose?.();
-    slide.dispose = undefined;
-    slide.activity = undefined;
     slide.decoded = false;
     slide.fullApplied = false;
-    slide.error.hidden = true;
-    slide.element.removeAttribute("aria-busy");
+    this.#showError(slide, false);
+    this.#busy(slide, false);
     for (const source of slide.picture?.querySelectorAll("source") ?? []) source.remove();
     if (slide.image instanceof HTMLMediaElement) {
       slide.image.pause();
+      // Without its sources, load() can't pick one again and keep downloading.
+      for (const source of slide.image.querySelectorAll(":scope > source")) source.remove();
       slide.image.removeAttribute("src");
       slide.image.load();
     } else if (slide.image instanceof HTMLIFrameElement) {
-      delete slide.frame.dataset.fluidboxMediaReady;
+      delete this.#host(slide).dataset.fluidboxMediaReady;
       slide.image.removeAttribute("src");
     } else if (slide.image instanceof HTMLImageElement) {
       slide.imageVersion += 1;
@@ -1050,8 +1869,6 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
       slide.image.removeAttribute("src");
       slide.image.removeAttribute("srcset");
       slide.image.removeAttribute("sizes");
-    } else {
-      slide.image.replaceChildren();
     }
     slide.loaded = false;
   }
@@ -1073,8 +1890,9 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #applyImage(index: number, slide: ViewerSlide) {
-    const item = this.#source.getItem(this.#item(index));
-    if (item.type !== "img" || !(slide.image instanceof HTMLImageElement) || !slide.picture) return;
+    const item = slide.drawn;
+    if (item?.type !== "image" || !(slide.image instanceof HTMLImageElement) || !slide.picture)
+      return;
     slide.imageVersion += 1;
     const version = slide.imageVersion;
     slide.fullApplied = true;
@@ -1093,7 +1911,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.image.src = item.src;
     void this.#revealImage(slide, version);
     slide.decoded = false;
-    slide.error.hidden = true;
+    this.#showError(slide, false);
   }
 
   #painted(image: HTMLImageElement) {
@@ -1103,8 +1921,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /** Whether the image already shows the one candidate the full media resolves to. */
-  #showsFull(image: HTMLImageElement, item: TItem, shown = image.currentSrc || image.src) {
-    if (item.type !== "img") return false;
+  #showsFull(image: HTMLImageElement, item: DrawnItem, shown = image.currentSrc || image.src) {
+    if (item.type !== "image") return false;
     if (item.sources?.length || item.srcset) return false;
     const base = this.#ownerDocument.baseURI;
     return new URL(shown, base).href === new URL(item.src, base).href;
@@ -1129,8 +1947,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /** The item's `<source>` elements; a staged copy goes through #writeSet. */
-  #sources(item: TItem, staged?: ViewerSlide) {
-    return (item.type === "img" ? (item.sources ?? []) : []).map((resource) => {
+  #sources(item: DrawnItem, staged?: ViewerSlide) {
+    return (item.type === "image" ? (item.sources ?? []) : []).map((resource) => {
       const source = this.#ownerDocument.createElement("source");
       if (staged) this.#writeSet(source, resource, staged);
       else {
@@ -1144,10 +1962,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   /** A detached copy of the slide's picture that loads the same candidate. */
-  #stage(item: TItem, slide: ViewerSlide) {
+  #stage(item: DrawnItem, slide: ViewerSlide) {
     const picture = this.#ownerDocument.createElement("picture");
     const image = this.#ownerDocument.createElement("img");
-    if (item.type === "img") {
+    if (item.type === "image") {
       picture.append(...this.#sources(item, slide));
       this.#writeSet(image, item, slide);
       image.src = item.src;
@@ -1156,7 +1974,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     return image;
   }
 
-  #loadPreview(item: TItem, slide: ViewerSlide) {
+  #loadPreview(item: DrawnItem, slide: ViewerSlide) {
     const image = slide.preview;
     const src = item.thumbnail?.src;
     if (!image || !src || image.hasAttribute("data-fluidbox-image-ready")) return;
@@ -1185,9 +2003,33 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     if (slide.imageVersion !== version) return;
     delete image.dataset.fluidboxImagePending;
+    // The viewer frames an image by its item's width and height before it loads. A file of
+    // another shape letterboxes inside that frame, and the close lands on its thumbnail
+    // askew, so a shop feed with wrong sizes is worth hearing about.
+    try {
+      if (process.env.NODE_ENV !== "production") {
+        const drawn = slide.drawn;
+        const file = image.currentSrc || image.src;
+        if (
+          drawn?.type === "image" &&
+          drawn.width &&
+          drawn.height &&
+          image.naturalWidth &&
+          image.naturalHeight &&
+          !misshapen.has(file) &&
+          Math.abs(image.naturalWidth / image.naturalHeight / (drawn.width / drawn.height) - 1) >
+            0.02
+        ) {
+          misshapen.add(file);
+          console.warn(
+            `Fluidbox: ${itemLabel(drawn)} declares ${drawn.width}×${drawn.height}, but ${file} is ${image.naturalWidth}×${image.naturalHeight}. The viewer frames the declared shape, so the image letterboxes and its close lands off the thumbnail. Give the item the file's width and height.`,
+          );
+        }
+      }
+    } catch {}
     if (slide.fullApplied) {
-      slide.error.hidden = true;
-      slide.element.removeAttribute("aria-busy");
+      this.#showError(slide, false);
+      this.#busy(slide, false);
     }
     // Zoomed in before the full image came: sharpen it now.
     const zoomed = this.#zoomed;
@@ -1204,6 +2046,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   #retry(index: number) {
     const slide = this.#slides.get(index);
     if (!slide) return;
+    // A custom slide with nothing drawn, or that failed itself, draws again from the start.
+    if (slide.custom && (!slide.drawn || slide.failed)) this.#unload(slide);
     this.#reset(slide);
     this.#load(index, slide);
   }
@@ -1216,9 +2060,32 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     slide.decoded = false;
   }
 
-  #fail(slide: ViewerSlide) {
-    slide.element.removeAttribute("aria-busy");
-    slide.error.hidden = false;
+  /** Mark the slide as loading its media, for assistive technology and for styling. */
+  #busy(slide: ViewerSlide, on: boolean) {
+    if (on) slide.element.setAttribute("aria-busy", "true");
+    else slide.element.removeAttribute("aria-busy");
+    slide.element.toggleAttribute("data-busy", on);
+  }
+
+  #showError(slide: ViewerSlide, on: boolean) {
+    slide.error.hidden = !on;
+    slide.element.toggleAttribute("data-error", on);
+  }
+
+  /** Load the slide on show again if it failed. False when it hadn't. */
+  retry() {
+    const slide = this.current;
+    if (!slide || slide.error.hidden) return false;
+    this.#retry(this.#index);
+    return true;
+  }
+
+  /** Show the slide's error, and report it as it first shows. */
+  #fail(slide: ViewerSlide, kind: FluidboxMediaErrorKind, cause: unknown) {
+    this.#busy(slide, false);
+    if (!slide.error.hidden) return;
+    this.#showError(slide, true);
+    this.onMediaError?.(this.#item(slide.position), kind, cause);
   }
 
   /** Fill the slide's alert again, so it is announced. */
@@ -1229,6 +2096,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #onScroll = () => {
+    // The strip's own glide changes slides as it lands, so no work slows it on the way.
+    if (this.#glide) return;
     if (this.#frozen) {
       const offset = this.#left - this.#frozenLeft;
       this.element.style.setProperty("--fluidbox-scroll-compensation", `${this.#sign * offset}px`);
@@ -1259,6 +2128,7 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #settled = () => {
+    if (this.#glide) return;
     if (this.#touching || this.#frozen || this.#rebasing || this.#instantTarget !== null) return;
     // A finger or trackpad still pressing into a fence keeps it up.
     if (this.#fence && (this.#fingers || performance.now() - this.#lastWheel < 180)) {
@@ -1267,6 +2137,8 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
     clearTimeout(this.#settleTimer);
     const refused = this.#refused !== null;
+    const stopped = this.#stopped;
+    this.#stopped = false;
     this.#unfence();
     if (this.#userOwned || this.#selection) this.#sync(undefined, this.#userOwned);
     if (this.#userOwned && this.#userScrolled) this.#onSelect(this.index, true);
@@ -1274,9 +2146,10 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     this.#userScrolled = false;
     this.#approved = null;
     this.#refused = null;
-    // A refused move the fence did not catch snapped to the neighbour. Go back.
+    // A refused move the fence did not catch snapped to the neighbour, or a
+    // glide stopped between slides: go to the slide.
     const left = (this.#index - this.#base) * this.#width;
-    if (refused && Math.abs(this.#left - left) > 1) {
+    if ((refused || stopped) && Math.abs(this.#left - left) > 1) {
       this.#scrollTo(left, "smooth");
     }
     if (this.#selection?.index === this.#index) this.#resolveSelection();
@@ -1285,7 +2158,16 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
     }
   };
 
+  #stopGlide() {
+    if (!this.#glide) return;
+    cancelAnimationFrame(this.#glide.frame);
+    this.#glide.timing.cancel();
+    this.#glide = undefined;
+    this.element.style.removeProperty("scroll-snap-type");
+  }
+
   #resolveSelection() {
+    this.#stopGlide();
     if (!this.#selection) return;
     clearTimeout(this.#selection.timeout);
     this.#selection.resolve();
@@ -1293,10 +2175,26 @@ export class ViewerStrip<TItem extends FluidboxItem = FluidboxItem> {
   }
 
   #takeControl = (event: Event) => {
+    // A wheel that doesn't scroll the strip, as the viewer's own "navigate",
+    // "dismiss" or "zoom" wheel, isn't a gesture on it: it leaves a move under
+    // way be, and the strip's smooth scroll stays the strip's, not a swipe.
+    if (event instanceof WheelEvent && Math.abs(event.deltaY) > Math.abs(event.deltaX) * 1.3) {
+      return;
+    }
+    // A person's gesture takes over from a smooth move, the strip's glide or
+    // the browser's: the move ends on the slide it had reached, which the
+    // gesture then moves on from as from any other, and settles wherever it ends.
+    const gliding = !!this.#selection;
+    if (gliding) {
+      this.#stopped = true;
+      this.#resolveSelection();
+      this.#sync(undefined, false);
+      this.#onSelect(this.index, false);
+    }
     if (event.type === "wheel") this.#lastWheel = performance.now();
     if (event.type === "touchstart") this.#fingers = true;
     this.#userOwned = true;
-    this.#userScrolled = false;
+    this.#userScrolled = gliding;
     this.#touching = event.type === "pointerdown" || event.type === "touchstart";
   };
 

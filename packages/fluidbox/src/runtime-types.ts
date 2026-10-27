@@ -4,7 +4,7 @@ import type { FluidboxLabels } from "./labels";
 export type FluidboxItemId = string;
 
 export type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
@@ -12,7 +12,7 @@ export type {
   FluidboxThumbnail,
   FluidboxVideoItem,
 } from "./public-api";
-import type { FluidboxItem } from "./public-api";
+import type { FluidboxItem, FluidboxSlideshowOptions } from "./public-api";
 
 /** A finite, immutable snapshot for one controller revision. */
 export interface FluidboxSource<TItem extends FluidboxItem = FluidboxItem> {
@@ -21,21 +21,41 @@ export interface FluidboxSource<TItem extends FluidboxItem = FluidboxItem> {
   getIndex(id: FluidboxItemId): number | null;
 }
 
-export type {
-  FluidboxOrigin,
-  FluidboxOriginAdapter,
-  FluidboxRevealContext,
-  FluidboxStatus,
-} from "./public-api";
+export type { FluidboxRevealContext, FluidboxStatus } from "./public-api";
 import type {
   Fluidbox,
   FluidboxControlName,
-  FluidboxOrigin,
+  FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
+  FluidboxZoomEvent,
+  FluidboxRevealContext,
   FluidboxState,
   FluidboxViewerRenderer,
 } from "./public-api";
 
-export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel";
+/** Where a flight starts and lands: a trigger, and what in it shows the item. */
+export interface FluidboxOrigin<TItem extends FluidboxItem = FluidboxItem> {
+  /** The element that opened the item, scrolled into view on close. */
+  readonly trigger: HTMLElement;
+  /** The box the flight starts from and lands on. */
+  readonly visual: HTMLElement;
+  /** The image painted at the start of the flight, if any. */
+  readonly thumbnail?: HTMLImageElement;
+  /**
+   * Called before the closing flight measures `visual`, with the item it lands
+   * on: show that item on the trigger, synchronously, as an album cover does.
+   */
+  readonly onPreviewChange?: (item: TItem, index: number) => void;
+}
+
+/** Finds origins for items without a bound trigger, from `findTrigger` and `revealTrigger`. */
+export interface FluidboxOriginAdapter {
+  getOrigin(id: string): FluidboxOrigin | null;
+  /** Bring the item's trigger into view. Without it, the viewer scrolls it into view. */
+  revealOrigin?(id: string, index: number, context: FluidboxRevealContext): void | Promise<void>;
+}
+
+export type SessionReason = "api" | "trigger" | "keyboard" | "pointer" | "wheel" | "slideshow";
 
 export type SessionChangeReason = SessionReason | "source-update" | "source-empty";
 
@@ -64,7 +84,13 @@ export type SessionCommandResult =
 
 export type FluidboxDispose = () => void;
 
-export type { FluidboxRenderContext, FluidboxRenderer, FluidboxSlideRenderer } from "./public-api";
+export type {
+  FluidboxRenderContext,
+  FluidboxRenderer,
+  FluidboxSlide,
+  FluidboxSlideRenderer,
+  FluidboxSlides,
+} from "./public-api";
 import type { FluidboxRenderer } from "./public-api";
 
 /** The viewer's layer for controls and captions: the default buttons, then your viewer content. */
@@ -73,9 +99,12 @@ export interface FluidboxViewerLayer {
   readonly controls: readonly FluidboxControlName[];
   readonly viewer?: FluidboxViewerRenderer<any>;
   readonly labels: FluidboxLabels;
+  readonly icons?: Partial<Record<FluidboxControlName, () => Node>>;
+  /** The slideshow's options, which the viewer's timer reads. */
+  readonly slideshow?: FluidboxSlideshowOptions;
 }
 
-export type FluidboxThumbnailOverlayBehavior = "host" | "travel";
+export type FluidboxThumbnailOverlayBehavior = "host" | "travel" | "frame";
 
 export type FluidboxThumbnailOverlayRegistration<TItem extends FluidboxItem = FluidboxItem> =
   | {
@@ -88,10 +117,14 @@ export type FluidboxThumbnailOverlayRegistration<TItem extends FluidboxItem = Fl
       readonly behavior: "travel";
       /** Existing host overlay. The runtime publishes phase and progress here. */
       readonly element: HTMLElement;
-      /** Optional mask to move into the animated frame and restore on close. */
-      readonly frameLayer?: HTMLElement;
       /** Mounts application-owned content into a runtime transition target. */
       readonly renderer: FluidboxRenderer<TItem>;
+    }
+  | {
+      readonly behavior: "frame";
+      /** Moves into the animated frame for the flight, and back on close. */
+      readonly element: HTMLElement;
+      readonly renderer?: never;
     };
 
 export interface FluidboxZoomOptions {
@@ -99,6 +132,10 @@ export interface FluidboxZoomOptions {
   readonly step?: number;
   /** Maximum pinch, wheel, and keyboard zoom scale. @default 4 */
   readonly max?: number;
+  /** What a mouse click on the media does. @default "single" */
+  readonly click?: "single" | "double" | false;
+  /** What a touch or pen tap on the media does. @default "double" */
+  readonly tap?: "double" | false;
 }
 
 export interface FluidboxExtensionContext<TItem extends FluidboxItem = FluidboxItem> {
@@ -106,13 +143,15 @@ export interface FluidboxExtensionContext<TItem extends FluidboxItem = FluidboxI
   readonly dialog: HTMLElement;
   /**
    * Beside the viewer's layer, for what floats over the slides, as a
-   * filmstrip. A redraw of the layer never touches it. Mark what goes in it
+   * thumbnails. A redraw of the layer never touches it. Mark what goes in it
    * data-fluidbox-chrome to reveal and hide with the layer.
    */
   readonly layer: HTMLElement;
   readonly controller: SessionController<TItem>;
   readonly source: FluidboxSource<TItem>;
   readonly labels: FluidboxLabels;
+  /** What may close the viewer, as it was when the extension mounted. */
+  readonly gestures: ViewerGestures;
   /** Aborted when the viewer is destroyed. */
   readonly signal: AbortSignal;
 }
@@ -151,7 +190,7 @@ export interface FluidboxExtensionInstance<TItem extends FluidboxItem = Fluidbox
   destroy(): void;
 }
 
-/** A feature that plugs into the viewer, such as filmstrip() or sheet(). Each comes from its own entry, so it costs nothing until imported. */
+/** A feature that plugs into the viewer, such as thumbnails() or sheet(). Each comes from its own entry, so it costs nothing until imported. */
 export interface FluidboxExtension<TItem extends FluidboxItem = FluidboxItem> {
   mount(context: FluidboxExtensionContext<TItem>): FluidboxExtensionInstance<TItem>;
 }
@@ -166,8 +205,30 @@ export interface SessionController<TItem extends FluidboxItem = FluidboxItem> {
   /** Fire the before-event for a move to `target` without making it. False when it was prevented. */
   allows(target: SessionTarget, reason: SessionReason): boolean;
   subscribe(listener: (state: FluidboxState<TItem>) => void): FluidboxDispose;
-  /** The zoom came to rest at another scale, for the reason given or the last command's. */
-  zoomed?(scale: number, reason: SessionReason | undefined): void;
+  /**
+   * The zoom came to rest at another scale, for the reason given or the last command's. The
+   * viewer passes the event class, so it stays out of the initial chunk.
+   */
+  zoomed?(scale: number, reason: SessionReason | undefined, event: typeof FluidboxZoomEvent): void;
+  /** The box on show may have started or stopped being zoomable. */
+  zoomableChanged?(): void;
+  /**
+   * The viewer's own state changed: it became the document's fullscreen
+   * element or stopped being it, or the slideshow started or stopped playing.
+   */
+  changed?(): void;
+  /** A slide's media failed, or a zoom image did. */
+  mediaError?(event: FluidboxMediaErrorEvent<any>): void;
+  /** The open item came near the end. */
+  reachEnd?(event: FluidboxReachEndEvent): void;
+  /** The `reachEndThreshold` option, as given. */
+  reachEndThreshold?(): unknown;
+}
+
+/** What may close the viewer, and what a vertical wheel does. */
+export interface ViewerGestures {
+  readonly dismiss: { readonly drag: boolean; readonly backdrop: boolean };
+  readonly wheel: "dismiss" | "zoom" | "navigate" | "none";
 }
 
 export interface ViewerSessionMotionContext<TItem extends FluidboxItem = FluidboxItem> {

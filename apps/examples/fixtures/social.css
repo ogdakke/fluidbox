@@ -345,7 +345,7 @@
 /* X on a phone: the post sits over the bottom of the photo, and the reply count
    raises the replies in a sheet as the photo shrinks into the room above it. */
 @media (width < 900px) {
-  [data-fluidbox-overlay]:has(.x-layer) {
+  [data-fluidbox-viewer]:has(.x-layer) {
     --fluidbox-backdrop-background: #0a0a0a;
   }
   [data-fluidbox-dialog]:has(.x-layer) {

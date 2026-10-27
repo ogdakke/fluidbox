@@ -59,21 +59,21 @@ test.describe("shop fixture, wide screen", () => {
     await expect.poll(() => shownSlide(page)).toBe(5);
   });
 
-  test("the filmstrip column moves the viewer, and the close lands on that card", async ({
+  test("the thumbnails column moves the viewer, and the close lands on that card", async ({
     page,
   }) => {
     await load(page);
     await page.locator(".shop-slide").first().click();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
-    const strip = page.locator("[data-fluidbox-filmstrip-scroll]");
+    const strip = page.locator("[data-fluidbox-thumbnails-scroll]");
     await expect(strip).toHaveAttribute("aria-orientation", "vertical");
     const box = (await strip.boundingBox())!;
     expect(box.x).toBeLessThan(40);
     expect(box.height).toBeGreaterThan(box.width * 4);
     await expect(page.locator(".shop-dots")).toBeHidden();
-    await page.locator('[data-fluidbox-filmstrip-item][data-index="3"]').click();
+    await page.locator('[data-fluidbox-thumbnails-item][data-index="3"]').click();
     await expect(
-      page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]'),
+      page.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]'),
     ).toHaveAttribute("data-index", "3");
     await page.keyboard.press("Escape");
     await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
@@ -92,7 +92,7 @@ test.describe("shop fixture, wide screen", () => {
           .querySelector("[data-fluidbox-dialog]")
           ?.getAttribute("data-fluidbox-status");
         const orientation = document
-          .querySelector("[data-fluidbox-filmstrip-scroll]")
+          .querySelector("[data-fluidbox-thumbnails-scroll]")
           ?.getAttribute("aria-orientation");
         if (status === "opening") seen.push(orientation ?? "none");
       }).observe(document.body, { subtree: true, attributes: true, childList: true });
@@ -110,8 +110,8 @@ test.describe("shop fixture, wide screen", () => {
     await load(page);
     await page.locator(".shop-slide").first().click();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
-    const strip = page.locator("[data-fluidbox-filmstrip-scroll]");
-    const selected = page.locator('[data-fluidbox-filmstrip-item][aria-selected="true"]');
+    const strip = page.locator("[data-fluidbox-thumbnails-scroll]");
+    const selected = page.locator('[data-fluidbox-thumbnails-item][aria-selected="true"]');
     await expect(selected).toHaveAttribute("data-index", "0");
     const box = (await strip.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -139,7 +139,7 @@ test.describe("shop fixture, phone", () => {
     await load(page);
     await page.locator(".shop-slide").first().tap();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open");
-    await expect(page.locator("[data-fluidbox-filmstrip]")).toHaveCount(0);
+    await expect(page.locator("[data-fluidbox-thumbnails]")).toHaveCount(0);
     const dots = page.locator(".shop-dot");
     await expect(dots).toHaveCount(10);
     const sizes = () => dots.evaluateAll((all) => all.map((dot) => dot.getAttribute("data-size")));
@@ -226,20 +226,48 @@ test.describe("shop fixture, rich media", () => {
     expect(requests.modelViewer).toEqual([
       "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js",
     ]);
-    // The closing flight carries the poster home, not the live model.
-    const flown = page.waitForSelector("[data-fluidbox-flight] [data-fluidbox-model]", {
-      state: "attached",
-    });
+    // The close carries a snapshot of the model's view home, not the live model,
+    // with the poster hidden under it. The box holds a custom element, so it
+    // closes in its own frame rather than a flight.
+    const closing = page.evaluate(
+      () =>
+        new Promise<{ flight: boolean; snapshot: string; poster: string; model: string }>(
+          (resolve) => {
+            const check = () => {
+              const dialog = document.querySelector("[data-fluidbox-dialog]");
+              if (dialog?.getAttribute("data-fluidbox-status") === "closing") {
+                const box = dialog.querySelector(
+                  '[data-fluidbox-slide][aria-hidden="false"] [data-fluidbox-model]',
+                )!;
+                const shown = (selector: string) => {
+                  const element = box.querySelector(selector);
+                  return element ? getComputedStyle(element).visibility : "none";
+                };
+                resolve({
+                  flight: !!document.querySelector("[data-fluidbox-flight]"),
+                  snapshot: shown('[data-fluidbox-media-poster="snapshot"]'),
+                  poster: getComputedStyle(
+                    box.querySelector('[data-fluidbox-media-poster="poster"]')!,
+                  ).visibility,
+                  model: getComputedStyle(box.querySelector("model-viewer")!).visibility,
+                });
+                return;
+              }
+              requestAnimationFrame(check);
+            };
+            check();
+          },
+        ),
+    );
     await page.locator(dialog).focus();
     await page.keyboard.press("Escape");
-    const visible = await (
-      await flown
-    ).evaluate((box) => {
-      const poster = box.querySelector('[data-fluidbox-media-poster="poster"]')!;
-      const model = box.querySelector("model-viewer")!;
-      return [getComputedStyle(poster).visibility, getComputedStyle(model).visibility];
+    const visible = await closing;
+    expect(visible).toEqual({
+      flight: false,
+      snapshot: "visible",
+      poster: "hidden",
+      model: "hidden",
     });
-    expect(visible).toEqual(["visible", "hidden"]);
     await expect(page.locator(`${dialog}[data-open]`)).toHaveCount(0);
   });
 });

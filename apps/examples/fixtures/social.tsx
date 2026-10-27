@@ -15,6 +15,7 @@ import {
 } from "react-aria-components";
 import { Avatar, Badge, Icon, compact, type IconName, type Person } from "./social-ui";
 import "@ogdakke/fluidbox/sheet.css";
+import "@ogdakke/fluidbox/baseline.css";
 import "./safari-chrome.css";
 import "./social.css";
 
@@ -48,7 +49,12 @@ type Post = {
   readonly text: string;
   readonly ago: string;
   readonly date: string;
-  readonly stats: { replies: number; reposts: number; likes: number; views: number };
+  readonly stats: {
+    replies: number;
+    reposts: number;
+    likes: number;
+    views: number;
+  };
   readonly replies: readonly Reply[];
   readonly items: readonly FluidboxImageItem[];
 };
@@ -149,7 +155,7 @@ const postOf = (posts: readonly Post[], id: string | null) =>
 function useActivePost(posts: readonly Post[]) {
   return postOf(
     posts,
-    useFluidbox(({ id }) => id),
+    useFluidbox(({ value }) => value),
   );
 }
 
@@ -187,7 +193,7 @@ function Grid({ post }: { post: Post }) {
   return (
     <div className="x-grid" data-count={post.items.length}>
       {post.items.map((item) => (
-        <Fluidbox.Trigger key={item.id} item={item} asChild>
+        <Fluidbox.Trigger key={item.id} value={item} asChild>
           <button type="button" aria-label={`Open ${item.alt}`}>
             <img
               data-fluidbox-origin
@@ -345,7 +351,7 @@ function XViewer() {
                 icon="reply"
                 value={active.stats.replies}
                 label="Show replies"
-                data-fluidbox-sheet-stop="1"
+                data-fluidbox-sheet-snap="1"
               />
               <Count icon="repost" value={active.stats.reposts} label="Reposts" />
               <Count icon="like" value={active.stats.likes} label="Likes" />
@@ -438,7 +444,7 @@ function IgActions({ post }: { post: Post }) {
     <>
       <div className="ig-actions">
         <Count icon="like" label="Like" />
-        <Count icon="comment" label="Comment" data-fluidbox-sheet-stop="2" />
+        <Count icon="comment" label="Comment" data-fluidbox-sheet-snap="2" />
         <Count icon="send" label="Share" />
         <Count icon="bookmark" label="Save" />
       </div>
@@ -512,7 +518,7 @@ function InstagramViewer() {
         It can't be put away; a swipe down scrolls the photo off. */}
       <Fluidbox.Sheet
         snapPoints={["55%", "content"]}
-        dismiss="scroll"
+        dismissMotion="scroll"
         className="ig-sheet"
         data-fluidbox-chrome
         aria-label="Post"
@@ -528,9 +534,9 @@ function InstagramViewer() {
                   <p className="ig-caption">
                     <strong>{post.by.handle}</strong> {post.text}
                   </p>
-                  <Fluidbox.SheetStop stop={2} className="ig-more">
+                  <Fluidbox.SheetSnap to={2} className="ig-more">
                     View all {post.stats.replies} comments
-                  </Fluidbox.SheetStop>
+                  </Fluidbox.SheetSnap>
                   <IgComments post={post} />
                 </>
               )}
@@ -572,7 +578,7 @@ function InstagramProfile() {
         </header>
         <div className="ig-grid">
           {grams.map((gram) => (
-            <Fluidbox.Trigger key={gram.id} item={gram.items[0]} asChild>
+            <Fluidbox.Trigger key={gram.id} value={gram.items[0]} asChild>
               <button type="button" aria-label={`Open ${gram.text}`}>
                 <img data-fluidbox-origin src={gram.items[0].src} alt="" />
               </button>
@@ -723,7 +729,7 @@ function App() {
             <strong>X's phone viewer: fixed.</strong> The sheet entry (@ogdakke/fluidbox/sheet)
             raises any data-fluidbox-sheet element over the photo and fits the photo into the room
             above it. Swiping up on the photo raises it instead of dismissing; a reply count marked
-            data-fluidbox-sheet-stop opens it; Escape, a tap above it or the close button lower it.
+            data-fluidbox-sheet-snap opens it; Escape, a tap above it or the close button lower it.
           </li>
           <li>
             <strong>Insets must exist before the opening: open.</strong> The opening flight measures

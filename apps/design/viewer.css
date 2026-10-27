@@ -1,6 +1,6 @@
 /* Viewer chrome in the shared language: square hairline controls on a near-opaque backdrop. */
 
-[data-fluidbox-overlay] {
+[data-fluidbox-viewer] {
   font-family: var(--fb-font-sans);
 }
 
@@ -11,42 +11,57 @@
 
 /* Hairline focus rings on the trigger and the dialog; the controls use --fluidbox-focus-color. */
 fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible,
-[data-fluidbox-overlay] [data-fluidbox-dialog]:focus-visible {
+[data-fluidbox-viewer] [data-fluidbox-dialog]:focus-visible {
   outline-color: var(--fb-line-strong);
 }
 
-:where([data-fluidbox-overlay])
+fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible {
+  outline-width: 1px;
+}
+
+/* The baseline turns the sheet's browser ring off; the site's ring comes back. */
+[data-fluidbox-viewer] [data-fluidbox-sheet]:focus-visible {
+  outline: 1px solid var(--fb-fg);
+  outline-offset: 2px;
+}
+
+:where([data-fluidbox-viewer])
   :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]) {
   border: 1px solid var(--fb-line-strong);
   border-radius: 0;
   background: var(--fb-bg);
   color: var(--fb-fg);
+}
+
+/* Not on focus: the baseline's ring has a dark edge there. */
+:where([data-fluidbox-viewer])
+  :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]):not(:focus-visible) {
   box-shadow: none;
 }
 
-:where([data-fluidbox-overlay]) [data-fluidbox-close] {
+:where([data-fluidbox-viewer]) [data-fluidbox-close] {
   width: 40px;
   height: 40px;
 }
 
-:where([data-fluidbox-overlay]) [data-fluidbox-close]:hover {
+:where([data-fluidbox-viewer]) [data-fluidbox-close]:hover {
   transform: none;
   background: var(--fb-surface-2);
 }
 
-:where([data-fluidbox-overlay]) :is([data-fluidbox-previous], [data-fluidbox-next]) {
+:where([data-fluidbox-viewer]) :is([data-fluidbox-previous], [data-fluidbox-next]) {
   width: 44px;
   height: 44px;
 }
 
-:where([data-fluidbox-overlay])
+:where([data-fluidbox-viewer])
   :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next]):hover:not(:disabled) {
   border-color: var(--fb-fg);
   background: var(--fb-surface-2);
 }
 
 /* Gallery arrows are styled by a dialog-qualified package rule, so match its weight. */
-:where([data-fluidbox-overlay])
+:where([data-fluidbox-viewer])
   [data-fluidbox-dialog][data-gallery]
   :is([data-fluidbox-previous], [data-fluidbox-next]) {
   width: 44px;

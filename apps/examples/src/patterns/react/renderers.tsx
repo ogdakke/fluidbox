@@ -6,7 +6,7 @@ import { media, theme, thumbnailSrc } from "../shared";
 
 const ThemeContext = createContext("light");
 
-/** Custom content renders inside the app, so it reads the app's context. */
+/** Slide content renders inside the app, so it reads the app's context. */
 function Note() {
   const theme = useContext(ThemeContext);
   return <article className="pattern-note">Theme: {theme}</article>;
@@ -15,13 +15,12 @@ function Note() {
 export function Renderers() {
   return (
     <ThemeContext.Provider value={theme}>
-      {/* Items of type "custom" whose render is "note" render <Note />. */}
-      <Fluidbox.Root items={media} renderers={{ note: () => <Note /> }}>
+      <Fluidbox.Root items={media}>
         <div className="pattern-grid">
           {media.map((item) => (
             <Fluidbox.Trigger
               key={item.id}
-              item={item}
+              value={item.id}
               className="pattern-thumb"
               data-test="trigger"
             >
@@ -29,6 +28,14 @@ export function Renderers() {
             </Fluidbox.Trigger>
           ))}
         </div>
+        {/* Items of type "note" render <Note /> in their media box; the rest are built in. */}
+        <Fluidbox.Slides
+          note={() => (
+            <Fluidbox.Media>
+              <Note />
+            </Fluidbox.Media>
+          )}
+        />
       </Fluidbox.Root>
     </ThemeContext.Provider>
   );

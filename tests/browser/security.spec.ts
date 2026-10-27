@@ -63,7 +63,7 @@ test("<fluidbox-item> refuses an iframe with a script URL", async ({ page }) => 
   await page.evaluate(() => {
     const gallery = document.createElement("fluidbox-gallery");
     const item = document.createElement("fluidbox-item");
-    item.setAttribute("item-id", "bad");
+    item.setAttribute("value", "bad");
     const trigger = document.createElement("button");
     trigger.slot = "trigger";
     trigger.dataset.testBad = "";

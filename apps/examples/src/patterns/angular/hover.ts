@@ -35,7 +35,7 @@ export class HoverZoom implements OnInit, OnDestroy {
   imports: [FluidboxModule, HoverZoom],
   template: `
     <div fluidboxRoot [items]="[photo]">
-      <button [fluidboxTrigger]="photo" class="pattern-product" data-test="product">
+      <button [fluidboxTrigger]="photo.id" class="pattern-product" data-test="product">
         <img
           [appHoverZoom]="photo"
           [src]="thumbnailSrc(photo)"

@@ -2,6 +2,7 @@ import type {
   FluidboxItem,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxTarget,
 } from "./public-api";
@@ -21,7 +22,14 @@ const derivedIds = new WeakMap<FluidboxItem, string>();
 export function idOf(item: FluidboxItem): string {
   const id = item.id ?? derivedIds.get(item) ?? ("src" in item ? item.src : undefined);
   if (typeof id !== "string" || !id.trim())
-    throw new TypeError("A fluidbox item needs an id or a src.");
+    throw new TypeError(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production") return "A fluidbox item needs an id or a src.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   return id;
 }
 
@@ -62,7 +70,7 @@ export function sameItems(a: readonly FluidboxItem[], b: readonly FluidboxItem[]
 
 /** The text an item is named by: its alt text or title. */
 export function itemLabel(item: FluidboxItem): string {
-  return item.type === "img" ? item.alt : item.title;
+  return item.type === "image" ? item.alt : item.title;
 }
 
 /** A target as an index or an id. An item names itself by its id. */
@@ -70,23 +78,52 @@ export function targetKey(target: FluidboxTarget): number | string {
   return typeof target === "object" && target !== null ? idOf(target) : target;
 }
 
-/** A target and the items that return to it, as indexes and ids, without repeats. */
-export function targetKeys(
-  target: FluidboxTarget,
-  returns: readonly FluidboxTarget[] = [],
-): (number | string)[] {
-  return [...new Set([target, ...returns].map(targetKey))];
+/**
+ * A trigger's value as indexes and ids, without repeats: one target, or a
+ * list of them. An empty list is a TypeError.
+ */
+export function targetKeys(value: FluidboxTarget | readonly FluidboxTarget[]): (number | string)[] {
+  const targets: readonly FluidboxTarget[] = Array.isArray(value)
+    ? value
+    : [value as FluidboxTarget];
+  if (!targets.length)
+    throw new TypeError(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "A fluidbox trigger needs at least one item.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
+  return [...new Set(targets.map(targetKey))];
 }
 
 function checkCount(count: number) {
   if (!Number.isInteger(count) || count < 0) {
-    throw new RangeError("A fluidbox item list's count must be a non-negative integer.");
+    throw new RangeError(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "A fluidbox item list's count must be a non-negative integer.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   }
 }
 
 function checkIndex(index: number, count: number) {
   if (!Number.isInteger(index) || index < 0 || index >= count) {
-    throw new RangeError(`Fluidbox item index is out of range: ${index}`);
+    throw new RangeError(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `Fluidbox item index is out of range: ${index}`;
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   }
 }
 
@@ -96,41 +133,96 @@ function checkIndex(index: number, count: number) {
  */
 export function createItemList<TItem extends FluidboxItem>(
   options: FluidboxItemListOptions<TItem>,
-): FluidboxItemList<TItem> {
-  const { count, item, index } = options;
-  checkCount(count);
+): FluidboxLazyItemList<TItem> {
+  const { item, index } = options;
+  // Shared by every count of the list, so a longer one keeps what was made.
   const made = new Map<number, TItem>();
   const indices = new Map<string, number>();
-  const get = (at: number) => {
-    checkIndex(at, count);
-    let found = made.get(at);
-    if (!found) {
-      found = item(at);
-      checkItemUrls(found);
-      made.set(at, found);
-      indices.set(idOf(found), at);
-    }
-    return found;
+  const list = (count: number): FluidboxLazyItemList<TItem> => {
+    checkCount(count);
+    const get = (at: number) => {
+      checkIndex(at, count);
+      let found = made.get(at);
+      if (!found) {
+        found = item(at);
+        checkItem(found);
+        made.set(at, found);
+        indices.set(idOf(found), at);
+      }
+      return found;
+    };
+    const holds = (at: number, id: string) =>
+      Number.isInteger(at) && at >= 0 && at < count && idOf(get(at)) === id;
+    return Object.freeze({
+      count,
+      get,
+      indexOf(id: string) {
+        const known = indices.get(id);
+        if (known !== undefined) return known < count ? known : -1;
+        if (index) {
+          const guess = index(id);
+          return holds(guess, id) ? guess : -1;
+        }
+        // A scan reads ids without keeping every item it passes.
+        for (let at = 0; at < count; at++) {
+          if (idOf(made.get(at) ?? item(at)) === id) return at;
+        }
+        return -1;
+      },
+      withCount: list,
+    });
   };
-  const holds = (at: number, id: string) =>
-    Number.isInteger(at) && at >= 0 && at < count && idOf(get(at)) === id;
-  return Object.freeze({
-    count,
-    get,
-    indexOf(id: string) {
-      const known = indices.get(id);
-      if (known !== undefined) return known;
-      if (index) {
-        const guess = index(id);
-        return holds(guess, id) ? guess : -1;
-      }
-      // A scan reads ids without keeping every item it passes.
-      for (let at = 0; at < count; at++) {
-        if (idOf(made.get(at) ?? item(at)) === id) return at;
-      }
-      return -1;
-    },
-  });
+  return list(options.count);
+}
+
+/** What an item's `data` names may be: lower case, digits and single dashes. */
+const dataName = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
+/**
+ * Throw when an item's `data` names an attribute the viewer can't set, or one
+ * it owns. In development only: a production build, and a page without a
+ * bundler, skip it.
+ */
+export function checkItemData(item: FluidboxItem, id: string) {
+  try {
+    if (process.env.NODE_ENV === "production") return;
+  } catch {
+    return;
+  }
+  for (const [name, value] of Object.entries(item.data ?? {})) {
+    if (!dataName.test(name) || name.startsWith("fluidbox-") || typeof value !== "string") {
+      throw new TypeError(
+        `Fluidbox item ${id} has data "${name}", which needs a lower-case name of letters, digits and single dashes, not starting "fluidbox-", and a string value.`,
+      );
+    }
+  }
+}
+
+/** Whether an item's media box is the whole stage: `fit: "fill"`, which images ignore. */
+export function fillsStage(item: FluidboxItem): boolean {
+  return item.fit === "fill" && item.type !== "image";
+}
+
+/**
+ * Throw a TypeError for an item the viewer can't show: a URL it refuses, or no
+ * `width` and `height` to size its box by, which only a fill box goes without.
+ */
+function checkItem(item: FluidboxItem) {
+  checkItemUrls(item);
+  checkItemData(item, idOf(item));
+  if (fillsStage(item)) return;
+  const { width, height } = item;
+  if (!(width! > 0 && height! > 0)) {
+    throw new TypeError(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `Fluidbox item ${idOf(item)} needs a positive width and height, or fit: "fill".`;
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
+  }
 }
 
 /**
@@ -149,10 +241,18 @@ export function toList<TItem extends FluidboxItem>(
   const indices = new Map<string, number>();
   // Own ids first, so a derived one never takes an id an item named itself by.
   for (const [index, item] of snapshot.entries()) {
+    checkItem(item);
     if (item.id === undefined) continue;
     const id = idOf(item);
-    checkItemUrls(item);
-    if (indices.has(id)) throw new TypeError(`Duplicate fluidbox item id: ${id}`);
+    if (indices.has(id))
+      throw new TypeError(
+        (() => {
+          try {
+            if (process.env.NODE_ENV !== "production") return `Duplicate fluidbox item id: ${id}`;
+          } catch {}
+          return "fluidbox";
+        })(),
+      );
     indices.set(id, index);
   }
   const seen = new Set<TItem>();

@@ -1,29 +1,25 @@
 <!-- #region example -->
 <fluidbox-gallery class="pattern-grid">
-  <button
-    type="button"
-    class="pattern-thumb"
-    data-test="trigger"
-    data-fluidbox-item-id="media-note"
-  >
+  <!-- Items of type "note" show this in their media box; the rest are built in. -->
+  <template data-fluidbox-slide="note">
+    <fluidbox-media>
+      <article class="pattern-note" data-theme></article>
+    </fluidbox-media>
+  </template>
+  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-value="media-note">
     <img src="/art/meadow.svg" alt="A note" />
   </button>
-  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-item-id="media-map">
+  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-value="media-map">
     <img src="/map/preview.svg" alt="Helsinki Market Square on OpenStreetMap" />
   </button>
-  <button
-    type="button"
-    class="pattern-thumb"
-    data-test="trigger"
-    data-fluidbox-item-id="media-video"
-  >
+  <button type="button" class="pattern-thumb" data-test="trigger" data-fluidbox-value="media-video">
     <img src="/video/drift-poster.jpg" alt="Drifting clouds" />
   </button>
   <button
     type="button"
     class="pattern-thumb"
     data-test="trigger"
-    data-fluidbox-item-id="media-youtube"
+    data-fluidbox-value="media-youtube"
   >
     <img
       src="https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg"

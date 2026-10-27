@@ -1,0 +1,45 @@
+/* The new controls have no default styles until the baseline stylesheet; this page places them. */
+[data-fluidbox-portal]
+  :is(
+    [data-fluidbox-counter],
+    [data-fluidbox-fullscreen],
+    [data-fluidbox-download],
+    [data-fluidbox-share]
+  ) {
+  position: fixed;
+  top: 16px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  display: inline-grid;
+  place-items: center;
+  background: Canvas;
+  color: CanvasText;
+  border: 1px solid GrayText;
+  font: inherit;
+  pointer-events: auto;
+}
+[data-fluidbox-portal] [data-fluidbox-counter] {
+  left: 16px;
+}
+[data-fluidbox-portal] [data-fluidbox-fullscreen] {
+  left: 96px;
+}
+[data-fluidbox-portal] [data-fluidbox-download] {
+  left: 176px;
+}
+[data-fluidbox-portal] [data-fluidbox-share] {
+  left: 256px;
+}
+[data-fluidbox-portal] [data-fluidbox-fullscreen]::after {
+  content: "FS";
+}
+[data-fluidbox-portal] [data-fluidbox-download]::after {
+  content: "DL";
+}
+[data-fluidbox-portal] [data-fluidbox-share]::after {
+  content: "SH";
+}
+[data-fluidbox-portal] [hidden] {
+  display: none;
+}

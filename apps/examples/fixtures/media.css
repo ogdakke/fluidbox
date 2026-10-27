@@ -9,7 +9,7 @@
   background: var(--fb-surface-2);
   cursor: zoom-in;
 }
-.media-grid img {
+.media-grid :is(img, video) {
   display: block;
   width: 100%;
   aspect-ratio: 1;
@@ -22,4 +22,11 @@
   height: 100%;
   background: var(--fb-surface-2);
   color: var(--fb-fg);
+}
+.media-grid model-viewer {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: var(--fb-surface-2);
 }

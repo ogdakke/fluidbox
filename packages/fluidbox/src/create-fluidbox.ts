@@ -6,34 +6,36 @@ import type { DomViewerDriver } from "./dom-viewer-driver";
 import { publishOverlayPhase, resetOverlayPhase } from "./overlay-phase";
 import { OriginRegistry } from "./origin-registry";
 import {
-  FluidboxItemChangeEvent,
-  FluidboxToggleEvent,
+  FluidboxValueChangeEvent,
   type Fluidbox,
   type FluidboxBindOptions,
   type FluidboxCommandOptions,
+  type FluidboxControlName,
   type FluidboxItem,
   type FluidboxItemList,
   type FluidboxItems,
-  type FluidboxLoading,
+  type FluidboxPreload,
   type FluidboxOptions,
-  type FluidboxOrigin,
-  type FluidboxOriginAdapter,
   type FluidboxOverlayOptions,
   type FluidboxReason,
   type FluidboxSheet,
   type FluidboxState,
   type FluidboxStatus,
   type FluidboxTarget,
+  type FluidboxTriggerValue,
   type FluidboxUpdateOptions,
+  type FluidboxValue,
+  type FluidboxValueChangeAction,
   type FluidboxZoomCommandOptions,
   type FluidboxZoomState,
-  FluidboxSheetEvent,
-  FluidboxZoomEvent,
 } from "./public-api";
+import type { FluidboxZoomEvent } from "./viewer-events";
 import type {
   FluidboxDispose,
   FluidboxExtension,
   FluidboxItemId,
+  FluidboxOrigin,
+  FluidboxOriginAdapter,
   FluidboxViewerLayer,
   FluidboxSource,
   FluidboxThumbnailOverlayRegistration,
@@ -45,13 +47,13 @@ import type {
   SessionTarget,
   ViewerSessionMotionContext,
 } from "./runtime-types";
-import { bindTrigger } from "./trigger";
+import { bindTrigger, resolveOrigin } from "./trigger";
 
 const defaultControls = ["previous", "next", "close"] as const;
 /** The factor of zoomIn, zoomOut and the zoom controls, as of the + and - keys. */
 const ZOOM_FACTOR = 1.5;
 
-const reasonOf = (reason: SessionChangeReason): FluidboxReason =>
+const reasonOf = (reason: SessionChangeReason | FluidboxReason): FluidboxReason =>
   reason === "source-update" || reason === "source-empty" ? "items" : reason;
 
 /**
@@ -84,8 +86,9 @@ interface PendingCommand {
   removeExternalAbort?: () => void;
 }
 
+/** One overlay on one item's trigger. A trigger can have several, side by side. */
 interface OverlayRegistration<TItem extends FluidboxItem> {
-  readonly token: object;
+  readonly id: FluidboxItemId;
   readonly registration: FluidboxThumbnailOverlayRegistration<TItem>;
   /** Its registration with the viewer, once there is one. */
   dispose?: FluidboxDispose | void;
@@ -96,6 +99,15 @@ export type FluidboxRuntimeDriver<TItem extends FluidboxItem> = Pick<
   DomViewerDriver<TItem>,
   keyof DomViewerDriver<TItem>
 >;
+
+/**
+ * Every control's name, so `bindControl` can check one before its wiring
+ * loads. A test keeps it in step with `allControlNames`.
+ */
+export const controlNameList =
+  "previous next close zoomIn zoomOut zoomReset counter fullscreen download share slideshow retry".split(
+    " ",
+  );
 
 /** Options objects with the same members, so a binding may pass a fresh literal each render. */
 function sameOptions(a: unknown, b: unknown): boolean {
@@ -116,7 +128,7 @@ function sameOptions(a: unknown, b: unknown): boolean {
 
 type Settings<TItem extends FluidboxItem> = Pick<
   FluidboxOptions<TItem>,
-  "controls" | "viewer" | "filmstrip" | "sheet"
+  "controls" | "icons" | "viewer" | "thumbnails" | "sheet" | "slideshow"
 >;
 
 /**
@@ -149,18 +161,18 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #listening = false;
   #zoom: FluidboxOptions<TItem>["zoom"];
   #loop: boolean;
-  readonly #renderers: FluidboxOptions<TItem>["renderers"];
+  readonly #slides: FluidboxOptions<TItem>["slides"];
   readonly #controls: SessionController<TItem> = this.#controller();
   /** Changed in place by update, so every part of the viewer reads the new strings. */
   readonly #labels: FluidboxLabels;
   #settings: Settings<TItem>;
-  #loading: FluidboxLoading = "hover";
+  #preload: FluidboxPreload = "intent";
   readonly #lifetime = new AbortController();
   readonly #bindings = new Set<() => void>();
   /** Re-resolve each binding's targets after the items change. */
   readonly #refreshers = new Set<() => void>();
   #sheet: Addon<FluidboxSheet> | undefined;
-  #filmstrip: Addon<null> | undefined;
+  #thumbnails: Addon<null> | undefined;
   /** The add-on entries the settings need, while they load. Opening waits for them. */
   #addonsLoading: Promise<void> | undefined;
   #list: FluidboxItemList<TItem>;
@@ -170,19 +182,22 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #state: FluidboxState<TItem>;
   readonly #origins: OriginRegistry;
   readonly #listeners = new Set<(state: FluidboxState<TItem>) => void>();
-  readonly #overlays = new Map<FluidboxItemId, OverlayRegistration<TItem>>();
+  readonly #overlays = new Set<OverlayRegistration<TItem>>();
   #pending: PendingCommand | undefined;
   #revealController: AbortController | undefined;
   /** The item whose origin the user last saw: the one opened or last revealed. */
   #revealedId: string | undefined;
   #sourceRefreshPending = false;
-  /** The side of the last toggle event, so a rolled-back command toggles back. */
-  #announced: "open" | "closed" = "closed";
+  /** The value the last valuechange announced, so a rolled-back command announces its way back. */
+  #announced: FluidboxValue = null;
   /** The reason of the request whose status change comes next. */
   #reason: FluidboxReason = "api";
   /** The scale the zoom last rested at, and the item it belongs to. */
   #zoomScale = 1;
   #zoomId: string | null = null;
+  #gestures: Pick<FluidboxOptions, "dismiss" | "wheel">;
+  #shareUrl: FluidboxOptions<TItem>["shareUrl"];
+  #reachEndThreshold: number | undefined;
   readonly [hostKey]: FluidboxHost;
 
   constructor(options: FluidboxOptions<TItem>, driver?: FluidboxRuntimeDriver<TItem>) {
@@ -193,24 +208,31 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       : undefined;
     this.#source = toSource(this.#list);
     this.#labels = { ...resolveLabels(options.labels) };
-    const { sheet, filmstrip, controls, viewer } = options;
-    this.#settings = { sheet, filmstrip, controls, viewer };
-    // The adapter only ever sees this fluidbox's items.
-    this.#origins = new OriginRegistry(options.origins as FluidboxOriginAdapter | undefined);
+    const { sheet, thumbnails, controls, icons, viewer, slideshow } = options;
+    this.#settings = { sheet, thumbnails, controls, icons, viewer, slideshow };
+    this.#origins = new OriginRegistry(this.#triggerAdapter(options));
     this.#zoom = options.zoom;
     this.#loop = !!options.loop;
-    this.#renderers = options.renderers;
+    this.#slides = options.slides;
+    this.#gestures = { dismiss: options.dismiss, wheel: options.wheel };
+    this.#shareUrl = options.shareUrl;
+    this.#reachEndThreshold = options.reachEndThreshold;
     this.#state = this.#stateFor("closed", null);
     this[hostKey] = this.#host();
     this.#makeAddons();
     if (driver) this.#attach(driver);
-    this.#setLoading(options.loading);
+    this.#setPreload(options.preload);
+    // A deep link opens as a viewer the server rendered does: without motion.
+    const value = options.value;
+    if (value != null && this.#source.getIndex(value) !== null && typeof document !== "undefined") {
+      queueMicrotask(() => void this.#command("open", value, "api", { instant: true }));
+    }
   }
 
-  #setLoading(loading: FluidboxLoading | undefined) {
-    this.#loading = loading ?? "hover";
+  #setPreload(preload: FluidboxPreload | undefined) {
+    this.#preload = preload ?? "intent";
     // Browsers without idle callbacks load on the next task.
-    if (this.#loading !== "eager" || this.#viewer || typeof window === "undefined") return;
+    if (this.#preload !== "eager" || this.#viewer || typeof window === "undefined") return;
     const idle = window.requestIdleCallback ?? setTimeout;
     idle(() => void this.load());
   }
@@ -218,10 +240,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   /** Give a new viewer what it would have seen, had it been there from the start. */
   #attach(viewer: FluidboxRuntimeDriver<TItem>) {
     viewer.setLoop(this.#loop);
+    viewer.setGestures(this.#gestures);
     viewer.setSource(this.#source);
     viewer.connect(this.#controls, this.#portal(), this.#extensions());
-    for (const [id, overlay] of this.#overlays) {
-      overlay.dispose = viewer.registerThumbnailOverlay(id, overlay.registration);
+    for (const overlay of this.#overlays) {
+      overlay.dispose = viewer.registerThumbnailOverlay(overlay.id, overlay.registration);
     }
     this.#viewer = viewer;
   }
@@ -232,9 +255,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#viewerLoad ??= import("./dom-viewer-driver").then(
       ({ DomViewerDriver }) => {
         if (this.#lifetime.signal.aborted || generation !== this.#generation) return undefined;
-        this.#attach(
-          new DomViewerDriver<TItem>(document, this.#zoom, this.#renderers, this.#labels),
-        );
+        this.#attach(new DomViewerDriver<TItem>(document, this.#zoom, this.#slides, this.#labels));
         return this.#viewer;
       },
       (error: unknown) => {
@@ -289,12 +310,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   /** The viewer's layer: the default controls, then your viewer content. */
   #portal(): FluidboxViewerLayer {
-    const { controls, viewer } = this.#settings;
+    const { controls, icons, viewer, slideshow } = this.#settings;
     // The defaults until you draw your own viewer, and Close after, until it
     // draws its own: the one way out a screen reader's touch can count on.
     const shown = controls ?? (viewer ? (["close"] as const) : true);
     const names = shown === true ? defaultControls : shown || [];
-    return { fluidbox: this, controls: names, viewer, labels: this.#labels };
+    return { fluidbox: this, controls: names, viewer, labels: this.#labels, icons, slideshow };
   }
 
   /** What the viewer and its add-ons drive this fluidbox with. */
@@ -310,16 +331,25 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       previous: (options = {}) => this.#step("previous", options),
       allows: (target, reason) => this.#allowed("goTo", target, reason),
       subscribe: (listener) => this.subscribe(listener),
-      zoomed: (scale, reason) => this.#zoomed(scale, reason),
+      zoomed: (scale, reason, ZoomEvent) => this.#zoomed(scale, reason, ZoomEvent),
+      zoomableChanged: () => {
+        const { status, index, item, zoom } = this.#state;
+        const next = this.#zoomFor(status, index, item);
+        if (next?.max !== zoom?.max || !next !== !zoom) this.#publish(status, index);
+      },
+      changed: () => this.#publish(this.#state.status, this.#state.index),
+      mediaError: (event) => void this.dispatchEvent(event),
+      reachEnd: (event) => void this.dispatchEvent(event),
+      reachEndThreshold: () => this.#reachEndThreshold,
     };
   }
 
   /** Make the add-ons the settings turn on. Their entries load on first use. */
   #makeAddons() {
-    const { sheet, filmstrip } = this.#settings;
+    const { sheet, thumbnails } = this.#settings;
     const loading = loadAddons([
       ...(sheet ? (["sheet"] as const) : []),
-      ...(filmstrip ? (["filmstrip"] as const) : []),
+      ...(thumbnails ? (["thumbnails"] as const) : []),
     ]);
     if (loading) {
       // The latest load makes the add-ons of the settings it finds, which a
@@ -341,18 +371,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     }
     this.#addonsLoading = undefined;
     this.#sheet = sheet
-      ? addon("sheet")(sheet === true ? {} : sheet, (stop, reason) => {
-          this.dispatchEvent(new FluidboxSheetEvent("sheetchange", { stop, reason }));
-        })
+      ? addon("sheet")(sheet === true ? {} : sheet, (event) => this.dispatchEvent(event))
       : undefined;
-    this.#filmstrip = filmstrip
-      ? addon("filmstrip")(filmstrip === true ? {} : filmstrip)
+    this.#thumbnails = thumbnails
+      ? addon("thumbnails")(thumbnails === true ? {} : thumbnails)
       : undefined;
   }
 
   #extensions() {
     return [
-      this.#filmstrip?.extension as FluidboxExtension<TItem> | undefined,
+      this.#thumbnails?.extension as FluidboxExtension<TItem> | undefined,
       this.#sheet?.extension as FluidboxExtension<TItem> | undefined,
     ];
   }
@@ -363,18 +391,31 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const previous = this.#settings;
     const next: Settings<TItem> = {
       controls: has("controls") ? options.controls : previous.controls,
+      icons: has("icons") ? options.icons : previous.icons,
       viewer: has("viewer") ? options.viewer : previous.viewer,
-      filmstrip: has("filmstrip") ? options.filmstrip : previous.filmstrip,
+      thumbnails: has("thumbnails") ? options.thumbnails : previous.thumbnails,
       sheet: has("sheet") ? options.sheet : previous.sheet,
+      slideshow: has("slideshow") ? options.slideshow : previous.slideshow,
     };
     this.#settings = next;
-    if (has("loading")) this.#setLoading(options.loading);
+    if (has("preload")) this.#setPreload(options.preload);
+    if (has("shareUrl")) this.#shareUrl = options.shareUrl;
+    if (has("reachEndThreshold")) this.#reachEndThreshold = options.reachEndThreshold;
+    if (has("dismiss") || has("wheel")) {
+      this.#gestures = {
+        dismiss: has("dismiss") ? options.dismiss : this.#gestures.dismiss,
+        wheel: has("wheel") ? options.wheel : this.#gestures.wheel,
+      };
+      this.#viewer?.setGestures(this.#gestures);
+      // A sheet reads whether a drag may close as it mounts.
+      if (has("dismiss") && !this.#addonsLoading) this.#viewer?.setExtensions(this.#extensions());
+    }
     if (has("zoom")) {
       this.#zoom = options.zoom;
       this.#viewer?.setZoom(options.zoom);
       // The zoom state may gain, lose or change its bounds.
       const { status, index, item, zoom } = this.#state;
-      if (this.#zoomFor(status, item)?.max !== zoom?.max) this.#publish(status, index);
+      if (this.#zoomFor(status, index, item)?.max !== zoom?.max) this.#publish(status, index);
     }
     if (has("loop") && !!options.loop !== this.#loop) {
       this.#loop = !!options.loop;
@@ -384,24 +425,29 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     }
     let relabeled = false;
     if (has("labels")) {
-      const labels = resolveLabels(options.labels);
-      relabeled = Object.entries(labels).some(
-        ([key, value]) => this.#labels[key as keyof FluidboxLabels] !== value,
-      );
-      if (relabeled) {
-        Object.assign(this.#labels, labels);
-        this.#viewer?.relabel();
+      const labels = resolveLabels(options.labels) as unknown as Record<string, unknown>;
+      const own = this.#labels as unknown as Record<string, unknown>;
+      // Both sides' keys, so a label without a default goes back to its fallback.
+      for (const key in { ...own, ...labels }) {
+        if (own[key] === labels[key]) continue;
+        own[key] = labels[key];
+        relabeled = true;
       }
+      if (relabeled) this.#viewer?.relabel();
     }
     if (
       relabeled ||
       !sameOptions(next.controls, previous.controls) ||
+      !sameOptions(next.icons, previous.icons) ||
+      !sameOptions(next.slideshow, previous.slideshow) ||
       next.viewer !== previous.viewer
     ) {
       this.#viewer?.setPortal(this.#portal());
+      // The Slideshow control may show or hide.
+      this.#publish(this.#state.status, this.#state.index);
     }
     if (
-      !sameOptions(next.filmstrip, previous.filmstrip) ||
+      !sameOptions(next.thumbnails, previous.thumbnails) ||
       !sameOptions(next.sheet, previous.sheet)
     ) {
       // The outgoing sheet announces its return to rest as it is torn down.
@@ -432,7 +478,17 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
 
   zoomTo(scale: number, options?: FluidboxZoomCommandOptions) {
     if (!Number.isFinite(scale)) {
-      return Promise.reject(new RangeError(`Fluidbox zoom scale must be finite: ${scale}`));
+      return Promise.reject(
+        new RangeError(
+          (() => {
+            try {
+              if (process.env.NODE_ENV !== "production")
+                return `Fluidbox zoom scale must be finite: ${scale}`;
+            } catch {}
+            return "fluidbox";
+          })(),
+        ),
+      );
     }
     return this.#zoomCommand(() => scale, "api", options);
   }
@@ -445,7 +501,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return this.#zoomCommand((from) => from / ZOOM_FACTOR, "api", options);
   }
 
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">) {
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">) {
     return this.#zoomCommand(() => 1, "api", options);
   }
 
@@ -466,24 +522,82 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   /** The zoom came to rest at another scale on the item on show. */
-  #zoomed(scale: number, reason: FluidboxReason | undefined) {
-    this.#zoomId = this.#state.id;
+  #zoomed(scale: number, reason: FluidboxReason | undefined, ZoomEvent: typeof FluidboxZoomEvent) {
+    this.#zoomId = this.#state.value;
     if (scale === this.#zoomScale) return;
     this.#zoomScale = scale;
     if (this.#state.zoom && this.#state.zoom.scale !== scale) {
       this.#publish(this.#state.status, this.#state.index);
     }
-    this.dispatchEvent(
-      new FluidboxZoomEvent("zoomchange", { scale, reason: reason ?? this.#reason }),
+    this.dispatchEvent(new ZoomEvent("zoomchange", { scale, reason: reason ?? this.#reason }));
+  }
+
+  /** The zoom of the item on show: open on a box that zooms, with zoom on. */
+  #zoomFor(
+    status: FluidboxStatus,
+    index: number | null,
+    item: TItem | null,
+  ): FluidboxZoomState | null {
+    if (status !== "open" || index === null || !item || this.#zoom === false) return null;
+    // The viewer knows whether the box on show zooms; until it is on the item, an image does.
+    const box = this.#viewer?.zoomable(index) ?? (item.type === "image" ? {} : null);
+    if (!box) return null;
+    // The scale belongs to the item it rested on; another item starts fitted.
+    const scale = this.#zoomId === idOf(item) ? this.#zoomScale : 1;
+    return Object.freeze({ scale, min: 1, max: box.max ?? this.#zoom?.max ?? 4 });
+  }
+
+  setFullscreen(on?: boolean) {
+    return this.#onShow((viewer) => viewer.setFullscreen(on ?? !this.#state.fullscreen));
+  }
+
+  download() {
+    return this.#onShow((viewer, item) => viewer.download(item));
+  }
+
+  share() {
+    return this.#onShow((viewer, item, url = this.#shareLink(item)) =>
+      url ? viewer.share(item, url) : false,
     );
   }
 
-  /** The zoom of the item on show: open on an image, with zoom on. */
-  #zoomFor(status: FluidboxStatus, item: TItem | null): FluidboxZoomState | null {
-    if (status !== "open" || item?.type !== "img" || this.#zoom === false) return null;
-    // The scale belongs to the item it rested on; another item starts fitted.
-    const scale = this.#zoomId === idOf(item) ? this.#zoomScale : 1;
-    return Object.freeze({ scale, min: 1, max: this.#zoom?.max ?? 4 });
+  play() {
+    // An opening viewer may still be loading; it plays once it has, unless
+    // anything changed meanwhile: a close, a move or another open.
+    const state = this.#state;
+    if (this.#viewer) this.#viewer.play();
+    else if (state.status !== "closed") {
+      this.#loadViewer().then(
+        (viewer) => state === this.#state && viewer?.play(),
+        () => {},
+      );
+    }
+  }
+
+  pause() {
+    // After a play still waiting for the viewer to load, in turn.
+    if (this.#viewer) this.#viewer.pause();
+    else
+      this.#viewerLoad?.then(
+        (viewer) => viewer?.pause(),
+        () => {},
+      );
+  }
+
+  /** Run a command on the item on show; with none open it does nothing and resolves false. */
+  #onShow(
+    run: (viewer: FluidboxRuntimeDriver<TItem>, item: TItem) => Promise<boolean> | false,
+  ): Promise<boolean> {
+    const { status, item } = this.#state;
+    return Promise.resolve(
+      status === "open" && !!item && !!this.#viewer && run(this.#viewer, item),
+    );
+  }
+
+  /** The link Share shares, resolved against the page; undefined when there is none. */
+  #shareLink(item: TItem) {
+    const url = this.#shareUrl?.(item);
+    return url ? new URL(url, location.href).href : undefined;
   }
 
   next(options?: FluidboxCommandOptions) {
@@ -533,16 +647,42 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     );
   }
 
+  /**
+   * Origins for items without a bound trigger, from the options' `findTrigger`
+   * and `revealTrigger`, read on each use.
+   */
+  #triggerAdapter(options: FluidboxOptions<TItem>): FluidboxOriginAdapter {
+    const item = (id: string) => {
+      const index = this.#source.getIndex(id);
+      return index === null ? null : { item: this.#source.getItem(index), index };
+    };
+    return {
+      getOrigin: (id) => {
+        const find = options.findTrigger;
+        const found = find && item(id);
+        const trigger = found ? find(found.item, found.index) : null;
+        return trigger ? resolveOrigin(trigger) : null;
+      },
+      get revealOrigin(): FluidboxOriginAdapter["revealOrigin"] {
+        const reveal = options.revealTrigger;
+        if (!reveal) return undefined;
+        return (id, index, context) => {
+          const found = item(id);
+          return found ? reveal(found.item, index, context) : undefined;
+        };
+      },
+    };
+  }
+
   bind(
     element: HTMLElement,
-    target: FluidboxTarget<TItem>,
+    value: FluidboxTriggerValue<TItem>,
     options: FluidboxBindOptions<TItem> = {},
   ) {
     // Before anything is attached, so a destroyed fluidbox holds no listeners.
     this.#assertAlive();
     const trigger = bindTrigger(this, element, {
-      target,
-      returns: options.returns,
+      value,
       onPreviewChange: options.onPreviewChange,
     });
     const refresh = () => trigger.refresh();
@@ -553,31 +693,70 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     }, options.signal);
   }
 
+  bindControl(
+    element: HTMLElement,
+    name: FluidboxControlName,
+    options: { readonly signal?: AbortSignal } = {},
+  ) {
+    this.#assertAlive();
+    if (!controlNameList.includes(name)) {
+      throw new TypeError(
+        (() => {
+          try {
+            if (process.env.NODE_ENV !== "production")
+              return `Fluidbox has no control named "${name}".`;
+          } catch {}
+          return "fluidbox";
+        })(),
+      );
+    }
+    // The control code loads on first use, so a page that binds none skips it.
+    let release: (() => void) | undefined;
+    let released = false;
+    void import("./control-wiring").then(({ bindControl }) => {
+      if (!released) release = bindControl(this, element, name);
+    });
+    return this.#keep(() => {
+      released = true;
+      release?.();
+    }, options.signal);
+  }
+
   bindOverlay(
     element: HTMLElement,
-    target: FluidboxTarget<TItem>,
+    value: FluidboxTriggerValue<TItem>,
     options: FluidboxOverlayOptions<TItem> = {},
   ) {
     this.#assertAlive();
-    const { travel, frameLayer } = options;
-    const registration: FluidboxThumbnailOverlayRegistration<TItem> = travel
-      ? {
-          behavior: "travel",
-          element,
-          frameLayer,
-          renderer:
-            travel === true
-              ? ({ target: frame }) => {
-                  frame.append(...[...element.childNodes].map((node) => node.cloneNode(true)));
-                  return () => frame.replaceChildren();
-                }
-              : travel,
-        }
-      : { behavior: "host", element };
-    const targets = targetKeys(target, options.returns);
+    const { flight = "none" } = options;
+    const registration: FluidboxThumbnailOverlayRegistration<TItem> =
+      flight === "frame"
+        ? { behavior: "frame", element }
+        : flight === "none"
+          ? { behavior: "host", element }
+          : {
+              behavior: "travel",
+              element,
+              renderer:
+                flight === "copy"
+                  ? ({ target: frame }) => {
+                      frame.append(...[...element.childNodes].map((node) => node.cloneNode(true)));
+                      return () => frame.replaceChildren();
+                    }
+                  : flight.live,
+            };
+    const targets = targetKeys(value);
     for (const each of targets) {
       if (typeof each === "string" ? !each : !Number.isInteger(each) || each < 0) {
-        throw new RangeError(`Not a fluidbox item target: ${String(each)}`);
+        throw new RangeError(
+          (() => {
+            try {
+              if (process.env.NODE_ENV !== "production")
+                return `Not a fluidbox item target: ${String(each)}`;
+            } catch {}
+            return "fluidbox";
+          })(),
+        );
       }
     }
     // Ids may arrive with later items.
@@ -693,11 +872,15 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return {
       registerOrigin: (ids, origin) => this.#registerOrigin(ids, origin),
       intend: () => {
-        if (this.#loading === "hover") void this.load();
+        if (this.#preload === "intent") void this.load();
       },
       command: (name, target, reason) =>
         this.#command(name, target, reason === "items" ? "api" : reason),
-      takeOver: (index) => this.#command("open", index, "api", { instant: true }),
+      takeOver: (value) => this.#command("open", value, "api", { instant: true }),
+      shareLink: (item) => this.#shareLink(item as TItem),
+      slideshow: () => !!this.#settings.slideshow,
+      retry: () => Promise.resolve(this.#state.status === "open" && !!this.#viewer?.retry()),
+      labels: this.#labels,
       zoom: (name, reason) =>
         this.#zoomCommand(
           (from) =>
@@ -737,9 +920,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   ): FluidboxDispose {
     if (this.#lifetime.signal.aborted) return () => {};
     this.#assertKnownId(id);
-    this.#overlays.get(id)?.dispose?.();
-    const overlay: OverlayRegistration<TItem> = { token: {}, registration };
-    this.#overlays.set(id, overlay);
+    const overlay: OverlayRegistration<TItem> = { id, registration };
+    this.#overlays.add(overlay);
     if (this.#viewer) overlay.dispose = this.#viewer.registerThumbnailOverlay(id, registration);
     // The overlay's resting state is public styling, so it shows before the viewer loads.
     else publishOverlayPhase(registration.element, "idle", 1);
@@ -747,8 +929,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     return () => {
       if (disposed) return;
       disposed = true;
-      if (this.#overlays.get(id) !== overlay) return;
-      this.#overlays.delete(id);
+      if (!this.#overlays.delete(overlay)) return;
       if (overlay.dispose) overlay.dispose();
       else resetOverlayPhase(registration.element);
     };
@@ -762,9 +943,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       this.#finish(this.#pending, aborted());
     }
     if (this.#state.status === "closed") return;
+    const from = this.#announced;
+    this.#before(null, null, this.#reason, false);
     this.#origins.restoreThumbnail();
     this.#publish("closed", null);
-    this.#toggle("closed");
+    this.#announce(null, this.#reason);
+    if (from !== null) this.#complete("close", null, from, this.#reason);
   }
 
   #close(options: SessionCommandOptions): Promise<SessionCommandResult> {
@@ -784,8 +968,9 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     );
     this.#abortReveal();
     const index = this.#state.index;
+    const from = this.#announced;
     this.#publish("closing", index);
-    this.#toggle("closing");
+    this.#announce(null, reason);
     const active = index === null ? null : this.#source.getItem(index);
     // A swipe reveals its slide's origin only once the strip settles. A close
     // that starts sooner still has to land on that origin, not the last one.
@@ -801,7 +986,12 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       }
     }
     if (active) this.#origins.hideThumbnail(idOf(active));
-    return this.#closeMotion(operation, active ? this.#origins.get(idOf(active)) : null, reason);
+    return this.#closeMotion(
+      operation,
+      active ? this.#origins.get(idOf(active)) : null,
+      reason,
+      from,
+    );
   }
 
   #goTo(target: SessionTarget, options: SessionCommandOptions) {
@@ -828,8 +1018,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     // A thumbnail can change its media while the close flight targets it.
     // Keep that flight running when the selected item still exists. Reopening
     // here would turn a normal preview update into an interrupted close.
-    if (this.#state.status === "closing" && this.#state.id !== null) {
-      const index = source.getIndex(this.#state.id);
+    if (this.#state.status === "closing" && this.#state.value !== null) {
+      const index = source.getIndex(this.#state.value);
       if (index !== null) {
         const changed = index !== this.#state.index;
         this.#source = source;
@@ -841,7 +1031,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#supersede();
     this.#abortReveal();
 
-    const { id: previousId, index: previousIndex, status } = this.#state;
+    const { value: previousId, index: previousIndex, status } = this.#state;
     this.#source = source;
     this.#viewer?.setSource(source);
     this.#sourceRefreshPending = false;
@@ -862,11 +1052,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     const matchingIndex = previousId === null ? null : source.getIndex(previousId);
     const index = matchingIndex ?? Math.min(previousIndex, source.count - 1);
     const changed = idOf(source.getItem(index)) !== previousId || index !== previousIndex;
+    const value = idOf(source.getItem(index));
+    // The items force it: announced, but not cancelable.
+    if (value !== this.#announced && status !== "closed") {
+      this.#before(value, index, "source-update", false);
+    }
     this.#publish(status, index);
-    if (changed) this.#itemEvent("itemchange", index, "source-update");
+    if (status !== "closed") this.#announce(value, "source-update");
 
     if (status === "closed") return Promise.resolve(completed(changed));
-    return this.#reconcileSelection(index, changed);
+    return this.#reconcileSelection(index, changed, previousId);
   }
 
   #select(
@@ -885,7 +1080,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       // A plain move that repeats a pending scrub ends it, so it brings the trigger into view.
       if (!options.scrub && this.#pending?.scrub) {
         return repeated.then((result) => {
-          if (result.status === "completed" && this.#state.id === id) {
+          if (result.status === "completed" && this.#state.value === id) {
             this.#requestReveal(id, index, "selection");
           }
           return result;
@@ -914,15 +1109,16 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     );
     operation.scrub = options.scrub;
     this.#abortReveal();
+    const from = this.#announced;
     this.#publish(opening ? "opening" : status, index);
-    if (opening) this.#toggle("opening");
-    this.#itemEvent("itemchange", index, reason);
+    this.#announce(id, reason);
     if (opening) this.#revealedId = id;
     return this.#move(operation, index, opening, reason, {
       scrub: options.scrub,
       step: options.step,
       instant: opening && options.instant,
       phase: opening ? "open" : "selection",
+      from,
     });
   }
 
@@ -932,14 +1128,11 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     this.#viewer?.setSource(this.#source);
   }
 
-  #reconcileSelection(index: number, changed: boolean) {
+  #reconcileSelection(index: number, changed: boolean, from: FluidboxValue) {
     const operation = this.#begin(`source:${idOf(this.#source.getItem(index))}`);
     const opening = this.#state.status !== "open";
-    if (opening && this.#state.status !== "opening") {
-      this.#publish("opening", index);
-      this.#toggle("opening");
-    }
-    return this.#move(operation, index, opening, "source-update", { changed });
+    if (opening && this.#state.status !== "opening") this.#publish("opening", index);
+    return this.#move(operation, index, opening, "source-update", { changed, from });
   }
 
   /** Run the open or select motion to an item, then settle on it. */
@@ -954,12 +1147,15 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       instant,
       phase = "selection",
       changed = true,
+      from,
     }: {
       scrub?: boolean;
       step?: 1 | -1;
       instant?: boolean;
       phase?: "open" | "selection";
       changed?: boolean;
+      /** The value the motion leaves. */
+      from: FluidboxValue;
     },
   ) {
     const item = this.#source.getItem(index);
@@ -983,22 +1179,26 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
           })),
     ).then((settled) => {
       if (!settled || !this.#owns(operation)) return;
-      if (opening) {
-        this.#publish("open", index);
-        this.#toggle("open");
-      }
+      if (opening) this.#publish("open", index);
       if (!scrub) this.#requestReveal(idOf(item), index, phase);
-      if (changed) this.#itemEvent("settle", index, reason);
+      if (changed) {
+        this.#complete(opening ? "open" : "move", idOf(item), opening ? null : from, reason);
+      }
       this.#finish(operation, completed(changed));
+      // Once the move is done, so a handler's new items don't interrupt it,
+      // and not while a valuechangecomplete handler's own move is on its way.
+      if (!this.#pending) this.#viewer?.reachEnd();
     });
     return operation.promise;
   }
 
   #reconcileClose(reason: "source-empty") {
+    const from = this.#announced;
+    this.#before(null, null, reason, false);
     const operation = this.#begin(reason);
     this.#publish("closing", null);
-    this.#toggle("closing");
-    return this.#closeMotion(operation, null, reason);
+    this.#announce(null, reason);
+    return this.#closeMotion(operation, null, reason, from);
   }
 
   /** Run the close motion, then settle closed. */
@@ -1006,6 +1206,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
     operation: PendingCommand,
     origin: FluidboxOrigin | null,
     reason: SessionChangeReason,
+    from: FluidboxValue,
   ) {
     void this.#run(operation, () =>
       // A viewer that never loaded has painted nothing to close.
@@ -1016,7 +1217,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       // A close that the items emptied has nothing left to refresh.
       this.#flushSourceRefresh();
       this.#publish("closed", null);
-      this.#toggle("closed");
+      if (from !== null) this.#complete("close", null, from, reason);
       this.#finish(operation, completed(true));
     });
     return operation.promise;
@@ -1110,36 +1311,75 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   #allowed(
     command: "open" | "close" | "goTo" | "next" | "previous",
     target: SessionTarget | undefined,
-    sessionReason: SessionReason,
+    reason: SessionReason,
   ) {
-    const reason = reasonOf(sessionReason);
     const { status, index } = this.#state;
     const shown = status === "open" || status === "opening";
-    const opening = command === "open" && !shown;
     // A command that would do nothing announces nothing.
-    if (command === "close" && !shown) return true;
-    if (opening || command === "close") {
-      return this.dispatchEvent(
-        new FluidboxToggleEvent("beforetoggle", {
-          cancelable: true,
-          oldState: opening ? "closed" : "open",
-          newState: opening ? "open" : "closed",
-          reason,
-        }),
-      );
-    }
-    if (!shown) return true;
+    if (command === "close") return !shown || this.#before(null, null, reason);
+    if (command !== "open" && !shown) return true;
     const goal = target ? this.#resolve(target) : null;
-    if (typeof goal !== "number" || goal === index) return true;
-    const item = this.#source.getItem(goal);
+    if (typeof goal !== "number" || (shown && goal === index)) return true;
+    return this.#before(idOf(this.#source.getItem(goal)), goal, reason);
+  }
+
+  /** Fire `beforevaluechange` for a change to `value`. False when a listener prevented it. */
+  #before(
+    value: FluidboxValue,
+    index: number | null,
+    reason: SessionChangeReason | FluidboxReason,
+    cancelable = true,
+  ) {
+    const previousValue = this.#announced;
     return this.dispatchEvent(
-      new FluidboxItemChangeEvent<TItem>("beforeitemchange", {
-        cancelable: true,
-        id: idOf(item),
-        index: goal,
-        item,
-        reason,
-      }),
+      this.#valueEvent("beforevaluechange", value, previousValue, index, reason, cancelable),
+    );
+  }
+
+  #valueEvent(
+    type: "beforevaluechange" | "valuechange" | "valuechangecomplete",
+    value: FluidboxValue,
+    previousValue: FluidboxValue,
+    index: number | null,
+    reason: SessionChangeReason | FluidboxReason,
+    cancelable = false,
+    action: FluidboxValueChangeAction = previousValue === null
+      ? "open"
+      : value === null
+        ? "close"
+        : "move",
+  ) {
+    const item = index === null || index >= this.#list.count ? null : this.#list.get(index);
+    return new FluidboxValueChangeEvent<TItem>(type, {
+      cancelable,
+      value,
+      previousValue,
+      index: item ? index : null,
+      item,
+      action,
+      reason: reasonOf(reason),
+    });
+  }
+
+  /** Fire `valuechange` as the viewer heads for `value`, unless it already announced it. */
+  #announce(value: FluidboxValue, reason: SessionChangeReason | FluidboxReason) {
+    const previousValue = this.#announced;
+    if (value === previousValue) return;
+    this.#announced = value;
+    const index = value === null ? null : this.#state.index;
+    this.dispatchEvent(this.#valueEvent("valuechange", value, previousValue, index, reason));
+  }
+
+  /** Fire `valuechangecomplete` once the motion to `value` settled. */
+  #complete(
+    action: FluidboxValueChangeAction,
+    value: FluidboxValue,
+    previousValue: FluidboxValue,
+    reason: SessionChangeReason | FluidboxReason,
+  ) {
+    const index = value === null ? null : this.#state.index;
+    this.dispatchEvent(
+      this.#valueEvent("valuechangecomplete", value, previousValue, index, reason, false, action),
     );
   }
 
@@ -1164,7 +1404,7 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
       void Promise.resolve(reveal)
         .then(() => {
           this.#viewer?.revealed();
-          if (!controller.signal.aborted && this.#state.id === id) {
+          if (!controller.signal.aborted && this.#state.value === id) {
             this.#origins.hideThumbnail(id);
           }
         })
@@ -1180,12 +1420,8 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   #restoreState(state: FluidboxState<TItem>, reason: SessionChangeReason) {
-    const current = this.#state;
     this.#publish(state.status, state.index);
-    if (current.status !== state.status) this.#toggle(state.status);
-    if (state.index !== null && current.id !== state.id) {
-      this.#itemEvent("itemchange", state.index, reason);
-    }
+    this.#announce(state.status === "closed" ? null : state.value, reason);
   }
 
   /** The index of a target, or the error for an unknown one, which commands reject with. */
@@ -1202,20 +1438,31 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
   }
 
   #assertKnownId(id: string) {
-    if (this.#source.getIndex(id) === null) throw new RangeError(`Unknown fluidbox item id: ${id}`);
+    if (this.#source.getIndex(id) === null)
+      throw new RangeError(
+        (() => {
+          try {
+            if (process.env.NODE_ENV !== "production") return `Unknown fluidbox item id: ${id}`;
+          } catch {}
+          return "fluidbox";
+        })(),
+      );
   }
 
   #stateFor(status: FluidboxStatus, index: number | null): FluidboxState<TItem> {
     const item = index === null ? null : this.#source.getItem(index);
     return Object.freeze({
       status,
-      id: item ? idOf(item) : null,
+      value: item ? idOf(item) : null,
       index,
       item,
       count: this.#source.count,
       hasPrevious: index !== null && (index > 0 || this.#loops),
       hasNext: index !== null && (index < this.#source.count - 1 || this.#loops),
-      zoom: this.#zoomFor(status, item),
+      zoom: this.#zoomFor(status, index, item),
+      fullscreen: !!this.#viewer?.fullscreen,
+      // Closing stops it at once, before the viewer hears of the close.
+      playing: (status === "open" || status === "opening") && !!this.#viewer?.playing,
     });
   }
 
@@ -1236,29 +1483,5 @@ export class FluidboxRuntime<TItem extends FluidboxItem>
         report(error);
       }
     }
-  }
-
-  /** Opening and closing toggle; an aborted command lands back where it was. */
-  #toggle(status: FluidboxStatus) {
-    const side = status === "opening" || status === "open" ? "open" : "closed";
-    if (side === this.#announced) return;
-    const oldState = this.#announced;
-    this.#announced = side;
-    this.dispatchEvent(
-      new FluidboxToggleEvent("toggle", { oldState, newState: side, reason: this.#reason }),
-    );
-  }
-
-  #itemEvent(type: "itemchange" | "settle", index: number, reason: SessionChangeReason) {
-    if (index < 0 || index >= this.#list.count) return;
-    const item = this.#list.get(index);
-    this.dispatchEvent(
-      new FluidboxItemChangeEvent<TItem>(type, {
-        id: idOf(item),
-        index,
-        item,
-        reason: reasonOf(reason),
-      }),
-    );
   }
 }

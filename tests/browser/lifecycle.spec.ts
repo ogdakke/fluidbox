@@ -12,8 +12,8 @@ async function setup(page: Page, reducedMotion = false) {
   await page.goto("/lifecycle.html");
   await page.waitForFunction(() => "lifecycleReady" in document.body.dataset);
   await page.evaluate(async () => {
-    const { createFluidbox, items, origins } = window.lifecycle;
-    window.fb = createFluidbox({ items, origins });
+    const { createFluidbox, items, findTrigger } = window.lifecycle;
+    window.fb = createFluidbox({ items, findTrigger });
     for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
       window.fb.bind(trigger, trigger.dataset.photoId!);
     }
@@ -25,7 +25,7 @@ async function setup(page: Page, reducedMotion = false) {
 function leftovers(page: Page) {
   return page.evaluate(() => ({
     inert: [...document.querySelectorAll("[inert]")].map((node) => node.tagName),
-    overlays: document.querySelectorAll("[data-fluidbox-overlay]").length,
+    overlays: document.querySelectorAll("[data-fluidbox-viewer]").length,
     flights: document.querySelectorAll("[data-fluidbox-flight]").length,
   }));
 }
@@ -119,11 +119,11 @@ for (const reducedMotion of [false, true]) {
           };
           const pick = <T>(choices: readonly T[]) =>
             choices[Math.floor(random() * choices.length)]!;
-          const { createFluidbox, items, origins } = window.lifecycle;
+          const { createFluidbox, items, findTrigger } = window.lifecycle;
           // Every third seed goes round the gallery.
           const loop = seed % 3 === 0;
           const make = () => {
-            const fluidbox = createFluidbox({ items, origins, loop });
+            const fluidbox = createFluidbox({ items, findTrigger, loop });
             for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
               fluidbox.bind(trigger, trigger.dataset.photoId!);
             }
@@ -219,7 +219,7 @@ for (const reducedMotion of [false, true]) {
           const settled = `${status} ${fluidbox.state.index}, viewer ${dialog ? dialog.getAttribute("data-fluidbox-status") : "gone"}`;
           const consistent =
             status === "closed"
-              ? !document.querySelector("[data-fluidbox-overlay]")
+              ? !document.querySelector("[data-fluidbox-viewer]")
               : status === "open" && dialog?.getAttribute("data-fluidbox-status") === "open";
           const final = random() < 0.5 ? "close" : "destroy";
           log.push(final);
@@ -236,7 +236,7 @@ for (const reducedMotion of [false, true]) {
             closed,
             finalStatus: fluidbox.state.status,
             inert: document.querySelectorAll("[inert]").length,
-            overlays: document.querySelectorAll("[data-fluidbox-overlay]").length,
+            overlays: document.querySelectorAll("[data-fluidbox-viewer]").length,
             flights: document.querySelectorAll("[data-fluidbox-flight]").length,
           };
         },
@@ -332,7 +332,10 @@ test("new items keep the slides of the items they share, and equal items change 
   });
   expect(swapped).toBe(true);
   expect(await marked()).toEqual(["Study one:Study one", "Study two:Study two", "Study four:new"]);
-  expect(await page.evaluate(() => window.fb.state)).toMatchObject({ status: "open", id: "two" });
+  expect(await page.evaluate(() => window.fb.state)).toMatchObject({
+    status: "open",
+    value: "two",
+  });
   expect(
     await page.evaluate(() => {
       const image = document.querySelector<HTMLImageElement>(

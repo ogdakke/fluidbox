@@ -9,12 +9,12 @@ export function programmatic(root: HTMLElement) {
     void gallery.open(2);
   });
 
-  // beforeitemchange comes before every move between items; canceling it keeps the viewer still.
-  gallery.addEventListener("beforeitemchange", (event) => {
-    if (lock.checked) event.preventDefault();
+  // beforevaluechange comes before every open, move and close; canceling a move keeps the viewer still.
+  gallery.addEventListener("beforevaluechange", (event) => {
+    if (lock.checked && event.action === "move") event.preventDefault();
   });
 
-  for (const type of ["beforetoggle", "toggle", "beforeitemchange", "itemchange", "settle"]) {
+  for (const type of ["valuechange", "valuechangecomplete"]) {
     gallery.addEventListener(type, () => {
       log.append(Object.assign(document.createElement("li"), { textContent: type }));
       while (log.children.length > 20) log.firstElementChild!.remove();

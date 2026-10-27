@@ -1,19 +1,39 @@
 import { mountSite } from "../src/site";
-import { createFluidbox, type FluidboxItem, type FluidboxSlideRenderer } from "@ogdakke/fluidbox";
-import { renderEmbed, vimeoItem, youtubeItem } from "@ogdakke/fluidbox/embeds";
-import { createModelRenderer, modelItem } from "@ogdakke/fluidbox/model";
-import { createSpinRenderer, spinItem } from "@ogdakke/fluidbox/spin";
+import {
+  createFluidbox,
+  type FluidboxCustomItemBase,
+  type FluidboxItem,
+  type FluidboxSlideRenderer,
+} from "@ogdakke/fluidbox";
+import { embedSlide, vimeoItem, youtubeItem } from "@ogdakke/fluidbox/embed";
+import { createModelSlide, modelItem } from "@ogdakke/fluidbox/model";
+import { createSpinSlide, spinItem } from "@ogdakke/fluidbox/spin";
 import "./media.css";
 
 mountSite("fixtures", {
   fixture: "Media add-ons · slide activity, YouTube and Vimeo, a 360° spin and a 3D model",
 });
 
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    probe: FluidboxCustomItemBase<"probe">;
+  }
+}
+
 /** What the probe slides saw, in order, for the tests. */
 const log: string[] = [];
+/** Each close a probe slide heard start from it. */
+const closes: string[] = [];
 
 /** A slide that records when it mounts, comes on show, leaves it and unloads. */
-const probe: FluidboxSlideRenderer = ({ item, target, signal, active, onActiveChange }) => {
+const probe: FluidboxSlideRenderer = ({
+  item,
+  media: target,
+  signal,
+  active,
+  onActiveChange,
+  onClose,
+}) => {
   const id = item.id ?? "";
   log.push(`${id} mount ${active ? "active" : "inactive"}`);
   const text = document.createElement("p");
@@ -25,12 +45,12 @@ const probe: FluidboxSlideRenderer = ({ item, target, signal, active, onActiveCh
     text.textContent = `${id}: ${now ? "on show" : "waiting"}`;
   });
   signal.addEventListener("abort", () => log.push(`${id} abort`));
+  onClose(() => closes.push(id));
 };
 
 const probeItem = (id: string): FluidboxItem => ({
-  type: "custom",
+  type: "probe",
   id,
-  render: "probe",
   title: `Probe ${id}`,
   width: 800,
   height: 600,
@@ -38,7 +58,7 @@ const probeItem = (id: string): FluidboxItem => ({
 });
 
 const items: FluidboxItem[] = [
-  { type: "img", id: "photo", src: "/photo-square.svg", alt: "Square", width: 800, height: 800 },
+  { type: "image", id: "photo", src: "/photo-square.svg", alt: "Square", width: 800, height: 800 },
   probeItem("a"),
   probeItem("b"),
   youtubeItem("https://youtu.be/M7lc1UVf-VE", {
@@ -79,11 +99,11 @@ const MODEL_VIEWER = "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/m
 
 const fluidbox = createFluidbox({
   items,
-  renderers: {
+  slides: {
     probe,
-    embed: renderEmbed,
-    spin: createSpinRenderer(),
-    model: createModelRenderer({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) }),
+    embed: embedSlide,
+    spin: createSpinSlide(),
+    model: createModelSlide({ load: () => import(/* @vite-ignore */ MODEL_VIEWER) }),
   },
 });
 
@@ -92,13 +112,13 @@ for (const item of items) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.item = item.id;
-  button.setAttribute("aria-label", `Open ${item.type === "img" ? item.alt : item.title}`);
+  button.setAttribute("aria-label", `Open ${item.type === "image" ? item.alt : item.title}`);
   const image = document.createElement("img");
   image.alt = "";
-  image.src = item.type === "img" ? item.src : (item.thumbnail?.src ?? "");
+  image.src = item.type === "image" ? item.src : (item.thumbnail?.src ?? "");
   button.append(image);
   grid.append(button);
   fluidbox.bind(button, item);
 }
 
-Object.assign(window, { mediaFixture: { fluidbox, log } });
+Object.assign(window, { mediaFixture: { fluidbox, log, closes } });

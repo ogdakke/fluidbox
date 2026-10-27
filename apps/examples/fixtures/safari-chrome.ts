@@ -20,7 +20,7 @@ const settings = {
     label: "Page header",
     options: { none: "None", sticky: "Sticky", fixed: "Fixed" },
   },
-  filmstrip: { label: "Filmstrip", options: { off: "Off", on: "On (fluidbox-gallery)" } },
+  thumbnails: { label: "Thumbnails", options: { off: "Off", on: "On (fluidbox-gallery)" } },
   fit: { label: "viewport-fit", options: { auto: "auto", cover: "cover" } },
   probe: { label: "Probe colour", options: { solid: "Solid", translucent: "Translucent" } },
 } as const;
@@ -184,16 +184,16 @@ function onStatus(next: FluidboxStatus) {
   updateReadout();
 }
 
-if (current.filmstrip === "on") {
-  // The filmstrip is a gallery element feature. The gallery wraps the grid so
-  // its hidden <fluidbox-filmstrip> marker never counts as a grid cell.
+if (current.thumbnails === "on") {
+  // The thumbnails is a gallery element feature. The gallery wraps the grid so
+  // its hidden <fluidbox-thumbnails> marker never counts as a grid cell.
   void import("@ogdakke/fluidbox/elements").then(async () => {
     const element = document.createElement("fluidbox-gallery") as FluidboxGalleryElement;
     element.setAttribute("aria-label", "Lab gallery");
     gallery.replaceWith(element);
-    // With items set, the gallery binds every data-fluidbox-item-id descendant as a trigger.
-    for (const [id, trigger] of triggers) trigger.dataset.fluidboxItemId = id;
-    element.append(gallery, document.createElement("fluidbox-filmstrip"));
+    // With items set, the gallery binds every data-fluidbox-value descendant as a trigger.
+    for (const [id, trigger] of triggers) trigger.dataset.fluidboxValue = id;
+    element.append(gallery, document.createElement("fluidbox-thumbnails"));
     element.items = items;
     element.subscribe((state) => onStatus(state.status));
     window.safariChromeLab = await element.whenReady();

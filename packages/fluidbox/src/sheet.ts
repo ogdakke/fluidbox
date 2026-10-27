@@ -14,11 +14,13 @@ import type {
   FluidboxSheetOptions,
 } from "./public-api";
 import { PhotoRoom } from "./photo-room";
+import { FluidboxSheetEvent } from "./sheet-event";
 
 export type { FluidboxSheet, FluidboxSheetOptions, FluidboxSheetSnapPoint } from "./public-api";
 import type { FluidboxSheetSnapPoint } from "./public-api";
 
-type FluidboxSheetDismiss = NonNullable<FluidboxSheetOptions["dismiss"]>;
+/** How a swipe down closes the viewer, or "none" while the Root's `dismiss.drag` is off. */
+type FluidboxSheetDismiss = NonNullable<FluidboxSheetOptions["dismissMotion"]> | "none";
 
 const DEFAULT_SNAP_POINTS: readonly FluidboxSheetSnapPoint[] = ["60%", "content"];
 /** Stops closer than this are one stop. */
@@ -88,21 +90,21 @@ const px = (value: number) => `${value}px`;
  */
 export function createSheet(
   options: FluidboxSheetOptions<PublicItem>,
-  onChange: (stop: number, reason: FluidboxReason) => void,
+  onChange: (event: FluidboxSheetEvent) => void,
 ): Addon<FluidboxSheet> {
   let stop = 0;
   let instance: SheetRuntime | undefined;
   const announce = (next: number, reason: FluidboxReason) => {
     if (next === stop) return;
     stop = next;
-    onChange(stop, reason);
+    onChange(new FluidboxSheetEvent("sheetchange", { snap: stop, reason }));
   };
   return {
     handle: {
-      get stop() {
+      get snap() {
         return stop;
       },
-      set(next, setOptions) {
+      setSnap(next, setOptions) {
         instance?.set(next, setOptions?.animate ?? true, "api");
       },
     },
@@ -187,10 +189,10 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   ) {
     this.#context = context;
     this.#dialog = context.dialog;
-    this.#overlay = this.#dialog.closest<HTMLElement>("[data-fluidbox-overlay]") ?? this.#dialog;
+    this.#overlay = this.#dialog.closest<HTMLElement>("[data-fluidbox-viewer]") ?? this.#dialog;
     this.#source = context.source;
     this.#options = options;
-    this.#dismiss = options.dismiss ?? "flight";
+    this.#dismiss = context.gestures.dismiss.drag ? (options.dismissMotion ?? "flight") : "none";
     this.#announce = announce;
     this.#onDestroy = onDestroy;
     const document = this.#dialog.ownerDocument;
@@ -666,12 +668,12 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   };
 
   #placeMarkers(offsets: number[]) {
-    const markers = [...this.#scroller.querySelectorAll<HTMLElement>("[data-fluidbox-sheet-snap]")];
+    const markers = [...this.#scroller.querySelectorAll<HTMLElement>("[data-fluidbox-sheet-mark]")];
     for (const [index, offset] of offsets.entries()) {
       let marker = markers[index];
       if (!marker) {
         marker = this.#dialog.ownerDocument.createElement("div");
-        marker.dataset.fluidboxSheetSnap = "";
+        marker.dataset.fluidboxSheetMark = "";
         this.#scroller.append(marker);
       }
       marker.style.top = `${offset}px`;
@@ -968,7 +970,7 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
   }
 
   #syncTriggers(stop = this.#stop) {
-    for (const trigger of this.#dialog.querySelectorAll("[data-fluidbox-sheet-stop]")) {
+    for (const trigger of this.#dialog.querySelectorAll("[data-fluidbox-sheet-snap]")) {
       trigger.setAttribute("aria-expanded", String(stop > 0));
     }
   }
@@ -1102,9 +1104,9 @@ class SheetRuntime implements FluidboxExtensionInstance<FluidboxItem> {
 
   #onClick = (event: MouseEvent) => {
     const target = event.target instanceof Element ? event.target : null;
-    const trigger = target?.closest<HTMLElement>("[data-fluidbox-sheet-stop]");
+    const trigger = target?.closest<HTMLElement>("[data-fluidbox-sheet-snap]");
     if (trigger && this.#dialog.contains(trigger)) {
-      const stop = Number(trigger.dataset.fluidboxSheetStop);
+      const stop = Number(trigger.dataset.fluidboxSheetSnap);
       if (!Number.isInteger(stop)) return;
       event.preventDefault();
       event.stopPropagation();

@@ -1,36 +1,76 @@
 <!-- #region example -->
+<!-- The add-ons read their markup: a YouTube iframe, spin frames and a <model-viewer>. -->
 <fluidbox-gallery class="pattern-grid">
-  <button
-    type="button"
-    class="pattern-thumb"
-    data-test="trigger"
-    data-fluidbox-item-id="fjord-wood"
-  >
-    <img src="/products/fjord-wood-640.webp" alt="The print in a wood frame" />
-  </button>
-  <button
-    type="button"
-    class="pattern-thumb"
-    data-test="trigger"
-    data-fluidbox-item-id="product-video"
-  >
-    <img src="https://i.ytimg.com/vi/M7lc1UVf-VE/mqdefault.jpg" alt="How the print is made" />
-  </button>
-  <button
-    type="button"
-    class="pattern-thumb"
-    data-test="trigger"
-    data-fluidbox-item-id="product-spin"
-  >
-    <img src="/products/spin/fjord-00-thumb.webp" alt="The framed print, all the way round" />
-  </button>
-  <button
-    type="button"
-    class="pattern-thumb"
-    data-test="trigger"
-    data-fluidbox-item-id="product-model"
-  >
-    <img src="/products/fjord-model-thumb.webp" alt="The framed print in 3D" />
-  </button>
+  <fluidbox-item value="fjord-wood">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img src="/products/fjord-wood-640.webp" alt="The print in a wood frame" />
+    </button>
+    <template slot="content">
+      <img
+        src="/products/fjord-wood.webp"
+        srcset="/products/fjord-wood-640.webp 640w, /products/fjord-wood.webp 1600w"
+        alt="The print in a wood frame"
+        width="1600"
+        height="1600"
+      />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item value="product-video">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img
+        src="https://i.ytimg.com/vi/M7lc1UVf-VE/mqdefault.jpg"
+        alt="How the print is made"
+        width="320"
+        height="180"
+      />
+    </button>
+    <template slot="content">
+      <!-- Nothing loads from YouTube until Play. -->
+      <iframe
+        src="https://www.youtube.com/watch?v=M7lc1UVf-VE"
+        title="How the print is made"
+      ></iframe>
+    </template>
+  </fluidbox-item>
+  <fluidbox-item value="product-spin">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img
+        src="/products/spin/fjord-00-thumb.webp"
+        alt="The framed print, all the way round"
+        width="160"
+        height="160"
+      />
+    </button>
+    <template slot="content">
+      <img
+        data-spin-frames="/products/spin/fjord-{index}.webp"
+        data-spin-count="36"
+        data-spin-digits="2"
+        alt="The framed print, all the way round"
+        width="800"
+        height="800"
+      />
+    </template>
+  </fluidbox-item>
+  <fluidbox-item value="product-model">
+    <button slot="trigger" type="button" class="pattern-thumb" data-test="trigger">
+      <img
+        src="/products/damaged-helmet/damaged-helmet-thumb.webp"
+        alt="Damaged Helmet, a 3D model"
+        width="160"
+        height="160"
+      />
+    </button>
+    <template slot="content">
+      <!-- Khronos's glTF sample: CC BY-NC 4.0 © 2016 theblueturtle_, CC BY 4.0 © 2018 ctxwing. -->
+      <model-viewer
+        src="/products/damaged-helmet/damaged-helmet.glb"
+        poster="/products/damaged-helmet/damaged-helmet.webp"
+        alt="Damaged Helmet, a 3D model"
+        width="800"
+        height="800"
+      ></model-viewer>
+    </template>
+  </fluidbox-item>
 </fluidbox-gallery>
 <!-- #endregion example -->

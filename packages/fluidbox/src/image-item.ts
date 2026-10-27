@@ -17,11 +17,13 @@ export interface FluidboxImageProps {
  * An image item from an `<img>`'s props. `image` is the full-size one for the
  * viewer, and `thumbnail`, at the triggers' `sizes`, becomes its thumbnail. A
  * `url()` in either one's `style.backgroundImage`, such as the blur
- * `next/image` makes, becomes the placeholder.
+ * `next/image` makes, becomes the placeholder. `zoom` is the larger image zoom
+ * loads, as the item's `zoom` field.
  */
 export function imageItem(
   image: FluidboxImageProps,
   thumbnail?: FluidboxImageProps,
+  zoom?: FluidboxImageItem["zoom"],
 ): FluidboxImageItem {
   const width = Number(image.width ?? thumbnail?.width);
   const height = Number(image.height ?? thumbnail?.height);
@@ -30,13 +32,14 @@ export function imageItem(
   }
   const placeholder = backgroundUrl(image) ?? (thumbnail && backgroundUrl(thumbnail));
   return {
-    type: "img",
+    type: "image",
     ...sources(image),
     alt: image.alt ?? thumbnail?.alt ?? "",
     width,
     height,
     ...(thumbnail ? { thumbnail: { ...sources(thumbnail), width, height } } : {}),
     ...(placeholder ? { placeholder } : {}),
+    ...(zoom ? { zoom } : {}),
   };
 }
 

@@ -1,6 +1,6 @@
 /** The custom elements, `<fluidbox-gallery>` and its children, defined on import. Browser only. */
 import "./item";
-import "./filmstrip";
+import "./thumbnails";
 import { FluidboxGalleryElement } from "./gallery";
 
 if (!customElements.get("fluidbox-gallery"))
@@ -8,5 +8,11 @@ if (!customElements.get("fluidbox-gallery"))
 
 export { FluidboxGalleryElement };
 export type { FluidboxGalleryEventMap } from "./gallery";
-export { FluidboxFilmstripElement, FluidboxSheetElement } from "./filmstrip";
+export { FluidboxThumbnailsElement, FluidboxSheetElement } from "./thumbnails";
 export { FluidboxItemElement, type FluidboxPreviewChangeEvent } from "./item";
+export {
+  defineMarkup,
+  defineSlide,
+  type FluidboxMarkupContext,
+  type FluidboxMarkupReader,
+} from "./elements-registry";

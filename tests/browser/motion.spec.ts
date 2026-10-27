@@ -350,7 +350,7 @@ test("failed early decode keeps the source painted until the mounted flight deco
 
 test("indexed item without a mounted origin uses scale and fade", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/harness.html?virtual&count=1000&no-filmstrip");
+  await page.goto("/harness.html?virtual&count=1000&no-thumbnails");
   await page.evaluate(() => {
     (window as unknown as { __renderVirtualWindow(start: number): void }).__renderVirtualWindow(
       500,
@@ -1032,7 +1032,7 @@ test("opening crop transforms the fallback and media together", async ({ page })
 
 test("a marked origin inside the trigger is the flight's box", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/harness.html?no-filmstrip");
+  await page.goto("/harness.html?no-thumbnails");
   const trigger = page.locator('fluidbox-item[data-test-index="0"] [data-fluidbox-trigger]');
   await trigger.evaluate((button: HTMLElement) => {
     button.style.borderRadius = "16px";
@@ -1071,7 +1071,7 @@ test("a marked origin inside the trigger is the flight's box", async ({ page }) 
 
 test("unfinished open and close hand off the painted media pose", async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/harness.html?no-filmstrip");
+  await page.goto("/harness.html?no-thumbnails");
   const trigger = page.locator('fluidbox-item[data-test-index="0"] [data-fluidbox-trigger]');
   await page.evaluate(() => {
     const sentinel = document.createElement("aside");

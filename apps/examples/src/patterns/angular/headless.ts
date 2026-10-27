@@ -8,6 +8,7 @@ import { photos } from "../shared";
 @Component({
   selector: "div[appCaption]",
   standalone: true,
+  imports: [FluidboxModule],
   host: { class: "pattern-caption" },
   template: `
     <button
@@ -20,7 +21,7 @@ import { photos } from "../shared";
     </button>
     <span>
       <strong data-test="title">{{ title() }}</strong>
-      <small data-test="counter">{{ (fluidbox().index ?? 0) + 1 }} / {{ fluidbox().count }}</small>
+      <small data-test="counter"><span fluidboxCounter></span></small>
     </span>
     <button
       type="button"
@@ -45,7 +46,7 @@ export class Caption {
   template: `
     <div fluidboxRoot [items]="photos" class="pattern-grid">
       @for (photo of photos; track photo.id) {
-        <button [fluidboxTrigger]="photo" class="pattern-thumb" data-test="trigger">
+        <button [fluidboxTrigger]="photo.id" class="pattern-thumb" data-test="trigger">
           <img [src]="photo.src" [alt]="label(photo)" />
         </button>
       }

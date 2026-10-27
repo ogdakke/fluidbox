@@ -1,6 +1,6 @@
 /**
- * Add a media add-on's rules to a document once. The rules sit in `:where()`,
- * so any rule of the page's own wins over them.
+ * Add a media add-on's rules to a document once. They are the functional ones,
+ * in no cascade layer, as styles.css is; their look is in baseline.css.
  */
 export function addStyles(ownerDocument: Document, name: string, css: string) {
   const id = `fluidbox-${name}-styles`;
@@ -52,7 +52,11 @@ export function paintPoster(
   );
 }
 
-/** The rules every media add-on shares: a box that fills the slide, and its poster. */
+/**
+ * The rules every media add-on shares: a box that fills the slide, and its
+ * poster. The poster's rules weigh one attribute, so a site's
+ * `img { height: auto }` doesn't resize what the flight lands on.
+ */
 export const posterStyles = `
 :where([data-fluidbox-media-addon]) {
   position: relative;
@@ -61,7 +65,7 @@ export const posterStyles = `
   height: 100%;
   overflow: hidden;
 }
-:where([data-fluidbox-media-addon] > [data-fluidbox-media-poster]) {
+:where([data-fluidbox-media-addon]) > [data-fluidbox-media-poster] {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -69,6 +73,10 @@ export const posterStyles = `
   object-fit: cover;
   pointer-events: none;
   user-select: none;
+}
+/* In a box as large as the stage, the poster keeps its own shape. */
+:where([data-fluidbox-fill] [data-fluidbox-media-addon]) > [data-fluidbox-media-poster] {
+  object-fit: contain;
 }
 :where([data-fluidbox-media-addon] > [data-fluidbox-media-pending]) {
   opacity: 0;

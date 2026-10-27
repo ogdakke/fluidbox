@@ -14,7 +14,7 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       const scene = scenes.find((candidate) => candidate.id === id);
       if (!scene) continue;
       const item = document.createElement("fluidbox-item");
-      item.setAttribute("item-id", `doc-${scene.id}`);
+      item.setAttribute("value", `doc-${scene.id}`);
       item.style.setProperty("--ratio", String(scene.width / scene.height));
       const image = () =>
         Object.assign(document.createElement("img"), {
@@ -34,8 +34,8 @@ const demos: Record<string, (root: HTMLElement) => void> = {
       item.append(trigger, content);
       gallery.append(item);
     }
-    if (root.hasAttribute("data-filmstrip"))
-      gallery.append(document.createElement("fluidbox-filmstrip"));
+    if (root.hasAttribute("data-thumbnails"))
+      gallery.append(document.createElement("fluidbox-thumbnails"));
     root.replaceChildren(gallery);
   },
 };

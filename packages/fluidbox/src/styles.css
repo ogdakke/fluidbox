@@ -1,4 +1,6 @@
-/* The viewer's layout and default look. */
+/* The viewer's layout: what makes it work. Its look is in baseline.css. These
+   rules sit in no cascade layer, and their attribute selectors outweigh a
+   site's element resets, such as img { height: auto }. */
 
 /**
  * Insets of the stage the media fits into. Registered `<length>`s, so zoom
@@ -25,6 +27,25 @@
   syntax: "<length>";
   inherits: true;
   initial-value: 0px;
+}
+
+/* The runtime finds these two by name and waits for them before it opens. */
+@keyframes fluidbox-gallery-controls-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--fluidbox-gallery-control-opacity, 1);
+  }
+}
+
+@keyframes fluidbox-video-actions-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 :root {
@@ -57,40 +78,15 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: block;
   width: var(--fluidbox-preview-width, 100%);
   height: var(--fluidbox-preview-height, auto);
-  cursor: zoom-in;
   -webkit-user-select: none;
   user-select: none;
   touch-action: manipulation;
-}
-
-:where(fluidbox-item > :is([slot="trigger"], [data-fluidbox-trigger]):focus-visible) {
-  outline: 2px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: 2px;
 }
 
 [data-fluidbox-video-actions] {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  transition: opacity 180ms linear;
-}
-
-@keyframes fluidbox-gallery-controls-appear {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: var(--fluidbox-gallery-control-opacity, 1);
-  }
-}
-
-@keyframes fluidbox-video-actions-reveal {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 [data-fluidbox-transition-host] {
@@ -184,14 +180,22 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   visibility: visible !important;
 }
 
+/**
+ * How fast the viewer moves: `2` plays the open, the close, a release, a zoom
+ * and a move between slides twice as fast. Read as each motion starts, clamped
+ * to `0.25`–`4`. Reduced motion has no flights at any speed.
+ * @input --fluidbox-motion-speed
+ * @default 1
+ * @on Viewer, which takes it from around the trigger as it opens
+ */
 /* Keep root rule specificity; :where keeps descendant defaults easy to override. */
-:is([data-fluidbox-overlay], [data-fluidbox-flight]) {
+:is([data-fluidbox-viewer], [data-fluidbox-flight]) {
   display: block;
 }
 
 /* Over a modal dialog the viewer and its flights are manual popovers in the
    top layer. Drop the popover's own box; the rules below place them. */
-:is([data-fluidbox-overlay], [data-fluidbox-flight])[popover] {
+:is([data-fluidbox-viewer], [data-fluidbox-flight])[popover] {
   inset: auto;
   width: auto;
   max-width: none;
@@ -204,7 +208,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   background: none;
 }
 
-[data-fluidbox-overlay][data-fluidbox-overlay] {
+[data-fluidbox-viewer][data-fluidbox-viewer] {
   position: absolute;
   top: 0;
   inset-inline: 0;
@@ -214,7 +218,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 
 /* A press prepares the viewer over its card. A descendant can set visibility
    back to visible, as a ready slide preview does, so opacity hides it too. */
-[data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-prepared] {
+[data-fluidbox-viewer][data-fluidbox-viewer][data-fluidbox-prepared] {
   visibility: hidden;
   opacity: 0;
   pointer-events: none;
@@ -222,7 +226,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 
 /* Once it is modal, focus can go into the dialog before the opening paints;
    the overlay's opacity still hides it. */
-[data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-prepared][data-fluidbox-modal]
+[data-fluidbox-viewer][data-fluidbox-viewer][data-fluidbox-prepared][data-fluidbox-modal]
   > [data-fluidbox-container]
   > [data-fluidbox-dialog] {
   visibility: visible;
@@ -256,31 +260,12 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   max-height: none;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-flight-source-hidden] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-flight-source-hidden] {
   visibility: hidden !important;
   opacity: 0 !important;
 }
 
-/**
- * The backdrop (through `--fluidbox-backdrop-background`), the close button,
- * error messages.
- * @input --fluidbox-background
- * @default `#111`
- * @theme
- */
-/** Text and icons. @input --fluidbox-color @default `white` @theme */
-/**
- * The Previous and Next buttons; the close button on hover.
- * @input --fluidbox-control-background
- * @theme
- */
-/**
- * Focus rings on the controls, filmstrip items, the dialog and
- * `<fluidbox-item>` triggers.
- * @input --fluidbox-focus-color
- * @theme
- */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-container] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-container] {
   /* At the page's scroll position, never sticky: iOS 26 tints its bars from sticky layers. */
   position: absolute;
   top: var(--fluidbox-scroll-top, 0px);
@@ -293,27 +278,22 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   isolation: isolate;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
-  color: var(--fluidbox-color, white);
 }
 
-/** The backdrop's `background`. @input --fluidbox-backdrop-background @on Backdrop */
-/** The backdrop's `backdrop-filter`, such as `blur(24px)`. @input --fluidbox-backdrop-filter @on Backdrop */
-/** The backdrop's resting opacity. @input --fluidbox-backdrop-opacity @on Backdrop */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-backdrop] {
+/* A readable surface, not a design: system colours follow light and dark
+   mode and forced colours, and any theme replaces them. baseline.css gives
+   its own colour through --fluidbox-baseline-backdrop. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-backdrop] {
   position: absolute;
   inset: 0;
-  background: var(--fluidbox-backdrop-background, var(--fluidbox-background, #111));
-  opacity: var(--fluidbox-backdrop-opacity, 1);
-  -webkit-backdrop-filter: var(--fluidbox-backdrop-filter, none);
-  backdrop-filter: var(--fluidbox-backdrop-filter, none);
+  background: var(--fluidbox-backdrop-background, var(--fluidbox-baseline-backdrop, Canvas));
   transform: translateZ(0);
   will-change: opacity;
-  cursor: zoom-out;
 }
 
 /* Every dialog fills the viewport. A dialog that shrinks to its media would
    clip the opening and closing flights to the media's column. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-dialog] {
   --fluidbox-content-height: calc(
     var(--fluidbox-height, 100svh) - var(--fluidbox-stage-top) - var(--fluidbox-stage-bottom)
   );
@@ -325,23 +305,11 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   height: 100%;
   max-width: none;
   max-height: none;
-  outline: none;
   /* A slide gap makes the strip overhang; keep it off the page. */
   overflow-x: clip;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog]:focus-visible {
-  /* The dialog fills the window, so its ring goes inside. */
-  outline: 2px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: -4px;
-}
-
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slides]:focus-visible {
-  outline: 2px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: calc(-4px - var(--fluidbox-slide-gap, 0px) / 2);
-}
-
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-media] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-media] {
   display: block;
   max-width: 100cqw;
   max-height: var(--fluidbox-height, 100svh);
@@ -352,7 +320,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   border-radius: 0;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   :is([data-fluidbox-media], [data-fluidbox-item-content]) {
   transform: var(--fluidbox-media-transform, none);
   transform-origin: top left;
@@ -364,40 +332,64 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   display: contents;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close] {
-  z-index: 6;
-  display: flex;
-  position: absolute;
-  top: -12px;
-  right: -12px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: var(--fluidbox-background, #111);
-  color: var(--fluidbox-color, white);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px oklch(0% 0 0 / 0.2);
-  transition:
-    transform 150ms ease-out,
-    background 150ms ease-out,
-    opacity 180ms linear;
-  opacity: var(--fluidbox-gallery-control-opacity, 1);
+/* Hidden means hidden, whatever display baseline.css or a plain rule of
+   yours gives the control: this outweighs a single class or attribute. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
+  :is(
+    [data-fluidbox-close],
+    [data-fluidbox-error],
+    [data-fluidbox-fullscreen],
+    [data-fluidbox-download],
+    [data-fluidbox-share],
+    [data-fluidbox-slideshow],
+    [data-fluidbox-counter],
+    [data-fluidbox-retry]
+  )[hidden] {
+  display: none;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close][hidden],
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-error][hidden] {
+/* An error part or a Retry of yours, in the viewer's layer or the slide's,
+   stands in for the default error. The default's message stays, unseen, for
+   the announcement; its Retry goes. */
+:where(
+    [data-fluidbox-viewer]:has(
+      [data-fluidbox-portal] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    ),
+    [data-fluidbox-slide]:has(
+      > [data-fluidbox-slide-layer] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    )
+  )
+  [data-fluidbox-error] {
+  opacity: 0;
+  pointer-events: none;
+}
+:where(
+    [data-fluidbox-viewer]:has(
+      [data-fluidbox-portal] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    ),
+    [data-fluidbox-slide]:has(
+      > [data-fluidbox-slide-layer] :is([data-fluidbox-retry], [data-fluidbox-error-content])
+    )
+  )
+  [data-fluidbox-error]
+  > [data-fluidbox-retry] {
   display: none;
+}
+/* An error part's content, laid out as its children. */
+[data-fluidbox-error-content] {
+  display: contents;
+}
+
+/* A toolbar of the bindings leaves its controls where they would be without
+   it, until you style it. */
+:where([data-fluidbox-toolbar]) {
+  display: contents;
 }
 
 /* Each slide carries half the gap on both sides; the strip is one gap wider
    than the dialog, which clips it. */
 /** Space between slides, seen only while swiping. @input --fluidbox-slide-gap @on Slides */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slides] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slides] {
   display: flex;
   width: calc(
     100% - var(--fluidbox-stage-left) - var(--fluidbox-stage-right) + var(--fluidbox-slide-gap, 0px)
@@ -413,15 +405,15 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   touch-action: pan-x;
   scrollbar-width: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slides]::-webkit-scrollbar {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slides]::-webkit-scrollbar {
   display: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-slides][data-fluidbox-frozen] {
   overflow-x: hidden;
   scroll-snap-type: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slide] {
   flex: 0 0 100%;
   min-width: 0;
   /* Media inside sizes against the slide with cqw units. */
@@ -435,7 +427,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   scroll-snap-align: center;
   transform: translateX(var(--fluidbox-scroll-compensation, 0px));
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide][hidden] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slide][hidden] {
   /* A refused swipe hides the slides past the fence. */
   display: none;
 }
@@ -447,19 +439,19 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
  * @default unset: photos fill the stage
  * @on Overlay
  */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-slide]
   :is([data-fluidbox-media], [data-fluidbox-item-content]) {
   width: var(--fluidbox-item-width, auto);
   height: var(--fluidbox-item-height, auto);
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-gallery][data-dismissing]
   [data-fluidbox-slide][aria-hidden="true"] {
   opacity: 0;
   visibility: hidden;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-frame] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-frame] {
   position: relative;
   isolation: isolate;
   width: max-content;
@@ -469,20 +461,13 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   overflow: hidden;
   will-change: transform, border-radius;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-travel-layer] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-travel-layer] {
   z-index: 3;
   transform-origin: top left;
 }
-/**
- * Shown behind an image before anything has loaded.
- * @input --fluidbox-image-placeholder-background
- * @on Image frames
- */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-image-frame] {
-  background: var(--fluidbox-image-placeholder-background, rgb(127 127 127 / 0.12));
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-frame]
+/* A custom box's own, too, as the zoom carries the box out of its frame. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
+  :is([data-fluidbox-frame], [data-fluidbox-item-content])
   :is([data-fluidbox-slide-placeholder], [data-fluidbox-slide-preview]) {
   position: absolute;
   inset: 0;
@@ -492,25 +477,25 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   transform-origin: top left;
   pointer-events: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide-placeholder] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slide-placeholder] {
   z-index: 0;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-slide-preview] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slide-preview] {
   z-index: 1;
   visibility: hidden;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-slide-preview][data-fluidbox-image-ready] {
   visibility: visible;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-frame]
   > [data-fluidbox-picture]
   > [data-fluidbox-media] {
   position: relative;
   z-index: 2;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   :is([data-fluidbox-media-cover], [data-fluidbox-video-stand-in]) {
   position: absolute;
   inset: 0;
@@ -520,18 +505,60 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   object-fit: cover;
   transform-origin: top left;
   pointer-events: none;
-  transition: opacity 0.25s ease-out;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-media-cover]:not([src]),
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-media-cover]:not([src]),
 /* The snapshot stays through the opening flight, so a fast embed never swaps framing mid-flight. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog]:not([data-opening])
   [data-fluidbox-media-ready]
   > [data-fluidbox-media-cover] {
   opacity: 0;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-media][data-fluidbox-image-pending] {
+  visibility: hidden;
+}
+/* Built-in media a slide draws into its own box fills the box. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-drawn] {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
+  [data-fluidbox-drawn][data-fluidbox-image-pending] {
+  visibility: hidden;
+}
+/* A slide's own layer covers the slide over its media and takes no pointer
+   events but its content's. The slide's transform makes it the layer's box. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slide-layer] {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: clip;
+  pointer-events: none;
+}
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-slide-layer] > * {
+  pointer-events: auto;
+}
+/* A slide's hotspots sit in the box, which its will-change makes their
+   containing block, on points of the painted media the runtime works out, so
+   they zoom with it. Each is centred on its point and keeps its screen size
+   by undoing the zoom's scale. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-hotspot] {
+  position: absolute;
+  z-index: 3;
+  translate: -50% -50%;
+  scale: calc(1 / var(--fluidbox-zoom-scale, 1));
+}
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
+  [data-fluidbox-hotspot][data-scale-with-zoom] {
+  scale: none;
+}
+/* They don't fly, and can't take focus while the box does. */
+[data-fluidbox-flight] [data-fluidbox-hotspot] {
   visibility: hidden;
 }
 /**
@@ -541,7 +568,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
  */
 /** A colour behind the layer's content. @input --fluidbox-layer-color @on `[data-fluidbox-transition-layer]` */
 /** The opacity of that colour. @input --fluidbox-layer-mask-opacity @on `[data-fluidbox-transition-layer]` */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-transition-layer] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-transition-layer] {
   --fluidbox-closed: 1;
   position: absolute;
   inset: 0;
@@ -553,7 +580,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   overflow: hidden;
   isolation: isolate;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-transition-layer]::before {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-transition-layer]::before {
   content: "";
   position: absolute;
   inset: -12px;
@@ -561,112 +588,24 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   background: var(--fluidbox-layer-color, transparent);
   opacity: var(--fluidbox-layer-mask-opacity, 1);
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-transition-layer] > * {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-transition-layer] > * {
   position: relative;
   z-index: 1;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog]:is([data-gallery], [data-fluidbox-headless])
-  [data-fluidbox-close] {
-  top: calc(var(--fluidbox-stage-top) + 16px);
-  right: calc(var(--fluidbox-stage-right) + 16px);
-}
-/* Right to left, Close takes the top-left corner. */
-:where([data-fluidbox-overlay][dir="rtl"]) [data-fluidbox-close] {
-  right: auto;
-  left: -12px;
-}
-:where([data-fluidbox-overlay][dir="rtl"])
-  [data-fluidbox-dialog]:is([data-gallery], [data-fluidbox-headless])
-  [data-fluidbox-close] {
-  right: auto;
-  left: calc(var(--fluidbox-stage-left) + 16px);
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-fluidbox-headless]:not([data-gallery])
-  [data-fluidbox-close] {
-  transition: opacity 180ms linear;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  :is([data-fluidbox-close], [data-fluidbox-previous], [data-fluidbox-next])
-  > [data-fluidbox-icon] {
-  display: block;
-  flex: none;
-}
-
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-gallery]
-  :is([data-fluidbox-previous], [data-fluidbox-next]) {
-  position: absolute;
-  z-index: 6;
-  top: calc(
-    var(--fluidbox-stage-top) + (100% - var(--fluidbox-stage-top) - var(--fluidbox-stage-bottom)) /
-      2
-  );
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
-  color: var(--fluidbox-color, white);
-  font: inherit;
-  cursor: pointer;
-  transform: translateY(-50%);
-  opacity: var(--fluidbox-gallery-control-opacity, 1);
-  transition: opacity 180ms linear;
-}
 
 /* One item has nowhere to step to. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog]:not([data-gallery])
   :is([data-fluidbox-previous], [data-fluidbox-next]) {
   display: none;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-previous] {
-  left: calc(var(--fluidbox-stage-left) + 16px);
-}
-
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-next] {
-  right: calc(var(--fluidbox-stage-right) + 16px);
-}
-
-/* Right to left, the next slide comes from the left, so Next sits there. */
-:where([data-fluidbox-overlay][dir="rtl"]) [data-fluidbox-previous] {
-  right: calc(var(--fluidbox-stage-right) + 16px);
-  left: auto;
-}
-
-:where([data-fluidbox-overlay][dir="rtl"]) [data-fluidbox-next] {
-  left: calc(var(--fluidbox-stage-left) + 16px);
-  right: auto;
-}
-
-:where([data-fluidbox-overlay][dir="rtl"])
-  :is([data-fluidbox-previous], [data-fluidbox-next])
-  > [data-fluidbox-icon] {
-  transform: scaleX(-1);
-}
-
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
-  /**
-   * The default controls' opacity.
-   * @default `1`; `0.35` when disabled
-   * @on Previous, Next, Close
-   */
-  --fluidbox-gallery-control-opacity: 0.35;
-  cursor: default;
-}
 /* Controls start hidden without a transition. A fade-out here would show the
    controls leaving and then arriving again with the reveal below. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-gallery][data-opening]
   :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-opening]
   :is(
     [data-fluidbox-chrome],
@@ -684,10 +623,10 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   transition: none;
 }
 /* The controls and the chrome fade in together as the backdrop arrives. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-gallery][data-opening][data-revealing]
   :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-opening][data-revealing]
   :is(
     [data-fluidbox-chrome],
@@ -702,10 +641,10 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   ) {
   animation: fluidbox-gallery-controls-appear 180ms linear var(--fluidbox-reveal-delay, 210ms) both;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-dismissing]
   :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-dismissing]
   :is(
     [data-fluidbox-chrome],
@@ -723,27 +662,11 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 }
 /* The add-ons' place beside the viewer's layer takes no box, so what they
    put in it sits on the dialog as the layer's own content does. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-addons] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-addons] {
   display: contents;
 }
-/* Your portal content, and other layers marked data-fluidbox-chrome, reveal and
-   dismiss with the controls. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  :is(
-    [data-fluidbox-chrome],
-    [data-fluidbox-portal]
-      > :not(
-        [data-fluidbox-previous],
-        [data-fluidbox-next],
-        [data-fluidbox-close],
-        [data-fluidbox-mount]
-      ),
-    [data-fluidbox-portal] > [data-fluidbox-mount] > *
-  ) {
-  transition: opacity 180ms linear;
-}
 @media (prefers-reduced-motion: reduce) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
+  :where([data-fluidbox-viewer], [data-fluidbox-flight])
     :is(
       [data-fluidbox-dialog][data-gallery]
         :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]),
@@ -756,7 +679,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
     animation-delay: 0ms;
   }
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-gallery]:is([data-opening], [data-dismissing])
   [data-fluidbox-slides] {
   overflow: hidden;
@@ -764,43 +687,38 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
 /* A photo dragged or closing in place moves toward the browser's bars; the
    strip reaches under them and pads by the same, as the zoom viewport does, so
    it isn't cut at the layout viewport. Nothing inside moves. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-dismissing]
   [data-fluidbox-slides] {
   box-sizing: content-box;
   margin-block: calc(-1 * var(--fluidbox-chrome-reach, 0px));
   padding-block: var(--fluidbox-chrome-reach, 0px);
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-gallery][data-zoomed]
   [data-fluidbox-slides] {
   overflow: visible;
   transform: translateX(calc(-1 * var(--fluidbox-zoom-scroll-offset, 0px)));
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-zoomed]
   [data-fluidbox-frame] {
   overflow: visible;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-gallery][data-zoomed]
   [data-fluidbox-slide][aria-hidden="true"] {
   visibility: hidden;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-dialog][data-zoomed] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-dialog][data-zoomed] {
   touch-action: none;
 }
-/* Zoom moves the media into its own viewport. The unzoomed preview, placeholder,
-   and frame surface left behind would otherwise show around the zoomed image. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+/* Zoom moves the media into its own viewport. The unzoomed preview and
+   placeholder left behind would otherwise show around the zoomed image. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-dialog][data-zoomed]
   :is([data-fluidbox-slide-placeholder], [data-fluidbox-slide-preview]) {
   visibility: hidden;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-dialog][data-zoomed]
-  [data-fluidbox-image-frame] {
-  background: transparent;
 }
 /* Reaches under the stage insets and the browser's bars, and pads by the same,
    so pan maths ignore the reach. */
@@ -818,7 +736,7 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
  * @default none
  * @on Dialog
  */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport] {
   /* Panning a picture has no reading direction, and the pan maths counts from the left. */
   direction: ltr;
   --fluidbox-zoom-reach: var(--fluidbox-zoom-bleed, var(--fluidbox-zoom-chrome, 0px));
@@ -840,109 +758,44 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   touch-action: pan-x pan-y;
   scrollbar-width: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-zoom-viewport]::-webkit-scrollbar {
   display: none;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-canvas] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-canvas] {
   position: relative;
   width: var(--fluidbox-zoom-canvas-width);
   height: var(--fluidbox-zoom-canvas-height);
   overflow: hidden;
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-anchor] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-anchor] {
   position: absolute;
   top: var(--fluidbox-zoom-anchor-top);
   left: var(--fluidbox-zoom-anchor-left);
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-zoom-anchor]
   > [data-fluidbox-media],
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-zoom-anchor]
   > [data-fluidbox-picture]
   > [data-fluidbox-media] {
   width: var(--fluidbox-zoom-item-width);
   height: var(--fluidbox-zoom-item-height);
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-placeholder] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-placeholder] {
   width: var(--fluidbox-zoom-placeholder-width);
   height: var(--fluidbox-zoom-placeholder-height);
 }
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport],
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
+/* A pan selects no text. */
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-zoom-viewport],
+:where([data-fluidbox-viewer], [data-fluidbox-flight])
   [data-fluidbox-zoom-viewport]
   [data-fluidbox-media] {
-  cursor: grab;
   user-select: none;
   -webkit-user-select: none;
 }
-/* A mouse zooms an image with one click; the cursor says so. */
-@media (hover: hover) and (pointer: fine) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
-    [data-fluidbox-dialog][data-zoomable]
-    [data-fluidbox-slide]
-    [data-fluidbox-image-frame]
-    [data-fluidbox-media] {
-    cursor: zoom-in;
-  }
-}
-/* The zoom controls, when `controls` lists them, sit together under the photo. */
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-zoom-controls] {
-  position: absolute;
-  z-index: 6;
-  bottom: calc(var(--fluidbox-stage-bottom) + 16px);
-  left: 50%;
-  display: flex;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 22px;
-  background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
-  transform: translateX(-50%);
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-zoom-controls]
-  > :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]) {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--fluidbox-color, white);
-  font: inherit;
-  cursor: pointer;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]):disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  :is([data-fluidbox-zoom-in], [data-fluidbox-zoom-out], [data-fluidbox-zoom-reset]):focus-visible {
-  outline: 1px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: 2px;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-zoom-viewport][data-grabbing],
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  [data-fluidbox-zoom-viewport][data-grabbing]
-  [data-fluidbox-media] {
-  cursor: grabbing;
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-error] {
-  position: absolute;
-  z-index: 4;
-  bottom: 8px;
-  left: 8px;
-  right: 8px;
-  padding: 8px;
-  background: var(--fluidbox-background, white);
-  color: var(--fluidbox-color, black);
-}
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-announcer] {
+:where([data-fluidbox-viewer], [data-fluidbox-flight]) [data-fluidbox-announcer] {
   /* At the top: left in the flow, it sat a pixel past a short page's end. */
   position: absolute;
   top: 0;
@@ -954,72 +807,25 @@ fluidbox-item > :is([slot="content"], [slot="caption"], [slot="description"]) {
   white-space: nowrap;
 }
 
-:where([data-fluidbox-overlay], [data-fluidbox-flight]) [data-fluidbox-close]:hover {
-  transform: scale(1.1);
-  background: var(--fluidbox-control-background, rgb(20 20 20 / 0.72));
-}
-
-/**
- * The dark edge inside the controls' focus rings, which keeps a light ring
- * visible over a bright photo.
- * @input --fluidbox-focus-contrast
- * @default `black`
- * @theme
- */
-:where([data-fluidbox-overlay], [data-fluidbox-flight])
-  :is(
-    [data-fluidbox-previous],
-    [data-fluidbox-next],
-    [data-fluidbox-close],
-    [data-fluidbox-error] button
-  ):focus-visible {
-  outline: 2px solid var(--fluidbox-focus-color, currentColor);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 2px var(--fluidbox-focus-contrast, black);
-}
-
-/* Windows high contrast and other forced colours drop backgrounds and shadows,
-   so the controls get an edge, and focus and disabled states a system colour. */
+/* Forced colours keep focus rings in the system's colour. */
 @media (forced-colors: active) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
-    :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
-    border: 1px solid ButtonText;
-  }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
-    :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
-    border-color: GrayText;
-    color: GrayText;
-  }
-  :where([data-fluidbox-overlay], [data-fluidbox-flight]) :focus-visible {
+  :where([data-fluidbox-viewer], [data-fluidbox-flight]) :focus-visible {
     outline-color: Highlight;
-  }
-}
-
-/* More contrast: disabled controls stay legible. */
-@media (prefers-contrast: more) {
-  :where([data-fluidbox-overlay], [data-fluidbox-flight])
-    :is([data-fluidbox-previous], [data-fluidbox-next]):disabled {
-    --fluidbox-gallery-control-opacity: 0.6;
   }
 }
 
 /* A viewer the server rendered covers the page until the runtime takes it over.
    Like the runtime's, it is absolute at the top of the page, never fixed: iOS 26
    tints its bars from fixed layers. The takeover moves it to the scroll position. */
-[data-fluidbox-overlay][data-fluidbox-overlay][data-fluidbox-static][hidden] {
+[data-fluidbox-viewer][data-fluidbox-viewer][data-fluidbox-static][hidden] {
   display: none;
 }
 /* The copy has no inline styles, for a strict style-src. Its image's width and
    height are its ratio scaled past any screen; these limits fit it to the slide. */
 [data-fluidbox-server-viewer],
-:where([data-fluidbox-overlay][data-fluidbox-static]) [data-fluidbox-picture] {
+:where([data-fluidbox-viewer][data-fluidbox-static]) [data-fluidbox-picture] {
   display: contents;
 }
-:where([data-fluidbox-overlay][data-fluidbox-static]) [data-fluidbox-slide] [data-fluidbox-media] {
+:where([data-fluidbox-viewer][data-fluidbox-static]) [data-fluidbox-slide] [data-fluidbox-media] {
   max-height: var(--fluidbox-content-height);
-}
-:where([data-fluidbox-overlay][data-fluidbox-static])
-  a:is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
-  color: var(--fluidbox-color, white);
-  text-decoration: none;
 }

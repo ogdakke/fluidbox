@@ -3,8 +3,13 @@
  * implements the same thirteen patterns in `src/patterns/<framework>/`, against the
  * hooks listed in CONTRACT.md, so one browser spec checks them all.
  */
-import type { FluidboxImageItem, FluidboxItem, FluidboxLabels } from "@ogdakke/fluidbox";
-import { youtubeItem } from "@ogdakke/fluidbox/embeds";
+import type {
+  FluidboxCustomItemBase,
+  FluidboxImageItem,
+  FluidboxItem,
+  FluidboxLabels,
+} from "@ogdakke/fluidbox";
+import { youtubeItem } from "@ogdakke/fluidbox/embed";
 import { modelItem } from "@ogdakke/fluidbox/model";
 import { spinItem } from "@ogdakke/fluidbox/spin";
 import { artItem, artSrc, sceneById, scenes } from "../art";
@@ -13,30 +18,28 @@ import "./patterns.css";
 
 export { artSrc, sceneById, scenes };
 
-const art = (prefix: string, ids: string[]) =>
-  ids.map((id) => artItem(sceneById(id), `${prefix}-${id}`));
+/** An item with its id, which triggers and `value` name it by. */
+export type WithId<T extends FluidboxItem = FluidboxImageItem> = T & { readonly id: string };
 
-/** 1 basic, 5 programmatic, 6 zoom (zoom off), 7 filmstrip, 8 sheet, 9 headless, 10 rtl. */
-export const photos: FluidboxImageItem[] = art("photo", ["aurora", "ridge", "fjord", "lagoon"]);
+const art = (prefix: string, ids: string[]) =>
+  ids.map((id) => artItem(sceneById(id), `${prefix}-${id}`) as WithId);
+
+/** 1 basic, 5 programmatic, 6 zoom (zoom off), 7 thumbnails, 8 sheet, 9 headless, 10 rtl. */
+export const photos: WithId[] = art("photo", ["aurora", "ridge", "fjord", "lagoon"]);
 
 /** 2 overlay: an album behind one trigger. */
-export const album: FluidboxImageItem[] = art("album", [
-  "dune",
-  "canyon",
-  "coast",
-  "meadow",
-  "alpine",
-]);
+export const album: WithId[] = art("album", ["dune", "canyon", "coast", "meadow", "alpine"]);
 
 /** 3 origins: a product card and a horizontal scroller. */
-export const product: FluidboxImageItem = {
-  type: "img",
+export const product: WithId = {
+  id: "runner",
+  type: "image",
   src: "/runner.svg",
   alt: "Illustrated coral running shoe",
   width: 1000,
   height: 700,
 };
-export const strip: FluidboxImageItem[] = art("strip", [
+export const strip: WithId[] = art("strip", [
   "alpine",
   "meadow",
   "aurora",
@@ -47,12 +50,22 @@ export const strip: FluidboxImageItem[] = art("strip", [
   "canyon",
 ]);
 
-/** 4 renderers: one custom note, one live map, one video, one YouTube embed. */
-export const media: FluidboxItem[] = [
+/** 4 renderers: a note, an item type of the examples' own, declared for the types below. */
+export interface NoteItem extends FluidboxCustomItemBase<"note"> {
+  readonly id: string;
+}
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    note: NoteItem;
+  }
+}
+
+/** 4 renderers: a note, a live map, a video and a YouTube embed. */
+export const media: WithId<FluidboxItem>[] = [
   {
-    type: "custom",
+    type: "note",
     id: "media-note",
-    render: "note",
     title: "A note",
     width: 800,
     height: 600,
@@ -95,21 +108,21 @@ export const media: FluidboxItem[] = [
 ];
 
 /**
- * 6 zoom: photos at two widths in `srcset`, and the full-size file as `zoomSrc`,
+ * 6 zoom: photos at two widths in `srcset`, and the full-size file as `zoom.src`,
  * which the viewer loads once a zoom shows more pixels than the 1280w has.
  */
-const ladder = (id: string, alt: string, width: number, height: number): FluidboxImageItem => ({
+const ladder = (id: string, alt: string, width: number, height: number): WithId => ({
   id: `zoom-${id}`,
-  type: "img",
+  type: "image",
   src: `/photos/${id}-1280.webp`,
   srcset: `/photos/${id}-640.webp 640w, /photos/${id}-1280.webp 1280w`,
-  zoomSrc: `/photos/${id}.webp`,
+  zoom: { src: `/photos/${id}.webp` },
   alt,
   width,
   height,
   thumbnail: { src: `/photos/${id}-thumb.webp` },
 });
-export const zoomPhotos: FluidboxImageItem[] = [
+export const zoomPhotos: WithId[] = [
   ladder("1015", "Fjord from the cliff edge", 1800, 1200),
   ladder("883", "Still lake", 1800, 1200),
   ladder("1016", "Red rock canyon", 1920, 1080),
@@ -117,9 +130,9 @@ export const zoomPhotos: FluidboxImageItem[] = [
 ];
 
 /** 12 hover: a product photo, shown on the page at 640w, magnified from the 1600w. */
-export const productPhoto: FluidboxImageItem = {
+export const productPhoto: WithId = {
   id: "fjord-wood",
-  type: "img",
+  type: "image",
   src: "/products/fjord-wood.webp",
   srcset: "/products/fjord-wood-640.webp 640w, /products/fjord-wood.webp 1600w",
   alt: "The print in a wood frame",
@@ -129,7 +142,7 @@ export const productPhoto: FluidboxImageItem = {
 };
 
 /** 13 media: a photo, a video, a 360° spin and a 3D model, from the add-ons' helpers. */
-export const productMedia: FluidboxItem[] = [
+export const productMedia: WithId<FluidboxItem>[] = [
   productPhoto,
   youtubeItem("https://www.youtube.com/watch?v=M7lc1UVf-VE", {
     id: "product-video",
@@ -167,13 +180,13 @@ export const productMedia: FluidboxItem[] = [
 export const modelViewerUrl =
   "https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js";
 
-/** The value each framework provides through its own context, read by the custom renderer. */
+/** The value each framework provides through its own context, read by the note slide. */
 export const theme = "dusk";
 
 /** The picture a trigger shows for an item: its thumbnail, a video's poster, or the image. */
 export const thumbnailSrc = (item: FluidboxItem) =>
   item.thumbnail?.src ??
-  (item.type === "video" ? item.poster : item.type === "img" ? item.src : "");
+  (item.type === "video" ? item.poster : item.type === "image" ? item.src : "");
 
 /** 10 rtl: the viewer's words in Arabic, with Arabic-Indic digits in the position. */
 // Plain "ar" now formats with Western digits; nu-arab asks for Arabic-Indic ones.
@@ -186,8 +199,8 @@ export const arabic: Partial<FluidboxLabels> = {
   position: (index, count) =>
     `العنصر ${arabicNumber.format(index + 1)} من ${arabicNumber.format(count)}`,
   slides: "عناصر المعرض",
-  filmstrip: "شريط الصور المصغّرة",
-  filmstripList: "اختر عنصرًا من المعرض",
+  thumbnails: "شريط الصور المصغّرة",
+  thumbnailsList: "اختر عنصرًا من المعرض",
   zoomed: "صورة مكبّرة",
   sheet: "التفاصيل",
   error: "تعذّر تحميل الوسائط.",
@@ -201,7 +214,7 @@ export type PatternName =
   | "renderers"
   | "programmatic"
   | "zoom"
-  | "filmstrip"
+  | "thumbnails"
   | "sheet"
   | "headless"
   | "rtl"
@@ -216,7 +229,7 @@ export const patternNames: readonly PatternName[] = [
   "renderers",
   "programmatic",
   "zoom",
-  "filmstrip",
+  "thumbnails",
   "sheet",
   "headless",
   "rtl",

@@ -29,30 +29,31 @@ export const mount: MountLive = (root) => {
         get children() {
           return [
             createComponent(Fluidbox.Trigger, {
-              item: album[0]!,
+              value: album[0]!,
               class: "pattern-thumb pattern-album",
               "data-test": "trigger",
               get children() {
                 return [
                   element("img", { src: album[0]!.src, alt: coverAlt }),
-                  createComponent(Fluidbox.ThumbnailOverlay, {
-                    travel: true,
+                  createComponent(Fluidbox.Overlay, {
+                    flight: "live",
                     class: "pattern-overlay",
                     "data-test": "count",
                     get children() {
                       return [
-                        createComponent(Fluidbox.FrameLayer, {
+                        createComponent(Fluidbox.Overlay, {
+                          flight: "frame",
                           class: "live-layer",
                           "data-test": "layer",
-                        }),
+                        } as never),
                         countText,
                       ];
                     },
-                  }),
+                  } as never),
                 ];
               },
             } as never),
-            createComponent(Fluidbox.Filmstrip, {}),
+            createComponent(Fluidbox.Thumbnails, {}),
             createComponent(Show as Component<{ when: boolean; children: JSX.Element }>, {
               get when() {
                 return viewer();

@@ -6,19 +6,24 @@ import { photos } from "../shared";
 </script>
 
 <template>
-  <!-- Without a Viewer, the viewer has the default Previous, Next and Close. -->
   <Fluidbox.Root :items="photos">
     <div class="pattern-grid">
       <Fluidbox.Trigger
         v-for="photo in photos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >
         <img :src="photo.src" :alt="itemLabel(photo)" />
       </Fluidbox.Trigger>
     </div>
+    <!-- Without a Viewer, the viewer has these same three buttons. -->
+    <Fluidbox.Viewer>
+      <Fluidbox.Previous />
+      <Fluidbox.Next />
+      <Fluidbox.Close />
+    </Fluidbox.Viewer>
   </Fluidbox.Root>
 </template>
 <!-- #endregion example -->

@@ -1,6 +1,8 @@
-/** The Vue binding: the `Fluidbox` components and the `useFluidbox` and `useFluidboxSheet` composables. */
+/** The Vue binding: the `Fluidbox` parts and the `useFluidbox`, `useFluidboxSheet` and `useFluidboxSlide` composables. */
 import {
   Comment,
+  Fragment,
+  Suspense,
   Teleport,
   cloneVNode,
   computed,
@@ -14,9 +16,9 @@ import {
   normalizeStyle,
   onBeforeUnmount,
   onMounted,
+  onUnmounted,
   onUpdated,
   provide,
-  shallowReactive,
   shallowRef,
   toRaw,
   watch,
@@ -29,94 +31,134 @@ import {
   type SlotsType,
   type VNode,
   type VNodeChild,
+  type WatchSource,
 } from "vue";
 import {
   createFluidbox,
   type Fluidbox as FluidboxInstance,
   type FluidboxControlName,
-  type FluidboxFilmstripOptions,
   type FluidboxItem,
-  type FluidboxItemChangeEvent,
   type FluidboxItemList,
-  type FluidboxItems,
   type FluidboxLabels,
-  type FluidboxLoading,
-  type FluidboxOriginAdapter,
-  type FluidboxRenderer,
-  type FluidboxSlideRenderContext,
-  type FluidboxSlideRenderer,
+  type FluidboxMediaErrorEvent,
+  type FluidboxReachEndEvent,
+  type FluidboxOptions,
   type FluidboxSheetEvent,
-  type FluidboxSheetOptions,
   type FluidboxSheetSnapPoint,
+  type FluidboxSlide,
+  type FluidboxSlideRenderer,
+  type FluidboxSlides,
   type FluidboxState,
   type FluidboxTarget,
-  type FluidboxToggleEvent,
-  type FluidboxUpdateOptions,
+  type FluidboxValue,
+  type FluidboxValueChangeDetails,
+  type FluidboxVideoItem,
+  type FluidboxVideoOptions,
   type FluidboxViewerRenderer,
+  type FluidboxHotspotCoordinate,
   type FluidboxZoomEvent,
 } from "@ogdakke/fluidbox";
 import {
+  controlNames,
+  createFluidboxSync,
   createSlots,
   createTrigger,
-  fluidboxControlIcon,
+  crossOrigin,
+  defaultLabels,
+  downloadLink,
   fluidboxControls,
-  fluidboxEventTypes,
-  frameLayerOf,
-  latestOrigins,
+  fluidboxStaticViewerNodes,
+  holdSlideCommit,
+  idOf,
+  placeHotspot,
+  latestFindTrigger,
   resolveLabels,
-  createFluidboxSync,
+  takeOverFluidbox,
+  targetKeys,
   unloadFluidbox,
+  valueChangeDetails,
   watchFluidbox,
   zoomControlNames,
-  type FluidboxChangeDetails,
   type FluidboxSlot,
+  type FluidboxSlots,
+  type FluidboxStaticNode,
   type FluidboxTriggerPreview,
+  commandsOf,
 } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxApi,
+  FluidboxCommands,
   FluidboxItemContext,
+  FluidboxRootProps,
   FluidboxSheetApi,
-  FluidboxVueRenderer,
+  FluidboxSheetProps,
+  FluidboxSlideApi,
+  FluidboxSlideContent,
+  FluidboxSlidesSlots,
+  FluidboxThumbnailContext,
+  FluidboxTriggerProps,
 } from "./types";
 
 export type {
   FluidboxApi,
   FluidboxCommands,
+  FluidboxControlProps,
+  FluidboxHotspotProps,
+  FluidboxIframeProps,
+  FluidboxImageProps,
   FluidboxItemContext,
+  FluidboxMediaProps,
+  FluidboxOverlayProps,
+  FluidboxRootProps,
   FluidboxSheetApi,
-  FluidboxVueRenderContext,
-  FluidboxVueRenderer,
+  FluidboxSheetProps,
+  FluidboxSheetSnapProps,
+  FluidboxSlideApi,
+  FluidboxSlideContent,
+  FluidboxSlidesSlots,
+  FluidboxThumbnailContext,
+  FluidboxTriggerProps,
+  FluidboxVideoProps,
 } from "./types";
-export type { FluidboxChangeDetails, FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
+export type { FluidboxTriggerPreview } from "@ogdakke/fluidbox/kit";
 export type {
-  FluidboxCustomItem,
+  FluidboxCustomItemBase,
+  FluidboxItemTypes,
   FluidboxIframeItem,
   FluidboxImageItem,
   FluidboxItem,
-  FluidboxItemChangeEvent,
   FluidboxItemList,
   FluidboxItemListOptions,
+  FluidboxLazyItemList,
   FluidboxItems,
   FluidboxLabels,
-  FluidboxLoading,
-  FluidboxOrigin,
-  FluidboxOriginAdapter,
+  FluidboxMediaErrorEvent,
+  FluidboxReachEndEvent,
+  FluidboxPreload,
   FluidboxReason,
   FluidboxSheetEvent,
   FluidboxSheetSnapPoint,
+  FluidboxSlide,
+  FluidboxSlideRenderer,
+  FluidboxHotspotCoordinate,
+  FluidboxHotspotOptions,
   FluidboxState,
   FluidboxStatus,
   FluidboxTarget,
-  FluidboxToggleEvent,
+  FluidboxValue,
+  FluidboxValueChangeAction,
+  FluidboxValueChangeDetails,
+  FluidboxValueChangeEvent,
   FluidboxVideoItem,
   FluidboxZoomCommandOptions,
   FluidboxZoomEvent,
+  FluidboxZoomPose,
   FluidboxZoomState,
 } from "@ogdakke/fluidbox";
 
 type AnyItem = FluidboxItem;
 
-/** Content the runtime asked for, teleported from a part so it keeps the app's context. */
+/** Content the runtime asked for, teleported from Root so it keeps the app's context. */
 interface Mount {
   readonly key: number;
   readonly target: HTMLElement;
@@ -126,7 +168,7 @@ interface Mount {
 /**
  * Patches the current component at once, for content the runtime asked for:
  * it may measure what it asked for, and it empties a target right after the
- * dispose, which must find Vue's nodes there.
+ * dispose, which must find Vue's nodes gone.
  */
 function usePatch() {
   const instance = getCurrentInstance()!;
@@ -137,19 +179,23 @@ function usePatch() {
   };
 }
 
-/** Teleports content into runtime targets until the returned dispose runs. */
+/** Renders content into runtime targets, each in a host of its own, until the returned dispose runs. */
 function useMounts() {
   const patch = usePatch();
   const list = shallowRef<readonly Mount[]>([]);
   let nextKey = 0;
   return {
-    mount(target: HTMLElement, render: () => VNodeChild): () => void {
-      const entry = { key: nextKey++, target, render };
+    mount: (target: HTMLElement, render: () => VNodeChild): (() => void) => {
+      const host = target.ownerDocument.createElement("span");
+      host.dataset.fluidboxMount = "";
+      target.append(host);
+      const entry = { key: nextKey++, target: host, render };
       list.value = [...list.value, entry];
       patch();
       return () => {
         list.value = list.value.filter((candidate) => candidate !== entry);
         patch();
+        host.remove();
       };
     },
     render: () =>
@@ -157,44 +203,15 @@ function useMounts() {
   };
 }
 
-/** The kit's slots for a sheet or a filmstrip, as a list this component renders at once. */
-function useRuntimeSlots(onChange?: (slots: readonly FluidboxSlot<AnyItem>[]) => void) {
-  const patch = usePatch();
-  const runtime = createSlots<AnyItem>();
-  const list = shallowRef<readonly FluidboxSlot<AnyItem>[]>([]);
-  const keys = new WeakMap<FluidboxSlot<AnyItem>, number>();
-  let nextKey = 0;
-  const unsubscribe = runtime.subscribe(() => {
-    list.value = runtime.slots;
-    for (const slot of runtime.slots) if (!keys.has(slot)) keys.set(slot, nextKey++);
-    onChange?.(runtime.slots);
-    patch();
-  });
-  onBeforeUnmount(unsubscribe);
-  return {
-    /** Stable, so passing it again to `update` remounts nothing. */
-    render: runtime.render,
-    list,
-    teleport: (content: (slot: FluidboxSlot<AnyItem>) => VNodeChild) =>
-      list.value.map((slot) =>
-        h(Teleport, { key: keys.get(slot), to: slot.target }, [content(slot)]),
-      ),
-  };
+/** The Thumbnails and Sheet parts' options. Their presence turns each on. */
+interface Addons {
+  thumbnails: { readonly custom: boolean } | null;
+  sheet: FluidboxSheetProps | null;
 }
 
-interface FilmstripPart {
-  readonly options: () => true | FluidboxFilmstripOptions<AnyItem>;
-}
-
-interface SheetPart {
-  readonly options: () => FluidboxSheetOptions<AnyItem>;
-}
-
-/** The parts that turn viewer features on, as they are rendered inside Root. */
-interface Features {
-  viewers: number;
-  filmstrip: FilmstripPart | null;
-  sheet: SheetPart | null;
+/** The Slides part's slots, as a new object whenever they may have changed. */
+interface SlidesEntry {
+  readonly slots: Readonly<Record<string, FluidboxSlideContent<any> | undefined>>;
 }
 
 interface RootContext {
@@ -207,89 +224,106 @@ interface RootContext {
   readonly api: FluidboxApi<AnyItem>;
   readonly sheet: FluidboxSheetApi;
   readonly viewerTarget: Readonly<ShallowRef<HTMLElement | null>>;
-  readonly features: Features;
+  readonly thumbnailsSlots: FluidboxSlots<AnyItem>;
+  readonly sheetSlots: FluidboxSlots<AnyItem>;
+  readonly slides: ShallowRef<SlidesEntry | null>;
+  /** Render content into a runtime target until the returned function runs. */
+  readonly mount: (target: HTMLElement, render: () => VNodeChild) => () => void;
+  readonly setAddon: <K extends keyof Addons>(name: K, value: Addons[K]) => void;
+  /** Count a Viewer part, which the viewer patches as it draws its layer. */
+  readonly addViewer: (patch: () => void) => () => void;
+  /** What the server's copy of an open viewer needs to know, set as the parts set up. */
+  readonly serverHints: ServerHints;
+}
+
+interface ServerHints {
+  thumbnails: boolean;
+  sheet: boolean;
+  viewer: boolean;
+}
+
+interface SlideContext {
+  readonly slide: FluidboxSlide<any>;
+  readonly api: FluidboxSlideApi<any>;
 }
 
 interface TriggerContext {
-  readonly target: () => FluidboxTarget<AnyItem>;
-  readonly returns: () => readonly FluidboxTarget<AnyItem>[] | undefined;
-}
-
-interface OverlayContext {
-  readonly layer: ShallowRef<HTMLElement | null>;
+  /** The item keys of the trigger: its first opens, and every one closes back onto it. */
+  readonly keys: () => readonly (number | string)[];
 }
 
 const RootKey: InjectionKey<RootContext> = Symbol("fluidbox");
+const SlideKey: InjectionKey<SlideContext> = Symbol("fluidbox-slide");
 const TriggerKey: InjectionKey<TriggerContext> = Symbol("fluidbox-trigger");
-const OverlayKey: InjectionKey<OverlayContext> = Symbol("fluidbox-overlay");
-/** Provided inside the copy of an overlay that flies with the photo. */
+/** Provided inside the live copy an overlay renders into the flying frame. */
 const TravelKey: InjectionKey<true> = Symbol("fluidbox-travel");
 
-function useRootContext(part: string): RootContext {
+function useRootContext(): RootContext {
   const context = inject(RootKey, null);
-  if (!context) throw new Error(`<Fluidbox.${part}> must be rendered inside <Fluidbox.Root>.`);
+  if (!context)
+    throw new Error(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "Fluidbox parts must be rendered inside <Fluidbox.Root>.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   return context;
 }
 
-/** Equal members, one level down; arrays compare element by element. */
-function same(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
-  if (Array.isArray(a) || Array.isArray(b)) {
-    return (
-      Array.isArray(a) &&
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((each, index) => each === b[index])
+function useSlideContext(part: string): SlideContext {
+  const context = inject(SlideKey, null);
+  if (!context)
+    throw new Error(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return `<Fluidbox.${part}> must be inside a slide, in <Fluidbox.Slides>.`;
+        } catch {}
+        return "fluidbox";
+      })(),
     );
-  }
-  const keys = Object.keys(a);
-  const other = b as Record<string, unknown>;
-  return (
-    keys.length === Object.keys(b).length &&
-    keys.every((key) => same((a as Record<string, unknown>)[key], other[key]))
-  );
+  return context;
 }
 
-const settingKeys = ["labels", "zoom", "loop", "viewer", "filmstrip", "sheet", "loading"] as const;
-type Settings = {
-  -readonly [K in (typeof settingKeys)[number]]: FluidboxUpdateOptions<AnyItem>[K];
-};
+/** A target as the runtime takes it: the raw item, not Vue's proxy. */
+const rawTarget = <T>(target: T): T =>
+  (typeof target === "object" && target !== null ? toRaw(target) : target) as T;
 
-export interface FluidboxRootProps<TItem extends FluidboxItem = FluidboxItem> {
-  /** The items, or a list read on demand. Reactive, also in place. */
-  readonly items: FluidboxItems<TItem>;
-  /**
-   * Whether the viewer is open, for `v-model:open`. The viewer opens on
-   * `index` and closes when this changes. Leave it out to let triggers own it.
-   */
-  readonly open?: boolean;
-  /** The item the viewer shows, for `v-model:index`. */
-  readonly index?: number;
-  /** Your strings for the viewer. */
-  readonly labels?: Partial<FluidboxLabels>;
-  /** Pinch, double-tap, wheel and keyboard zoom of images. `false` turns it off. */
-  readonly zoom?: false | { readonly step?: number; readonly max?: number };
-  /** Go round: past the last item comes the first. A single item never loops. */
-  readonly loop?: boolean;
-  /** Draw `custom` items, by the name in their `render`. */
-  readonly renderers?: Readonly<Record<string, FluidboxVueRenderer<TItem>>>;
-  /** Find origins the viewer can't see, as in a virtualized grid. */
-  readonly origins?: FluidboxOriginAdapter<TItem>;
-  /** When the viewer's code loads: on `"hover"` (the default), on `"press"`, or `"eager"`ly. */
-  readonly loading?: FluidboxLoading;
-}
+const stateKeys = [
+  "status",
+  "value",
+  "index",
+  "item",
+  "count",
+  "hasPrevious",
+  "hasNext",
+  "zoom",
+  "fullscreen",
+  "playing",
+] as const satisfies readonly (keyof FluidboxState)[];
 
 type RootEmits<TItem extends FluidboxItem> = {
-  beforetoggle: (event: FluidboxToggleEvent) => true;
-  toggle: (event: FluidboxToggleEvent) => true;
-  beforeitemchange: (event: FluidboxItemChangeEvent<TItem>) => true;
-  itemchange: (event: FluidboxItemChangeEvent<TItem>) => true;
-  settle: (event: FluidboxItemChangeEvent<TItem>) => true;
-  sheetchange: (event: FluidboxSheetEvent) => true;
-  zoomchange: (event: FluidboxZoomEvent) => true;
-  "update:open": (open: boolean, details: FluidboxChangeDetails) => true;
-  "update:index": (index: number, details: FluidboxChangeDetails) => true;
+  /**
+   * Before every open, move and close, from any input, with the value the
+   * viewer goes to: an id, or null for a close. `details.cancel()` stops it.
+   */
+  valueChange: (value: FluidboxValue, details: FluidboxValueChangeDetails<TItem>) => true;
+  /**
+   * The value the viewer went to, for `v-model`, once an open, move or close
+   * goes through: a canceled one never reaches the model.
+   */
+  "update:modelValue": (value: FluidboxValue, details: FluidboxValueChangeDetails<TItem>) => true;
+  /** Once the motion of a value change settled: the flight landed, a move came to rest, or a close finished. */
+  valueChangeComplete: (value: FluidboxValue, details: FluidboxValueChangeDetails<TItem>) => true;
+  /** When the image on show comes to rest at another zoom. */
+  zoomChange: (event: FluidboxZoomEvent) => true;
+  /** When a slide's media fails to load, as it shows its error. */
+  mediaError: (event: FluidboxMediaErrorEvent<TItem>) => true;
+  /** When the open item comes within `reachEndThreshold` of the last, once per count: load more. */
+  reachEnd: (event: FluidboxReachEndEvent<TItem>) => true;
 };
 
 type RootSlots<TItem extends FluidboxItem> = SlotsType<{
@@ -299,7 +333,8 @@ type RootSlots<TItem extends FluidboxItem> = SlotsType<{
 /**
  * Owns one fluidbox per gallery. It touches nothing until a viewer is pressed
  * or opened, so Root is safe to render on the server, and prop and part
- * changes apply to it in place. Unmounting drops the viewer. The default slot gets the `useFluidbox()` object.
+ * changes apply to it in place. Unmounting drops the viewer. The default slot
+ * gets the `useFluidbox()` object.
  */
 const Root = defineComponent(
   <TItem extends FluidboxItem>(
@@ -307,175 +342,240 @@ const Root = defineComponent(
     { emit, slots }: SetupContext<RootEmits<TItem>, RootSlots<TItem>>,
   ) => {
     // Reading items one by one tracks in-place changes to a reactive array.
-    const items = computed((): FluidboxItems<TItem> => {
+    const items = computed(() => {
       const value = props.items;
       return Array.isArray(value) ? value.map((item: TItem) => toRaw(item)) : toRaw(value);
     });
-    const viewerTarget = shallowRef<HTMLElement | null>(null);
-    const features = shallowReactive<Features>({ viewers: 0, filmstrip: null, sheet: null });
     const mounts = useMounts();
+    const thumbnailsSlots = createSlots<TItem>();
+    const sheetSlots = createSlots<TItem>();
+    const slides = shallowRef<SlidesEntry | null>(null);
+    const viewerTarget = shallowRef<HTMLElement | null>(null);
+    const viewers = new Set<() => void>();
     const labels = computed(() => resolveLabels(props.labels));
-
-    // Renderers resolve by name when a slide mounts, so the newest one is used.
-    const renderers = new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
-      get(_, key) {
-        const render = typeof key === "string" ? props.renderers?.[key] : undefined;
-        if (!render) return undefined;
-        return (context: FluidboxSlideRenderContext<TItem>) =>
-          mounts.mount(context.target, () =>
-            render({
-              item: context.item,
-              index: context.index,
-              signal: context.signal,
-              get active() {
-                return context.active;
-              },
-              onActiveChange: context.onActiveChange,
-            }),
-          );
-      },
-      has: (_, key) => typeof key === "string" && !!props.renderers?.[key],
-    });
+    const serverHints: ServerHints = { thumbnails: false, sheet: false, viewer: false };
 
     // One function for the life of Root, so `update` redraws the layer only when it comes or goes.
-    const viewer: FluidboxViewerRenderer<TItem> = ({ target }) => {
+    const renderViewer: FluidboxViewerRenderer<TItem> = ({ target }) => {
       viewerTarget.value = target;
+      // A viewer made by the open it serves measures its layer right after
+      // this, and the content can change the layer's insets, so draw it now.
+      for (const patch of viewers) patch();
       return () => {
         if (viewerTarget.value === target) viewerTarget.value = null;
       };
     };
 
-    /** The options the props and parts ask for now. */
-    const settings = (): Settings => {
+    const labelOptions = (): Partial<FluidboxLabels> => ({
+      ...toRaw(props.labels),
+      position: (index, count) => (props.labels?.position ?? defaultLabels.position)(index, count),
+    });
+    const zoomOption = (): FluidboxOptions<TItem>["zoom"] => {
       const { zoom } = props;
-      const labelsInput = props.labels;
-      return {
-        labels: labelsInput && { ...toRaw(labelsInput) },
-        zoom: zoom === false ? false : zoom && { step: zoom.step, max: zoom.max },
-        loop: props.loop,
-        // Without a Viewer part, the viewer has the default controls.
-        viewer:
-          features.viewers > 0 ? (viewer as unknown as FluidboxViewerRenderer<AnyItem>) : undefined,
-        filmstrip: features.filmstrip?.options(),
-        sheet: features.sheet?.options(),
-        loading: props.loading,
-      };
+      return zoom === false ? false : zoom ? { ...toRaw(zoom) } : undefined;
+    };
+    const dismissOption = () => props.dismiss && { ...toRaw(props.dismiss) };
+    const slideshowOption = () => props.slideshow && { ...toRaw(props.slideshow) };
+    // An attribute gives a string: "3" is 3.
+    const threshold = () => {
+      const given = props.reachEndThreshold as unknown;
+      return given === "" || given == null ? undefined : Number(given);
     };
 
-    let applied = settings();
-    const fluidbox = createFluidbox<TItem>({
-      items: items.value,
-      ...(applied as FluidboxUpdateOptions<TItem>),
-      renderers,
-      origins: latestOrigins(() => props.origins as FluidboxOriginAdapter<TItem> | undefined),
-    });
+    // findTrigger and revealTrigger are read from the newest props on each use.
+    const fluidbox = createFluidbox<TItem>(
+      latestFindTrigger<TItem, FluidboxOptions<TItem>>(
+        {
+          items: items.value,
+          labels: labelOptions(),
+          zoom: zoomOption(),
+          loop: props.loop,
+          preload: props.preload,
+          dismiss: dismissOption(),
+          wheel: props.wheel,
+          slideshow: slideshowOption(),
+          reachEndThreshold: threshold(),
+          // Share shares the item's href unless shareUrl says otherwise.
+          shareUrl: (item) => (props.shareUrl ? props.shareUrl(item) : props.href?.(idOf(item))),
+          // Slides are looked up by type as one mounts, so the Slides part's
+          // newest slots are used without telling the viewer.
+          slides: new Proxy({} as Record<string, FluidboxSlideRenderer<TItem>>, {
+            get(_, key) {
+              if (typeof key !== "string" || !slides.value?.slots[key]) return undefined;
+              const renderer: FluidboxSlideRenderer<TItem> = (slide) => {
+                // The open waits until the slide's content reports its commit.
+                const release = holdSlideCommit(slide);
+                const unmount = mounts.mount(slide.layer, () =>
+                  h(SlideHost, { slide, type: key, release }),
+                );
+                return () => {
+                  release();
+                  unmount();
+                };
+              };
+              return renderer;
+            },
+            has: (_, key) => typeof key === "string" && !!slides.value?.slots[key],
+          }) as FluidboxSlides<TItem>,
+        },
+        () => props as FluidboxRootProps<TItem>,
+      ),
+    );
     const state = shallowRef(fluidbox.state);
     const list = shallowRef(fluidbox.items);
-    const sheetStop = shallowRef(0);
-
+    const sheetSnap = shallowRef(0);
     const unsubscribe = fluidbox.subscribe(() => {
       state.value = fluidbox.state;
       if (fluidbox.items !== list.value) list.value = fluidbox.items;
-      // A sheet that loads or goes changes the stop too.
-      sheetStop.value = fluidbox.sheet?.stop ?? 0;
+      // A sheet that loads or goes changes the snap too.
+      sheetSnap.value = fluidbox.sheet?.snap ?? 0;
     });
     // The fluidbox ignores items equal to its own, as an inline `:items="[product]"`.
     watch(items, (next) => void fluidbox.setItems(next));
 
+    // The Viewer, Thumbnails and Sheet parts register as they set up. Changes
+    // go to the viewer together, after the parts that render with them.
+    let addons: Addons = { thumbnails: null, sheet: null };
+    let scheduled = false;
+    const applyAddons = () => {
+      if (!scheduled) return;
+      scheduled = false;
+      const { thumbnails, sheet } = addons;
+      fluidbox.update({
+        viewer: viewers.size > 0 ? renderViewer : undefined,
+        thumbnails: thumbnails
+          ? thumbnails.custom
+            ? { render: thumbnailsSlots.render }
+            : true
+          : undefined,
+        sheet: sheet
+          ? {
+              render: sheetSlots.render,
+              snapPoints: sheet.snapPoints,
+              dismissMotion: sheet.dismissMotion,
+            }
+          : undefined,
+      });
+    };
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = true;
+      // A part that unmounts and mounts again within one patch changes nothing.
+      queueMicrotask(applyAddons);
+    };
+    const setAddon = <K extends keyof Addons>(name: K, value: Addons[K]) => {
+      addons = { ...addons, [name]: value };
+      schedule();
+    };
+    const addViewer = (patch: () => void) => {
+      viewers.add(patch);
+      schedule();
+      return () => {
+        viewers.delete(patch);
+        schedule();
+      };
+    };
+
+    // Objects are compared by value, so inline labels, zoom or dismiss change nothing.
+    watch(
+      () =>
+        JSON.stringify([
+          props.labels ?? {},
+          props.zoom ?? null,
+          props.dismiss ?? null,
+          props.slideshow ?? null,
+          props.loop,
+          props.preload,
+          props.wheel,
+        ]),
+      () =>
+        fluidbox.update({
+          labels: labelOptions(),
+          zoom: zoomOption(),
+          loop: props.loop,
+          preload: props.preload,
+          dismiss: dismissOption(),
+          wheel: props.wheel,
+          slideshow: slideshowOption(),
+        }),
+    );
+    // On its own, as it changes nothing the viewer shows.
+    watch(
+      () => props.reachEndThreshold,
+      () => fluidbox.update({ reachEndThreshold: threshold() }),
+    );
+
     const events = new AbortController();
-    for (const type of fluidboxEventTypes) {
-      fluidbox.addEventListener(
-        type,
-        (event) => (emit as unknown as (type: string, event: Event) => void)(type, event),
-        { signal: events.signal },
-      );
-    }
-    fluidbox.addEventListener("sheetchange", (event) => (sheetStop.value = event.stop), {
-      signal: events.signal,
+    const { signal } = events;
+    fluidbox.addEventListener("zoomchange", (event) => emit("zoomChange", event), { signal });
+    fluidbox.addEventListener("mediaerror", (event) => emit("mediaError", event), { signal });
+    fluidbox.addEventListener("reachend", (event) => emit("reachEnd", event), { signal });
+    fluidbox.addEventListener("sheetchange", (event) => (sheetSnap.value = event.snap), {
+      signal,
     });
+    // valueChange comes from the before-event, so `details.cancel()` works in
+    // its handler; the model hears only of changes that went through.
     watchFluidbox(
       fluidbox,
       {
-        open: (open, details) => emit("update:open", open, details),
-        index: (index, details) => emit("update:index", index, details),
+        value: (value, details) => emit("valueChange", value, details),
+        complete: (value, details) => emit("valueChangeComplete", value, details),
       },
-      events.signal,
+      signal,
+    );
+    fluidbox.addEventListener(
+      "valuechange",
+      (event) => emit("update:modelValue", event.value, valueChangeDetails(event)),
+      { signal },
     );
 
-    // The parts register as Root mounts; the runtime loads the add-ons they turn on.
+    // A Root that renders open on an image draws the viewer's copy on its
+    // first render, so the server's HTML shows the photo, and the viewer
+    // takes it over as the Root mounts.
+    const initial =
+      props.modelValue !== undefined ? props.modelValue : (props.defaultValue ?? null);
+    const first = Array.isArray(items.value) ? (items.value as readonly TItem[]) : [];
+    const at = initial === null ? -1 : first.findIndex((item) => idOf(item) === initial);
+    const serverIndex = first[at]?.type === "image" ? at : null;
+    const serverViewer = shallowRef<HTMLElement | null>(null);
+    const takenOver = shallowRef(false);
+
+    // Your value wins whenever it changes. The triggers and parts have
+    // registered by now, so an open flies from the item's own. The default
+    // value opens once, as the Root mounts.
     onMounted(() => {
-      watch(
-        settings,
-        (next) => {
-          const changes: Partial<Settings> = {};
-          for (const key of settingKeys) {
-            if (!same(applied[key], next[key]))
-              (changes as Record<string, unknown>)[key] = next[key];
-          }
-          if (Object.keys(changes).length) fluidbox.update(changes as FluidboxUpdateOptions<TItem>);
-          applied = next;
-        },
-        { immediate: true },
-      );
-      // Your open and index win whenever they change. The triggers have
-      // registered by now, so an open flies from the item's own.
+      applyAddons();
       const sync = createFluidboxSync(fluidbox);
+      const copy = serverViewer.value;
+      if (copy && serverIndex !== null) {
+        const done = () => (takenOver.value = true);
+        void takeOverFluidbox(fluidbox, copy, idOf(first[serverIndex]!)).then(done, done);
+      } else {
+        sync(props.modelValue === undefined ? (props.defaultValue ?? undefined) : props.modelValue);
+      }
       watch(
-        [() => props.open, () => props.index],
-        ([open, index]) => sync(open === undefined ? undefined : open !== false, index),
-        {
-          immediate: true,
-        },
+        () => props.modelValue,
+        (value) => sync(value),
       );
     });
+    // The events stop first, so the drop never reaches `update:modelValue` as a close.
     onBeforeUnmount(() => {
-      unsubscribe();
       events.abort();
+      unsubscribe();
       unloadFluidbox(fluidbox);
     });
 
-    const api: FluidboxApi<TItem> = {
-      get status() {
-        return state.value.status;
-      },
-      get id() {
-        return state.value.id;
-      },
-      get index() {
-        return state.value.index;
-      },
-      get item() {
-        return state.value.item;
-      },
-      get count() {
-        return state.value.count;
-      },
-      get hasPrevious() {
-        return state.value.hasPrevious;
-      },
-      get hasNext() {
-        return state.value.hasNext;
-      },
-      get zoom() {
-        return state.value.zoom;
-      },
-      open: (target, options) => fluidbox.open(target, options),
-      close: (options) => fluidbox.close(options),
-      next: (options) => fluidbox.next(options),
-      previous: (options) => fluidbox.previous(options),
-      zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
-      zoomIn: (options) => fluidbox.zoomIn(options),
-      zoomOut: (options) => fluidbox.zoomOut(options),
-      resetZoom: (options) => fluidbox.resetZoom(options),
-      setItems: (next) => fluidbox.setItems(next),
-      preload: (target) => fluidbox.preload(target),
-      load: () => fluidbox.load(),
-    };
+    const commands = commandsOf<FluidboxCommands<TItem>>(fluidbox, rawTarget);
+    // The state's fields read the state ref, so a template that reads them follows the viewer.
+    const api = { ...commands } as FluidboxApi<TItem>;
+    for (const key of stateKeys) {
+      Object.defineProperty(api, key, { enumerable: true, get: () => state.value[key] });
+    }
     const sheet: FluidboxSheetApi = {
-      get stop() {
-        return sheetStop.value;
+      get snap() {
+        return sheetSnap.value;
       },
-      set: (stop, options) => fluidbox.sheet?.set(stop, options),
+      setSnap: (snap, options) => fluidbox.sheet?.setSnap(snap, options),
     };
 
     provide(RootKey, {
@@ -486,25 +586,111 @@ const Root = defineComponent(
       api: api as FluidboxApi<AnyItem>,
       sheet,
       viewerTarget,
-      features,
+      thumbnailsSlots: thumbnailsSlots as unknown as FluidboxSlots<AnyItem>,
+      sheetSlots: sheetSlots as unknown as FluidboxSlots<AnyItem>,
+      slides,
+      mount: mounts.mount,
+      setAddon,
+      addViewer,
+      serverHints,
     });
-    return () => [slots.default?.(api), ...mounts.render()];
+    return () => [
+      slots.default?.(api),
+      // After the Root's content, so the parts in it have said what the copy needs.
+      serverIndex !== null && !takenOver.value
+        ? h(ServerViewer, {
+            setElement: (element: HTMLElement | null) => (serverViewer.value = element),
+            items: first,
+            index: serverIndex,
+            labels: labels.value,
+            loop: props.loop,
+            href: props.href,
+            hints: serverHints,
+          })
+        : null,
+      ...mounts.render(),
+    ];
   },
   {
     name: "FluidboxRoot",
-    props: ["items", "open", "index", "labels", "zoom", "loop", "renderers", "origins", "loading"],
-    emits: [...fluidboxEventTypes, "update:open", "update:index"],
+    // Declared without types to keep the item type generic, but `loop`, so a
+    // bare `loop` attribute is true; unset, it stays undefined.
+    props: {
+      items: null,
+      modelValue: null,
+      defaultValue: null,
+      loop: { type: Boolean, default: undefined },
+      href: null,
+      labels: null,
+      zoom: null,
+      findTrigger: null,
+      revealTrigger: null,
+      preload: null,
+      dismiss: null,
+      wheel: null,
+      shareUrl: null,
+      slideshow: null,
+      reachEndThreshold: null,
+      // Typed as the names, which keeps the generic signature's props.
+    } as unknown as (keyof FluidboxRootProps)[],
+    emits: [
+      "valueChange",
+      "update:modelValue",
+      "valueChangeComplete",
+      "zoomChange",
+      "mediaError",
+      "reachEnd",
+    ],
   },
 );
 
-export interface FluidboxTriggerProps<TItem extends FluidboxItem = FluidboxItem> {
-  /** Decorate the one child instead of rendering a `<button>`. */
-  readonly asChild?: boolean;
-  /** Required. The item this trigger opens, or its index or id. */
-  readonly item: FluidboxTarget<TItem>;
-  /** More items that close back onto this trigger, as an album cover's. */
-  readonly returns?: readonly FluidboxTarget<TItem>[];
+function staticElement(each: FluidboxStaticNode | string): VNode | string {
+  if (typeof each === "string") return each;
+  return h(each.tag, { ...each.attributes }, each.children.map(staticElement));
 }
+
+/**
+ * The open viewer's copy. It is built as elements, not HTML, so it renders
+ * under Trusted Types and a strict style-src.
+ */
+const ServerViewer = defineComponent({
+  name: "FluidboxServerViewer",
+  props: {
+    setElement: {
+      type: Function as PropType<(element: HTMLElement | null) => void>,
+      required: true,
+    },
+    items: { type: Array as PropType<readonly FluidboxItem[]>, required: true },
+    index: { type: Number, required: true },
+    labels: { type: Object as PropType<FluidboxLabels>, required: true },
+    loop: { type: Boolean, default: undefined },
+    href: Function as PropType<FluidboxRootProps["href"]>,
+    hints: { type: Object as PropType<ServerHints>, required: true },
+  },
+  setup(props) {
+    return () => {
+      const copy = fluidboxStaticViewerNodes({
+        items: props.items,
+        value: idOf(props.items[props.index]!),
+        labels: props.labels,
+        loop: props.loop,
+        href: props.href,
+        thumbnails: props.hints.thumbnails,
+        sheet: props.hints.sheet,
+        controls: !props.hints.viewer,
+      });
+      if (!copy) return null;
+      return h(
+        "div",
+        {
+          ref: (element: unknown) => props.setElement(toElement(element)),
+          "data-fluidbox-server-viewer": "",
+        },
+        [staticElement(copy)],
+      );
+    };
+  },
+});
 
 type TriggerSlots<TItem extends FluidboxItem> = SlotsType<{
   default?: (preview: FluidboxTriggerPreview<TItem>) => VNode[];
@@ -520,38 +706,50 @@ const Trigger = defineComponent(
     props: FluidboxTriggerProps<TItem>,
     { attrs, slots }: SetupContext<{}, TriggerSlots<TItem>>,
   ) => {
-    const { fluidbox, state, items } = useRootContext("Trigger");
+    const { fluidbox, state, items } = useRootContext();
     const instance = getCurrentInstance()!;
-    const target = (): FluidboxTarget<AnyItem> => {
-      const item = props.item as FluidboxTarget<AnyItem> | undefined;
-      if (item === undefined || item === null) {
-        throw new Error("<Fluidbox.Trigger> needs an item: the item, its index or its id.");
+    const value = () => {
+      const target = props.value as FluidboxTarget<AnyItem> | readonly FluidboxTarget<AnyItem>[];
+      if (target === null || target === undefined) {
+        throw new Error(
+          (() => {
+            try {
+              if (process.env.NODE_ENV !== "production")
+                return "<Fluidbox.Trigger> needs a value: an item, its id or its index, or a list.";
+            } catch {}
+            return "fluidbox";
+          })(),
+        );
       }
-      return typeof item === "object" ? toRaw(item) : item;
+      return Array.isArray(target) ? target.map(rawTarget) : rawTarget(target);
     };
-    const returns = () =>
-      (props.returns as readonly FluidboxTarget<AnyItem>[] | undefined)?.map((each) =>
-        typeof each === "object" ? toRaw(each) : each,
-      );
+    // Its first opens; every one closes back onto it. Compared by value.
+    const keys = computed(() => JSON.stringify(targetKeys(value())));
+    provide(TriggerKey, { keys: () => JSON.parse(keys.value) as (number | string)[] });
     // Read by render, so the forced update below sees a change.
     const previewed = shallowRef(0);
+    // Whether the last render's slot read the preview: only then does it follow the viewer.
+    let follows = false;
     const options = () => ({
-      target: target(),
-      returns: returns(),
-      // The closing flight measures right after this, so patch the DOM now.
+      value: value(),
+      // The closing flight measures the trigger right after this, so patch the DOM now.
       onPreviewChange() {
+        if (!follows) return;
         previewed.value++;
-        if (!instance.isUnmounted) instance.update();
+        if (instance.isMounted && !instance.isUnmounted) instance.update();
       },
     });
     const trigger = createTrigger(fluidbox, options());
-    watch([() => props.item, () => props.returns], () => trigger.update(options()));
+    watch(
+      () => props.value,
+      () => trigger.update(options()),
+    );
+    // Indexes name other items after the items change.
     watch(items, () => trigger.refresh(), { flush: "post" });
     onBeforeUnmount(() => trigger.destroy());
-    provide(TriggerKey, { target, returns });
 
     const handlers = {
-      ref: (value: unknown) => trigger.setElement(toElement(value)),
+      ref: (element: unknown) => trigger.setElement(toElement(element)),
       onClick: (event: MouseEvent) => trigger.click(event),
       onPointerdown: (event: PointerEvent) => trigger.pointerDown(event),
       onPointerup: () => trigger.pointerUp(),
@@ -559,8 +757,29 @@ const Trigger = defineComponent(
     };
 
     return () => {
-      void previewed.value;
-      const preview = trigger.preview(state.value) as FluidboxTriggerPreview<TItem>;
+      follows = false;
+      // Read the state only for a slot that reads the preview, so other triggers
+      // do not render again on every change.
+      let shown: FluidboxTriggerPreview<TItem> | undefined;
+      const read = () => {
+        if (!shown) {
+          follows = true;
+          void previewed.value;
+          shown = trigger.preview(state.value) as FluidboxTriggerPreview<TItem>;
+        }
+        return shown;
+      };
+      const preview: FluidboxTriggerPreview<TItem> = {
+        get item() {
+          return read().item;
+        },
+        get index() {
+          return read().index;
+        },
+        get status() {
+          return read().status;
+        },
+      };
       const rendered = slots.default?.(preview) ?? [];
       // Your handlers come first in the merge, so preventDefault stops the open.
       const asChild = props.asChild as boolean | "" | undefined;
@@ -573,161 +792,424 @@ const Trigger = defineComponent(
     name: "FluidboxTrigger",
     inheritAttrs: false,
     // Declared by name to keep the item type generic; `as-child` arrives as "".
-    props: ["asChild", "item", "returns"],
+    props: ["asChild", "value"],
   },
 );
 
-/**
- * Your own content in the viewer: controls, captions, buttons that move the
- * sheet. Without a Viewer, the viewer has the default Previous, Next and Close.
- */
+/** Renders your controls and captions into the viewer's layer. Without one, the viewer has the default controls. */
 const Viewer = defineComponent({
   name: "FluidboxViewer",
   setup(_, { slots }) {
-    const { features, viewerTarget } = useRootContext("Viewer");
-    features.viewers++;
-    onBeforeUnmount(() => features.viewers--);
+    const { viewerTarget, addViewer, serverHints } = useRootContext();
+    // Read by the server's copy of the open viewer, which renders after this.
+    serverHints.viewer = true;
+    // Once mounted, so a server render loads nothing.
+    const patch = usePatch();
+    let remove: (() => void) | undefined;
+    onMounted(() => (remove = addViewer(patch)));
+    onBeforeUnmount(() => remove?.());
     return () =>
       viewerTarget.value ? h(Teleport, { to: viewerTarget.value }, slots.default?.() ?? []) : null;
   },
 });
 
-/** The copy of an overlay's content that flies with the photo. */
-const Travelling = defineComponent({
-  name: "FluidboxTravelling",
+/** The Slides parts claimed, per Root. */
+const claimed = new WeakSet<object>();
+
+/**
+ * The slide for each item type, as a named slot: your own types, or the
+ * built-in ones. Types it has no slot for draw the built-in slide, or
+ * `#default`. It renders nothing: the viewer asks for a slide's content as
+ * the slide mounts, and renders it into the slide's layer.
+ */
+const Slides = defineComponent({
+  name: "FluidboxSlides",
+  slots: Object as SlotsType<FluidboxSlidesSlots>,
   setup(_, { slots }) {
-    provide(TravelKey, true);
-    return () => slots.default?.();
+    const { slides } = useRootContext();
+    // Development builds only; a page without a bundler has no process.
+    const twice = (() => {
+      try {
+        if (process.env.NODE_ENV !== "production") {
+          if (claimed.has(slides)) return "A <Fluidbox.Root> takes one <Fluidbox.Slides>.";
+          claimed.add(slides);
+        }
+      } catch {}
+      return "";
+    })();
+    if (twice) throw new Error(twice);
+    const entry = () => ({ slots: slots as SlidesEntry["slots"] });
+    slides.value = entry();
+    // The slides on show render the newest slots.
+    onUpdated(() => (slides.value = entry()));
+    onBeforeUnmount(() => {
+      claimed.delete(slides);
+      slides.value = null;
+    });
+    return () => null;
   },
 });
 
 /**
- * Content over a trigger's thumbnail, such as a count. It follows the viewer's
- * motion through `--fluidbox-closed`, and with `travel` its content renders live
- * in the frame that flies with the photo.
+ * One slide's content, in the slide's layer. Content that suspends waits
+ * inside the slide, not the app around the viewer, and the open waits with
+ * it: the commit is reported beside the content, so once the boundary shows it.
  */
-const ThumbnailOverlay = defineComponent({
-  name: "FluidboxThumbnailOverlay",
-  inheritAttrs: false,
+const SlideHost = defineComponent({
+  name: "FluidboxSlide",
   props: {
-    /** Fly with the photo as the viewer opens and closes. */
-    travel: Boolean,
+    slide: { type: Object as PropType<FluidboxSlide<any>>, required: true },
+    type: { type: String, required: true },
+    release: { type: Function as PropType<() => void>, required: true },
   },
-  setup(props, { attrs, slots }) {
-    const { fluidbox, items } = useRootContext("ThumbnailOverlay");
-    const trigger = inject(TriggerKey, null);
-    if (!trigger) {
-      throw new Error("<Fluidbox.ThumbnailOverlay> must be rendered inside <Fluidbox.Trigger>.");
-    }
-    const element = shallowRef<HTMLElement | null>(null);
-    const layer = shallowRef<HTMLElement | null>(null);
-    provide(OverlayKey, { layer });
-    const mounts = useMounts();
-    const travel: FluidboxRenderer<AnyItem> = ({ target }) =>
-      mounts.mount(target, () => h(Travelling, null, () => slots.default?.()));
-    watchEffect(
-      (onCleanup) => {
-        const overlay = element.value;
+  setup(props) {
+    const { slides, items } = useRootContext();
+    const { slide } = props;
+    const active = shallowRef(slide.active);
+    onBeforeUnmount(slide.onActiveChange((next) => (active.value = next)));
+    const api: FluidboxSlideApi<any> = {
+      item: slide.item,
+      get index() {
+        // New items keep a slide whose item moved, so a template that reads it renders again.
         void items.value;
-        if (!overlay) return;
-        onCleanup(
-          fluidbox.bindOverlay(
-            overlay,
-            trigger.target(),
-            props.travel
-              ? {
-                  returns: trigger.returns(),
-                  travel,
-                  frameLayer: layer.value ?? frameLayerOf(overlay),
-                }
-              : { returns: trigger.returns() },
-          ),
-        );
+        return slide.index;
       },
-      { flush: "post" },
-    );
-    return () => [
-      h(
-        "span",
-        mergeProps(attrs, {
-          ref: element,
-          "data-fluidbox-thumbnail-overlay": props.travel ? "travel" : "",
-        }),
-        slots.default?.(),
-      ),
-      ...mounts.render(),
-    ];
+      get active() {
+        return active.value;
+      },
+      get opening() {
+        return slide.opening;
+      },
+      signal: slide.signal,
+      onActiveChange: slide.onActiveChange,
+      get origin() {
+        return slide.origin;
+      },
+      returnPlayback: slide.returnPlayback,
+      onClose: slide.onClose,
+      waitUntil: slide.waitUntil,
+      fail: slide.fail,
+      onZoom: slide.onZoom,
+    };
+    provide(SlideKey, { slide, api });
+    return () => {
+      const contents = slides.value?.slots;
+      const content = contents?.[props.type] ?? contents?.default;
+      return h(Suspense, null, {
+        default: () =>
+          h(Fragment, null, [
+            content?.({ item: slide.item, index: api.index }),
+            h(SlideCommitted, { release: props.release }),
+          ]),
+        fallback: () => null,
+      });
+    };
   },
 });
 
 /**
- * A layer of a travelling ThumbnailOverlay that is moved into the flying frame
- * for the flight and put back after, as one element: a frame, a border, a
- * shadow. It renders a `<span data-fluidbox-frame-layer>`.
+ * Reports the slide's commit as it mounts. Its mounted hook runs after the
+ * content's before it, and a pending Suspense holds it until the content resolves.
  */
-const FrameLayer = defineComponent({
-  name: "FluidboxFrameLayer",
-  inheritAttrs: false,
-  setup(_, { attrs, slots }) {
-    const overlay = inject(OverlayKey, null);
-    if (!overlay) {
-      throw new Error("<Fluidbox.FrameLayer> must be rendered inside <Fluidbox.ThumbnailOverlay>.");
-    }
-    // The flying copy leaves it out: the element itself flies.
-    if (inject(TravelKey, null)) return () => null;
-    const setLayer = (value: unknown) => (overlay.layer.value = toElement(value));
-    onBeforeUnmount(() => (overlay.layer.value = null));
-    return () =>
-      h(
-        "span",
-        mergeProps(attrs, { ref: setLayer, "data-fluidbox-frame-layer": "" }),
-        slots.default?.(),
-      );
+const SlideCommitted = defineComponent({
+  name: "FluidboxSlideCommitted",
+  props: { release: { type: Function as PropType<() => void>, required: true } },
+  setup(props) {
+    onMounted(() => props.release());
+    return () => null;
   },
 });
 
-function control(name: FluidboxControlName, displayName: string) {
-  const definition = fluidboxControls[name];
+/**
+ * The slide this part is inside, in one reactive object: its item, whether it
+ * is on show, and its hooks into the open.
+ */
+export function useFluidboxSlide<
+  TItem extends FluidboxItem = FluidboxItem,
+>(): FluidboxSlideApi<TItem> {
+  return useSlideContext("useFluidboxSlide").api;
+}
+
+/** What a part put on an element of the viewer's is put back by the returned function. */
+function applyAttributes(element: HTMLElement, attrs: Record<string, unknown>): () => void {
+  const restores: (() => void)[] = [];
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === undefined || value === null || typeof value === "function") continue;
+    if (key === "class") {
+      const added = normalizeClass(value)
+        .split(/\s+/)
+        .filter((name) => name && !element.classList.contains(name));
+      element.classList.add(...added);
+      restores.push(() => element.classList.remove(...added));
+    } else if (key === "style") {
+      const style = normalizeStyle(value);
+      const declarations: [string, string][] =
+        typeof style === "string"
+          ? style
+              .split(";")
+              .map((each) => each.split(/:(.*)/s).map((part) => part.trim()) as [string, string])
+              .filter(([name, css]) => name && css)
+          : Object.entries(style ?? {}).map(([name, css]) => [cssName(name), String(css)]);
+      for (const [name, css] of declarations) {
+        const before = element.style.getPropertyValue(name);
+        const priority = element.style.getPropertyPriority(name);
+        element.style.setProperty(name, css);
+        restores.push(() => element.style.setProperty(name, before, priority));
+      }
+    } else {
+      // aria-* and data-* write booleans as text; other attributes are there or not.
+      const text = /^(aria|data)-/.test(key)
+        ? String(value as string | number | boolean)
+        : value === true
+          ? ""
+          : value === false
+            ? null
+            : String(value as string | number);
+      if (text === null) continue;
+      const before = element.getAttribute(key);
+      element.setAttribute(key, text);
+      restores.push(() =>
+        before === null ? element.removeAttribute(key) : element.setAttribute(key, before),
+      );
+    }
+  }
+  return () => {
+    for (const restore of restores.reverse()) restore();
+  };
+}
+
+const cssName = (name: string) =>
+  name.startsWith("--") ? name : name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+
+/** Give an element of the viewer's this component's attributes, again after every update. */
+function useAttributes(element: () => HTMLElement | null, attrs: Record<string, unknown>) {
+  let restore: (() => void) | undefined;
+  const apply = () => {
+    restore?.();
+    const target = element();
+    restore = target ? applyAttributes(target, attrs) : undefined;
+  };
+  onMounted(apply);
+  onUpdated(apply);
+  onBeforeUnmount(() => restore?.());
+  return apply;
+}
+
+/**
+ * The slide's media box: the element that flies, follows a drag to dismiss
+ * and zooms. It is the viewer's own element; this part gives it its
+ * attributes, its default slot and what `render` draws.
+ */
+const Media = defineComponent({
+  name: "FluidboxMedia",
+  inheritAttrs: false,
+  props: ["zoom", "render"],
+  setup(props: { zoom?: boolean | ""; render?: FluidboxSlideRenderer<any> }, { attrs, slots }) {
+    const { slide } = useSlideContext("Media");
+    // In the box from the start, so what renders into it is never moved there.
+    const host = slide.media.ownerDocument.createElement("span");
+    host.dataset.fluidboxMount = "";
+    slide.media.append(host);
+    onUnmounted(() => host.remove());
+    useAttributes(() => slide.media, attrs);
+    onMounted(() => {
+      watch(
+        () => props.render,
+        (render, _, onCleanup) => {
+          if (!render) return;
+          // Its own signal and the nodes it adds go when this part does, so a
+          // new render function draws afresh.
+          const scope = new AbortController();
+          slide.signal.addEventListener("abort", () => scope.abort(), {
+            once: true,
+            signal: scope.signal,
+          });
+          const before = new Set(slide.media.childNodes);
+          const dispose = render(Object.create(slide, { signal: { value: scope.signal } }));
+          onCleanup(() => {
+            dispose?.();
+            scope.abort();
+            for (const node of [...slide.media.childNodes]) if (!before.has(node)) node.remove();
+          });
+        },
+        { immediate: true },
+      );
+      // Its mounted hook runs after Image's, so an explicit `zoom` wins.
+      watch(
+        () => props.zoom,
+        (zoom) => {
+          if (zoom !== undefined) slide.zoomable(zoom === "" || zoom);
+        },
+        { immediate: true },
+      );
+    });
+    // One Teleport to one target, never disabled, so what it holds is never moved.
+    return () => h(Teleport, { to: host }, slots.default?.() ?? []);
+  },
+});
+
+/**
+ * A pin on a point of the slide's painted media: your button, inside `Media`,
+ * which the viewer keeps on its point as the box fits and zooms.
+ */
+const Hotspot = defineComponent({
+  name: "FluidboxHotspot",
+  props: {
+    x: { type: [String, Number] as PropType<FluidboxHotspotCoordinate>, required: true },
+    y: { type: [String, Number] as PropType<FluidboxHotspotCoordinate>, required: true },
+    scaleWithZoom: { type: Boolean, default: undefined },
+  },
+  setup(props, { slots }) {
+    const { slide } = useSlideContext("Hotspot");
+    const button = shallowRef<HTMLButtonElement>();
+    onMounted(() => watchEffect(() => placeHotspot(slide, button.value!, { ...props })));
+    return () => h("button", { type: "button", ref: button }, slots.default?.());
+  },
+});
+
+/** Draw one of the built-in media into the slide's box, again when a source changes. */
+function useDraw(
+  part: string,
+  draw: (slide: FluidboxSlide<any>) => () => void,
+  sources: WatchSource[],
+) {
+  const { slide } = useSlideContext(part);
+  let dispose: (() => void) | undefined;
+  onMounted(() => {
+    watch(
+      sources,
+      () => {
+        dispose?.();
+        dispose = draw(slide);
+      },
+      { immediate: true },
+    );
+  });
+  onBeforeUnmount(() => dispose?.());
+}
+
+const itemKey = (item: unknown) => JSON.stringify(item ?? null);
+
+/** The built-in image in the slide's box: it loads, sharpens and fails as a photo's does. */
+const Image = defineComponent({
+  name: "FluidboxImage",
+  props: ["item"],
+  setup(props: { item?: FluidboxItem }) {
+    useDraw("Image", (slide) => slide.drawImage(props.item && toRaw(props.item as never)), [
+      () => itemKey(props.item),
+    ]);
+    return () => null;
+  },
+});
+
+/** The built-in video in the slide's box. `attach` loads the media yourself; pass a stable function. */
+const Video = defineComponent({
+  name: "FluidboxVideo",
+  props: ["item", "attach"],
+  setup(props: { item?: FluidboxVideoItem; attach?: FluidboxVideoOptions["attach"] }) {
+    useDraw(
+      "Video",
+      (slide) => {
+        const { attach } = props;
+        return slide.drawVideo(props.item && toRaw(props.item), attach && { attach });
+      },
+      // A new attach function loads the media afresh, so pass a stable one.
+      [() => itemKey(props.item), () => props.attach],
+    );
+    return () => null;
+  },
+});
+
+/** The built-in iframe in the slide's box. */
+const Iframe = defineComponent({
+  name: "FluidboxIframe",
+  props: ["item"],
+  setup(props: { item?: FluidboxItem }) {
+    useDraw("Iframe", (slide) => slide.drawIframe(props.item && toRaw(props.item as never)), [
+      () => itemKey(props.item),
+    ]);
+    return () => null;
+  },
+});
+
+/** Whether a slot rendered anything but comments. */
+function hasContent(nodes: readonly VNode[] | undefined): nodes is VNode[] {
+  return !!nodes?.some((node) => !isVNode(node) || node.type !== Comment);
+}
+
+/**
+ * The content and name of a control: its label as text without content, and
+ * with it, the label as `aria-label` unless `label` is false.
+ */
+function named(
+  children: VNode[] | undefined,
+  label: string | false | undefined,
+  text: string,
+  ariaLabel: unknown,
+) {
+  const name = typeof label === "string" ? label : text;
+  return hasContent(children)
+    ? {
+        naming: { "aria-label": ariaLabel ?? (label === false ? undefined : name) },
+        content: children,
+      }
+    : { naming: { "data-fluidbox-default": "", "aria-label": ariaLabel }, content: name };
+}
+
+/** The disabled, hidden and active states, name and Download's link of a control, as the state has it. */
+function useControl(name: FluidboxControlName) {
+  const { fluidbox, state, labels } = useRootContext();
+  const control = fluidboxControls[name];
+  const shown = computed(() => ({
+    disabled: control.disabled(state.value),
+    hidden: !!control.hidden?.(fluidbox, state.value),
+    label: control.label(labels.value, state.value),
+    active: !!control.active?.(state.value),
+  }));
+  return { fluidbox, state, control, shown };
+}
+
+const labelProp = {
+  label: { type: [String, Boolean] as PropType<string | false>, default: undefined },
+};
+
+function control(name: Exclude<FluidboxControlName, "download" | "counter">, displayName: string) {
   return defineComponent({
     name: displayName,
     inheritAttrs: false,
-    setup(_, { attrs, slots }) {
-      const { fluidbox, state, labels } = useRootContext(displayName.slice("Fluidbox".length));
+    props: labelProp,
+    setup(props, { attrs, slots }) {
+      const { fluidbox, control, shown } = useControl(name);
       const run = (event: MouseEvent) => {
         if (event.defaultPrevented) return;
         // Prevented, so the viewer's own handling of the attribute skips it.
         event.preventDefault();
-        void definition.run(fluidbox, event);
+        void control.run(fluidbox, event);
       };
       return () => {
-        const children = slots.default?.();
+        const { disabled, hidden, label, active } = shown.value;
+        const { naming, content } = named(
+          slots.default?.(),
+          props.label,
+          label,
+          attrs["aria-label"],
+        );
         return h(
           "button",
-          mergeProps(
-            {
-              type: "button",
-              disabled: definition.disabled(state.value),
-              [definition.attribute]: "",
-              "data-fluidbox-managed": "",
-              "aria-label": children ? undefined : definition.label(labels.value),
-            },
-            attrs,
-            { onClick: run },
-          ),
-          children ?? [controlIcon(name)],
+          mergeProps({ type: "button", disabled, hidden: hidden || undefined }, attrs, naming, {
+            [control.attribute]: "",
+            "data-fluidbox-managed": "",
+            "data-active": active ? "" : undefined,
+            onClick: run,
+          }),
+          content,
         );
       };
     },
   });
 }
 
-function controlIcon(name: FluidboxControlName): VNode {
-  return h("svg", { ...fluidboxControlIcon.attributes, "data-fluidbox-icon": "" }, [
-    h("path", { d: fluidboxControlIcon.paths[name] }),
-  ]);
-}
-
-/** Closes the viewer. With no content, it shows the default icon and label. */
+/** Closes the viewer. With no content, it shows its label. */
 const Close = control("close", "FluidboxClose");
 /** Moves to the previous item. */
 const Previous = control("previous", "FluidboxPrevious");
@@ -739,174 +1221,438 @@ const ZoomIn = control("zoomIn", "FluidboxZoomIn");
 const ZoomOut = control("zoomOut", "FluidboxZoomOut");
 /** Zooms the image back out to fit. */
 const ZoomReset = control("zoomReset", "FluidboxZoomReset");
+/** Makes the viewer fullscreen, or leaves it. Hidden where fullscreen isn't available. */
+const Fullscreen = control("fullscreen", "FluidboxFullscreen");
+/** Shares the item's link, or copies it. Hidden without a link or a way to share it. */
+const Share = control("share", "FluidboxShare");
+/** Plays and pauses the slideshow, named for what it does next. Hidden without a `slideshow` option, unless it plays. */
+const Slideshow = control("slideshow", "FluidboxSlideshow");
+/** Loads the failed media again. */
+const Retry = control("retry", "FluidboxRetry");
+const parts = {
+  previous: Previous,
+  next: Next,
+  close: Close,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
+  zoomReset: ZoomReset,
+};
 
-/**
- * The default Previous, Next and Close, for a Viewer with content of its own,
- * and with `zoom` the zoom controls in their group.
- */
-const Controls = defineComponent({
-  name: "FluidboxControls",
-  props: { zoom: Boolean },
-  setup(props) {
-    const { labels } = useRootContext("Controls");
-    const zooms = { zoomIn: ZoomIn, zoomOut: ZoomOut, zoomReset: ZoomReset } as const;
-    return () => [
-      ...[Previous, Next, Close].map((part) => h(part)),
-      ...(props.zoom
-        ? [
-            h(
-              "div",
-              {
-                "data-fluidbox-zoom-controls": "",
-                role: "group",
-                "aria-label": labels.value.zoomed,
-              },
-              zoomControlNames.map((name) => h(zooms[name as keyof typeof zooms])),
-            ),
-          ]
-        : []),
-    ];
-  },
-});
-
-/**
- * Turns the filmstrip on. With a default slot, it fills each thumbnail button,
- * getting `{ item, index }`; the selected button has `data-fluidbox-selected`.
- */
-const Filmstrip = defineComponent({
-  name: "FluidboxFilmstrip",
-  slots: Object as SlotsType<{ default?: (thumbnail: FluidboxItemContext) => VNode[] }>,
-  setup(_, { slots }) {
-    const { features } = useRootContext("Filmstrip");
-    const strip = useRuntimeSlots();
-    const custom = !!slots.default;
-    const part: FilmstripPart = {
-      options: () => (custom ? { render: strip.render } : true),
+/** A link that downloads the item on show's file. Off-site files are fetched, so they download too. */
+const Download = defineComponent({
+  name: "FluidboxDownload",
+  inheritAttrs: false,
+  props: labelProp,
+  setup(props, { attrs, slots }) {
+    const { fluidbox, state, control, shown } = useControl("download");
+    const run = (event: MouseEvent) => {
+      const href = (event.currentTarget as HTMLAnchorElement).href;
+      // A same-site file downloads by itself; elsewhere the browser would navigate.
+      if (event.defaultPrevented || !href || !crossOrigin(href)) return;
+      event.preventDefault();
+      void fluidbox.download();
     };
-    features.filmstrip = part;
-    onBeforeUnmount(() => {
-      if (features.filmstrip === part) features.filmstrip = null;
-    });
-    return () => strip.teleport(({ item, index }) => slots.default?.({ item, index }));
+    return () => {
+      const { hidden, label } = shown.value;
+      const { naming, content } = named(slots.default?.(), props.label, label, attrs["aria-label"]);
+      return h(
+        "a",
+        mergeProps(
+          { ...downloadLink(state.value.item), hidden: hidden || undefined },
+          attrs,
+          naming,
+          { [control.attribute]: "", "data-fluidbox-managed": "", onClick: run },
+        ),
+        content,
+      );
+    };
   },
 });
 
-export interface FluidboxSheetProps {
-  /**
-   * The stops above the resting one, lowest first.
-   * @default ["60%", "content"]
-   */
-  readonly snapPoints?: readonly FluidboxSheetSnapPoint[];
-  /**
-   * What a swipe down on the photo does with the sheet down.
-   * @default "flight"
-   */
-  readonly dismiss?: "flight" | "scroll" | "none";
+/** A group of controls. With no content it holds Previous, Next and Close. */
+const Toolbar = defineComponent({
+  name: "FluidboxToolbar",
+  setup(_, { slots }) {
+    return () =>
+      h(
+        "div",
+        { role: "group", "data-fluidbox-toolbar": "" },
+        slots.default?.() ?? controlNames.map((name) => h(parts[name], { key: name })),
+      );
+  },
+});
+
+/** The zoom controls' group, named like the zoomed image. With no content it holds Zoom in, Zoom out and Fit. */
+const ZoomControls = defineComponent({
+  name: "FluidboxZoomControls",
+  setup(_, { slots }) {
+    const { labels } = useRootContext();
+    return () =>
+      h(
+        "div",
+        { role: "group", "aria-label": labels.value.zoomed, "data-fluidbox-zoom-controls": "" },
+        slots.default?.() ?? zoomControlNames.map((name) => h(parts[name], { key: name })),
+      );
+  },
+});
+
+/**
+ * Where the viewer is, as `1 / 4`, or what its slot makes of `{ index, count }`.
+ * Hidden from screen readers, which hear the slide's name.
+ */
+const Counter = defineComponent({
+  name: "FluidboxCounter",
+  slots: Object as SlotsType<{
+    default?: (counter: { readonly index: number; readonly count: number }) => VNode[];
+  }>,
+  setup(_, { slots }) {
+    const { state, labels } = useRootContext();
+    return () => {
+      const { index, count } = state.value;
+      return h(
+        "span",
+        {
+          "aria-hidden": "true",
+          hidden: index === null || undefined,
+          "data-fluidbox-counter": "",
+          // The binding renders it; the core's painting would replace its slot.
+          "data-fluidbox-managed": "",
+        },
+        index === null
+          ? undefined
+          : slots.default
+            ? slots.default({ index, count })
+            : labels.value.counter(index, count),
+      );
+    };
+  },
+});
+
+/**
+ * The item's caption, which describes the dialog, or what its slot makes of
+ * `{ item, index }`. Inside a slide it is that slide's item; elsewhere the item
+ * on show. Nothing without a caption.
+ */
+const Caption = defineComponent({
+  name: "FluidboxCaption",
+  slots: Object as SlotsType<{ default?: (context: FluidboxItemContext) => VNode[] }>,
+  setup(_, { slots }) {
+    const { state } = useRootContext();
+    const slide = inject(SlideKey, null)?.slide;
+    return () => {
+      const item = slide ? slide.item : state.value.item;
+      const index = slide ? slide.index : state.value.index;
+      if (!item || index === null) return null;
+      const content = slots.default ? slots.default({ item, index }) : item.caption;
+      if (content === undefined || content === null || content === "") return null;
+      return h("div", { "data-fluidbox-caption": "", "data-fluidbox-description": "" }, content);
+    };
+  },
+});
+
+/** The loading and error state of the slide a part follows: its own, or the one on show. */
+function useSlideStatus() {
+  const { fluidbox, viewerTarget } = useRootContext();
+  const slide = inject(SlideKey, null)?.slide;
+  const busy = shallowRef(false);
+  const error = shallowRef(false);
+  const causes = new Map<number, unknown>();
+  watchEffect(
+    (onCleanup) => {
+      const root = slide
+        ? slide.media.closest<HTMLElement>("[data-fluidbox-slide]")
+        : viewerTarget.value?.closest<HTMLElement>("[data-fluidbox-dialog]");
+      if (!root) return;
+      const events = new AbortController();
+      fluidbox.addEventListener("mediaerror", (event) => causes.set(event.index, event.cause), {
+        signal: events.signal,
+      });
+      const read = () => {
+        const shown = slide ? root : root.querySelector("[data-fluidbox-slide][data-active]");
+        busy.value = !!shown?.hasAttribute("data-busy");
+        error.value = !!shown?.hasAttribute("data-error");
+      };
+      const observer = new MutationObserver(read);
+      observer.observe(root, {
+        attributes: true,
+        attributeFilter: ["data-busy", "data-error", "data-active"],
+        subtree: !slide,
+      });
+      read();
+      onCleanup(() => {
+        observer.disconnect();
+        events.abort();
+      });
+    },
+    { flush: "post" },
+  );
+  return { busy, error, slide, causes };
+}
+
+/** Its default slot, while the item on show is loading. */
+const Loading = defineComponent({
+  name: "FluidboxLoading",
+  setup(_, { slots }) {
+    const { busy } = useSlideStatus();
+    return () =>
+      busy.value
+        ? h("div", { "aria-hidden": "true", "data-fluidbox-loading": "" }, slots.default?.())
+        : null;
+  },
+});
+
+/**
+ * Its default slot, in place of the default error, while the item on show
+ * failed. The slot gets `{ item, error }`, where `error` is the `cause` of
+ * the item's last `mediaerror`.
+ */
+const ErrorPart = defineComponent({
+  name: "FluidboxError",
+  slots: Object as SlotsType<{
+    default?: (failed: { readonly item: FluidboxItem; readonly error: unknown }) => VNode[];
+  }>,
+  setup(_, { slots }) {
+    const { state } = useRootContext();
+    const { error, slide, causes } = useSlideStatus();
+    return () => {
+      const item = slide ? slide.item : state.value.item;
+      const index = slide ? slide.index : state.value.index;
+      if (!error.value || !item) return null;
+      return h(
+        "div",
+        { "data-fluidbox-error-content": "" },
+        slots.default?.({ item, error: index === null ? undefined : causes.get(index) }),
+      );
+    };
+  },
+});
+
+/** The slots on show, patched into at once as they change. */
+function useSlotList(
+  slots: FluidboxSlots<AnyItem>,
+  onChange?: (shown: readonly FluidboxSlot<AnyItem>[]) => void,
+) {
+  const patch = usePatch();
+  const list = shallowRef<readonly FluidboxSlot<AnyItem>[]>(slots.slots);
+  const keys = new WeakMap<FluidboxSlot<AnyItem>, number>();
+  let nextKey = 0;
+  const key = (slot: FluidboxSlot<AnyItem>) => {
+    if (!keys.has(slot)) keys.set(slot, nextKey++);
+    return keys.get(slot)!;
+  };
+  onBeforeUnmount(
+    slots.subscribe(() => {
+      list.value = slots.slots;
+      onChange?.(slots.slots);
+      patch();
+    }),
+  );
+  return {
+    list,
+    teleport: (content: (slot: FluidboxSlot<AnyItem>) => VNodeChild) =>
+      list.value.map((slot) => h(Teleport, { key: key(slot), to: slot.target }, [content(slot)])),
+  };
 }
 
 /**
- * Turns the sheet on: a panel over the photo for the active item's details.
- * The runtime's `<section data-fluidbox-sheet>` is the sheet and gets this
- * part's attributes; the default slot is its content and gets `{ item, index }`.
+ * Turns the thumbnails on. With a default slot, it fills each thumbnail
+ * button, getting `{ item, index, active }`; the selected button has `data-active`.
+ */
+const Thumbnails = defineComponent({
+  name: "FluidboxThumbnails",
+  slots: Object as SlotsType<{
+    default?: (thumbnail: FluidboxThumbnailContext) => VNode[];
+  }>,
+  setup(_, { slots }) {
+    const { setAddon, thumbnailsSlots, state, serverHints } = useRootContext();
+    // Read by the server's copy of the open viewer, which renders after this.
+    serverHints.thumbnails = true;
+    // Once mounted, so a server render loads nothing, and again when a slot
+    // comes or goes.
+    let custom: boolean | undefined;
+    const register = () => {
+      if (custom === !!slots.default) return;
+      custom = !!slots.default;
+      setAddon("thumbnails", { custom });
+    };
+    onMounted(register);
+    onUpdated(register);
+    onBeforeUnmount(() => setAddon("thumbnails", null));
+    const strip = useSlotList(thumbnailsSlots);
+    return () => {
+      if (!slots.default) return null;
+      const shown = state.value.index;
+      return strip.teleport(({ item, index }) =>
+        slots.default?.({ item, index, active: index === shown }),
+      );
+    };
+  },
+});
+
+/**
+ * Turns the sheet on: a panel over the photo for the item on show. The
+ * viewer's `<section data-fluidbox-sheet>` is the sheet and gets this part's
+ * attributes; the default slot is its content and gets `{ item, index }`.
  * Import `@ogdakke/fluidbox/sheet.css` once.
  */
 const Sheet = defineComponent({
   name: "FluidboxSheet",
   inheritAttrs: false,
   props: {
+    /**
+     * The snaps above the resting one, lowest first.
+     * @default ["60%", "content"]
+     */
     snapPoints: Array as PropType<readonly FluidboxSheetSnapPoint[]>,
-    dismiss: String as PropType<FluidboxSheetProps["dismiss"]>,
+    /**
+     * What a swipe down on the photo does with the sheet down.
+     * @default "flight"
+     */
+    dismissMotion: String as PropType<FluidboxSheetProps["dismissMotion"]>,
   },
-  slots: Object as SlotsType<{ default?: (sheet: FluidboxItemContext) => VNode[] }>,
-  setup(props, { attrs, slots }) {
-    const { features } = useRootContext("Sheet");
-    const applied = new WeakMap<HTMLElement, Applied>();
-    const decorate = (shown: readonly FluidboxSlot<AnyItem>[]) => {
-      for (const { container } of shown) {
-        applied.set(container, applyAttributes(container, attrs, applied.get(container)));
-      }
-    };
-    const sheet = useRuntimeSlots(decorate);
-    onUpdated(() => decorate(sheet.list.value));
-    const part: SheetPart = {
-      options: () => ({
-        snapPoints: props.snapPoints && [...toRaw(props.snapPoints)],
-        dismiss: props.dismiss,
-        render: sheet.render,
-      }),
-    };
-    features.sheet = part;
-    onBeforeUnmount(() => {
-      if (features.sheet === part) features.sheet = null;
+  emits: {
+    /** When the sheet comes to rest at another snap. */
+    snapChange: (_event: FluidboxSheetEvent) => true,
+  },
+  slots: Object as SlotsType<{
+    default?: (sheet: FluidboxItemContext) => VNode[];
+  }>,
+  setup(props, { attrs, emit, slots }) {
+    const { fluidbox, setAddon, sheetSlots, serverHints } = useRootContext();
+    // Read by the server's copy of the open viewer, which renders after this.
+    serverHints.sheet = true;
+    // The snap points are compared by value, so an inline array changes nothing.
+    // Once mounted, so a server render loads nothing.
+    onMounted(() =>
+      watch(
+        () => JSON.stringify([props.snapPoints ?? null, props.dismissMotion ?? null]),
+        () =>
+          setAddon("sheet", {
+            snapPoints: props.snapPoints && [...toRaw(props.snapPoints)],
+            dismissMotion: props.dismissMotion,
+          }),
+        { immediate: true },
+      ),
+    );
+    onBeforeUnmount(() => setAddon("sheet", null));
+    const events = new AbortController();
+    fluidbox.addEventListener("sheetchange", (event) => emit("snapChange", event), {
+      signal: events.signal,
     });
+    onBeforeUnmount(() => events.abort());
+    const restores = new Map<HTMLElement, () => void>();
+    const decorate = (shown: readonly FluidboxSlot<AnyItem>[]) => {
+      for (const [container, restore] of restores) {
+        restore();
+        restores.delete(container);
+      }
+      for (const { container } of shown) restores.set(container, applyAttributes(container, attrs));
+    };
+    const sheet = useSlotList(sheetSlots, decorate);
+    onMounted(() => decorate(sheet.list.value));
+    onUpdated(() => decorate(sheet.list.value));
+    onBeforeUnmount(() => decorate([]));
     return () => sheet.teleport(({ item, index }) => slots.default?.({ item, index }));
   },
 });
 
-/** What a part put on an element of the runtime's, to take off when it changes. */
-interface Applied {
-  readonly classes: readonly string[];
-  readonly styles: readonly string[];
-  readonly attributes: readonly string[];
-}
+/** A button that moves the sheet to the snap `to`. Its content names it, unless `label` says otherwise. */
+const SheetSnap = defineComponent({
+  name: "FluidboxSheetSnap",
+  inheritAttrs: false,
+  props: { to: { type: Number, required: true }, ...labelProp },
+  setup(props, { attrs, slots }) {
+    const { labels } = useRootContext();
+    return () => {
+      // Its content usually names it, so the label names it only when asked.
+      const { naming, content } = named(
+        slots.default?.(),
+        props.label ?? false,
+        labels.value.sheet,
+        attrs["aria-label"],
+      );
+      return h(
+        "button",
+        mergeProps({ type: "button" }, attrs, naming, {
+          "data-fluidbox-sheet-snap": String(props.to),
+        }),
+        content,
+      );
+    };
+  },
+});
 
-const cssName = (name: string) =>
-  name.startsWith("--") ? name : name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
-
-/** Put Vue attributes on an element the runtime owns, keeping the runtime's own. */
-function applyAttributes(
-  element: HTMLElement,
-  attrs: Record<string, unknown>,
-  previous: Applied | undefined,
-): Applied {
-  const classes = normalizeClass(attrs.class).split(/\s+/).filter(Boolean);
-  for (const name of previous?.classes ?? []) {
-    if (!classes.includes(name)) element.classList.remove(name);
-  }
-  element.classList.add(...classes);
-
-  const style = normalizeStyle(attrs.style);
-  const declarations: [string, string][] =
-    typeof style === "string"
-      ? style
-          .split(";")
-          .map((each) => each.split(/:(.*)/s).map((part) => part.trim()) as [string, string])
-          .filter(([name, value]) => name && value)
-      : Object.entries(style ?? {}).map(([name, value]) => [cssName(name), String(value)]);
-  const styles = declarations.map(([name]) => name);
-  for (const name of previous?.styles ?? []) {
-    if (!styles.includes(name)) element.style.removeProperty(name);
-  }
-  for (const [name, value] of declarations) element.style.setProperty(name, value);
-
-  const attributes: string[] = [];
-  for (const [name, value] of Object.entries(attrs)) {
-    if (name === "class" || name === "style" || typeof value === "function") continue;
-    if (value === false || value === null || value === undefined) continue;
-    element.setAttribute(name, value === true ? "" : String(value as string | number));
-    attributes.push(name);
-  }
-  for (const name of previous?.attributes ?? []) {
-    if (!attributes.includes(name)) element.removeAttribute(name);
-  }
-  return { classes, styles, attributes };
-}
+/** The live copy of an overlay's content that flies with the photo. */
+const Travelling = defineComponent({
+  name: "FluidboxTravelling",
+  setup(_, { slots }) {
+    provide(TravelKey, true);
+    return () => slots.default?.();
+  },
+});
 
 /**
- * A button that moves the sheet to `stop`, or back down when it is there. It
- * works in the viewer, as in a Viewer or the Sheet.
+ * A badge, caption or scrim on a trigger. It gets `--fluidbox-closed` and
+ * `data-fluidbox-phase` as the viewer opens and closes, and goes with the
+ * photo's flight as `flight` says.
  */
-const SheetStop = defineComponent({
-  name: "FluidboxSheetStop",
-  props: { stop: { type: Number, required: true } },
-  setup(props, { slots }) {
-    useRootContext("SheetStop");
-    return () =>
-      h(
-        "button",
-        { type: "button", "data-fluidbox-sheet-stop": String(props.stop) },
-        slots.default?.(),
+const Overlay = defineComponent({
+  name: "FluidboxOverlay",
+  inheritAttrs: false,
+  props: {
+    flight: {
+      type: String as PropType<"none" | "copy" | "live" | "frame">,
+      default: "none",
+    },
+  },
+  setup(props, { attrs, slots }) {
+    const { fluidbox, mount, items } = useRootContext();
+    const trigger = inject(TriggerKey, null);
+    // In the live copy a flight renders, an overlay is a picture, not another overlay.
+    const travelling = inject(TravelKey, false);
+    if (!trigger && !travelling) {
+      throw new Error(
+        (() => {
+          try {
+            if (process.env.NODE_ENV !== "production")
+              return "<Fluidbox.Overlay> must be inside a <Fluidbox.Trigger>.";
+          } catch {}
+          return "fluidbox";
+        })(),
       );
+    }
+    const element = shallowRef<HTMLElement | null>(null);
+    if (trigger && !travelling) {
+      watchEffect(
+        (onCleanup) => {
+          const overlay = element.value;
+          void items.value;
+          if (!overlay) return;
+          const { flight } = props;
+          onCleanup(
+            fluidbox.bindOverlay(overlay, trigger.keys(), {
+              flight:
+                flight === "live"
+                  ? {
+                      live: ({ target }) =>
+                        mount(target, () => h(Travelling, null, () => slots.default?.())),
+                    }
+                  : flight,
+            }),
+          );
+        },
+        { flush: "post" },
+      );
+    }
+    return () =>
+      // The frame overlay itself flies, so a live copy leaves it out.
+      travelling && props.flight === "frame"
+        ? null
+        : h(
+            "span",
+            mergeProps(attrs, { ref: element, "data-fluidbox-trigger-overlay": props.flight }),
+            slots.default?.(),
+          );
   },
 });
 
@@ -915,40 +1661,57 @@ const SheetStop = defineComponent({
  * picked by `selector` as a computed ref. Call it in a component inside Root.
  */
 export function useFluidbox<TItem extends FluidboxItem = FluidboxItem>(): FluidboxApi<TItem>;
-export function useFluidbox<TItem extends FluidboxItem = FluidboxItem, TSelected = unknown>(
+export function useFluidbox<TSelected, TItem extends FluidboxItem = FluidboxItem>(
   selector: (fluidbox: FluidboxApi<TItem>) => TSelected,
 ): ComputedRef<TSelected>;
-export function useFluidbox<TItem extends FluidboxItem, TSelected>(
-  selector?: (fluidbox: FluidboxApi<TItem>) => TSelected,
-): FluidboxApi<TItem> | ComputedRef<TSelected> {
-  const { api } = useRootContext("Root");
-  const typed = api as unknown as FluidboxApi<TItem>;
-  return selector ? computed(() => selector(typed)) : typed;
+export function useFluidbox<TSelected>(
+  selector?: (fluidbox: FluidboxApi) => TSelected,
+): FluidboxApi | ComputedRef<TSelected> {
+  const { api } = useRootContext();
+  return selector ? computed(() => selector(api)) : api;
 }
 
-/** The sheet's stop and a setter, in one reactive object. Call it in a component inside Root. */
+/** The sheet's snap, which follows `sheetchange`, and a function that moves it, in one reactive object. */
 export function useFluidboxSheet(): FluidboxSheetApi {
-  return useRootContext("Sheet").sheet;
+  return useRootContext().sheet;
 }
 
 /** Every part, as `<Fluidbox.Root>` and so on. */
 export const Fluidbox = {
   Root,
   Trigger,
+  Overlay,
+  Slides,
+  Media,
+  Image,
+  Video,
+  Iframe,
+  Hotspot,
   Viewer,
-  Controls,
+  Toolbar,
+  ZoomControls,
   Close,
   Previous,
   Next,
   ZoomIn,
   ZoomOut,
   ZoomReset,
-  Filmstrip,
+  Fullscreen,
+  Download,
+  Share,
+  Slideshow,
+  Counter,
+  Caption,
+  Loading,
+  Error: ErrorPart,
+  Retry,
+  Thumbnails,
   Sheet,
-  SheetStop,
-  ThumbnailOverlay,
-  FrameLayer,
+  SheetSnap,
 };
+
+/** The type of `Fluidbox`. */
+export type FluidboxVueParts = typeof Fluidbox;
 
 /** The element behind a ref, which is a component instance when the child is a component. */
 function toElement(value: unknown): HTMLElement | null {
@@ -961,7 +1724,15 @@ function toElement(value: unknown): HTMLElement | null {
 function onlyChild(vnodes: readonly VNode[]): VNode {
   const elements = vnodes.filter((vnode) => isVNode(vnode) && vnode.type !== Comment);
   if (elements.length !== 1) {
-    throw new Error("<Fluidbox.Trigger as-child> needs exactly one child element.");
+    throw new Error(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "<Fluidbox.Trigger as-child> needs exactly one child element.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   }
   return elements[0]!;
 }

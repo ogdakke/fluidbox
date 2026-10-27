@@ -20,7 +20,7 @@ function Caption() {
       <span>
         <strong data-test="title">{fluidbox.item ? itemLabel(fluidbox.item) : ""}</strong>{" "}
         <small data-test="counter">
-          {(fluidbox.index ?? 0) + 1} / {fluidbox.count}
+          <Fluidbox.Counter />
         </small>
       </span>
       <button
@@ -44,13 +44,13 @@ export function Headless() {
       <div class="pattern-grid">
         <For each={photos}>
           {(photo) => (
-            <Fluidbox.Trigger item={photo} class="pattern-thumb" data-test="trigger">
+            <Fluidbox.Trigger value={photo.id} class="pattern-thumb" data-test="trigger">
               <img src={photo.src} alt={itemLabel(photo)} />
             </Fluidbox.Trigger>
           )}
         </For>
       </div>
-      {/* Your own controls and caption, in place of the default controls. */}
+      {/* Your own controls and caption replace the default ones. */}
       <Fluidbox.Viewer>
         <Caption />
       </Fluidbox.Viewer>

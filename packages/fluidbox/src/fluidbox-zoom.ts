@@ -16,13 +16,45 @@ interface View {
 export type ZoomReason = "api" | "keyboard" | "pointer" | "wheel";
 interface Options {
   prepare: () => View | null;
-  config: () => { step: number; max: number };
+  config: () => {
+    step: number;
+    max: number;
+    /** What a mouse click on the media does. */
+    click: "single" | "double" | false;
+    /** What a touch or pen tap does. */
+    tap: "double" | false;
+  };
   /** The zoomed image scroller's name. */
   label: string;
   state: (locked: boolean) => void;
   /** The zoom came to rest at another scale. Never called per frame. */
   settled: (scale: number, reason: ZoomReason | undefined) => void;
   reducedMotion: () => boolean;
+  /** A duration in milliseconds, as the viewer's motion plays it. */
+  duration: (ms: number) => number;
+  /** Whether anything follows the pose, so an animation reports every frame of it. */
+  watched: () => boolean;
+  /** Where the zoomed element is: each frame it moves, then once at rest. */
+  pose: (image: HTMLElement, pose: ZoomPose) => void;
+  /** A person zoomed or panned, rather than code. */
+  interact: () => void;
+  /** True when a plain vertical wheel zooms, as Ctrl + wheel does. */
+  wheelZooms: () => boolean;
+}
+/** A zoom pose, with the zoomed element's layout rectangle at fit, in client pixels. */
+export interface ZoomPose extends Pose {
+  readonly moving: boolean;
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
+  /** The zoom viewport, the stage: the window less the stage insets, in client pixels. */
+  readonly viewport: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 type SafariGesture = Event & { scale: number; clientX?: number; clientY?: number };
 const fit = (): Pose => ({ scale: 1, x: 0, y: 0 });
@@ -131,6 +163,11 @@ export class FluidboxZoom {
   #refocus = false;
   /** Resolves the command whose motion is running: true once it rests, false if interrupted. */
   #command: ((rested: boolean) => void) | undefined;
+  /** The pose last published, so a pose is reported once. */
+  #published: { scale: number; x: number; y: number; moving: boolean } | undefined;
+  /** The frame loop that reports an animation's poses while something follows them. */
+  #watch = 0;
+  #scrollIdle: ReturnType<typeof setTimeout> | undefined;
 
   constructor(root: HTMLElement, options: Options) {
     this.#options = options;
@@ -171,6 +208,7 @@ export class FluidboxZoom {
   // only at gesture boundaries. Native scrolling needs no animation-frame work.
   #leaveNative() {
     this.#endMousePan();
+    clearTimeout(this.#scrollIdle);
     const viewport = this.#viewport;
     const image = this.#image;
     if (!viewport || !image || !this.#placeholder) return;
@@ -209,6 +247,8 @@ export class FluidboxZoom {
     viewport.addEventListener("pointerup", this.#finishMousePan);
     viewport.addEventListener("pointercancel", this.#finishMousePan);
     viewport.addEventListener("lostpointercapture", this.#finishMousePan);
+    viewport.addEventListener("scroll", this.#nativeScroll, { passive: true });
+    viewport.addEventListener("scrollend", this.#nativeRest);
     // A named, focusable scroller, so it reads as part of the dialog and the
     // keys can reach it.
     viewport.setAttribute("role", "group");
@@ -248,7 +288,7 @@ export class FluidboxZoom {
     // Inside the dialog, so focus stays in it and aria-modal keeps it in the
     // accessibility tree. After the slides, so it paints over them as the image
     // did, and before the viewer's layer and the add-ons, so your controls and
-    // captions, the filmstrip and the sheet stay over it.
+    // captions, the thumbnails and the sheet stay over it.
     const dialog = this.#root.querySelector("[data-fluidbox-dialog]")!;
     dialog.insertBefore(viewport, dialog.querySelector(":scope > [data-fluidbox-portal]"));
     image.style.setProperty("--fluidbox-media-transform", `scale(${this.#pose.scale})`);
@@ -263,7 +303,13 @@ export class FluidboxZoom {
   }
 
   #startMousePan = (event: PointerEvent) => {
-    if (event.pointerType !== "mouse" || event.button !== 0 || !event.isPrimary || !this.#viewport)
+    if (
+      event.pointerType !== "mouse" ||
+      event.button !== 0 ||
+      !event.isPrimary ||
+      !this.#viewport ||
+      ownsInput(event)
+    )
       return;
     event.preventDefault();
     const target = event.target as HTMLElement;
@@ -309,6 +355,7 @@ export class FluidboxZoom {
   #freeze() {
     this.#leaveNative();
     cancelAnimationFrame(this.#frame);
+    cancelAnimationFrame(this.#watch);
     this.#frame = 0;
     if (this.#animation && this.#image) {
       const matrix = new DOMMatrix(getComputedStyle(this.#image).transform);
@@ -381,6 +428,83 @@ export class FluidboxZoom {
     this.#frame = 0;
     if (!this.#image) return;
     this.#image.style.setProperty("--fluidbox-media-transform", transform(this.#pose));
+    this.#publish(this.#pose, this.#source !== null);
+  }
+
+  /** The zoomed element is the image, or the box the zoom moves: the pose goes to it. */
+  get target() {
+    return this.#image;
+  }
+
+  /**
+   * Tell the box and whoever follows it where the zoom is: the scale as
+   * `--fluidbox-zoom-scale`, and the whole pose to the listeners.
+   */
+  #publish(pose: Pose, moving: boolean) {
+    const image = this.#image;
+    if (!image) return;
+    const last = this.#published;
+    if (
+      last &&
+      last.moving === moving &&
+      last.scale === pose.scale &&
+      last.x === pose.x &&
+      last.y === pose.y
+    )
+      return;
+    this.#published = { ...pose, moving };
+    image.style.setProperty("--fluidbox-zoom-scale", String(pose.scale));
+    const g = this.#geometry;
+    this.#options.pose(image, {
+      ...pose,
+      moving,
+      left: g.left,
+      top: g.top,
+      width: g.width,
+      height: g.height,
+      viewport: {
+        left: g.stage.left,
+        top: g.stage.top,
+        width: g.viewportWidth,
+        height: g.viewportHeight,
+      },
+    });
+  }
+
+  /** The pose the native scroller shows: its scroll offsets, as a translation. */
+  #nativePose(): Pose {
+    const viewport = this.#viewport;
+    const g = this.#geometry;
+    if (!viewport) return this.#pose;
+    return {
+      scale: this.#pose.scale,
+      x: this.#nativeOrigin.x - viewport.scrollLeft - (g.left - g.stage.left),
+      y: this.#nativeOrigin.y - viewport.scrollTop - (g.top - g.stage.top),
+    };
+  }
+
+  #nativeScroll = () => {
+    this.#publish(this.#nativePose(), true);
+    clearTimeout(this.#scrollIdle);
+    this.#scrollIdle = setTimeout(() => this.#nativeRest(), 150);
+  };
+
+  #nativeRest = () => {
+    clearTimeout(this.#scrollIdle);
+    if (this.#viewport) this.#publish(this.#nativePose(), false);
+  };
+
+  /** Report an animation's poses, frame by frame, while something follows them. */
+  #follow(animation: Animation) {
+    cancelAnimationFrame(this.#watch);
+    if (!this.#options.watched()) return;
+    const frame = () => {
+      if (this.#animation !== animation || !this.#image) return;
+      const matrix = new DOMMatrix(getComputedStyle(this.#image).transform);
+      this.#publish({ scale: matrix.a, x: matrix.e, y: matrix.f }, true);
+      this.#watch = requestAnimationFrame(frame);
+    };
+    this.#watch = requestAnimationFrame(frame);
   }
 
   #queue() {
@@ -423,7 +547,9 @@ export class FluidboxZoom {
 
   #rest(target: Pose) {
     cancelAnimationFrame(this.#frame);
+    cancelAnimationFrame(this.#watch);
     this.#paint();
+    this.#publish(target, false);
     this.#options.state(target.scale > 1.001);
     this.#enterNative();
     if (this.#refocus) this.#viewport?.focus({ preventScroll: true });
@@ -484,12 +610,13 @@ export class FluidboxZoom {
       };
     });
     const animation = image.animate(frames, {
-      duration: springBack ? 400 : 320,
+      duration: this.#options.duration(springBack ? 400 : 320),
       easing: "linear",
       fill: "both",
     });
     this.#animation = animation;
     this.#options.state(true);
+    this.#follow(animation);
     void animation.ready.then(
       () => {
         if (this.#animation !== animation || animation.playState !== "running") return;
@@ -547,6 +674,7 @@ export class FluidboxZoom {
     if (event.touches.length < 2 && !this.zoomed) return;
     if (!this.#acquire()) return;
     this.#consume(event);
+    this.#options.interact();
     this.#source = "touch";
     this.#reason = "pointer";
     this.#touchTap = event.touches.length === 1 ? point(event.touches[0]!) : null;
@@ -640,17 +768,20 @@ export class FluidboxZoom {
       this.#consume(event);
       return;
     }
-    if (!event.ctrlKey && this.#viewport) {
+    const pinch =
+      event.ctrlKey ||
+      (this.#options.wheelZooms() && Math.abs(event.deltaY) > Math.abs(event.deltaX) * 1.3);
+    if (!pinch && this.#viewport) {
       event.stopImmediatePropagation();
       return;
     }
-    if (!event.ctrlKey && !this.zoomed) return;
+    if (!pinch && !this.zoomed) return;
     // A pinch on content that owns its input is the content's; the page still doesn't zoom.
     if (!this.zoomed && ownsInput(event)) {
       event.preventDefault();
       return;
     }
-    if (!event.ctrlKey) {
+    if (!pinch) {
       this.#freeze();
       this.#settle();
       event.stopImmediatePropagation();
@@ -660,6 +791,7 @@ export class FluidboxZoom {
     const source = this.#source;
     if (source !== "wheel") {
       if (!this.#acquire()) return;
+      this.#options.interact();
       this.#source = "wheel";
       this.#reason = "wheel";
     }
@@ -683,6 +815,7 @@ export class FluidboxZoom {
     }
     if (!this.#acquire()) return;
     this.#consume(event);
+    this.#options.interact();
     this.#source = "safari";
     this.#reason = "pointer";
     this.#options.state(true);
@@ -726,12 +859,18 @@ export class FluidboxZoom {
     }
     if (!onMedia) return false;
     if (event.detail === 0) return false;
+    this.#options.interact();
     const anchor = { x: event.clientX, y: event.clientY };
+    const { click, tap } = this.#options.config();
     // A mouse zooms with one click, as on a product page: the cursor says so.
     // The second click of a double-click is the same intent, not a toggle back.
+    // Under "double" the browser's click count, which follows the OS setting,
+    // says when, and a single click waits for nothing.
     if (this.#pointerType === "mouse") {
-      if (event.detail === 1) this.#toggleAt(anchor);
-    } else this.#tapAt(anchor);
+      if (event.detail === (click === "single" ? 1 : click === "double" ? 2 : -1)) {
+        this.#toggleAt(anchor);
+      }
+    } else if (tap) this.#tapAt(anchor);
     return true;
   }
 
@@ -868,6 +1007,8 @@ export class FluidboxZoom {
    */
   suspend() {
     this.#freeze();
+    this.#publish(fit(), false);
+    this.#published = undefined;
     if (this.#image) this.#left = this.#image;
     clearTimeout(this.#idle);
     clearTimeout(this.#clickTimer);
@@ -888,7 +1029,10 @@ export class FluidboxZoom {
   release() {
     const image = this.#left;
     this.#left = null;
-    if (image && image !== this.#image) image.style.removeProperty("--fluidbox-media-transform");
+    if (image && image !== this.#image) {
+      image.style.removeProperty("--fluidbox-media-transform");
+      image.style.removeProperty("--fluidbox-zoom-scale");
+    }
   }
   destroy() {
     this.suspend();

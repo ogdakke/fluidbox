@@ -29,9 +29,9 @@ interface Entry {
 
 /**
  * The published entries, read from the package's `exports`. Each built file maps
- * back to its source through tsdown's `entry` or `copy`, and `dist/<binding>/`
- * to that binding's package. A directive names an entry by its subpath, `root`
- * for the package itself.
+ * back to its source through tsdown's `entry` or `copy`, and
+ * `dist/<binding>/<part>.js` to that binding's `src/<part>.ts`. A directive
+ * names an entry by its subpath, `root` for the package itself.
  */
 function readEntries(): Map<string, Entry> {
   const manifest = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
@@ -40,11 +40,13 @@ function readEntries(): Map<string, Entry> {
   for (const [subpath, target] of Object.entries<Record<string, string>>(manifest.exports)) {
     const file = target.import ?? target.default;
     const name = subpath === "." ? "root" : subpath.slice(2);
-    const own = /^\.\/dist\/([\w.-]+?)(?:\.js)?$/.exec(file ?? "");
-    const binding = /^\.\/dist\/([\w-]+)\/index\.js$/.exec(file ?? "");
-    const source = binding
-      ? join(root, "packages", binding[1]!, "src/index.ts")
-      : own && built.get(own[1]!) && join(packageDir, built.get(own[1]!)!);
+    const own = /^\.\/dist\/([\w./-]+?)(?:\.js)?$/.exec(file ?? "");
+    const binding = /^\.\/dist\/([\w-]+)\/([\w-]+)\.js$/.exec(file ?? "");
+    // The core's own entries first: elements/embed is a tsdown entry, not a binding's.
+    const source =
+      own && built.get(own[1]!)
+        ? join(packageDir, built.get(own[1]!)!)
+        : binding && join(root, "packages", binding[1]!, `src/${binding[2]}.ts`);
     if (!source) throw new Error(`Can't tell which source builds ${subpath} (${file}).`);
     result.set(name, {
       path: subpath === "." ? manifest.name : `${manifest.name}/${name}`,
@@ -496,7 +498,7 @@ export function checkApiCoverage(pages: readonly { slug: string; markdown: strin
   if (reference) {
     const required = [
       ...entryExports("root"),
-      ...entryExports("filmstrip"),
+      ...entryExports("thumbnails"),
       ...entryExports("sheet"),
       ...entryExports("hover-zoom"),
       ...entryExports("kit").filter((item) => item.kind === "value"),

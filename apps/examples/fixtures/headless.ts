@@ -1,8 +1,19 @@
 import { mountSite } from "../src/site";
 import { createFluidbox } from "@ogdakke/fluidbox";
-import "@ogdakke/fluidbox/filmstrip";
-import type { Fluidbox, FluidboxItem, FluidboxRenderer } from "@ogdakke/fluidbox";
+import "@ogdakke/fluidbox/thumbnails";
+import type {
+  Fluidbox,
+  FluidboxCustomItemBase,
+  FluidboxItem,
+  FluidboxSlides,
+} from "@ogdakke/fluidbox";
 import "./headless.css";
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    demo: FluidboxCustomItemBase<"demo">;
+  }
+}
 
 mountSite("fixtures", {
   fixture: "Headless runtime · custom renderers, a protected viewer, and a secondary viewer",
@@ -13,7 +24,7 @@ type DemoItem = FluidboxItem;
 const items: readonly DemoItem[] = [
   {
     id: "one",
-    type: "img",
+    type: "image",
     src: "/photo-square.svg",
     alt: "Blue square study",
     width: 800,
@@ -32,7 +43,7 @@ const items: readonly DemoItem[] = [
   },
   {
     id: "two",
-    type: "img",
+    type: "image",
     src: "/photo-portrait.svg",
     alt: "Orange portrait study",
     width: 600,
@@ -40,18 +51,13 @@ const items: readonly DemoItem[] = [
   },
 ];
 
-const origins = {
-  getOrigin(id: string) {
-    const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${id}"]`);
-    const visual = trigger?.querySelector<HTMLImageElement>("img");
-    return trigger && visual ? { trigger, visual, thumbnail: visual } : null;
-  },
-};
+const findTrigger = (item: DemoItem) =>
+  document.querySelector<HTMLElement>(`[data-photo-id="${item.id}"]`);
 const increment = (name: string) => {
   document.body.dataset[name] = String(Number(document.body.dataset[name] ?? 0) + 1);
 };
-const renderers = {
-  demo({ target, item, signal }) {
+const slides = {
+  demo({ media: target, item, signal }) {
     increment("customMounts");
     const content = document.createElement("button");
     content.type = "button";
@@ -61,12 +67,12 @@ const renderers = {
     signal.addEventListener("abort", () => increment("customAborts"), { once: true });
     return () => increment("customDisposals");
   },
-} satisfies Record<string, FluidboxRenderer<DemoItem>>;
+} satisfies FluidboxSlides<DemoItem>;
 
 const viewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
-  renderers,
+  findTrigger,
+  slides,
   viewer({ target, fluidbox, signal }) {
     const controls = document.createElement("div");
     controls.dataset.demoControls = "";
@@ -79,7 +85,7 @@ const viewer: Fluidbox<DemoItem> = createFluidbox({
     const caption = controls.querySelector<HTMLElement>("[data-demo-caption]")!;
     const sync = () => {
       const state = fluidbox.state;
-      caption.textContent = state.id ?? "";
+      caption.textContent = state.value ?? "";
       controls.querySelector<HTMLButtonElement>("[data-demo-previous]")!.disabled =
         !state.hasPrevious;
       controls.querySelector<HTMLButtonElement>("[data-demo-next]")!.disabled = !state.hasNext;
@@ -104,23 +110,23 @@ const viewer: Fluidbox<DemoItem> = createFluidbox({
 });
 const secondaryViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
-  renderers,
+  findTrigger,
+  slides,
 });
-// The filmstrip is an option: its code loads only with the side-effect import.
-const filmstripViewer: Fluidbox<DemoItem> = createFluidbox({
+// The thumbnails is an option: its code loads only with the side-effect import.
+const thumbnailsViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
-  renderers,
-  filmstrip: true,
+  findTrigger,
+  slides,
+  thumbnails: true,
 });
 const protectedViewer: Fluidbox<DemoItem> = createFluidbox({
   items,
-  origins,
-  renderers,
+  findTrigger,
+  slides,
 });
-protectedViewer.addEventListener("beforetoggle", (event) => {
-  if (event.newState === "closed") event.preventDefault();
+protectedViewer.addEventListener("beforevaluechange", (event) => {
+  if (event.action === "close") event.preventDefault();
 });
 
 for (const trigger of document.querySelectorAll<HTMLElement>("[data-photo-id]")) {
@@ -132,14 +138,14 @@ declare global {
     headlessViewer: typeof viewer;
     headlessSecondaryViewer: typeof secondaryViewer;
     headlessProtectedViewer: typeof protectedViewer;
-    headlessFilmstripViewer: typeof filmstripViewer;
+    headlessThumbnailsViewer: typeof thumbnailsViewer;
     loadSheet: () => Promise<unknown>;
   }
 }
 
 window.headlessViewer = viewer;
 window.headlessSecondaryViewer = secondaryViewer;
-window.headlessFilmstripViewer = filmstripViewer;
+window.headlessThumbnailsViewer = thumbnailsViewer;
 window.headlessProtectedViewer = protectedViewer;
 // The sheet add-on loads on demand, so the other headless tests run without it.
 window.loadSheet = () =>

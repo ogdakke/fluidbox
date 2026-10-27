@@ -5,7 +5,7 @@ export { createFluidbox };
 export const items: FluidboxItem[] = [
   {
     id: "bundle-fixture",
-    type: "img",
+    type: "image",
     src: "/fixture.jpg",
     alt: "Bundle fixture",
     width: 1,

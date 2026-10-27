@@ -9,7 +9,7 @@ mountSite("fixtures", {
 
 const item = (id: string, src: string, width: number, height: number): FluidboxImageItem => ({
   id,
-  type: "img",
+  type: "image",
   src,
   alt: `Study ${id}`,
   width,
@@ -22,13 +22,8 @@ const items = [
   item("three", "/first.svg", 600, 400),
 ];
 
-const origins = {
-  getOrigin(id: string) {
-    const trigger = document.querySelector<HTMLElement>(`[data-photo-id="${id}"]`);
-    const visual = trigger?.querySelector<HTMLImageElement>("img");
-    return trigger && visual ? { trigger, visual, thumbnail: visual } : null;
-  },
-};
+const findTrigger = (found: { readonly id?: string }) =>
+  document.querySelector<HTMLElement>(`[data-photo-id="${found.id}"]`);
 
 declare global {
   interface Window {
@@ -36,10 +31,10 @@ declare global {
       createFluidbox: typeof createFluidbox;
       items: typeof items;
       item: typeof item;
-      origins: typeof origins;
+      findTrigger: typeof findTrigger;
     };
   }
 }
 
-window.lifecycle = { createFluidbox, items, item, origins };
+window.lifecycle = { createFluidbox, items, item, findTrigger };
 document.body.dataset.lifecycleReady = "";

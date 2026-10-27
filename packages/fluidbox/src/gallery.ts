@@ -1,21 +1,23 @@
 import { createFluidboxSync } from "./controlled";
 import { createFluidbox } from "./create-fluidbox";
+import type * as PartsModule from "./elements-parts";
+import { onDefine, registeredSlide } from "./elements-registry";
 import { forwardEvents } from "./events";
-import { FluidboxFilmstripElement, FluidboxSheetElement } from "./filmstrip";
+import { FluidboxThumbnailsElement, FluidboxSheetElement } from "./thumbnails";
 import { FluidboxItemElement, type DeclarativeFluidboxDefinition } from "./item";
 import { idOf, toList } from "./items";
-import type { FluidboxLabels } from "./labels";
+import { holdSlideCommit } from "./kit";
+import { resolveLabels, type FluidboxLabels } from "./labels";
 import type {
   Fluidbox,
   FluidboxCommandOptions,
   FluidboxEventMap,
-  FluidboxFilmstripOptions,
+  FluidboxThumbnailsOptions,
   FluidboxItem,
   FluidboxItemList,
   FluidboxItems,
-  FluidboxLoading,
+  FluidboxPreload,
   FluidboxOptions,
-  FluidboxOriginAdapter,
   FluidboxRenderer,
   FluidboxSlideRenderer,
   FluidboxSheet,
@@ -24,13 +26,14 @@ import type {
   FluidboxState,
   FluidboxTarget,
   FluidboxUpdateOptions,
+  FluidboxValue,
   FluidboxViewerContext,
   FluidboxViewerRenderer,
   FluidboxZoomCommandOptions,
 } from "./public-api";
-import { FluidboxToggleEvent } from "./public-api";
-import { latestOrigins } from "./origins";
-import { bindTrigger, frameLayerOf, type FluidboxTrigger } from "./trigger";
+import { FluidboxValueChangeEvent } from "./public-api";
+import { latestFindTrigger } from "./origins";
+import { bindTrigger, type FluidboxTrigger } from "./trigger";
 
 /** Markup attributes whose change re-reads the items. */
 function same(a: unknown, b: unknown): boolean {
@@ -55,18 +58,30 @@ function sameItems(a: FluidboxItemList, b: FluidboxItemList) {
  * change, as an album cover does, so changes inside a trigger never count.
  */
 const ITEM_ATTRIBUTES = new Set([
-  "item-id",
-  "data-fluidbox-item-id",
-  "returns",
+  "value",
+  "data-fluidbox-value",
+  "type",
   "slot",
   "placeholder",
+  "caption",
   "aria-label",
 ]);
 /** Attributes whose change updates the viewer. */
-const VIEWER_ATTRIBUTES = ["nozoom", "zoom-step", "zoom-max", "loop", "loading"];
-/** Your state for the viewer: `open`, and the `index` it shows. */
-const CONTROL_ATTRIBUTES = ["open", "index"];
-const LOADINGS: readonly string[] = ["hover", "press", "eager"] satisfies FluidboxLoading[];
+const VIEWER_ATTRIBUTES = [
+  "nozoom",
+  "zoom-step",
+  "zoom-max",
+  "zoom-click",
+  "zoom-tap",
+  "loop",
+  "preload",
+  "wheel",
+  "reach-end-threshold",
+];
+const PRELOADS: readonly string[] = ["intent", "press", "eager"] satisfies FluidboxPreload[];
+const WHEELS: readonly string[] = ["dismiss", "zoom", "navigate", "none"] satisfies NonNullable<
+  FluidboxOptions["wheel"]
+>[];
 
 /** The `<fluidbox-item>` trigger an element is in, or is. */
 const triggerOf = (node: Node) =>
@@ -74,20 +89,60 @@ const triggerOf = (node: Node) =>
     "fluidbox-item > [slot=trigger]",
   ) ?? null;
 
+/** A marked overlay, but not the still copy a flight leaves on the card. */
+const OVERLAY = "[data-fluidbox-trigger-overlay]:not([data-fluidbox-ghost])";
+
+/** An overlay coming or going, but not a frame layer the flight moves out and back. */
 const isOverlay = (node: Node) =>
   node instanceof Element &&
-  (node.matches("[data-fluidbox-thumbnail-overlay]") ||
-    !!node.querySelector("[data-fluidbox-thumbnail-overlay]"));
+  !node.matches("[data-fluidbox-travel-layer]") &&
+  (node.matches(OVERLAY) || !!node.querySelector(OVERLAY));
+
+/** How a marked overlay goes with the flight, from its attribute. */
+const overlayFlight = (overlay: HTMLElement) => {
+  const flight = overlay.dataset.fluidboxTriggerOverlay;
+  return flight === "copy" || flight === "frame" ? flight : "none";
+};
+
+/**
+ * The parts of the viewer and slide templates, loaded once a gallery has
+ * templates, so a gallery without them never loads them.
+ */
+type Parts = typeof PartsModule;
+let parts: Parts | undefined;
+let partsLoading: Promise<Parts> | undefined;
+const loadParts = () =>
+  (partsLoading ??= import("./elements-parts").then(
+    (loaded) => (parts = loaded),
+    (error: unknown) => {
+      // A failed load tries again on the next viewer.
+      partsLoading = undefined;
+      throw error;
+    },
+  ));
+
+/** Whether the fluidbox has an item of id `value`. */
+function hasItem(fluidbox: Fluidbox, value: string) {
+  const { items } = fluidbox;
+  if (items.indexOf) return items.indexOf(value) >= 0;
+  for (let at = 0; at < items.count; at++) if (idOf(items.get(at)) === value) return true;
+  return false;
+}
+
+/** One factory per icon template, so the same templates make the same icons option. */
+const iconFactories = new WeakMap<HTMLTemplateElement, () => Node>();
 
 const closedState: FluidboxState = Object.freeze({
   status: "closed",
-  id: null,
+  value: null,
   index: null,
   item: null,
   count: 0,
   hasPrevious: false,
   hasNext: false,
   zoom: null,
+  fullscreen: false,
+  playing: false,
 });
 
 function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined {
@@ -106,16 +161,18 @@ function snapPoints(value: string | null): FluidboxSheetSnapPoint[] | undefined 
 
 /**
  * The fluidbox as markup: `<fluidbox-item>` children, or an `items` property
- * with descendants marked `data-fluidbox-item-id` as triggers. It takes the
+ * with descendants marked `data-fluidbox-value` as triggers. It takes the
  * same options as createFluidbox as properties, has the same commands, and
- * fires the same events.
+ * fires the same events. The `value` attribute opens, moves or closes the
+ * viewer when it changes.
  *
- * Children that turn features on: `<fluidbox-filmstrip>`, `<fluidbox-sheet>`
- * (each needs its entry imported), and a `<template slot="viewer">` for your
- * own controls, where `<fluidbox-controls>` stands for the default ones.
+ * Children that turn features on: `<fluidbox-thumbnails>`, `<fluidbox-sheet>`
+ * (each needs its entry imported), a `<template slot="viewer">` for your own
+ * controls and captions, and a `<template data-fluidbox-slide="type">` for
+ * the slides of an item type.
  */
 export class FluidboxGalleryElement extends HTMLElement {
-  static readonly observedAttributes = [...VIEWER_ATTRIBUTES, ...CONTROL_ATTRIBUTES];
+  static readonly observedAttributes = [...VIEWER_ATTRIBUTES, "value"];
 
   addEventListener<K extends keyof FluidboxGalleryEventMap>(
     type: K,
@@ -155,14 +212,30 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   #fluidbox: Fluidbox | null = null;
   #items: FluidboxItems | null = null;
-  #origins: FluidboxOriginAdapter | undefined;
-  #renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>> = {};
+  #findTrigger: FluidboxOptions["findTrigger"];
+  #revealTrigger: FluidboxOptions["revealTrigger"];
+  #slides: Readonly<Record<string, FluidboxSlideRenderer<any>>> = {};
   #viewer: FluidboxViewerRenderer<any> | undefined;
+  #icons: FluidboxOptions["icons"];
   #labels: Partial<FluidboxLabels> | undefined;
   #zoom: FluidboxOptions["zoom"] | undefined;
+  #dismiss: FluidboxOptions["dismiss"];
+  #shareUrl: FluidboxOptions["shareUrl"];
+  #slideshow: FluidboxOptions["slideshow"];
   #definitions = new Map<string, DeclarativeFluidboxDefinition>();
-  /** The renderers the viewer looks up by name: markup content, then the renderers property. */
-  #runtimeRenderers: Record<string, FluidboxSlideRenderer<any>> = {};
+  /** The slides of markup content, by the item type it gets. */
+  #markupSlides = new Map<string, FluidboxSlideRenderer<any>>();
+  /** One slide per slide template, so a template keeps its slide. */
+  #templateSlides = new WeakMap<HTMLTemplateElement, FluidboxSlideRenderer<any>>();
+  /**
+   * The slides the viewer looks up by type as a slide mounts: the `slides`
+   * property, a slide template, a slide registered for the page, then the
+   * markup's own.
+   */
+  #slideLookup = new Proxy({} as Record<string, FluidboxSlideRenderer<any>>, {
+    get: (_, type) => (typeof type === "string" ? this.#slideFor(type) : undefined),
+    has: (_, type) => typeof type === "string" && !!this.#slideFor(type),
+  });
   #triggers = new Map<HTMLElement, { element: HTMLElement; trigger: FluidboxTrigger }>();
   #overlays: (() => void)[] = [];
   #observer: MutationObserver | undefined;
@@ -174,14 +247,24 @@ export class FluidboxGalleryElement extends HTMLElement {
   #events: AbortController | undefined;
   #lastStatus: FluidboxState["status"] = "closed";
   #listeners = new Set<(state: FluidboxState) => void>();
-  #readyWaiters: Array<{ resolve(fluidbox: Fluidbox): void; reject(error: unknown): void }> = [];
+  #readyWaiters: Array<{
+    resolve(fluidbox: Fluidbox): void;
+    reject(error: unknown): void;
+  }> = [];
   #lifetime: AbortController | undefined;
   #updateQueued = false;
-  #sync: ((open?: boolean, index?: number) => void) | undefined;
+  #sync: ((value?: FluidboxValue) => void) | undefined;
+  /** The `value` attribute the viewer was last brought to; undefined before the first. */
+  #synced: FluidboxValue | undefined;
   /** What the items set through `items` or `setItems` came to, once applied. */
   #itemsResult: Promise<boolean> | undefined;
-  /** A new function when `viewer` changes, so the update draws the viewer again. */
+  /** A new function when `viewer` or the viewer template changes, so the update draws the viewer again. */
   #viewerRenderer: FluidboxViewerRenderer<any> = (context) => this.#mountViewer(context);
+  #viewerTemplate: HTMLTemplateElement | null = null;
+  /** The viewer was drawn before the parts arrived, so it draws again once they do. */
+  #drawnWithoutParts = false;
+  /** The slides changed while the viewer was open. */
+  #rebuildOnClose = false;
 
   connectedCallback() {
     if (!this.hasAttribute("tabindex")) this.tabIndex = -1;
@@ -189,6 +272,14 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.addEventListener("fluidbox-addon-change", () => this.#queueUpdate(), {
       signal: this.#lifetime.signal,
     });
+    // A markup reader registered later reads the items again; a slide draws them anew.
+    this.#lifetime.signal.addEventListener(
+      "abort",
+      onDefine((kind) => (kind === "slide" ? this.#slidesChanged() : this.#queueRefresh())),
+      {
+        once: true,
+      },
+    );
     this.#observer = new MutationObserver((records) => {
       let refresh = false;
       for (const record of records) {
@@ -196,11 +287,21 @@ export class FluidboxGalleryElement extends HTMLElement {
         if (
           nodes.some(
             (node) =>
-              node instanceof FluidboxSheetElement || node instanceof FluidboxFilmstripElement,
+              node instanceof FluidboxSheetElement ||
+              node instanceof FluidboxThumbnailsElement ||
+              (node instanceof HTMLTemplateElement && node.matches("[slot=viewer]")),
           )
         ) {
           this.#queueUpdate();
         }
+        if (
+          nodes.some(
+            (node) => node instanceof Element && node.matches("template[data-fluidbox-slide]"),
+          )
+        )
+          this.#slidesChanged();
+        // The gallery's own attributes are its options and value.
+        if (record.target === this && record.type === "attributes") continue;
         const trigger = triggerOf(record.target);
         if (trigger) {
           // Inside a trigger only an overlay coming or going, or the trigger's
@@ -238,7 +339,7 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   attributeChangedCallback(name: string, previous: string | null, next: string | null) {
     if (previous === next) return;
-    if (!CONTROL_ATTRIBUTES.includes(name)) this.#queueUpdate();
+    if (name !== "value") this.#queueUpdate();
     else if (this.#fluidbox)
       void this.#ready().then(
         () => this.#control(),
@@ -289,23 +390,104 @@ export class FluidboxGalleryElement extends HTMLElement {
     return (await this.#itemsResult) ?? true;
   }
 
-  /** Origins for items that have no trigger in the gallery. */
-  get origins(): FluidboxOriginAdapter | undefined {
-    return this.#origins;
+  /** Find the trigger of an item that has none in the gallery. Read on each use. */
+  get findTrigger(): FluidboxOptions["findTrigger"] {
+    return this.#findTrigger;
   }
 
-  set origins(origins: FluidboxOriginAdapter | undefined) {
-    this.#origins = origins;
+  set findTrigger(findTrigger: FluidboxOptions["findTrigger"]) {
+    this.#findTrigger = findTrigger;
   }
 
-  /** Renderers of `custom` items, by name. Read when a slide mounts. */
-  get renderers(): Readonly<Record<string, FluidboxSlideRenderer<any>>> {
-    return this.#renderers;
+  /** Bring an item's trigger into view. Without it, the viewer scrolls it into view. */
+  get revealTrigger(): FluidboxOptions["revealTrigger"] {
+    return this.#revealTrigger;
   }
 
-  set renderers(renderers: Readonly<Record<string, FluidboxSlideRenderer<any>>>) {
-    this.#renderers = renderers;
-    this.#syncRenderers();
+  set revealTrigger(revealTrigger: FluidboxOptions["revealTrigger"]) {
+    this.#revealTrigger = revealTrigger;
+  }
+
+  /**
+   * The open item's id, as the `value` attribute has it, or null for closed.
+   * Setting it opens, moves or closes the viewer; the viewer changing on its
+   * own leaves it, as `valuechange` reports.
+   */
+  get value(): string | null {
+    return this.getAttribute("value");
+  }
+
+  set value(value: string | null) {
+    if (value === null) this.removeAttribute("value");
+    else this.setAttribute("value", value);
+  }
+
+  /**
+   * Slides by item type, over the gallery's slide templates and the slides
+   * registered for the page. Read when a slide mounts.
+   */
+  get slides(): Readonly<Record<string, FluidboxSlideRenderer<any>>> {
+    return this.#slides;
+  }
+
+  set slides(slides: Readonly<Record<string, FluidboxSlideRenderer<any>>>) {
+    this.#slides = slides;
+    this.#slidesChanged();
+  }
+
+  /** Turn off dragging to dismiss, or closing on a backdrop tap. */
+  get dismiss(): FluidboxOptions["dismiss"] {
+    return this.#dismiss;
+  }
+
+  set dismiss(dismiss: FluidboxOptions["dismiss"]) {
+    this.#dismiss = dismiss;
+    this.#queueUpdate();
+  }
+
+  /** What a wheel does, as the `wheel` attribute says: `dismiss`, `zoom`, `navigate` or `none`. */
+  get wheel(): FluidboxOptions["wheel"] {
+    const value = this.getAttribute("wheel") ?? "";
+    return WHEELS.includes(value) ? (value as FluidboxOptions["wheel"]) : undefined;
+  }
+
+  set wheel(wheel: FluidboxOptions["wheel"]) {
+    if (wheel) this.setAttribute("wheel", wheel);
+    else this.removeAttribute("wheel");
+  }
+
+  /** How near the end `reachend` fires, as the `reach-end-threshold` attribute says. @default 2 */
+  get reachEndThreshold(): number | undefined {
+    const value = this.getAttribute("reach-end-threshold");
+    return value && Number.isFinite(+value) ? +value : undefined;
+  }
+
+  set reachEndThreshold(threshold: number | undefined) {
+    if (threshold == null) this.removeAttribute("reach-end-threshold");
+    else this.setAttribute("reach-end-threshold", String(threshold));
+  }
+
+  /** The link Share shares for an item. Without one, Share hides. */
+  get shareUrl(): FluidboxOptions["shareUrl"] {
+    return this.#shareUrl;
+  }
+
+  set shareUrl(shareUrl: FluidboxOptions["shareUrl"]) {
+    this.#shareUrl = shareUrl;
+    this.#queueUpdate();
+  }
+
+  /**
+   * Advance on a timer, once `play()`, `<fluidbox-slideshow>` or `autoplay`
+   * starts it. Without it, `<fluidbox-slideshow>` hides unless it plays.
+   */
+  get slideshow(): FluidboxOptions["slideshow"] {
+    return this.#slideshow;
+  }
+
+  set slideshow(slideshow: FluidboxOptions["slideshow"]) {
+    this.#slideshow = slideshow;
+    this.#queueUpdate();
   }
 
   /** Your own controls and captions, instead of a `<template slot="viewer">` or the defaults. */
@@ -317,7 +499,37 @@ export class FluidboxGalleryElement extends HTMLElement {
     if (viewer === this.#viewer) return;
     this.#viewer = viewer;
     this.#viewerRenderer = (context) => this.#mountViewer(context);
+    if (viewer) this.#loadParts();
     this.#queueUpdate();
+  }
+
+  /** Your icons for the default controls. They win over a `<template data-fluidbox-icon>`. */
+  get icons(): FluidboxOptions["icons"] {
+    return this.#icons;
+  }
+
+  set icons(icons: FluidboxOptions["icons"]) {
+    this.#icons = icons;
+    this.#queueUpdate();
+  }
+
+  /**
+   * The icons for the default controls: each `<template data-fluidbox-icon="close">`
+   * in the gallery, cloned into every button of that control, then the `icons` property.
+   */
+  #iconOptions(): FluidboxOptions["icons"] {
+    const icons: Record<string, () => Node> = {};
+    for (const template of this.querySelectorAll<HTMLTemplateElement>(
+      ":scope > template[data-fluidbox-icon]",
+    )) {
+      let factory = iconFactories.get(template);
+      if (!factory) {
+        factory = () => template.content.cloneNode(true);
+        iconFactories.set(template, factory);
+      }
+      icons[template.dataset.fluidboxIcon!] = factory;
+    }
+    return { ...icons, ...this.#icons };
   }
 
   get labels(): Partial<FluidboxLabels> | undefined {
@@ -340,14 +552,10 @@ export class FluidboxGalleryElement extends HTMLElement {
     this.#queueUpdate();
   }
 
-  /** When the viewer's code loads, as the `loading` attribute says: `hover` (the default), `press` or `eager`. */
-  get loading(): FluidboxLoading {
-    const value = this.getAttribute("loading") ?? "";
-    return LOADINGS.includes(value) ? (value as FluidboxLoading) : "hover";
-  }
-
-  set loading(loading: FluidboxLoading) {
-    this.setAttribute("loading", loading);
+  /** When the viewer's code loads, as the `preload` attribute says: `intent` (the default), `press` or `eager`. */
+  #preload(): FluidboxPreload {
+    const value = this.getAttribute("preload") ?? "";
+    return PRELOADS.includes(value) ? (value as FluidboxPreload) : "intent";
   }
 
   /** Follow the viewer state, across the rebuilds a change of options makes. */
@@ -408,8 +616,33 @@ export class FluidboxGalleryElement extends HTMLElement {
     return this.#run((fluidbox) => fluidbox.zoomOut(options));
   }
 
-  resetZoom(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
-    return this.#run((fluidbox) => fluidbox.resetZoom(options));
+  zoomReset(options?: Pick<FluidboxZoomCommandOptions, "signal">): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.zoomReset(options));
+  }
+
+  /** Enter or leave full screen; without an argument, switch. */
+  setFullscreen(on?: boolean): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.setFullscreen(on));
+  }
+
+  /** Save the item on show's file. */
+  download(): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.download());
+  }
+
+  /** Share the item on show's link, or copy it. */
+  share(): Promise<boolean> {
+    return this.#run((fluidbox) => fluidbox.share());
+  }
+
+  /** Start the slideshow on the open viewer. */
+  play(): void {
+    this.#run((fluidbox) => (fluidbox.play(), Promise.resolve(true))).catch(() => {});
+  }
+
+  /** Stop the slideshow, until `play()` or `<fluidbox-slideshow>`. */
+  pause(): void {
+    this.#run((fluidbox) => (fluidbox.pause(), Promise.resolve(true))).catch(() => {});
   }
 
   /**
@@ -432,10 +665,23 @@ export class FluidboxGalleryElement extends HTMLElement {
     return this.#fluidbox;
   }
 
-  /** Bring the viewer to the `open` and `index` attributes, where they changed. */
+  /**
+   * Bring the viewer to the `value` attribute when it changed: a request, as
+   * a binding's `value` is, so a viewer that moved on its own stays. A value
+   * counts as used once it found its item, or closed: one that names no item
+   * yet, as items set after the gallery connects, waits for them.
+   */
   #control() {
-    const index = Number.parseInt(this.getAttribute("index") ?? "", 10);
-    this.#sync?.(this.hasAttribute("open"), Number.isNaN(index) ? undefined : index);
+    const fluidbox = this.#fluidbox;
+    const value = this.getAttribute("value");
+    if (!fluidbox || value === this.#synced) return;
+    if (value !== null && !hasItem(fluidbox, value)) {
+      // With no items yet there is nothing to tell; with some, it counts as null.
+      if (fluidbox.items.count) this.#sync?.(value);
+      return;
+    }
+    this.#synced = value;
+    this.#sync?.(value);
   }
 
   #zoomAttributes(): FluidboxOptions["zoom"] | undefined {
@@ -444,9 +690,19 @@ export class FluidboxGalleryElement extends HTMLElement {
       const value = Number(this.getAttribute(name));
       return this.hasAttribute(name) && Number.isFinite(value) && value > 0 ? value : undefined;
     };
-    const step = number("zoom-step");
-    const max = number("zoom-max");
-    return step || max ? { ...(step ? { step } : {}), ...(max ? { max } : {}) } : undefined;
+    // `off` is false; anything else it doesn't name leaves the default.
+    const mode = <T extends string>(name: string, modes: readonly T[]) => {
+      const value = this.getAttribute(name);
+      return value === "off" ? false : modes.find((each) => each === value);
+    };
+    const zoom = {
+      step: number("zoom-step"),
+      max: number("zoom-max"),
+      click: mode("zoom-click", ["single", "double"] as const),
+      tap: mode("zoom-tap", ["double"] as const),
+    };
+    const given = Object.entries(zoom).filter(([, value]) => value !== undefined);
+    return given.length ? Object.fromEntries(given) : undefined;
   }
 
   /** Hand the viewer the current options. It loads the add-ons they turn on. */
@@ -461,24 +717,52 @@ export class FluidboxGalleryElement extends HTMLElement {
 
   #options() {
     const sheetElement = this.querySelector<FluidboxSheetElement>(":scope > fluidbox-sheet");
-    const filmstripElement = this.querySelector<FluidboxFilmstripElement>(
-      ":scope > fluidbox-filmstrip",
+    const thumbnailsElement = this.querySelector<FluidboxThumbnailsElement>(
+      ":scope > fluidbox-thumbnails",
     );
-    const filmstrip: boolean | FluidboxFilmstripOptions | undefined = filmstripElement
-      ? filmstripElement.render
-        ? { render: filmstripElement.render }
+    const thumbnails: boolean | FluidboxThumbnailsOptions | undefined = thumbnailsElement
+      ? thumbnailsElement.render
+        ? { render: thumbnailsElement.render }
         : true
       : undefined;
+    // Without content of yours, the viewer draws Previous, Next and Close.
+    const template = this.querySelector<HTMLTemplateElement>(":scope > template[slot=viewer]");
+    if (template !== this.#viewerTemplate) {
+      this.#viewerTemplate = template;
+      this.#viewerRenderer = (context) => this.#mountViewer(context);
+    }
     return {
       labels: this.#labels,
       zoom: this.zoom,
       loop: this.hasAttribute("loop"),
-      loading: this.loading,
+      preload: this.#preload(),
       controls: undefined,
-      viewer: this.#viewerRenderer,
-      filmstrip,
+      icons: this.#iconOptions(),
+      viewer: this.#viewer || template ? this.#viewerRenderer : undefined,
+      thumbnails,
       sheet: sheetElement ? this.#sheetOptions(sheetElement) : undefined,
+      dismiss: this.#dismiss,
+      wheel: this.wheel,
+      reachEndThreshold: this.reachEndThreshold,
+      shareUrl: this.#shareUrl,
+      slideshow: this.#slideshow,
     } satisfies FluidboxUpdateOptions;
+  }
+
+  /**
+   * The viewer keeps the slides it drew, so new ones take a new viewer: at
+   * once while closed, else as it closes. It keeps the value it had.
+   */
+  #slidesChanged() {
+    const fluidbox = this.#fluidbox;
+    if (!fluidbox) return;
+    if (fluidbox.state.status !== "closed") {
+      this.#rebuildOnClose = true;
+      return;
+    }
+    this.#rebuildOnClose = false;
+    this.#teardown();
+    this.#queueRefresh();
   }
 
   #teardown() {
@@ -489,7 +773,14 @@ export class FluidboxGalleryElement extends HTMLElement {
       this.#lastStatus = "closed";
       for (const listener of this.#listeners) listener(closed);
       this.dispatchEvent(
-        new FluidboxToggleEvent("toggle", { oldState: "open", newState: "closed", reason: "api" }),
+        new FluidboxValueChangeEvent("valuechange", {
+          value: null,
+          previousValue: dropped.value,
+          index: null,
+          item: null,
+          action: "close",
+          reason: "api",
+        }),
       );
     }
     for (const { trigger } of this.#triggers.values()) trigger.destroy();
@@ -527,14 +818,61 @@ export class FluidboxGalleryElement extends HTMLElement {
     });
   }
 
-  #syncRenderers() {
-    for (const key of Object.keys(this.#runtimeRenderers)) delete this.#runtimeRenderers[key];
-    Object.assign(this.#runtimeRenderers, this.#renderers);
-    for (const definition of this.#definitions.values()) {
-      if (definition.renderer) {
-        this.#runtimeRenderers[definition.renderer[0]] = definition.renderer[1];
+  #slideFor(type: string): FluidboxSlideRenderer<any> | undefined {
+    if (Object.hasOwn(this.#slides, type)) return this.#slides[type];
+    const template = Array.from(
+      this.querySelectorAll<HTMLTemplateElement>("template[data-fluidbox-slide]"),
+    ).find(
+      (each) => each.dataset.fluidboxSlide === type && each.closest("fluidbox-gallery") === this,
+    );
+    if (template) {
+      let slide = this.#templateSlides.get(template);
+      if (!slide) {
+        let stamp: FluidboxSlideRenderer<any> | undefined;
+        const stamped = (loaded: Parts) =>
+          (stamp ??= loaded.templateSlide(template, () => this.#partsContext()));
+        slide = (each) => {
+          if (parts) return stamped(parts)(each);
+          // An open that beats the parts waits for them, as for a framework's render.
+          const release = holdSlideCommit(each);
+          let dispose: void | (() => void);
+          void loadParts().then((loaded) => {
+            if (!each.signal.aborted) dispose = stamped(loaded)(each);
+            release();
+          }, release);
+          return () => {
+            release();
+            dispose?.();
+          };
+        };
+        this.#templateSlides.set(template, slide);
       }
+      return slide;
     }
+    return registeredSlide(type) ?? this.#markupSlides.get(type);
+  }
+
+  /** Load the parts for a gallery that has templates or viewer content of its own. */
+  #loadParts() {
+    if (parts) return;
+    void loadParts().then(
+      () => {
+        if (!this.#drawnWithoutParts) return;
+        this.#drawnWithoutParts = false;
+        this.#viewerRenderer = (context) => this.#mountViewer(context);
+        this.#queueUpdate();
+      },
+      () => {},
+    );
+  }
+
+  /** What the parts in the viewer template and the slide templates draw with. */
+  #partsContext() {
+    return {
+      fluidbox: this.#fluidbox!,
+      labels: resolveLabels(this.#labels),
+      icons: this.#iconOptions(),
+    };
   }
 
   #elements() {
@@ -544,6 +882,8 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   async #refresh() {
+    if (this.querySelector(":scope > template[slot=viewer], template[data-fluidbox-slide]"))
+      this.#loadParts();
     const definitions = new Map<string, DeclarativeFluidboxDefinition>();
     let items = this.#items;
     if (!items) {
@@ -559,7 +899,11 @@ export class FluidboxGalleryElement extends HTMLElement {
     // An array goes as it is, so the fluidbox can tell equal items from new ones.
     const given = Array.isArray(items) ? items : list;
     this.#definitions = definitions;
-    this.#syncRenderers();
+    this.#markupSlides = new Map(
+      Array.from(definitions.values(), (definition) => definition.renderer).filter(
+        (renderer) => !!renderer,
+      ),
+    );
     if (!this.#fluidbox) {
       this.#create(given);
       this.#itemsResult = undefined;
@@ -583,28 +927,32 @@ export class FluidboxGalleryElement extends HTMLElement {
   }
 
   #create(items: FluidboxItems) {
-    const fluidbox = createFluidbox({
-      ...this.#options(),
-      items,
-      // The origins property can change after the viewer is made.
-      origins: latestOrigins(() => this.#origins),
-      renderers: this.#runtimeRenderers,
-    });
+    // The findTrigger and revealTrigger properties can change after the viewer is made.
+    const fluidbox = createFluidbox(
+      latestFindTrigger({ ...this.#options(), items, slides: this.#slideLookup }, () => ({
+        findTrigger: this.#findTrigger,
+        revealTrigger: this.#revealTrigger,
+      })),
+    );
     this.#fluidbox = fluidbox;
     this.#sync = createFluidboxSync(fluidbox);
+    // A gallery moved in the page keeps the viewer as it was: the value it
+    // already used, or a change to it that was canceled, isn't asked again.
     this.#events = new AbortController();
     forwardEvents(fluidbox, this, this.#events.signal);
     this.#unsubscribe = fluidbox.subscribe((state) => {
       this.#keepFocus(state);
+      if (this.#rebuildOnClose && state.status === "closed")
+        queueMicrotask(() => this.#slidesChanged());
       for (const listener of this.#listeners) listener(state);
     });
   }
 
   #sheetOptions(element: FluidboxSheetElement): FluidboxSheetOptions<FluidboxItem> {
-    const dismiss = element.getAttribute("dismiss");
+    const dismissMotion = element.getAttribute("dismiss-motion");
     return {
       snapPoints: snapPoints(element.getAttribute("snap-points")),
-      ...(dismiss === "flight" || dismiss === "scroll" || dismiss === "none" ? { dismiss } : {}),
+      ...(dismissMotion === "flight" || dismissMotion === "scroll" ? { dismissMotion } : {}),
       render: element.render ?? this.#sheetTemplate,
     };
   }
@@ -616,21 +964,23 @@ export class FluidboxGalleryElement extends HTMLElement {
     if (template) context.target.append(template.content.cloneNode(true));
   };
 
-  /** One trigger per `<fluidbox-item>`, or per `data-fluidbox-item-id` descendant with `items` set. */
+  /** One trigger per `<fluidbox-item>`, or per `data-fluidbox-value` descendant with `items` set. */
   #bindTriggers(fluidbox: Fluidbox) {
     const wanted = new Map<
       HTMLElement,
       { target: string; returns: readonly string[]; item?: FluidboxItemElement }
     >();
     if (this.#items) {
-      for (const element of this.querySelectorAll<HTMLElement>("[data-fluidbox-item-id]")) {
-        const returns = element.dataset.fluidboxReturns?.split(/\s+/).filter(Boolean) ?? [];
-        wanted.set(element, { target: element.dataset.fluidboxItemId!, returns });
+      for (const element of this.querySelectorAll<HTMLElement>("[data-fluidbox-value]")) {
+        // An id, or ids separated by spaces: the first opens, every one closes back here.
+        const [target, ...returns] = element.dataset.fluidboxValue!.split(/\s+/).filter(Boolean);
+        if (target) wanted.set(element, { target, returns });
       }
     } else {
       for (const item of this.#elements()) {
         const trigger = item.trigger;
-        if (trigger) wanted.set(trigger, { target: item.itemId, returns: item.returns, item });
+        const [target, ...returns] = item.ids;
+        if (trigger) wanted.set(trigger, { target: target!, returns, item });
       }
     }
     for (const [element, { trigger }] of this.#triggers) {
@@ -641,9 +991,9 @@ export class FluidboxGalleryElement extends HTMLElement {
     for (const dispose of this.#overlays) dispose();
     this.#overlays = [];
     for (const [element, { target, returns, item }] of wanted) {
+      const value = [target, ...returns];
       const options = {
-        target,
-        returns,
+        value,
         onPreviewChange: item
           ? (selected: FluidboxItem) => item.previewChange(idOf(selected), selected)
           : undefined,
@@ -655,36 +1005,36 @@ export class FluidboxGalleryElement extends HTMLElement {
       } else {
         this.#triggers.set(element, { element, trigger: bindTrigger(fluidbox, element, options) });
       }
-      const overlay = element.querySelector<HTMLElement>("[data-fluidbox-thumbnail-overlay]");
-      if (overlay) {
-        const travel = overlay.dataset.fluidboxThumbnailOverlay === "travel";
+      // The still copy a flight leaves on the card is never an overlay of its own.
+      for (const overlay of element.querySelectorAll<HTMLElement>(OVERLAY)) {
         this.#overlays.push(
-          fluidbox.bindOverlay(overlay, target, {
-            returns,
-            travel,
-            frameLayer: travel ? frameLayerOf(overlay) : undefined,
-          }),
+          fluidbox.bindOverlay(overlay, value, { flight: overlayFlight(overlay) }),
         );
       }
     }
   }
 
   /**
-   * Fill the viewer with the `viewer` property, else a `<template slot="viewer">`
-   * (where `<fluidbox-controls>` stands for the default controls, and
-   * `<fluidbox-controls zoom>` adds the zoom controls), else the default
-   * controls. Buttons marked `data-fluidbox-close`, `-previous`, `-next`,
-   * `-zoom-in`, `-zoom-out` or `-zoom-reset` work wherever they are.
+   * Fill the viewer with the `viewer` property, else a `<template slot="viewer">`.
+   * Its parts expand: `<fluidbox-toolbar>` stands for Previous, Next and
+   * Close, `<fluidbox-zoom-controls>` for the zoom controls, and so on.
+   * Buttons marked `data-fluidbox-close`, `-previous`, `-next`, `-zoom-in`,
+   * `-zoom-out`, `-zoom-reset`, `-retry` and the rest work wherever they are.
    */
   #mountViewer(context: FluidboxViewerContext<any>) {
-    const { target } = context;
-    const ownerDocument = target.ownerDocument;
-    const template = this.querySelector<HTMLTemplateElement>(":scope > template[slot=viewer]");
+    const { target, signal } = context;
     let dispose: void | (() => void);
-    // The viewer's layer expands each <fluidbox-controls> into the default buttons.
     if (this.#viewer) dispose = this.#viewer(context);
-    else if (template) target.append(ownerDocument.importNode(template.content, true));
-    else target.append(ownerDocument.createElement("fluidbox-controls"));
+    else if (this.#viewerTemplate) {
+      target.append(target.ownerDocument.importNode(this.#viewerTemplate.content, true));
+    }
+    if (parts) parts.expandParts(target, { ...this.#partsContext(), signal });
+    else {
+      // Draw it again once the parts arrive, which a gallery with templates
+      // started loading as it connected.
+      this.#drawnWithoutParts = true;
+      this.#loadParts();
+    }
     return () => {
       dispose?.();
       target.replaceChildren();

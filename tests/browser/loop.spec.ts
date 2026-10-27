@@ -57,9 +57,9 @@ for (const direction of ["ltr", "rtl"] as const) {
       await expect(dialog(page)).toHaveCount(0);
     });
 
-    test("the filmstrip goes round too", async ({ page }) => {
+    test("the thumbnails goes round too", async ({ page }) => {
       await openFirst(page, query);
-      const selected = dialog(page).locator("[data-fluidbox-filmstrip-item][aria-selected=true]");
+      const selected = dialog(page).locator("[data-fluidbox-thumbnails-item][aria-selected=true]");
       await expect(selected).toHaveAttribute("data-index", "0");
       await selected.focus();
       await page.keyboard.press(back);
@@ -75,7 +75,9 @@ test("a veto holds across the seam", async ({ page }) => {
   await openFirst(page, "");
   await page.evaluate(() => {
     const gallery = document.querySelector<FluidboxGalleryElement>("fluidbox-gallery")!;
-    gallery.addEventListener("beforeitemchange", (event) => event.preventDefault());
+    gallery.addEventListener("beforevaluechange", (event) => {
+      if (event.action === "move") event.preventDefault();
+    });
   });
   await page.keyboard.press("ArrowLeft");
   await dialog(page).locator("[data-fluidbox-previous]").click();
@@ -103,4 +105,76 @@ test("loop turns off in place, and a single item never loops", async ({ page }) 
   await expect(dialog(page).locator("[data-fluidbox-next]")).toBeDisabled();
   await page.keyboard.press("ArrowRight");
   await expectSlide(page, "Item 1 of 1");
+});
+
+test("turning loop on and off keeps the open slide, and its iframe loaded", async ({ page }) => {
+  await page.goto("/elements-slides.html");
+  await page.waitForFunction(() => customElements.get("fluidbox-gallery") !== undefined);
+  const loads = () => page.evaluate(() => (window as { frameLoads?: number }).frameLoads);
+  // The last item: a frame that counts its loads.
+  await page.locator('button[data-test="frame"]').click();
+  await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+  await expectSlide(page, "Item 4 of 4");
+  await expect.poll(loads).toBe(1);
+  await activeSlide(page).evaluate((slide) => (slide.dataset.kept = ""));
+  const next = dialog(page).locator("[data-fluidbox-next]");
+  const gallery = page.locator("#media");
+  const setLoop = (loop: boolean) =>
+    gallery.evaluate((element, loop) => element.toggleAttribute("loop", loop), loop);
+
+  await setLoop(true);
+  await expect(next).toBeEnabled();
+  await expect(activeSlide(page)).toHaveAttribute("data-kept", "");
+  await expect.poll(() => offset(page)).toBeLessThan(2);
+  // Round to the first item and back.
+  await page.keyboard.press("ArrowRight");
+  await expectSlide(page, "Item 1 of 4");
+  await page.keyboard.press("ArrowLeft");
+  await expectSlide(page, "Item 4 of 4");
+
+  await setLoop(false);
+  await expect(next).toBeDisabled();
+  await expect(activeSlide(page)).toHaveAttribute("data-kept", "");
+  await expect.poll(() => offset(page)).toBeLessThan(2);
+  await setLoop(true);
+  await expect(next).toBeEnabled();
+  await expect(activeSlide(page)).toHaveAttribute("data-kept", "");
+  await page.waitForTimeout(300);
+  expect(await loads()).toBe(1);
+});
+
+test("turning loop on and off leaves a loaded neighbour where it was", async ({ page }) => {
+  await page.goto("/elements-slides.html");
+  await page.waitForFunction(() => customElements.get("fluidbox-gallery") !== undefined);
+  // Two items: the chair on show, and the counting frame beside it, loaded.
+  const gallery = page.locator("#media");
+  await gallery.evaluate((element) => {
+    for (const value of ["film", "model"]) element.querySelector(`[value="${value}"]`)!.remove();
+  });
+  await page.locator('button[data-test="spin"]').click();
+  await expect(dialog(page)).toHaveAttribute("data-fluidbox-status", "open");
+  await expectSlide(page, "Item 1 of 2");
+  await expect
+    .poll(() => page.evaluate(() => (window as { frameLoads?: number }).frameLoads))
+    .toBe(1);
+  // The frame beside it, marked in its own document: a reload would lose the mark.
+  const neighbour = () =>
+    activeSlide(page).evaluate((slide) => {
+      const frame = slide.nextElementSibling?.querySelector("iframe");
+      return (frame?.contentWindow as { kept?: boolean } | null)?.kept === true;
+    });
+  await activeSlide(page).evaluate((slide) => {
+    const frame = slide.nextElementSibling!.querySelector("iframe")!;
+    (frame.contentWindow as unknown as { kept: boolean }).kept = true;
+  });
+
+  for (const loop of [true, false, true, false]) {
+    await gallery.evaluate((element, loop) => element.toggleAttribute("loop", loop), loop);
+    await expect(dialog(page).locator("[data-fluidbox-previous]")).toBeEnabled({ enabled: loop });
+    await expectSlide(page, "Item 1 of 2");
+    expect(await neighbour()).toBe(true);
+    await expect.poll(() => offset(page)).toBeLessThan(2);
+  }
+  await page.waitForTimeout(300);
+  expect(await neighbour()).toBe(true);
 });

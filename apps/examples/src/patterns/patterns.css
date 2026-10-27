@@ -127,7 +127,7 @@
   font: 600 clamp(18px, 3vw, 32px) / 1.2 var(--fb-font-sans);
 }
 
-.pattern-filmstrip-thumb {
+.pattern-thumbnails-thumb {
   display: grid;
   place-items: center;
   width: 100%;
@@ -137,7 +137,7 @@
   font: 600 14px var(--fb-font-mono);
 }
 
-[data-fluidbox-selected] > .pattern-filmstrip-thumb {
+[data-active] > .pattern-thumbnails-thumb {
   color: #111;
   background: white;
 }
@@ -195,6 +195,36 @@
   cursor: pointer;
 }
 
+/* baseline.css places and draws every control by its attribute, so controls
+   marked up in the caption, as the custom elements' are, take the caption's
+   look instead. Qualified to outweigh the design system's gallery arrows. */
+[data-fluidbox-viewer]
+  [data-fluidbox-dialog]
+  .pattern-caption
+  :is([data-fluidbox-previous], [data-fluidbox-next], [data-fluidbox-close]) {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+[data-fluidbox-viewer] .pattern-caption [data-fluidbox-counter] {
+  position: static;
+  display: inline;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  background: none;
+}
+
 .pattern-caption button:disabled {
   opacity: 0.4;
 }
@@ -246,4 +276,12 @@
   width: 100%;
   height: auto;
   aspect-ratio: 1;
+}
+
+/* A live 3D model as a thumbnail. */
+.pattern-thumb model-viewer {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
 }

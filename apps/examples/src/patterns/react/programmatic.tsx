@@ -23,26 +23,23 @@ function Toolbar({ lock }: { lock: RefObject<HTMLInputElement | null> }) {
 export function Programmatic() {
   const lock = useRef<HTMLInputElement>(null);
   const [log, setLog] = useState<string[]>([]);
-  const record = (event: Event) => setLog((types) => [...types, event.type].slice(-20));
+  const record = (type: string) => setLog((types) => [...types, type].slice(-20));
   return (
     <Fluidbox.Root
       items={photos}
-      // beforeitemchange comes before every move between items; canceling it keeps the viewer still.
-      onBeforeItemChange={(event) => {
-        if (lock.current?.checked) event.preventDefault();
-        record(event);
+      // Called before every open, move and close; canceling a move keeps the viewer still.
+      onValueChange={(_, details) => {
+        if (lock.current?.checked && details.action === "move") details.cancel();
+        record("valuechange");
       }}
-      onBeforeToggle={record}
-      onToggle={record}
-      onItemChange={record}
-      onSettle={record}
+      onValueChangeComplete={() => record("valuechangecomplete")}
     >
       <Toolbar lock={lock} />
       <div className="pattern-grid">
         {photos.map((photo) => (
           <Fluidbox.Trigger
-            key={photo.src}
-            item={photo}
+            key={photo.id}
+            value={photo.id}
             className="pattern-thumb"
             data-test="trigger"
           >

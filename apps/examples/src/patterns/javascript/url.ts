@@ -45,10 +45,7 @@ export function mountUrl(root: HTMLElement) {
     const photo = photoInUrl();
     void (photo === null ? fluidbox.close() : fluidbox.open(photo));
   };
-  fluidbox.addEventListener("toggle", ({ newState }) => {
-    if (newState === "closed") followInUrl(null);
-  });
-  fluidbox.addEventListener("itemchange", ({ index }) => followInUrl(index));
+  fluidbox.addEventListener("valuechange", ({ index }) => followInUrl(index));
   addEventListener("popstate", showUrl);
   showUrl();
 

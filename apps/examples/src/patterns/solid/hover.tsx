@@ -12,7 +12,7 @@ export function Hover() {
   onMount(() => onCleanup(hoverZoom(image, productPhoto)));
   return (
     <Fluidbox.Root items={[productPhoto]}>
-      <Fluidbox.Trigger item={productPhoto} class="pattern-product" data-test="product">
+      <Fluidbox.Trigger value={productPhoto.id} class="pattern-product" data-test="product">
         <img
           ref={(element) => (image = element)}
           src={thumbnailSrc(productPhoto)}

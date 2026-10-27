@@ -68,9 +68,12 @@ samp {
   border: 1px solid var(--fb-line);
 }
 
-:focus-visible {
-  outline: 1px solid var(--fb-fg);
-  outline-offset: 2px;
+/* Under baseline.css's layer (layers.css), so the viewer's controls keep its ring. */
+@layer fb-base {
+  :focus-visible {
+    outline: 1px solid var(--fb-fg);
+    outline-offset: 2px;
+  }
 }
 
 ::selection {

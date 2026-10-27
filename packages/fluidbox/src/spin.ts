@@ -4,14 +4,14 @@
  */
 import { addStyles, paintPoster, posterStyles } from "./addon-styles";
 import type {
-  FluidboxCustomItem,
-  FluidboxItem,
+  FluidboxCustomItemBase,
   FluidboxSlideRenderer,
   FluidboxThumbnail,
 } from "./public-api";
 
 /** A spin's frames, one full turn in order. Make one with `spinItem`. */
-export interface FluidboxSpinItem extends FluidboxCustomItem {
+export interface FluidboxSpinItem extends FluidboxCustomItemBase<"spin"> {
+  readonly id: string;
   /** The frames' URLs, a full turn in order. The first is the spin's poster. */
   readonly frames: readonly string[];
   /**
@@ -20,6 +20,12 @@ export interface FluidboxSpinItem extends FluidboxCustomItem {
    * @default false
    */
   readonly autoplay?: boolean | number;
+}
+
+declare module "@ogdakke/fluidbox" {
+  interface FluidboxItemTypes {
+    spin: FluidboxSpinItem;
+  }
 }
 
 /** Frames numbered in their URLs, as `{ src: "/mug/{index}.webp", count: 36 }`. */
@@ -36,17 +42,12 @@ export interface FluidboxSpinFrameTemplate {
 /** What `spinItem` takes. */
 export interface FluidboxSpinItemOptions extends Omit<
   FluidboxSpinItem,
-  "type" | "id" | "render" | "frames" | "thumbnail"
+  "type" | "id" | "frames" | "thumbnail"
 > {
   readonly frames: readonly string[] | FluidboxSpinFrameTemplate;
   /** Defaults to the first frame's URL. */
   readonly id?: string;
   readonly thumbnail?: FluidboxThumbnail;
-  /**
-   * The key of the renderer in `renderers`.
-   * @default "spin"
-   */
-  readonly render?: string;
 }
 
 /** The frames' URLs from a list or a template. */
@@ -61,26 +62,20 @@ export function spinFrames(frames: readonly string[] | FluidboxSpinFrameTemplate
   );
 }
 
-/** A spin item for the spin renderer. */
+/** A spin item for the spin slide. */
 export function spinItem(options: FluidboxSpinItemOptions): FluidboxSpinItem {
   const frames = spinFrames(options.frames);
   if (!frames.length) throw new RangeError("A spin needs at least one frame.");
   return {
     ...options,
-    type: "custom",
+    type: "spin",
     id: options.id ?? frames[0]!,
-    render: options.render ?? "spin",
     frames,
   };
 }
 
-/** Whether an item is a spin made by `spinItem`. */
-export function isSpinItem(item: FluidboxItem): item is FluidboxSpinItem {
-  return item.type === "custom" && Array.isArray((item as Partial<FluidboxSpinItem>).frames);
-}
-
-/** What `createSpinRenderer` takes. */
-export interface FluidboxSpinRendererOptions {
+/** What `createSpinSlide` takes. */
+export interface FluidboxSpinSlideOptions {
   /**
    * The spin's value as a slider reads it.
    * @default (frame, count) => `Frame ${frame} of ${count}`
@@ -102,13 +97,9 @@ export interface FluidboxSpinRendererOptions {
 const spinStyles = `
 :where([data-fluidbox-spin]) {
   touch-action: none;
-  cursor: grab;
   outline-offset: -2px;
 }
-:where([data-fluidbox-spin][data-grabbing]) {
-  cursor: grabbing;
-}
-:where([data-fluidbox-spin] > [data-fluidbox-media-poster]) {
+:where([data-fluidbox-spin]) > [data-fluidbox-media-poster] {
   object-fit: contain;
 }
 `;
@@ -119,23 +110,20 @@ const FRICTION = 0.995;
 const REST = 0.004;
 
 /**
- * Make a renderer for `spinItem` spins. Frame 0 shows at once and is what the
+ * Make the slide for spin items. Frame 0 shows at once and is what the
  * opening flight lands on; the other frames load at low priority once the slide
  * is first on show. A horizontal drag turns the spin and lets go with inertia
  * that settles on a frame. With the spin focused, the arrow keys step a frame,
  * Home and End go to the first and last. The spin owns its input, so neither
  * gesture nor keys move the viewer.
  */
-export function createSpinRenderer(
-  options: FluidboxSpinRendererOptions = {},
-): FluidboxSlideRenderer<FluidboxItem> {
+export function createSpinSlide(
+  options: FluidboxSpinSlideOptions = {},
+): FluidboxSlideRenderer<FluidboxSpinItem> {
   const label = options.label ?? ((frame, count) => `Frame ${frame} of ${count}`);
   const keep = Math.max(2, options.keep ?? 48);
   const turns = options.turns ?? 1;
-  return ({ item, target, signal, active, onActiveChange }) => {
-    if (!isSpinItem(item)) {
-      throw new TypeError(`The spin renderer draws spinItem spins: ${item.id}`);
-    }
+  return ({ item, media: target, signal, active, onActiveChange }) => {
     const ownerDocument = target.ownerDocument;
     const view = ownerDocument.defaultView!;
     addStyles(ownerDocument, "spin", posterStyles + spinStyles);

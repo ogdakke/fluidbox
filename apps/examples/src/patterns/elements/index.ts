@@ -2,10 +2,9 @@ import "@ogdakke/fluidbox/elements";
 import type { MountPattern } from "../page";
 import type { PatternName } from "../shared";
 import basic from "./basic.html?raw";
-import filmstripMarkup from "./filmstrip.html?raw";
-import { filmstrip } from "./filmstrip";
-import headlessMarkup from "./headless.html?raw";
-import { headless } from "./headless";
+import thumbnailsMarkup from "./thumbnails.html?raw";
+import { thumbnails } from "./thumbnails";
+import headless from "./headless.html?raw";
 import hoverMarkup from "./hover.html?raw";
 import { hover } from "./hover";
 import mediaMarkup from "./media.html?raw";
@@ -45,9 +44,9 @@ export const patterns: Record<PatternName, MountPattern> = {
   renderers: mount(renderersMarkup, renderers),
   programmatic: mount(programmaticMarkup, programmatic),
   zoom: mount(zoomMarkup, zoom),
-  filmstrip: mount(filmstripMarkup, filmstrip),
+  thumbnails: mount(thumbnailsMarkup, thumbnails),
   sheet: mount(sheetMarkup, sheet),
-  headless: mount(headlessMarkup, headless),
+  headless: mount(headless),
   rtl: mount(rtlMarkup, rtl),
   url: mount(urlMarkup, url),
   hover: mount(hoverMarkup, hover),

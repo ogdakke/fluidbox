@@ -1,4 +1,5 @@
 import type { Fluidbox, FluidboxItem, FluidboxReason, FluidboxTarget } from "./public-api";
+import type { FluidboxLabels } from "./labels";
 import type { FluidboxOrigin as RuntimeOrigin } from "./runtime-types";
 
 /**
@@ -23,7 +24,15 @@ export interface FluidboxHost {
    * Open at `index` with no motion, showing the viewer once its image has
    * decoded, to take over from a copy of it that the server rendered.
    */
-  takeOver(index: number): Promise<boolean>;
+  takeOver(value: string): Promise<boolean>;
+  /** The link Share shares for an item, or undefined. */
+  shareLink(item: FluidboxItem): string | undefined;
+  /** Load the slide on show again if it failed. False when it hadn't. */
+  retry(): Promise<boolean>;
+  /** Whether the fluidbox has a `slideshow` option, without which the Slideshow control hides. */
+  slideshow(): boolean;
+  /** The labels the viewer uses now. */
+  readonly labels: FluidboxLabels;
   /** Drop the viewer and close at once, keeping the bindings, as a binding's unmount does. */
   unload(): void;
 }
@@ -32,7 +41,16 @@ export const hostKey = Symbol.for("@ogdakke/fluidbox/host");
 
 export function hostOf(fluidbox: Fluidbox<any>): FluidboxHost {
   const host = (fluidbox as unknown as { [hostKey]?: FluidboxHost })[hostKey];
-  if (!host) throw new TypeError("Expected a fluidbox from createFluidbox.");
+  if (!host)
+    throw new TypeError(
+      (() => {
+        try {
+          if (process.env.NODE_ENV !== "production")
+            return "Expected a fluidbox from createFluidbox.";
+        } catch {}
+        return "fluidbox";
+      })(),
+    );
   return host;
 }
 

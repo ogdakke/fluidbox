@@ -2,20 +2,23 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { itemLabel } from "@ogdakke/fluidbox";
-import { Fluidbox, type FluidboxItemChangeEvent } from "@ogdakke/fluidbox/vue";
+import {
+  Fluidbox,
+  type FluidboxValue,
+  type FluidboxValueChangeDetails,
+} from "@ogdakke/fluidbox/vue";
 import { photos } from "../shared";
 
 const locked = ref(false);
 const log = ref<string[]>([]);
-
-const record = (event: Event) => {
-  log.value = [...log.value, event.type].slice(-20);
+const record = (type: string) => {
+  log.value = [...log.value, type].slice(-20);
 };
 
-// beforeitemchange comes before every move between items; canceling it keeps the viewer still.
-function onBeforeItemChange(event: FluidboxItemChangeEvent) {
-  if (locked.value) event.preventDefault();
-  record(event);
+// Called before every open, move and close; canceling a move keeps the viewer still.
+function onValueChange(_: FluidboxValue, details: FluidboxValueChangeDetails) {
+  if (locked.value && details.action === "move") details.cancel();
+  record("valuechange");
 }
 </script>
 
@@ -23,11 +26,8 @@ function onBeforeItemChange(event: FluidboxItemChangeEvent) {
   <Fluidbox.Root
     v-slot="{ status, index, open }"
     :items="photos"
-    @beforetoggle="record"
-    @toggle="record"
-    @beforeitemchange="onBeforeItemChange"
-    @itemchange="record"
-    @settle="record"
+    @value-change="onValueChange"
+    @value-change-complete="record('valuechangecomplete')"
   >
     <div class="pattern-toolbar">
       <button type="button" data-test="open-third" @click="open(2)">Open the third photo</button>
@@ -40,7 +40,7 @@ function onBeforeItemChange(event: FluidboxItemChangeEvent) {
       <Fluidbox.Trigger
         v-for="photo in photos"
         :key="photo.id"
-        :item="photo"
+        :value="photo.id"
         class="pattern-thumb"
         data-test="trigger"
       >
