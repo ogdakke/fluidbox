@@ -18,9 +18,10 @@ npm install @ogdakke/fluidbox
 ```tsx
 import { Fluidbox, useFluidbox, useFluidboxSheet } from "@ogdakke/fluidbox/solid";
 import "@ogdakke/fluidbox/styles.css";
+import "@ogdakke/fluidbox/baseline.css"; // optional: the default look
 ```
 
-Import `@ogdakke/fluidbox/styles.css` once in your app. The thumbnails and the sheet are parts of the binding. Rendering `Fluidbox.Thumbnails` or `Fluidbox.Sheet` turns it on. They also need their stylesheets, `@ogdakke/fluidbox/thumbnails.css` and `@ogdakke/fluidbox/sheet.css`.
+Import `@ogdakke/fluidbox/styles.css` once in your app. It holds what makes the viewer work, and draws no look of its own: the controls are buttons with their labels as text. `baseline.css` is the default look, round controls with glyphs; leave it out to style the viewer yourself. See [Styling](./styling.md). The thumbnails and the sheet are parts of the binding. Rendering `Fluidbox.Thumbnails` or `Fluidbox.Sheet` turns it on. They also need their stylesheets, `@ogdakke/fluidbox/thumbnails.css` and `@ogdakke/fluidbox/sheet.css`.
 
 ## A gallery
 
@@ -30,7 +31,7 @@ import type { FluidboxImageItem } from "@ogdakke/fluidbox";
 import { Fluidbox } from "@ogdakke/fluidbox/solid";
 import "@ogdakke/fluidbox/styles.css";
 
-const photos: FluidboxImageItem[] = [
+const photos = [
   {
     id: "dune",
     type: "image",
@@ -49,7 +50,7 @@ const photos: FluidboxImageItem[] = [
     height: 1600,
     thumbnail: { src: "/photos/fjord-400.jpg", width: 400, height: 533 },
   },
-];
+] satisfies FluidboxImageItem[];
 
 export function Photos() {
   return (
@@ -57,7 +58,7 @@ export function Photos() {
       <For each={photos}>
         {(photo) => (
           <Fluidbox.Trigger value={photo.id}>
-            <img src={photo.thumbnail!.src} alt={photo.alt} />
+            <img src={photo.thumbnail.src} alt={photo.alt} />
           </Fluidbox.Trigger>
         )}
       </For>
@@ -87,6 +88,7 @@ All parts are properties of the `Fluidbox` object.
     <Fluidbox.Toolbar>
       <Fluidbox.Counter />
       <Fluidbox.ZoomControls />
+      <Fluidbox.Slideshow />
       <Fluidbox.Close />
     </Fluidbox.Toolbar>
     <Fluidbox.Previous />
@@ -107,12 +109,14 @@ All parts are properties of the `Fluidbox` object.
 | `Fluidbox.Slides`                                      | nothing                               | The content of each item type's slide.                                                      |
 | `Fluidbox.Media`                                       | into the slide's box                  | The box that flies and zooms: its children, or what a plain-JS slide draws.                 |
 | `Fluidbox.Image`, `Fluidbox.Video`, `Fluidbox.Iframe`  | the built-in media, in the box        | The viewer's own image, video and iframe, with their loading, zoom and error handling.      |
+| `Fluidbox.Hotspot`                                     | a `<button>`, on the media            | A pin at a point of the picture, which follows pan and zoom.                                |
 | `Fluidbox.Viewer`                                      | its children, in the viewer's layer   | Your controls and captions.                                                                 |
 | `Fluidbox.Toolbar`, `Fluidbox.ZoomControls`            | a `<div role="group">`                | Groups of controls. Empty, they hold Previous, Next and Close, or the three zoom controls.  |
 | `Fluidbox.Previous`, `Next`, `Close`                   | a `<button>`                          | Run the command, and disable themselves when they can't.                                    |
 | `Fluidbox.ZoomIn`, `ZoomOut`, `ZoomReset`              | a `<button>`                          | Zoom the image on show. See [Zoom](./patterns/zoom.md#zoom-controls).                       |
 | `Fluidbox.Fullscreen`, `Share`                         | a `<button>`                          | Full screen, and the share sheet or the clipboard. Hidden where they can't work.            |
 | `Fluidbox.Download`                                    | an `<a download>`                     | Saves the item's file. Hidden when the item has none.                                       |
+| `Fluidbox.Slideshow`                                   | a `<button>`                          | Plays and pauses the slideshow.                                                             |
 | `Fluidbox.Counter`, `Fluidbox.Caption`                 | a `<span>`, a `<div>`                 | Where the viewer is, and the item's caption.                                                |
 | `Fluidbox.Loading`, `Fluidbox.Error`, `Fluidbox.Retry` | a `<div>` with its children; a button | Your loading and error states for the item on show.                                         |
 | `Fluidbox.Thumbnails`                                  | its children, in each thumbnail       | Turns the thumbnails on. A child function draws your own thumbnails.                        |
@@ -132,6 +136,8 @@ All parts are properties of the `Fluidbox` object.
 | `loop`                  | `boolean`                                                     | `false`                                               | Go round: past the last item comes the first, by swipe, key, button and thumbnails. A single item never loops.                                              |
 | `dismiss`               | `{ drag?: boolean; backdrop?: boolean }`                      | both on                                               | Which gestures close the viewer. Escape and Close always do.                                                                                                |
 | `wheel`                 | `"dismiss" \| "zoom" \| "navigate" \| "none"`                 | `"dismiss"`                                           | What a vertical wheel does on an unzoomed slide.                                                                                                            |
+| `slideshow`             | `FluidboxSlideshowOptions`                                    |                                                       | `{ interval, loop, autoplay }`: advance on a timer once something plays it. See [Slideshow](#slideshow).                                                    |
+| `reachEndThreshold`     | `number`                                                      | `2`                                                   | How near the end `onReachEnd` fires.                                                                                                                        |
 | `href`                  | `(value: string \| null) => string \| undefined`              |                                                       | Where the server-rendered viewer's controls lead before JavaScript runs.                                                                                    |
 | `shareUrl`              | `(item) => string \| undefined`                               | `href` of the id                                      | The link Share shares. Without either, Share hides.                                                                                                         |
 | `findTrigger`           | `(item, index) => Element \| null`                            |                                                       | Finds the trigger of an item without a mounted one, as in a virtualized grid. See [Finding triggers](./items-and-origins.md#the-origin-adapter).            |
@@ -139,6 +145,7 @@ All parts are properties of the `Fluidbox` object.
 | `preload`               | `"intent" \| "press" \| "eager"`                              | `"intent"`                                            | When the viewer's code loads. See [Loading the viewer](./getting-started.md#loading-the-viewer).                                                            |
 | `onZoomChange`          | `(event: FluidboxZoomEvent) => void`                          |                                                       | When the image on show comes to rest at another zoom. `scale` and `reason`.                                                                                 |
 | `onMediaError`          | `(event: FluidboxMediaErrorEvent<TItem>) => void`             |                                                       | When a slide's media fails to load. `kind` and `cause`.                                                                                                     |
+| `onReachEnd`            | `(event: FluidboxReachEndEvent<TItem>) => void`               |                                                       | When the open item comes within `reachEndThreshold` of the last, once per count. See [Lazy lists](#lazy-lists-and-onreachend).                              |
 | `children`              | `JSX.Element`                                                 |                                                       | Your page content and the other parts.                                                                                                                      |
 
 `value` is a request, not a lock. When the viewer changes on its own, by a swipe or Escape, `onValueChange` reports it; leave `value` alone and the viewer still changes. To refuse a change, call `details.cancel()`.
@@ -201,9 +208,11 @@ The trigger adds `data-fluidbox-trigger` and `aria-haspopup="dialog"` to its ele
 
 `Fluidbox.Image`, `Fluidbox.Video` and `Fluidbox.Iframe` draw the viewer's own media into the box, for the slide's item or the `item` you give. They keep the built-in media's loading, placeholders, sharper zoom images, error and Retry. Outside a `Media` they draw into the box all the same. `Video` takes `attach`, to load the media yourself, as hls.js does. Pass a stable function: a new one loads the video again.
 
-`useFluidboxSlide()`, in a component inside a slide, returns its `item`, `index`, `active`, `opening`, `signal`, `onActiveChange`, `origin`, `returnPlayback`, `waitUntil`, `fail` and `onZoom`. Its fields are getters, like Solid props: don't destructure them. `active` and `index` are reactive, so read them in JSX or an effect; `index` also follows new items, which keep a slide whose item moved. An open waits for the slide's images and videos by itself; `waitUntil(promise)` makes it wait for what it can't see, such as a canvas's first frame. Call it in the component's body or in `onMount`. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
+`useFluidboxSlide()`, in a component inside a slide, returns its `item`, `index`, `active`, `opening`, `signal`, `onActiveChange`, `origin`, `onClose`, `returnPlayback`, `waitUntil`, `fail` and `onZoom`. Its fields are getters, like Solid props: don't destructure them. `active` and `index` are reactive, so read them in JSX or an effect; `index` also follows new items, which keep a slide whose item moved. An open waits for the slide's images and videos by itself; `waitUntil(promise)` makes it wait for what it can't see, such as a canvas's first frame. Call it in the component's body or in `onMount`. See [Slides that play and pause](./product-media.md#slides-that-play-and-pause).
 
 A slide's content renders in a `Suspense` boundary of the slide's own, with no fallback. Content that suspends, as a `lazy` component or a resource read in JSX does, holds the open until it resolves, for at most three seconds; the page around the viewer stays as it is. The open goes ahead once the slide's content has mounted.
+
+`origin` is what the trigger showed, on the slide an open started from: `origin.video` reads the trigger's `<video>` live, and `origin.model` is its live `<model-viewer>`, which the model slide continues from. It is null on the other slides. `onClose(listener)` calls back once as a close from this slide starts, on every close path, with the origin of the trigger the close lands on; the model slide uses it to turn the card's model to the view it closes on. Call it in `onMount`, and pass what it returns to `onCleanup`.
 
 A player of your own continues the trigger's video through `origin` and `returnPlayback`, as in [A player of your own continues the trigger's video](./product-media.md#a-player-of-your-own-continues-the-triggers-video). A slide kept from an earlier open reads the trigger of the open that shows it. Register the player in `onMount`, and pass what `returnPlayback` returns to `onCleanup`:
 
@@ -228,13 +237,49 @@ function ReelSlide() {
 }
 ```
 
+### `Fluidbox.Hotspot`
+
+| Prop            | Type                        | Default | Purpose                                                          |
+| --------------- | --------------------------- | ------- | ---------------------------------------------------------------- |
+| `x`, `y`        | `FluidboxHotspotCoordinate` |         | Required. Where on the picture: `"42%"`, or pixels of the media. |
+| `scaleWithZoom` | `boolean`                   | `false` | Grow with the zoom instead of keeping its screen size.           |
+| ...             | button attributes           |         | On the `<button data-fluidbox-hotspot>`.                         |
+
+A hotspot is a button placed on the media of its `Media`, and it must be inside one. Its children are its content: the package ships no icon, so give it text, or an icon and an `aria-label`. From the hotspots fixture (`apps/examples/fixtures/hotspots-solid.ts`):
+
+```tsx
+<Fluidbox.Slides
+  room={({ item }) => (
+    <Fluidbox.Media>
+      <Fluidbox.Image item={item.image} />
+      <For each={item.parts}>
+        {(part) => (
+          <Fluidbox.Hotspot x={part.x} y={part.y} aria-label={part.name}>
+            <span aria-hidden="true">+</span>
+          </Fluidbox.Hotspot>
+        )}
+      </For>
+    </Fluidbox.Media>
+  )}
+/>
+```
+
+- **Coordinates.** A percentage of the picture, as `"42%"`, or a number of pixels of the media's declared `width` and `height`, else of its natural size. The types take a number or `"N%"`; only the custom elements' attributes and untyped JavaScript read a bare string as pixels. They follow `object-fit` and `object-position`. Without an image or video in the box, they are relative to the box.
+- **Zoom.** A hotspot keeps its screen size as the photo zooms, unless `scaleWithZoom`. Keyboard focus on one pans a zoomed photo to it.
+- **Presses.** A press on a hotspot doesn't zoom or close the viewer.
+- **Motion.** Hotspots hide during flights and a drag to dismiss, and fade in with the controls.
+- **Placement.** Nothing between the hotspot and `Media`'s box may make a containing block (`position`, `transform`, `filter`, `will-change`). Development builds warn about it, and about a hotspot outside `Media`.
+- **Size.** The hotspot code is a chunk of its own, loaded with the first hotspot.
+
+`[data-fluidbox-hotspot]` and `[data-scale-with-zoom]` style them; `baseline.css` draws a round pin.
+
 ### `Fluidbox.Viewer`, `Fluidbox.Toolbar` and the controls
 
 `Fluidbox.Viewer` takes only `children`, and renders them into the viewer's layer. It renders nothing until the viewer exists.
 
 `Fluidbox.Toolbar` is a `<div role="group" data-fluidbox-toolbar>`; with no children it holds Previous, Next and Close. The stylesheet gives it `display: contents`, so the controls keep their places until you style it. `Fluidbox.ZoomControls` is the zoom group, named like the zoomed image; with no children it holds Zoom in, Zoom out and Fit.
 
-`Previous`, `Next`, `Close`, `ZoomIn`, `ZoomOut`, `ZoomReset`, `Fullscreen`, `Share`, `Download`, `Retry` and `SheetSnap` take their element's attributes and `ref`. With no children a control shows its label from `labels` as text, marked `data-fluidbox-default`. With children, the label becomes its `aria-label`. `label` overrides the label for this control; `label={false}` names it by its children, for children with visible text. `disabled` follows the viewer's state, and a control that can't work on this device or item gets `hidden`. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
+`Previous`, `Next`, `Close`, `ZoomIn`, `ZoomOut`, `ZoomReset`, `Fullscreen`, `Share`, `Download`, `Slideshow`, `Retry` and `SheetSnap` take their element's attributes and `ref`. With no children a control shows its label from `labels` as text, marked `data-fluidbox-default`. With children, the label becomes its `aria-label`. `label` overrides the label for this control; `label={false}` names it by its children, for children with visible text. `disabled` follows the viewer's state, and a control that can't work on this device or item gets `hidden`. Your `onClick` runs first, and `event.preventDefault()` in it stops the command.
 
 ```tsx
 <Fluidbox.Close />                         // "Close", as text
@@ -243,6 +288,8 @@ function ReelSlide() {
 ```
 
 `Fluidbox.Counter` shows `labels.counter`, as `1 / 4`, or `children({ index, count })`. It is hidden from screen readers, which hear the slide's name. `Fluidbox.Caption` shows the item's `caption`, or `children({ item, index })`, and describes the dialog. In a slide it is that slide's item; elsewhere the item on show.
+
+`Fullscreen` gets `data-active` while the viewer is full screen, and `Slideshow` while it plays.
 
 ### `Fluidbox.Loading`, `Fluidbox.Error` and `Fluidbox.Retry`
 
@@ -302,12 +349,12 @@ The viewer makes the sheet, a `<section data-fluidbox-sheet>` named by `labels.s
 
 Call them in a component inside `Fluidbox.Root`, including the content of `Slides`, `Viewer`, `Sheet` and `Thumbnails`.
 
-| Hook                    | Returns              | Purpose                                                                                                                                                                                                                                                                                    |
-| ----------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `useFluidbox()`         | `FluidboxApi<TItem>` | The state (`status`, `value`, `index`, `item`, `count`, `hasPrevious`, `hasNext`, `zoom`, `fullscreen`) as reactive getters, with `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `zoomReset`, `setFullscreen`, `download`, `share`, `setItems`, `preload` and `load`. |
-| `useFluidbox(selector)` | `Accessor<T>`        | A memo of what the selector picks from that same object.                                                                                                                                                                                                                                   |
-| `useFluidboxSheet()`    | `FluidboxSheetApi`   | `{ snap, setSnap }`: `snap()` is the snap the sheet rests at, following `sheetchange`, and `setSnap(snap, { animate? })` moves it. `snap()` is 0 without a sheet.                                                                                                                          |
-| `useFluidboxSlide()`    | `FluidboxSlideApi`   | Inside a slide: its item and activity, and its hooks into the open. It throws elsewhere.                                                                                                                                                                                                   |
+| Hook                    | Returns              | Purpose                                                                                                                                                                                                                                                                                                                |
+| ----------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useFluidbox()`         | `FluidboxApi<TItem>` | The state (`status`, `value`, `index`, `item`, `count`, `hasPrevious`, `hasNext`, `zoom`, `fullscreen`, `playing`) as reactive getters, with `open`, `close`, `next`, `previous`, `zoomTo`, `zoomIn`, `zoomOut`, `zoomReset`, `setFullscreen`, `download`, `share`, `play`, `pause`, `setItems`, `preload` and `load`. |
+| `useFluidbox(selector)` | `Accessor<T>`        | A memo of what the selector picks from that same object.                                                                                                                                                                                                                                                               |
+| `useFluidboxSheet()`    | `FluidboxSheetApi`   | `{ snap, setSnap }`: `snap()` is the snap the sheet rests at, following `sheetchange`, and `setSnap(snap, { animate? })` moves it. `snap()` is 0 without a sheet.                                                                                                                                                      |
+| `useFluidboxSlide()`    | `FluidboxSlideApi`   | Inside a slide: its item and activity, and its hooks into the open. It throws elsewhere.                                                                                                                                                                                                                               |
 
 The state fields of `useFluidbox()` are reactive getters, like Solid props. Read them in JSX or an effect, and don't destructure them. Commands resolve `true` once they happen, and `false` when they were prevented or superseded. A command you call before the viewer exists, such as a deep link on mount, waits for the viewer and then runs. `open` takes the item, its id or its index. Without one, it opens the current item, or the first if there is none. `preload(target)` starts loading an item a press is likely to open, and returns a function that lets go. `load()` loads the viewer's code now.
 
@@ -330,7 +377,74 @@ For a typed item, write `useFluidbox<Photo>()`, or annotate the selector: `useFl
 
 ### Types
 
-The entry exports the props of every part (`FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxOverlayProps`, `FluidboxSlidesProps`, `FluidboxMediaProps`, `FluidboxImageProps`, `FluidboxVideoProps`, `FluidboxIframeProps`, `FluidboxViewerProps`, `FluidboxGroupProps`, `FluidboxControlProps`, `FluidboxControlLabel`, `FluidboxDownloadProps`, `FluidboxCounterProps`, `FluidboxCaptionProps`, `FluidboxLoadingProps`, `FluidboxErrorProps`, `FluidboxThumbnailsProps`, `FluidboxSheetProps`, `FluidboxSheetSnapProps`), `FluidboxSlideContent`, `FluidboxItemContext`, `FluidboxThumbnailContext`, `FluidboxTriggerPreview`, `FluidboxCommands`, `FluidboxApi`, `FluidboxSheetApi`, `FluidboxSlideApi`, `UseFluidbox` and `FluidboxSolidParts` (the type of `Fluidbox`). It also re-exports the item, state and event types from `@ogdakke/fluidbox`.
+The entry exports the props of every part (`FluidboxRootProps`, `FluidboxTriggerProps`, `FluidboxOverlayProps`, `FluidboxSlidesProps`, `FluidboxMediaProps`, `FluidboxHotspotProps`, `FluidboxImageProps`, `FluidboxVideoProps`, `FluidboxIframeProps`, `FluidboxViewerProps`, `FluidboxGroupProps`, `FluidboxControlProps`, `FluidboxControlLabel`, `FluidboxDownloadProps`, `FluidboxCounterProps`, `FluidboxCaptionProps`, `FluidboxLoadingProps`, `FluidboxErrorProps`, `FluidboxThumbnailsProps`, `FluidboxSheetProps`, `FluidboxSheetSnapProps`), `FluidboxSlideContent`, `FluidboxItemContext`, `FluidboxThumbnailContext`, `FluidboxTriggerPreview`, `FluidboxCommands`, `FluidboxApi`, `FluidboxSheetApi`, `FluidboxSlideApi`, `UseFluidbox` and `FluidboxSolidParts` (the type of `Fluidbox`). It also re-exports the item, state and event types from `@ogdakke/fluidbox`.
+
+## Events
+
+The Root's event props are the fluidbox's events. `details.item` and `event.item` are your own objects, of the type of `items`.
+
+| Prop                    | Gets                                                  | When                                                                                                 |
+| ----------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `onValueChange`         | `value`, `details: FluidboxValueChangeDetails<TItem>` | Before every open, move and close, from any input. `details.cancel()` stops it.                      |
+| `onValueChangeComplete` | `value`, `details: FluidboxValueChangeDetails<TItem>` | Once the motion of a value change settled: the flight landed, a move came to rest, a close finished. |
+| `onZoomChange`          | `FluidboxZoomEvent`                                   | The image on show comes to rest at another zoom: `scale`, 1 at fit, and `reason`.                    |
+| `onMediaError`          | `FluidboxMediaErrorEvent<TItem>`                      | A slide's media fails to load, as it shows its error: `kind` and `cause`.                            |
+| `onReachEnd`            | `FluidboxReachEndEvent<TItem>`                        | The open item comes within `reachEndThreshold` of the last: `value`, `index` and `count`.            |
+| `Sheet` `onSnapChange`  | `FluidboxSheetEvent`                                  | The sheet comes to rest at another snap: `snap`, 0 at rest, and `reason`.                            |
+
+`details` has the `action` (`"open"`, `"move"` or `"close"`), the `reason` and `cancel()`. See [Events](./javascript.md#events) for the reasons and the rest of each event's fields.
+
+### Lazy lists and `onReachEnd`
+
+`onReachEnd` asks for more items. It fires once a move settles within `reachEndThreshold` (2 by default) of the last item, once per item count, and never with `loop`. A close and reopen at the same count doesn't fire it again. Any change of the count arms it again, and it fires at once if the open item is already near the new end.
+
+To append, hand Root a longer list. With an array, a new array keeps the slides of the items that stayed. With a list from `createItemList`, call `withCount` on it: the longer list keeps the items already made, the open item and its slides.
+
+```tsx
+import { createSignal } from "solid-js";
+import { createItemList, type FluidboxImageItem } from "@ogdakke/fluidbox";
+import { Fluidbox } from "@ogdakke/fluidbox/solid";
+
+const photoAt = (index: number): FluidboxImageItem => ({
+  type: "image",
+  id: `photo-${index}`,
+  src: `/photos/${index}.jpg`,
+  alt: `Photo ${index + 1}`,
+  width: 1600,
+  height: 1200,
+});
+
+export function Feed() {
+  const [list, setList] = createSignal(createItemList({ count: 20, item: photoAt }));
+  return (
+    <Fluidbox.Root
+      items={list()}
+      reachEndThreshold={4}
+      onReachEnd={({ count }) => setList((current) => current.withCount(count + 20))}
+    >
+      <Fluidbox.Trigger value={0}>Open the feed</Fluidbox.Trigger>
+    </Fluidbox.Root>
+  );
+}
+```
+
+`createItemList` returns a `FluidboxLazyItemList`. See [Lazy lists](./items-and-origins.md#lazy-lists).
+
+## Slideshow
+
+The `slideshow` prop, `{ interval = 5000, loop, autoplay = false }`, lets the viewer advance on a timer. `loop` defaults to Root's `loop`; without it the slideshow stops on the last slide. `autoplay` plays it once per open. `Fluidbox.Slideshow` plays and pauses it, and `useFluidbox()` has `play()`, `pause()` and `playing`. `play()` works without the prop, with the defaults; the Slideshow control hides without the prop, unless it is playing. Its labels are `playSlideshow` and `pauseSlideshow`. From the slides fixture (`apps/examples/fixtures/solid-slides.tsx`):
+
+```tsx
+<Fluidbox.Root items={photos} slideshow={{ interval: 4000 }}>
+  {/* the triggers */}
+  <Fluidbox.Viewer>
+    <Fluidbox.Slideshow />
+    <Fluidbox.Close />
+  </Fluidbox.Viewer>
+</Fluidbox.Root>
+```
+
+A hidden tab or a video playing in the slide holds the timer, with `playing` still true, and the interval starts again when the hold ends. A pointer, a key, a wheel or a zoom pauses it until something plays it again. Each move has the reason `"slideshow"`. While it plays, the viewer's live region is quiet, and under reduced motion each move is instant.
 
 ## Patterns
 
@@ -342,11 +456,13 @@ The entry exports the props of every part (`FluidboxRootProps`, `FluidboxTrigger
 | [Custom content](./patterns/renderers.md)          | `Slides note={() => <Fluidbox.Media><Note /></Fluidbox.Media>}`.                           |
 | [Programmatic control](./patterns/programmatic.md) | `useFluidbox()`, `onValueChange` with `details.cancel()`, `onValueChangeComplete`.         |
 | [Zoom](./patterns/zoom.md)                         | `Root zoom={{ step, max }}` or `zoom={false}`, `Toolbar` and `ZoomControls`.               |
+| [Hover zoom](./patterns/zoom.md#hover-zoom)        | `hoverZoom` from `@ogdakke/fluidbox/hover-zoom`, in `onMount`.                             |
 | [Thumbnails](./patterns/thumbnails.md)             | `<Fluidbox.Thumbnails />`, or with a child function for your own thumbnails.               |
 | [Sheet](./patterns/sheet.md)                       | `Fluidbox.Sheet snapPoints` with `{({ item }) => ...}`, `useFluidboxSheet()`, `SheetSnap`. |
 | [Headless controls](./patterns/headless.md)        | Your own buttons in `Viewer`, using `useFluidbox()`.                                       |
 | [Right to left](./patterns/rtl.md)                 | Root `labels`, inside a `dir="rtl"` element.                                               |
 | [Photo in the address](./patterns/url.md)          | `value` and `onValueChange` from a signal that follows `?photo=`.                          |
+| [Product media](./product-media.md)                | `Embed`, `Spin` and `Model` in `Slides`.                                                   |
 
 ## Solid notes
 
@@ -364,4 +480,6 @@ The entry exports the props of every part (`FluidboxRootProps`, `FluidboxTrigger
 
 **Previews update before the close flight.** When the viewer closes on a different item of a multi-item trigger, the preview accessor updates synchronously so the flight lands on the right picture. The trigger finds its image when it registers, so keep the `<img>` mounted and change its `src` instead of swapping in a new element.
 
-**Bundle.** The page loads the triggers, the items and the viewer's state. The viewer itself, with its gestures, transitions and slides, loads as `preload` says, by default when a pointer rests on a trigger. See [Loading the viewer](./getting-started.md#loading-the-viewer). The thumbnails and sheet runtimes load when a `Fluidbox.Thumbnails` or `Fluidbox.Sheet` first renders, so they cost nothing until then.
+**Motion speed.** `--fluidbox-motion-speed` divides the open, close, zoom and slide moves: `2` is twice as fast. Set it on the viewer, or anywhere around the triggers, as the viewer copies `--fluidbox-*` properties from there as it opens. See the [CSS reference](./css-reference.md#inputs).
+
+**Bundle.** The page loads the triggers, the items and the viewer's state. The viewer itself, with its gestures, transitions and slides, loads as `preload` says, by default when a pointer rests on a trigger. See [Loading the viewer](./getting-started.md#loading-the-viewer). The thumbnails, the sheet and the hotspots load when a `Fluidbox.Thumbnails`, a `Fluidbox.Sheet` or the first `Fluidbox.Hotspot` renders, so they cost nothing until then.
