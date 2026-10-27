@@ -37,7 +37,9 @@ props or parameters; the spec finds things by position or by the shared class na
   draws it (thumbnails, sheet, rtl).
 - Controls: the short form first. A part with no content renders its label as text, marked
   `data-fluidbox-default`, which `baseline.css` draws; the package ships no icons. Content a
-  control needs comes from the page (the sheet's Details button, the headless caption's buttons).
+  control needs comes from the page (the sheet's Details button, the headless caption's buttons),
+  and the zoom pattern gives its zoom controls icons of its own: an inline SVG marked
+  `aria-hidden`, with the label as the button's `aria-label`.
 
 ## Shared class names (patterns.css)
 
@@ -94,7 +96,7 @@ in the body portal (`[data-fluidbox-dialog]`). The active slide is
    `photos` with zoom off. The first gallery's viewer has the default controls and the zoom
    controls (`controls` with `zoomIn`, `zoomOut`, `zoomReset` in JS; a `Toolbar` and
    `ZoomControls` in the frameworks; `<fluidbox-toolbar>` and `<fluidbox-zoom-controls>` for
-   elements), and an
+   elements), whose Zoom in, Zoom out and Fit hold the page's SVG icons (`icons` in JS), and an
    `output.pattern-zoom-level[data-test="zoom-level"]` showing `state.zoom.scale` as a rounded
    percentage (`100%`), empty without a zoom, read the framework's way (selector hook, signal,
    the Root's slot, an injected signal; `subscribe` in elements and JS). Test: open trigger 1 →
