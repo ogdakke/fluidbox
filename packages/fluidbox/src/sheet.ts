@@ -14,6 +14,7 @@ import type {
   FluidboxSheetOptions,
 } from "./public-api";
 import { PhotoRoom } from "./photo-room";
+import { FluidboxSheetEvent } from "./sheet-event";
 
 export type { FluidboxSheet, FluidboxSheetOptions, FluidboxSheetSnapPoint } from "./public-api";
 import type { FluidboxSheetSnapPoint } from "./public-api";
@@ -89,14 +90,14 @@ const px = (value: number) => `${value}px`;
  */
 export function createSheet(
   options: FluidboxSheetOptions<PublicItem>,
-  onChange: (stop: number, reason: FluidboxReason) => void,
+  onChange: (event: FluidboxSheetEvent) => void,
 ): Addon<FluidboxSheet> {
   let stop = 0;
   let instance: SheetRuntime | undefined;
   const announce = (next: number, reason: FluidboxReason) => {
     if (next === stop) return;
     stop = next;
-    onChange(stop, reason);
+    onChange(new FluidboxSheetEvent("sheetchange", { snap: stop, reason }));
   };
   return {
     handle: {

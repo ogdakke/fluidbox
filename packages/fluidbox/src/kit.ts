@@ -73,6 +73,25 @@ export function placeHotspot(
 }
 
 /**
+ * Each command of `target`, a fluidbox or a binding's own root, as a function of
+ * its own, so a binding can hand them out. `arg` maps each argument on the way,
+ * as Vue unwraps its proxies.
+ */
+export function commandsOf<TCommands>(
+  target: object,
+  arg: (value: unknown) => unknown = (value) => value,
+): TCommands {
+  const commands: Record<string, (...args: unknown[]) => unknown> = {};
+  for (const name of "open close next previous zoomTo zoomIn zoomOut zoomReset setFullscreen download share play pause setItems preload load".split(
+    " ",
+  )) {
+    commands[name] = (...args) =>
+      (target as Record<string, (...args: unknown[]) => unknown>)[name]!(...args.map(arg));
+  }
+  return commands as TCommands;
+}
+
+/**
  * Drop a fluidbox's viewer and close it at once, keeping its bindings, as a
  * binding's unmount does. The next press or open makes a new viewer, so a
  * StrictMode remount keeps working.

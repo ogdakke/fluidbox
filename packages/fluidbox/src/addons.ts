@@ -1,7 +1,7 @@
 import type {
   FluidboxThumbnailsOptions,
-  FluidboxReason,
   FluidboxSheet,
+  FluidboxSheetEvent,
   FluidboxSheetOptions,
 } from "./public-api";
 import type { FluidboxExtension, FluidboxItem as RuntimeItem } from "./runtime-types";
@@ -14,7 +14,7 @@ export interface Addon<THandle> {
 interface Addons {
   sheet?: (
     options: FluidboxSheetOptions<any>,
-    onChange: (stop: number, reason: FluidboxReason) => void,
+    onChange: (event: FluidboxSheetEvent) => void,
   ) => Addon<FluidboxSheet>;
   thumbnails?: (options: FluidboxThumbnailsOptions<any>) => Addon<null>;
 }

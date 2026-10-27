@@ -83,6 +83,7 @@ import {
   type FluidboxSlots,
   type FluidboxStaticNode,
   type FluidboxTriggerPreview,
+  commandsOf,
 } from "@ogdakke/fluidbox/kit";
 import type {
   FluidboxApi,
@@ -564,24 +565,7 @@ const Root = defineComponent(
       unloadFluidbox(fluidbox);
     });
 
-    const commands: FluidboxCommands<TItem> = {
-      open: (target, options) => fluidbox.open(rawTarget(target), options),
-      close: (options) => fluidbox.close(options),
-      next: (options) => fluidbox.next(options),
-      previous: (options) => fluidbox.previous(options),
-      zoomTo: (scale, options) => fluidbox.zoomTo(scale, options),
-      zoomIn: (options) => fluidbox.zoomIn(options),
-      zoomOut: (options) => fluidbox.zoomOut(options),
-      zoomReset: (options) => fluidbox.zoomReset(options),
-      setFullscreen: (on) => fluidbox.setFullscreen(on),
-      download: () => fluidbox.download(),
-      share: () => fluidbox.share(),
-      play: () => fluidbox.play(),
-      pause: () => fluidbox.pause(),
-      setItems: (next) => fluidbox.setItems(rawTarget(next)),
-      preload: (target) => fluidbox.preload(rawTarget(target)),
-      load: () => fluidbox.load(),
-    };
+    const commands = commandsOf<FluidboxCommands<TItem>>(fluidbox, rawTarget);
     // The state's fields read the state ref, so a template that reads them follows the viewer.
     const api = { ...commands } as FluidboxApi<TItem>;
     for (const key of stateKeys) {
@@ -846,12 +830,14 @@ const Slides = defineComponent({
     // Development builds only; a page without a bundler has no process.
     const twice = (() => {
       try {
-        if (process.env.NODE_ENV !== "production") return claimed.has(slides);
+        if (process.env.NODE_ENV !== "production") {
+          if (claimed.has(slides)) return "A <Fluidbox.Root> takes one <Fluidbox.Slides>.";
+          claimed.add(slides);
+        }
       } catch {}
-      return false;
+      return "";
     })();
-    if (twice) throw new Error("A <Fluidbox.Root> takes one <Fluidbox.Slides>.");
-    claimed.add(slides);
+    if (twice) throw new Error(twice);
     const entry = () => ({ slots: slots as SlidesEntry["slots"] });
     slides.value = entry();
     // The slides on show render the newest slots.

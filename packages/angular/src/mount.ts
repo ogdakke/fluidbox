@@ -1,5 +1,5 @@
 import {
-  ApplicationRef,
+  type ApplicationRef,
   PLATFORM_ID,
   VERSION,
   booleanAttribute,
@@ -87,11 +87,6 @@ export function mountView<C>(
       },
     };
   });
-}
-
-/** The application, for parts that mount views of their own. */
-export function injectApp(): ApplicationRef {
-  return inject(ApplicationRef);
 }
 
 // The slots of Angular's view data a loading @defer is read from. They are the

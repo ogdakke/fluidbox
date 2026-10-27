@@ -174,7 +174,14 @@ export class FluidboxItemElement extends HTMLElement {
       trigger?.getAttribute("aria-label") || triggerImage?.alt || trigger?.textContent?.trim();
     const named = (name: string | null) => {
       if (name || fallback) return name || fallback!;
-      console.warn(`Fluidbox item ${id} has no accessible name; give its content an aria-label.`);
+      // Development builds only; a page without a bundler has no process.
+      try {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            `Fluidbox item ${id} has no accessible name; give its content an aria-label.`,
+          );
+        }
+      } catch {}
       return id;
     };
     const source = (element: Element, kind: string) => {

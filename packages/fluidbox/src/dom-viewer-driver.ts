@@ -1,6 +1,7 @@
 import { controlSelector, drawViewerLayer } from "./viewer-layer";
 import { idOf, itemLabel } from "./items";
-import { FluidboxMediaErrorEvent, type FluidboxOptions } from "./public-api";
+import type { FluidboxOptions } from "./public-api";
+import { FluidboxMediaErrorEvent, FluidboxZoomEvent } from "./viewer-events";
 import { reachEnd } from "./reach-end-event";
 import { chromeReach } from "./chrome-reach";
 import { visibleOrigin } from "./origin-geometry";
@@ -621,7 +622,7 @@ export class DomViewerDriver<
         settled: (scale, reason) => {
           // The slide's image gets sharper as the zoom shows more of its pixels.
           if (this.#strip?.shows(this.#strip.index)) this.#strip.sharpen(scale);
-          this.#controller?.zoomed?.(scale, reason);
+          this.#controller?.zoomed?.(scale, reason, FluidboxZoomEvent);
           // The open viewer says how far it is zoomed, through its live status.
           if (this.#controller?.state.status === "open") {
             this.#announce(labels.zoomLevel(scale));
