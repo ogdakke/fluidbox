@@ -78,7 +78,7 @@ createFluidbox({
 
 ### Hover zoom
 
-`@ogdakke/fluidbox/hover-zoom` magnifies a photo on the page under a resting mouse. See [Zoom](./patterns/zoom.md#hover-zoom).
+`@ogdakke/fluidbox/hover-zoom` magnifies a photo on the page under a resting mouse. See [Hover zoom](./patterns/hover.md).
 
 <!-- api: hoverZoom, FluidboxHoverZoomOptions -->
 

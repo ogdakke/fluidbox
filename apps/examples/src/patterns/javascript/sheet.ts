@@ -21,7 +21,7 @@ export function mountSheet(root: HTMLElement) {
         target.innerHTML = `
           <div class="pattern-sheet">
             <h3 data-test="sheet-title"></h3>
-            <p>Stop <output name="stop" data-test="stop"></output></p>
+            <p>Snap <output name="snap" data-test="stop"></output></p>
             <button type="button" data-action="expand" data-test="expand">Expand</button>
             <input data-test="field" placeholder="Add a note" aria-label="Note" />
           </div>`;
@@ -29,14 +29,14 @@ export function mountSheet(root: HTMLElement) {
         target
           .querySelector('[data-action="expand"]')!
           .addEventListener("click", () => sheet.setSnap(2));
-        const stop = target.querySelector<HTMLOutputElement>('output[name="stop"]')!;
-        stop.value = String(sheet.snap);
-        fluidbox.addEventListener("sheetchange", (event) => (stop.value = String(event.snap)), {
+        const snap = target.querySelector<HTMLOutputElement>('output[name="snap"]')!;
+        snap.value = String(sheet.snap);
+        fluidbox.addEventListener("sheetchange", (event) => (snap.value = String(event.snap)), {
           signal,
         });
       },
     },
-    // A button marked data-fluidbox-sheet-snap moves the sheet to that stop.
+    // A button marked data-fluidbox-sheet-snap moves the sheet to that snap.
     viewer({ target }) {
       target.insertAdjacentHTML(
         "beforeend",

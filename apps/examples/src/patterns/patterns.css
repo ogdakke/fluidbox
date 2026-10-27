@@ -137,7 +137,7 @@
   font: 600 14px var(--fb-font-mono);
 }
 
-[data-fluidbox-selected] > .pattern-thumbnails-thumb {
+[data-active] > .pattern-thumbnails-thumb {
   color: #111;
   background: white;
 }
