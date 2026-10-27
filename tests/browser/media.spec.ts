@@ -17,6 +17,7 @@ declare global {
     __modelViewerUnshown?: boolean;
     __modelViewerThrows?: boolean;
     __oldCard?: HTMLElement;
+    __openWait?: Promise<number>;
   }
 }
 
@@ -1252,14 +1253,35 @@ test.describe("live 3D thumbnail", () => {
     await loadLive(page);
     await turn(page, card(page, "live-a"), -40);
     await expect(card(page, "live-a")).toHaveAttribute("data-orbit", "-40");
-    // The slide's model takes longer than the open waits.
-    await page.evaluate(() => (window.__modelViewerDelay = 4500));
-    const started = Date.now();
+    // The slide's model takes longer than the open waits, with time left to see the snapshot.
+    await page.evaluate(() => (window.__modelViewerDelay = 6000));
+    // The page times the open, from the click to the open status: timed from here, the click's
+    // round trip and the retries' spacing would add up to a second.
+    await page.evaluate(() => {
+      window.__openWait = new Promise((resolve) => {
+        let clicked = 0;
+        document.addEventListener("click", () => (clicked = performance.now()), {
+          capture: true,
+          once: true,
+        });
+        const observer = new MutationObserver(() => {
+          const viewer = document.querySelector("[data-fluidbox-dialog]");
+          if (viewer?.getAttribute("data-fluidbox-status") !== "open") return;
+          observer.disconnect();
+          resolve(performance.now() - clicked);
+        });
+        observer.observe(document.body, {
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["data-fluidbox-status"],
+        });
+      });
+    });
     await card(page, "live-a").click();
     await expect(page.locator(dialog)).toHaveAttribute("data-fluidbox-status", "open", {
       timeout: 6000,
     });
-    const waited = Date.now() - started;
+    const waited = await page.evaluate(() => window.__openWait!);
     expect(waited).toBeGreaterThan(2500);
     expect(waited).toBeLessThan(4500);
     await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(0);
@@ -1277,7 +1299,7 @@ test.describe("live 3D thumbnail", () => {
       ),
     ).not.toContain("visible");
     await expect(page.locator(`${shown} [data-fluidbox-model-ready]`)).toHaveCount(1, {
-      timeout: 4000,
+      timeout: 5000,
     });
     await expect(slideModel(page)).toHaveAttribute("data-orbit-at-load", "-40");
     await expect(snapshot).toBeHidden();

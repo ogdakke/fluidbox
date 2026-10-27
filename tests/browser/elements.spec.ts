@@ -13,10 +13,10 @@ const overlay = "[data-fluidbox-viewer]";
 const shown = '[data-fluidbox-slide][aria-hidden="false"]';
 const parts = "#parts";
 
-async function load(page: Page) {
+async function load(page: Page, waitUntil: "load" | "domcontentloaded" = "load") {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/elements-slides.html");
+  await page.goto("/elements-slides.html", { waitUntil });
   await page.waitForFunction(() => customElements.get("fluidbox-gallery") !== undefined);
   return errors;
 }
@@ -47,8 +47,10 @@ async function hold(page: Page, url: string) {
 test("a slide template stamps its box and its layer, and the open waits for the box's image", async ({
   page,
 }) => {
-  const errors = await load(page);
+  // Firefox's parser preloads an image in a `<template>`, so the hold starts before the page does,
+  // and the page can't wait for its load event, which waits for that preload.
   const release = await hold(page, "**/art/fjord.svg?note");
+  const errors = await load(page, "domcontentloaded");
   await page.locator('[data-test="note"]').click();
   await expect(page.locator(overlay)).toHaveCount(1);
   await page.waitForTimeout(400);
